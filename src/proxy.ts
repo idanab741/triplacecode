@@ -2,7 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/services/supabase/session";
 
 /** נתיבים שדורשים משתמש מחובר. */
-const PROTECTED_PATHS = ["/home", "/profile-setup", "/preferences"];
+const PROTECTED_PATHS = [
+  "/home",
+  "/profile-setup",
+  "/preferences",
+  "/profile",
+  "/favorites",
+  "/community",
+  "/ai",
+  "/search",
+];
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);

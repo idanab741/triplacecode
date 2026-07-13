@@ -1,17 +1,20 @@
 "use client";
 
-/**
- * מסך /home זמני — מציג רק אישור שההתחברות עבדה.
- * מסך הבית האמיתי ייבנה בשלב נפרד.
- */
-
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { signOut } from "@/services/auth/authService";
 import { isProfileComplete } from "@/services/profile/profileService";
 import { isPreferencesComplete } from "@/services/preferences/preferencesService";
-import { Button, Screen } from "@/components/ui";
+import { getFirstName } from "@/utils/greeting";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { HomeHero } from "@/screens/home/HomeHero";
+import { GreetingBlock } from "@/screens/home/GreetingBlock";
+import { SearchBarLink } from "@/screens/home/SearchBarLink";
+import { QuickCategories } from "@/screens/home/QuickCategories";
+import { DiscoverCard } from "@/screens/home/DiscoverCard";
+import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
+
+const HOT_DESTINATIONS: Destination[] = [];
 
 export default function HomePage() {
   const {
@@ -34,30 +37,24 @@ export default function HomePage() {
     }
   }, [loading, profileLoading, preferencesLoading, user, profile, preferences, router]);
 
-  async function handleSignOut() {
-    if (user) {
-      await signOut();
-    }
-    router.push("/");
-  }
-
-  if (loading || profileLoading || preferencesLoading) {
-    return (
-      <Screen withBottomNavSpacing={false}>
-        <p className="pt-10 text-center text-ink-secondary">טוען...</p>
-      </Screen>
-    );
-  }
+  const isGuest = Boolean(user?.is_anonymous);
+  const displayName = isGuest ? null : getFirstName(profile?.full_name);
 
   return (
-    <Screen withBottomNavSpacing={false}>
-      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 text-center">
-        <h1 className="text-2xl font-bold text-ink">{user ? "שלום!" : "שלום, אורח!"}</h1>
-        {user && <p className="text-ink-secondary">{user.email}</p>}
-        <Button variant="secondary" onClick={handleSignOut}>
-          {user ? "התנתקות" : "יציאה"}
-        </Button>
+    <div className="min-h-screen bg-bg pb-28">
+      <div className="mx-auto max-w-xl">
+        <HomeHero avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+
+        <div className="flex flex-col gap-6 pb-4 pt-5">
+          <GreetingBlock name={displayName} loading={loading || profileLoading} />
+          <SearchBarLink />
+          <QuickCategories />
+          <DiscoverCard />
+          <HotDestinations destinations={HOT_DESTINATIONS} />
+        </div>
       </div>
-    </Screen>
+
+      <MainBottomNav active="home" />
+    </div>
   );
 }

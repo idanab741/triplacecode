@@ -16,6 +16,10 @@ export const colors = {
   inkSecondary: "#8A8FA3",
   accent: "#4A9EFF",
   danger: "#E5484D",
+  categoryOrange: "#FF9F4A",
+  categoryPink: "#FF6B9D",
+  categoryPurple: "#9F7BFF",
+  categoryGreen: "#3EC28F",
 } as const;
 
 export const radius = {

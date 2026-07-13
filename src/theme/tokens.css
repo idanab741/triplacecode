@@ -14,6 +14,12 @@
   --color-accent: #4a9eff;
   --color-danger: #e5484d;
 
+  /* צבעי הדגשה לקטגוריות (למשל הקטגוריות המהירות במסך הבית) */
+  --color-category-orange: #ff9f4a;
+  --color-category-pink: #ff6b9d;
+  --color-category-purple: #9f7bff;
+  --color-category-green: #3ec28f;
+
   --radius-card: 20px;
   --radius-pill: 999px;
 
@@ -30,6 +36,10 @@
   --color-ink-secondary: var(--color-ink-secondary);
   --color-accent: var(--color-accent);
   --color-danger: var(--color-danger);
+  --color-category-orange: var(--color-category-orange);
+  --color-category-pink: var(--color-category-pink);
+  --color-category-purple: var(--color-category-purple);
+  --color-category-green: var(--color-category-green);
 
   --radius-card: var(--radius-card);
   --radius-pill: var(--radius-pill);
