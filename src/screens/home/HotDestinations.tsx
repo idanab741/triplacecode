@@ -31,7 +31,7 @@ export function HotDestinations({ destinations }: HotDestinationsProps) {
           {destinations.map((destination) => (
             <Link
               key={destination.id}
-              href={`/place/${destination.id}`}
+              href={`/destination/${destination.id}`}
               className="relative h-40 w-56 shrink-0 overflow-hidden rounded-card shadow-soft"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

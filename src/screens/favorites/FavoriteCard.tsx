@@ -4,8 +4,8 @@ import type { UnifiedPlace } from "@/services/places/unifiedPlaceService";
 export function FavoriteCard({ place }: { place: UnifiedPlace }) {
   const subtitle = [place.subcategory, place.category, place.country].filter(Boolean)[0];
 
-  return (
-    <Link href={`/place/${place.id}`} className="flex flex-col gap-2">
+  const content = (
+    <>
       <div className="relative h-32 w-full overflow-hidden rounded-card bg-bg-secondary shadow-soft">
         {place.imageUrls[0] && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -21,6 +21,16 @@ export function FavoriteCard({ place }: { place: UnifiedPlace }) {
           )}
         </div>
       </div>
-    </Link>
+    </>
   );
+
+  if (place.type === "destination") {
+    return (
+      <Link href={`/destination/${place.id}`} className="flex flex-col gap-2">
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className="flex flex-col gap-2">{content}</div>;
 }

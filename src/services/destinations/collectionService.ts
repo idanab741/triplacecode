@@ -39,6 +39,7 @@ export async function collectDestination({
       google_place_id: raw.id,
       name,
       country,
+      description: raw.editorialSummary?.text ?? null,
       image_url: imageUrl,
       latitude: raw.location?.latitude ?? null,
       longitude: raw.location?.longitude ?? null,
