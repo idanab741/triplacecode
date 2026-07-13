@@ -11,6 +11,7 @@ export interface GooglePlaceRaw {
   regularOpeningHours?: { weekdayDescriptions?: string[] };
   types?: string[];
   editorialSummary?: { text: string };
+  primaryTypeDisplayName?: { text: string };
 }
 
 const FIELD_MASK = [
@@ -25,6 +26,7 @@ const FIELD_MASK = [
   "places.regularOpeningHours",
   "places.types",
   "places.editorialSummary",
+  "places.primaryTypeDisplayName",
 ].join(",");
 
 async function textSearchGooglePlaces(textQuery: string): Promise<GooglePlaceRaw[]> {

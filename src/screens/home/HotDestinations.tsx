@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export interface Destination {
   id: string;
   name: string;
@@ -27,8 +29,9 @@ export function HotDestinations({ destinations }: HotDestinationsProps) {
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {destinations.map((destination) => (
-            <div
+            <Link
               key={destination.id}
+              href={`/place/${destination.id}`}
               className="relative h-40 w-56 shrink-0 overflow-hidden rounded-card shadow-soft"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -43,7 +46,7 @@ export function HotDestinations({ destinations }: HotDestinationsProps) {
                   <p className="text-xs text-white/80">{destination.subtitle}</p>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

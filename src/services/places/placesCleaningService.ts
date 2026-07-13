@@ -1,4 +1,5 @@
 import type { GooglePlaceRaw } from "./googlePlacesService";
+import { downloadAndStorePhoto } from "./photoStorageService";
 
 /** מתחת לדירוג הזה, יעד לא נשמר. */
 export const MIN_RATING = 3.5;
@@ -15,6 +16,7 @@ export interface CleanPlaceRow {
   google_place_id: string;
   name: string;
   category: string;
+  subcategory: string | null;
   short_description: string | null;
   city: string;
   country: string | null;
@@ -32,15 +34,16 @@ export interface CleanPlaceRow {
 }
 
 /**
- * מנקה ומשלימה שדות חסרים ביעד גולמי מגוגל.
+ * מנקה ומשלימה שדות חסרים ביעד גולמי מגוגל, ומורידה את התמונות שלו
+ * פעם אחת בלבד לאחסון הקבוע שלנו (ראו photoStorageService).
  * מחזיר null אם היעד לא עומד בסף האיכות (בלי תמונה, או דירוג נמוך מדי).
  */
-export function cleanGooglePlace(
+export async function cleanGooglePlace(
   raw: GooglePlaceRaw,
   category: string,
   city: string,
   country: string
-): CleanPlaceRow | null {
+): Promise<CleanPlaceRow | null> {
   const name = raw.displayName?.text?.trim();
   if (!name) return null;
 
@@ -50,14 +53,19 @@ export function cleanGooglePlace(
   const rating = raw.rating ?? null;
   if (rating !== null && rating < MIN_RATING) return null;
 
-  const imageUrls = photos
-    .slice(0, 5)
-    .map((photo) => `/api/places/photo?ref=${encodeURIComponent(photo.name)}`);
+  const storedUrls = await Promise.all(
+    photos.slice(0, 5).map((photo, index) =>
+      downloadAndStorePhoto(photo.name, `places/${raw.id}/${index}.jpg`)
+    )
+  );
+  const imageUrls = storedUrls.filter((url): url is string => url !== null);
+  if (imageUrls.length === 0) return null;
 
   return {
     google_place_id: raw.id,
     name,
     category,
+    subcategory: raw.primaryTypeDisplayName?.text ?? null,
     short_description: raw.editorialSummary?.text ?? null,
     city,
     country,

@@ -1,4 +1,5 @@
 import { searchCityPlace } from "@/services/places/googlePlacesService";
+import { downloadAndStorePhoto } from "@/services/places/photoStorageService";
 import { createAdminClient } from "@/services/supabase/admin";
 
 export interface CollectDestinationInput {
@@ -28,7 +29,9 @@ export async function collectDestination({
 
   const photos = raw.photos ?? [];
   const imageUrl =
-    photos.length > 0 ? `/api/places/photo?ref=${encodeURIComponent(photos[0].name)}` : null;
+    photos.length > 0
+      ? await downloadAndStorePhoto(photos[0].name, `destinations/${raw.id}.jpg`)
+      : null;
 
   const supabase = createAdminClient();
   const { error } = await supabase.from("destinations").upsert(
