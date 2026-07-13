@@ -14,13 +14,14 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const city: string | undefined = body?.city;
   const category: string | undefined = body?.category;
+  const country: string | undefined = body?.country;
 
   if (!city || !category) {
     return NextResponse.json({ error: "יש לספק city ו-category" }, { status: 400 });
   }
 
   try {
-    const result = await collectPlacesForCityAndCategory(city, category);
+    const result = await collectPlacesForCityAndCategory(city, category, country);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";

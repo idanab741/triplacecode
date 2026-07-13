@@ -1,5 +1,6 @@
 import { searchCityPlace } from "@/services/places/googlePlacesService";
 import { downloadAndStorePhoto } from "@/services/places/photoStorageService";
+import { getWikipediaSummary } from "./wikipediaService";
 import { createAdminClient } from "@/services/supabase/admin";
 
 export interface CollectDestinationInput {
@@ -33,13 +34,15 @@ export async function collectDestination({
       ? await downloadAndStorePhoto(photos[0].name, `destinations/${raw.id}.jpg`)
       : null;
 
+  const description = raw.editorialSummary?.text ?? (await getWikipediaSummary(name));
+
   const supabase = createAdminClient();
   const { error } = await supabase.from("destinations").upsert(
     {
       google_place_id: raw.id,
       name,
       country,
-      description: raw.editorialSummary?.text ?? null,
+      description,
       image_url: imageUrl,
       latitude: raw.location?.latitude ?? null,
       longitude: raw.location?.longitude ?? null,
