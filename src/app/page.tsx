@@ -1,7 +1,18 @@
+"use client";
+
+/**
+ * מצב "אורח" (ללא חשבון) מושבת זמנית: /home דורש כעת התחברות,
+ * ואין עדיין מסלול אמיתי לכניסת אורחים. יוחלט בהמשך אם להוסיף
+ * כניסת אורח אמיתית (למשל anonymous auth של Supabase) או להסיר את הכפתור.
+ */
+
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 
 export default function SplashPage() {
+  const [guestMessage, setGuestMessage] = useState<string | null>(null);
+
   return (
     <main className="flex min-h-screen flex-1 flex-col bg-bg">
       {/* אזור מקום קבוע לתמונת גיבור/קמע — יתווסף בשלב עתידי, כרגע רק גרדיאנט עדין */}
@@ -21,9 +32,14 @@ export default function SplashPage() {
           <Button href="/auth" fullWidth>
             בואו נתחיל!
           </Button>
-          <Button href="/home" variant="secondary" fullWidth>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => setGuestMessage("כניסת אורח תהיה זמינה בקרוב")}
+          >
             היכנס כאורח
           </Button>
+          {guestMessage && <p className="text-sm text-ink-secondary">{guestMessage}</p>}
         </div>
 
         <Link href="/auth?tab=login" className="text-sm text-accent">

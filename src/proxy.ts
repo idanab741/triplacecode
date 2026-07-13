@@ -1,8 +1,21 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/services/supabase/session";
 
-export function proxy(request: NextRequest) {
-  return updateSession(request);
+/** נתיבים שדורשים משתמש מחובר. */
+const PROTECTED_PATHS = ["/home", "/profile-setup"];
+
+export async function proxy(request: NextRequest) {
+  const { response, user } = await updateSession(request);
+
+  const isProtected = PROTECTED_PATHS.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
+  );
+
+  if (isProtected && !user) {
+    return NextResponse.redirect(new URL("/auth", request.url));
+  }
+
+  return response;
 }
 
 export const config = {

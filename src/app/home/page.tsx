@@ -5,14 +5,22 @@
  * מסך הבית האמיתי ייבנה בשלב נפרד.
  */
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth/authService";
+import { isProfileComplete } from "@/services/profile/profileService";
 import { Button, Screen } from "@/components/ui";
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, profile, profileLoading } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !profileLoading && user && !isProfileComplete(profile)) {
+      router.replace("/profile-setup");
+    }
+  }, [loading, profileLoading, user, profile, router]);
 
   async function handleSignOut() {
     if (user) {
@@ -21,7 +29,7 @@ export default function HomePage() {
     router.push("/");
   }
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <Screen withBottomNavSpacing={false}>
         <p className="pt-10 text-center text-ink-secondary">טוען...</p>
