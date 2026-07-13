@@ -59,7 +59,7 @@ export default function ProfileSetupPage() {
     setSubmitting(false);
 
     if (error) {
-      setFormError("שמירת הפרופיל נכשלה, נסו שוב");
+      setFormError(`שמירת הפרופיל נכשלה: ${error.message}`);
       return;
     }
 
