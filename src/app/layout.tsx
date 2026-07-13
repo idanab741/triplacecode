@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 import { AuthProvider } from "@/providers/AuthProvider";
 import "./globals.css";
@@ -11,6 +11,10 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "TRIPLACE",
   description: "TRIPLACE",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light",
 };
 
 export default function RootLayout({

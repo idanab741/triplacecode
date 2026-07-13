@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "../theme/tokens.css";
 
+:root {
+  /* מונע מדפדפנים (בעיקר כרום באנדרואיד) לכפות מצב כהה - האתר בעיצוב בהיר בלבד */
+  color-scheme: light;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-ink);
