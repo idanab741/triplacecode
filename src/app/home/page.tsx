@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isProfileComplete } from "@/services/profile/profileService";
 import { isPreferencesComplete } from "@/services/preferences/preferencesService";
+import { getHotPlaces } from "@/services/places/placesService";
 import { getFirstName } from "@/utils/greeting";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHero } from "@/screens/home/HomeHero";
@@ -13,8 +14,6 @@ import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
-
-const HOT_DESTINATIONS: Destination[] = [];
 
 export default function HomePage() {
   const {
@@ -27,6 +26,8 @@ export default function HomePage() {
   } = useAuth();
   const router = useRouter();
 
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+
   useEffect(() => {
     if (loading || profileLoading || preferencesLoading || !user) return;
 
@@ -36,6 +37,21 @@ export default function HomePage() {
       router.replace("/preferences");
     }
   }, [loading, profileLoading, preferencesLoading, user, profile, preferences, router]);
+
+  useEffect(() => {
+    getHotPlaces().then((places) => {
+      setDestinations(
+        places
+          .filter((place) => place.image_urls.length > 0)
+          .map((place) => ({
+            id: place.id,
+            name: place.name,
+            city: place.city,
+            imageUrl: place.image_urls[0],
+          }))
+      );
+    });
+  }, []);
 
   const isGuest = Boolean(user?.is_anonymous);
   const displayName = isGuest ? null : getFirstName(profile?.full_name);
@@ -50,7 +66,7 @@ export default function HomePage() {
           <SearchBarLink />
           <QuickCategories />
           <DiscoverCard />
-          <HotDestinations destinations={HOT_DESTINATIONS} />
+          <HotDestinations destinations={destinations} />
         </div>
       </div>
 
