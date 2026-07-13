@@ -13,11 +13,6 @@ export interface GooglePlaceRaw {
   editorialSummary?: { text: string };
 }
 
-interface SearchGooglePlacesParams {
-  city: string;
-  query: string;
-}
-
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
@@ -32,11 +27,7 @@ const FIELD_MASK = [
   "places.editorialSummary",
 ].join(",");
 
-/** מושך יעדים מ-Google Places API (New) - Text Search, לפי עיר וטקסט חיפוש. */
-export async function searchGooglePlaces({
-  city,
-  query,
-}: SearchGooglePlacesParams): Promise<GooglePlaceRaw[]> {
+async function textSearchGooglePlaces(textQuery: string): Promise<GooglePlaceRaw[]> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new Error("GOOGLE_MAPS_API_KEY אינו מוגדר ב-.env.local");
@@ -49,10 +40,7 @@ export async function searchGooglePlaces({
       "X-Goog-Api-Key": apiKey,
       "X-Goog-FieldMask": FIELD_MASK,
     },
-    body: JSON.stringify({
-      textQuery: `${query} ב${city}`,
-      languageCode: "he",
-    }),
+    body: JSON.stringify({ textQuery, languageCode: "he" }),
   });
 
   if (!response.ok) {
@@ -62,4 +50,23 @@ export async function searchGooglePlaces({
 
   const data = await response.json();
   return data.places ?? [];
+}
+
+interface SearchGooglePlacesParams {
+  city: string;
+  query: string;
+}
+
+/** מושך יעדים מ-Google Places API (New) - Text Search, לפי עיר וטקסט חיפוש. */
+export async function searchGooglePlaces({
+  city,
+  query,
+}: SearchGooglePlacesParams): Promise<GooglePlaceRaw[]> {
+  return textSearchGooglePlaces(`${query} ב${city}`);
+}
+
+/** מחזיר את התוצאה המובילה עבור שאילתת עיר (לשימוש בטבלת destinations). */
+export async function searchCityPlace(searchQuery: string): Promise<GooglePlaceRaw | null> {
+  const results = await textSearchGooglePlaces(searchQuery);
+  return results[0] ?? null;
 }

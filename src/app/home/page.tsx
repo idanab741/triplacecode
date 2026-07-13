@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isProfileComplete } from "@/services/profile/profileService";
 import { isPreferencesComplete } from "@/services/preferences/preferencesService";
-import { getHotPlaces } from "@/services/places/placesService";
+import { getFeaturedDestinations } from "@/services/destinations/destinationsService";
 import { getFirstName } from "@/utils/greeting";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHero } from "@/screens/home/HomeHero";
@@ -39,15 +39,15 @@ export default function HomePage() {
   }, [loading, profileLoading, preferencesLoading, user, profile, preferences, router]);
 
   useEffect(() => {
-    getHotPlaces().then((places) => {
+    getFeaturedDestinations().then((rows) => {
       setDestinations(
-        places
-          .filter((place) => place.image_urls.length > 0)
-          .map((place) => ({
-            id: place.id,
-            name: place.name,
-            city: place.city,
-            imageUrl: place.image_urls[0],
+        rows
+          .filter((row) => row.image_url)
+          .map((row) => ({
+            id: row.id,
+            name: row.name,
+            subtitle: row.country,
+            imageUrl: row.image_url as string,
           }))
       );
     });

@@ -1,0 +1,51 @@
+import { searchCityPlace } from "@/services/places/googlePlacesService";
+import { createAdminClient } from "@/services/supabase/admin";
+
+export interface CollectDestinationInput {
+  /** השם שיוצג באפליקציה (בעברית) - נקבע על ידינו, לא נלקח מגוגל. */
+  name: string;
+  country: string;
+  /** שאילתת החיפוש שנשלחת לגוגל כדי למצוא את התמונה והקואורדינטות. */
+  searchQuery: string;
+}
+
+export interface CollectDestinationResult {
+  name: string;
+  country: string;
+  imageUrl: string | null;
+}
+
+/** מושך תמונת נוף מייצגת לעיר יעד, ושומר אותה ב-destinations. */
+export async function collectDestination({
+  name,
+  country,
+  searchQuery,
+}: CollectDestinationInput): Promise<CollectDestinationResult> {
+  const raw = await searchCityPlace(searchQuery);
+  if (!raw) {
+    throw new Error(`לא נמצאה תוצאה עבור: ${searchQuery}`);
+  }
+
+  const photos = raw.photos ?? [];
+  const imageUrl =
+    photos.length > 0 ? `/api/places/photo?ref=${encodeURIComponent(photos[0].name)}` : null;
+
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("destinations").upsert(
+    {
+      google_place_id: raw.id,
+      name,
+      country,
+      image_url: imageUrl,
+      latitude: raw.location?.latitude ?? null,
+      longitude: raw.location?.longitude ?? null,
+    },
+    { onConflict: "google_place_id" }
+  );
+
+  if (error) {
+    throw new Error(`שמירה נכשלה: ${error.message}`);
+  }
+
+  return { name, country, imageUrl };
+}
