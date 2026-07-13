@@ -1,6 +1,5 @@
 import { searchCityPlace } from "@/services/places/googlePlacesService";
 import { downloadAndStorePhoto } from "@/services/places/photoStorageService";
-import { getWikipediaSummary } from "./wikipediaService";
 import { createAdminClient } from "@/services/supabase/admin";
 
 export interface CollectDestinationInput {
@@ -9,6 +8,12 @@ export interface CollectDestinationInput {
   country: string;
   /** שאילתת החיפוש שנשלחת לגוגל כדי למצוא את התמונה והקואורדינטות. */
   searchQuery: string;
+  /**
+   * תיאור קצר בסגנון תיירותי - לא מגיע אוטומטית מגוגל (הן לא מספקות
+   * תיאור עורכי לערים שלמות, רק למקומות ספציפיים). יש לכתוב ידנית.
+   * אם לא מועבר, לא נוגעים בתיאור הקיים (חשוב בהרצות חוזרות).
+   */
+  description?: string;
 }
 
 export interface CollectDestinationResult {
@@ -22,6 +27,7 @@ export async function collectDestination({
   name,
   country,
   searchQuery,
+  description,
 }: CollectDestinationInput): Promise<CollectDestinationResult> {
   const raw = await searchCityPlace(searchQuery);
   if (!raw) {
@@ -34,15 +40,13 @@ export async function collectDestination({
       ? await downloadAndStorePhoto(photos[0].name, `destinations/${raw.id}.jpg`)
       : null;
 
-  const description = raw.editorialSummary?.text ?? (await getWikipediaSummary(name));
-
   const supabase = createAdminClient();
   const { error } = await supabase.from("destinations").upsert(
     {
       google_place_id: raw.id,
       name,
       country,
-      description,
+      ...(description !== undefined ? { description } : {}),
       image_url: imageUrl,
       latitude: raw.location?.latitude ?? null,
       longitude: raw.location?.longitude ?? null,

@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const name: string | undefined = body?.name;
   const country: string | undefined = body?.country;
   const searchQuery: string | undefined = body?.searchQuery;
+  const description: string | undefined = body?.description;
 
   if (!name || !country || !searchQuery) {
     return NextResponse.json(
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await collectDestination({ name, country, searchQuery });
+    const result = await collectDestination({ name, country, searchQuery, description });
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";

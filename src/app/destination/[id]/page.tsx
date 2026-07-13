@@ -2,8 +2,10 @@ import Link from "next/link";
 import { getDestinationById } from "@/services/destinations/destinationsServerService";
 import { getPlacesByCityAndCategory } from "@/services/places/placesServerService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
+import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { Screen } from "@/components/ui";
 import { WeatherRow } from "@/screens/destination/WeatherRow";
+import { EventsRow } from "@/screens/destination/EventsRow";
 import { PlaceRow } from "@/screens/destination/PlaceRow";
 import { BusinessOwnersRow } from "@/screens/destination/BusinessOwnersRow";
 
@@ -28,13 +30,14 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     );
   }
 
-  const [restaurants, attractions, hotels, forecast] = await Promise.all([
+  const hasCoords = destination.latitude != null && destination.longitude != null;
+
+  const [restaurants, attractions, hotels, forecast, events] = await Promise.all([
     getPlacesByCityAndCategory(destination.name, "restaurants_culinary"),
     getPlacesByCityAndCategory(destination.name, "attractions"),
     getPlacesByCityAndCategory(destination.name, "hotels"),
-    destination.latitude != null && destination.longitude != null
-      ? getWeeklyForecast(destination.latitude, destination.longitude)
-      : Promise.resolve([]),
+    hasCoords ? getWeeklyForecast(destination.latitude!, destination.longitude!) : Promise.resolve([]),
+    hasCoords ? getUpcomingEvents(destination.latitude!, destination.longitude!) : Promise.resolve([]),
   ]);
 
   return (
@@ -73,6 +76,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         )}
 
         <WeatherRow forecast={forecast} />
+        <EventsRow events={events} />
 
         <PlaceRow
           title="מסעדות"
