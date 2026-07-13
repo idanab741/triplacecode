@@ -12,6 +12,7 @@
   --color-ink: #1a1a2e;
   --color-ink-secondary: #8a8fa3;
   --color-accent: #4a9eff;
+  --color-danger: #e5484d;
 
   --radius-card: 20px;
   --radius-pill: 999px;
@@ -28,6 +29,7 @@
   --color-ink: var(--color-ink);
   --color-ink-secondary: var(--color-ink-secondary);
   --color-accent: var(--color-accent);
+  --color-danger: var(--color-danger);
 
   --radius-card: var(--radius-card);
   --radius-pill: var(--radius-pill);

@@ -15,6 +15,7 @@ export const colors = {
   ink: "#1A1A2E",
   inkSecondary: "#8A8FA3",
   accent: "#4A9EFF",
+  danger: "#E5484D",
 } as const;
 
 export const radius = {

@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
+import { AuthProvider } from "@/providers/AuthProvider";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -12,6 +13,10 @@ export const metadata: Metadata = {
   description: "TRIPLACE",
 };
 
+export const viewport: Viewport = {
+  colorScheme: "light",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,7 +24,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="he" dir="rtl" className={`${rubik.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-bg-secondary">{children}</body>
+      <body className="min-h-full flex flex-col bg-bg-secondary">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
