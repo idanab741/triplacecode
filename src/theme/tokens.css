@@ -1,0 +1,39 @@
+/*
+ * Design tokens כמשתני CSS — התאמה ל-src/theme/tokens.ts.
+ * ה-@theme הופך כל משתנה כאן למחלקת Tailwind אוטומטית,
+ * למשל --color-bg-secondary -> bg-bg-secondary, --radius-card -> rounded-card.
+ */
+
+:root {
+  --color-primary-start: #4a9eff;
+  --color-primary-end: #1b6fe8;
+  --color-bg: #ffffff;
+  --color-bg-secondary: #f5f7fa;
+  --color-ink: #1a1a2e;
+  --color-ink-secondary: #8a8fa3;
+  --color-accent: #4a9eff;
+
+  --radius-card: 20px;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 8px 24px -6px rgba(26, 26, 46, 0.12),
+    0 2px 8px -2px rgba(26, 26, 46, 0.06);
+}
+
+@theme inline {
+  --color-primary-start: var(--color-primary-start);
+  --color-primary-end: var(--color-primary-end);
+  --color-bg: var(--color-bg);
+  --color-bg-secondary: var(--color-bg-secondary);
+  --color-ink: var(--color-ink);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-accent: var(--color-accent);
+
+  --radius-card: var(--radius-card);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-soft: var(--shadow-soft);
+
+  --font-sans: var(--font-rubik), ui-sans-serif, system-ui, "Segoe UI", Arial,
+    sans-serif;
+}
