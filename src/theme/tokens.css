@@ -34,6 +34,6 @@
 
   --shadow-soft: var(--shadow-soft);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", Arial,
+  --font-sans: var(--font-rubik), ui-sans-serif, system-ui, "Segoe UI", Arial,
     sans-serif;
 }
