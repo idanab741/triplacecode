@@ -7,3 +7,5 @@ export { Screen } from "./Screen";
 export { Checkbox } from "./Checkbox";
 export { Select } from "./Select";
 export { Field } from "./Field";
+export { Chip } from "./Chip";
+export { Switch } from "./Switch";

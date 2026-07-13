@@ -3,7 +3,7 @@ import { createClient } from "@/services/supabase/server";
 
 /**
  * נקודת החזרה מקישור אימות המייל של Supabase.
- * מחליפה את קוד האימות ב-session, ומנתבת לפי מצב הפרופיל.
+ * מחליפה את קוד האימות ב-session, ומנתבת לפי מצב הפרופיל וההעדפות.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -19,13 +19,19 @@ export async function GET(request: Request) {
       } = await supabase.auth.getUser();
 
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .single();
+        const [{ data: profile }, { data: preferences }] = await Promise.all([
+          supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+          supabase
+            .from("user_preferences")
+            .select("onboarding_completed_at")
+            .eq("id", user.id)
+            .single(),
+        ]);
 
-        const destination = profile?.full_name ? "/home" : "/profile-setup";
+        let destination = "/profile-setup";
+        if (profile?.full_name) {
+          destination = preferences?.onboarding_completed_at ? "/home" : "/preferences";
+        }
         return NextResponse.redirect(`${origin}${destination}`);
       }
     }

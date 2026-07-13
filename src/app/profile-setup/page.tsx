@@ -64,7 +64,7 @@ export default function ProfileSetupPage() {
     }
 
     await refreshProfile();
-    router.push("/home");
+    router.push("/preferences");
   }
 
   if (loading || profileLoading) {

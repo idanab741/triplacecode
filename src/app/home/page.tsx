@@ -10,17 +10,29 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth/authService";
 import { isProfileComplete } from "@/services/profile/profileService";
+import { isPreferencesComplete } from "@/services/preferences/preferencesService";
 import { Button, Screen } from "@/components/ui";
 
 export default function HomePage() {
-  const { user, loading, profile, profileLoading } = useAuth();
+  const {
+    user,
+    loading,
+    profile,
+    profileLoading,
+    preferences,
+    preferencesLoading,
+  } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !profileLoading && user && !isProfileComplete(profile)) {
+    if (loading || profileLoading || preferencesLoading || !user) return;
+
+    if (!isProfileComplete(profile)) {
       router.replace("/profile-setup");
+    } else if (!isPreferencesComplete(preferences)) {
+      router.replace("/preferences");
     }
-  }, [loading, profileLoading, user, profile, router]);
+  }, [loading, profileLoading, preferencesLoading, user, profile, preferences, router]);
 
   async function handleSignOut() {
     if (user) {
@@ -29,7 +41,7 @@ export default function HomePage() {
     router.push("/");
   }
 
-  if (loading || profileLoading) {
+  if (loading || profileLoading || preferencesLoading) {
     return (
       <Screen withBottomNavSpacing={false}>
         <p className="pt-10 text-center text-ink-secondary">טוען...</p>

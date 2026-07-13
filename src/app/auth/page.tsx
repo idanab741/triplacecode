@@ -9,14 +9,19 @@ import {
   resetPasswordForEmail,
   translateAuthError,
 } from "@/services/auth/authService";
-import { getProfile, isProfileComplete } from "@/services/profile/profileService";
+import { getProfile } from "@/services/profile/profileService";
+import { getPreferences } from "@/services/preferences/preferencesService";
+import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
 
 type Tab = "signup" | "signin";
 
 async function redirectAfterAuth(userId: string, router: ReturnType<typeof useRouter>) {
-  const profile = await getProfile(userId);
-  router.push(isProfileComplete(profile) ? "/home" : "/profile-setup");
+  const [profile, preferences] = await Promise.all([
+    getProfile(userId),
+    getPreferences(userId),
+  ]);
+  router.push(getPostAuthPath(profile, preferences));
 }
 
 function AuthPageContent() {
