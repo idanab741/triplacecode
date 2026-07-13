@@ -1,34 +1,27 @@
 "use client";
 
-import { Suspense, useState, type FormEvent, type ReactNode } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, Input, Screen } from "@/components/ui";
+import { Button, Card, Field, Input, Screen } from "@/components/ui";
 import {
   signUpWithEmail,
   signInWithEmail,
   resetPasswordForEmail,
   translateAuthError,
 } from "@/services/auth/authService";
+import { getProfile } from "@/services/profile/profileService";
+import { getPreferences } from "@/services/preferences/preferencesService";
+import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
 
 type Tab = "signup" | "signin";
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5 text-sm">
-      <span className="font-medium text-ink">{label}</span>
-      {children}
-      {error && <span className="text-xs text-danger">{error}</span>}
-    </label>
-  );
+async function redirectAfterAuth(userId: string, router: ReturnType<typeof useRouter>) {
+  const [profile, preferences] = await Promise.all([
+    getProfile(userId),
+    getPreferences(userId),
+  ]);
+  router.push(getPostAuthPath(profile, preferences));
 }
 
 function AuthPageContent() {
@@ -87,8 +80,8 @@ function AuthPageContent() {
       setSuFormError(translateAuthError(error.message));
       return;
     }
-    if (data.session) {
-      router.push("/home");
+    if (data.session && data.user) {
+      await redirectAfterAuth(data.user.id, router);
     } else {
       setSuMessage("שלחנו אליך מייל לאימות החשבון. יש לאשר אותו כדי להתחבר.");
     }
@@ -105,14 +98,16 @@ function AuthPageContent() {
     if (Object.keys(errors).length > 0) return;
 
     setSiLoading(true);
-    const { error } = await signInWithEmail(siEmail, siPassword);
+    const { data, error } = await signInWithEmail(siEmail, siPassword);
     setSiLoading(false);
 
     if (error) {
       setSiFormError(translateAuthError(error.message));
       return;
     }
-    router.push("/home");
+    if (data.user) {
+      await redirectAfterAuth(data.user.id, router);
+    }
   }
 
   async function handleForgotPassword(e: FormEvent) {
@@ -255,7 +250,11 @@ function AuthPageContent() {
           )}
         </Card>
 
-        <Button href="/home" variant="secondary" fullWidth>
+        <Button
+          variant="secondary"
+          fullWidth
+          onClick={() => setSocialMessage("כניסת אורח תהיה זמינה בקרוב")}
+        >
           המשך כאורח
         </Button>
 
