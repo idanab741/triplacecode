@@ -66,7 +66,7 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
       <div aria-hidden="true" />
 
       {message && (
-        <div className="absolute inset-x-5 top-12 rounded-card bg-ink px-4 py-2 text-center text-xs text-white shadow-soft">
+        <div className="absolute inset-x-5 top-16 rounded-card bg-ink px-4 py-2 text-center text-xs text-white shadow-soft">
           {message}
         </div>
       )}

@@ -30,7 +30,7 @@ export function QuickCategories() {
   return (
     <div
       ref={scrollRef}
-      className="flex gap-3 overflow-x-auto px-6 pb-1"
+      className="flex gap-4 overflow-x-auto px-6 pb-2"
       style={{ scrollbarWidth: "none" }}
     >
       {QUICK_CATEGORIES.map((category) => (

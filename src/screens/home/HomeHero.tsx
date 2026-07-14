@@ -1,8 +1,7 @@
-/** אזור ה-Hero: תמונת הקמע והלוגו. */
 export function HomeHero() {
   return (
     <div
-      className="relative w-full shrink-0"
+      className="relative w-full shrink-0 overflow-hidden"
       style={{
         backgroundColor: "#e5e6f4",
         aspectRatio: "4881 / 3377",
@@ -11,7 +10,7 @@ export function HomeHero() {
       <img
         src="/images/home-hero.png"
         alt="triplace - AI Powered by"
-        className="block h-auto w-full"
+        className="block w-full -mb-10"
       />
     </div>
   );
