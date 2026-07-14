@@ -15,16 +15,17 @@ export default function SplashPage() {
   const [guestMessage, setGuestMessage] = useState<string | null>(null);
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden">
+    <main className="flex min-h-screen flex-1 flex-col bg-bg">
       <Image
         src="/images/hero-splash.png"
-        alt="triplace"
-        fill
+        alt="קמע triplace, AI Powered by triplace"
+        width={800}
+        height={800}
         priority
-        className="object-fill"
+        className="h-auto w-full"
       />
 
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-5 bg-[linear-gradient(0deg,var(--color-bg)_45%,transparent)] px-6 pb-10 pt-28 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-10 text-center">
         <div className="flex w-full max-w-xs flex-col gap-3">
           <Button href="/auth" fullWidth>
             בואו נתחיל!
@@ -39,12 +40,12 @@ export default function SplashPage() {
           {guestMessage && <p className="text-sm text-ink-secondary">{guestMessage}</p>}
         </div>
 
-        <Link
-          href="/auth?tab=login"
-          className="rounded-pill bg-bg px-5 py-2.5 text-sm font-semibold text-accent shadow-soft"
-        >
-          יש לך כבר חשבון? לחץ כאן
-        </Link>
+        <p className="text-sm text-ink">
+          יש לך כבר חשבון?{" "}
+          <Link href="/auth?tab=login" className="font-semibold text-accent">
+            לחץ כאן
+          </Link>
+        </p>
       </div>
     </main>
   );
