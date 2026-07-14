@@ -9,6 +9,7 @@ import { getFeaturedDestinations } from "@/services/destinations/destinationsSer
 import { getFirstName } from "@/utils/greeting";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHero } from "@/screens/home/HomeHero";
+import { HomeHeader } from "@/screens/home/HomeHeader";
 import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { QuickCategories } from "@/screens/home/QuickCategories";
@@ -100,12 +101,24 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-bg pb-28">
       <div className="mx-auto max-w-xl">
-        <HomeHero avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+        {/* בלוק עליון מאוחד: ה-Hero ממשיך בצבע האחיד שלו (#e5e6f4, נדגם מתחתית תמונת ה-Hero)
+            עד אחרי הקטגוריות, ורק שם מתעגל ועובר לרקע הרגיל של הדף */}
+        <div className="overflow-hidden rounded-b-[40px]" style={{ backgroundColor: "#e5e6f4" }}>
+          <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+          <HomeHero />
+
+          <div className="flex flex-col pb-6">
+            <GreetingBlock name={displayName} loading={loading || profileLoading} />
+            <div className="mt-4">
+              <SearchBarLink />
+            </div>
+            <div className="mt-7">
+              <QuickCategories />
+            </div>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-6 pb-4 pt-5">
-          <GreetingBlock name={displayName} loading={loading || profileLoading} />
-          <SearchBarLink />
-          <QuickCategories />
           <DiscoverCard />
           <HotDestinations
             title={personalized ? "מותאם בשבילך" : "יעדים חמים"}

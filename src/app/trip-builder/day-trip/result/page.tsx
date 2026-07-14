@@ -97,6 +97,33 @@ function DayTripResultContent() {
           ))}
         </div>
 
+        {itinerary.events.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-ink">אירועים בסביבה השבוע</h2>
+            <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+              {itinerary.events.map((event) => (
+                <a
+                  key={event.id}
+                  href={event.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-48 shrink-0 overflow-hidden rounded-card bg-bg shadow-soft"
+                >
+                  {event.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={event.imageUrl} alt={event.name} className="h-24 w-full object-cover" />
+                  )}
+                  <div className="p-2.5">
+                    <p className="text-sm font-medium text-ink">{event.name}</p>
+                    {event.venueName && <p className="text-xs text-ink-secondary">{event.venueName}</p>}
+                    {event.date && <p className="text-xs text-ink-secondary">{event.date}</p>}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <Link href="/home">
           <Button variant="primary" fullWidth>
             סיום

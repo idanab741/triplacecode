@@ -6,4 +6,6 @@ export const QUICK_CATEGORY_LABELS: Record<QuickCategoryId, string> = {
   weekend: "סופ\"ש",
   nature_trip: "טיול בטבע",
   day_trip: "טיול יומי",
+  abroad: "חו\"ל",
+  nightlife: "חיי לילה",
 };

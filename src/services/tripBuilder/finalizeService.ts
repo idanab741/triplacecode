@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary } from "./sessionService";
-import type { FinalItinerary, FinalItineraryStop, LatLng, TripBuilderStop } from "./types";
+import type { FinalItinerary, FinalItineraryEvent, FinalItineraryStop, LatLng, TripBuilderStop } from "./types";
 
 interface LikedStopWithPlace extends TripBuilderStop {
   place: {
@@ -91,8 +92,11 @@ export async function finalizeItinerary(
     warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
   }
 
+  const events = await fetchNearbyEvents(origin);
+
   const itinerary: FinalItinerary = {
     stops: finalStops,
+    events,
     totalEtaMinutes: cumulativeMinutes,
     warnings,
   };
@@ -127,6 +131,26 @@ function orderByNearestNeighbor(stops: LikedStopWithPlace[], origin: LatLng): Li
   }
 
   return ordered;
+}
+
+/**
+ * אירועים ופסטיבלים אמיתיים בסביבה (Ticketmaster) - מוצגים כהמלצה משלימה
+ * בסוף המסלול, לא כתחנה מוחלקת, כי הם תלויי-תאריך ולא מקום קבוע.
+ */
+async function fetchNearbyEvents(origin: LatLng): Promise<FinalItineraryEvent[]> {
+  try {
+    const events = await getUpcomingEvents(origin.lat, origin.lng);
+    return events.map((event) => ({
+      id: event.id,
+      name: event.name,
+      date: event.date,
+      venueName: event.venueName,
+      imageUrl: event.imageUrl,
+      url: event.url,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function estimateCostFromPriceLevel(priceLevel: number | null): number {

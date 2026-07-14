@@ -46,7 +46,10 @@ ${JSON.stringify({
 
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 [{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint", "order": 0}, ...]
-כאשר "category" הוא אחד מהערכים: ${params.answers.interests.join(", ") || "nature_landscapes, restaurants_culinary"}.`;
+כאשר "category" הוא אחד מהערכים: ${
+    params.answers.interests.filter((i) => i !== "events_festivals").join(", ") ||
+    "nature_landscapes, restaurants_culinary"
+  }.`;
 
   const { text, error } = await callClaude(prompt);
   if (error || !text) return null;
@@ -93,7 +96,9 @@ function buildFallbackPlan(
   durationRules: Record<string, { roles: StopRole[] }>
 ): CategoryPlanItem[] {
   const rule = durationRules[answers.durationBand] ?? durationRules["2-4h"];
-  const interests = answers.interests.length > 0 ? answers.interests : ["attractions"];
+  // אירועים/פסטיבלים תלויי-תאריך מוצגים כהמלצה משלימה בסוף, לא כתחנה מוחלקת
+  const attractionInterests = answers.interests.filter((i) => i !== "events_festivals");
+  const interests = attractionInterests.length > 0 ? attractionInterests : ["attractions"];
   const foodCategory = interests.includes("restaurants_culinary") ? "restaurants_culinary" : "restaurants_culinary";
   const coffeeCategory = "coffee_carts_cafes";
 

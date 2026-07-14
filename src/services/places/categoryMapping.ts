@@ -17,6 +17,11 @@ export const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
   attractions: "אטרקציות ותיירות",
   hotels: "מלונות",
   beaches_pools: "חופים ובריכות",
+  springs_streams: "מעיינות ונחלים",
+  wineries_breweries: "יקבים ומבשלות בירה",
+  water_attractions: "פארק מים אטרקציות מים",
+  sports_extreme: "ספורט אתגרי אקסטרים",
+  live_shows: "אולם הופעות",
 };
 
 const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {

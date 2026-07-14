@@ -9,7 +9,7 @@ interface GreetingBlockProps {
 export function GreetingBlock({ name, loading }: GreetingBlockProps) {
   if (loading) {
     return (
-      <div className="flex flex-col items-center gap-2 px-6 pt-5 text-center">
+      <div className="flex flex-col items-center gap-2 px-6 pt-2 text-center">
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-4 w-40" />
       </div>
@@ -19,7 +19,7 @@ export function GreetingBlock({ name, loading }: GreetingBlockProps) {
   const greeting = getTimeBasedGreeting();
 
   return (
-    <div className="px-6 pt-5 text-center">
+    <div className="px-6 pt-2 text-center">
       <h2 className="text-xl font-bold text-ink">
         {greeting}, {name || "אורח"}!
       </h2>

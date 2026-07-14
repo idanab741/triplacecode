@@ -87,8 +87,18 @@ export interface FinalItineraryStop {
   reason: string | null;
 }
 
+export interface FinalItineraryEvent {
+  id: string;
+  name: string;
+  date: string | null;
+  venueName: string | null;
+  imageUrl: string | null;
+  url: string;
+}
+
 export interface FinalItinerary {
   stops: FinalItineraryStop[];
+  events: FinalItineraryEvent[];
   totalEtaMinutes: number;
   warnings: string[];
 }

@@ -3,6 +3,8 @@ export interface UpcomingEvent {
   name: string;
   date: string | null;
   venueName: string | null;
+  venueLatitude: number | null;
+  venueLongitude: number | null;
   imageUrl: string | null;
   url: string;
 }
@@ -13,7 +15,9 @@ interface TicketmasterEvent {
   url: string;
   dates?: { start?: { localDate?: string } };
   images?: { url: string }[];
-  _embedded?: { venues?: { name: string }[] };
+  _embedded?: {
+    venues?: { name: string; location?: { latitude?: string; longitude?: string } }[];
+  };
 }
 
 /** אירועים אמיתיים בשבוע הקרוב, דרך Ticketmaster Discovery API. */
@@ -46,14 +50,19 @@ export async function getUpcomingEvents(
     const data = await response.json();
     const events: TicketmasterEvent[] = data._embedded?.events ?? [];
 
-    return events.map((event) => ({
-      id: event.id,
-      name: event.name,
-      date: event.dates?.start?.localDate ?? null,
-      venueName: event._embedded?.venues?.[0]?.name ?? null,
-      imageUrl: event.images?.[0]?.url ?? null,
-      url: event.url,
-    }));
+    return events.map((event) => {
+      const venue = event._embedded?.venues?.[0];
+      return {
+        id: event.id,
+        name: event.name,
+        date: event.dates?.start?.localDate ?? null,
+        venueName: venue?.name ?? null,
+        venueLatitude: venue?.location?.latitude ? Number(venue.location.latitude) : null,
+        venueLongitude: venue?.location?.longitude ? Number(venue.location.longitude) : null,
+        imageUrl: event.images?.[0]?.url ?? null,
+        url: event.url,
+      };
+    });
   } catch {
     return [];
   }
