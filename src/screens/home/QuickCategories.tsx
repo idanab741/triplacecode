@@ -30,7 +30,7 @@ export function QuickCategories() {
   return (
     <div
       ref={scrollRef}
-      className="flex gap-4 overflow-x-auto px-6 pb-2"
+      className="flex gap-4 overflow-x-auto px-6 pb-1"
       style={{ scrollbarWidth: "none" }}
     >
       {QUICK_CATEGORIES.map((category) => (
@@ -40,8 +40,7 @@ export function QuickCategories() {
           className="flex shrink-0 flex-col items-center gap-1.5"
         >
           <span
-className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full shadow-soft"            style={{ background: `var(${category.colorVar})` }}
-          >
+className="flex h-15 w-15 items-center justify-center overflow-hidden rounded-full shadow-soft"          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={category.imageSrc}

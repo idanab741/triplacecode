@@ -19,7 +19,7 @@ export function GreetingBlock({ name, loading }: GreetingBlockProps) {
   const greeting = getTimeBasedGreeting();
 
   return (
-<div className="-mt-2 px-6 text-center">
+<div className="-m1 px-6 text-center">
   
  <h2 className="text-3xl font-bold leading-tight text-ink">
   {greeting},{" "}
@@ -28,9 +28,9 @@ export function GreetingBlock({ name, loading }: GreetingBlockProps) {
   </span>
 </h2>
 
-      <p className="mt-2 text-sm text-ink-secondary">
-        הטיול הבא שלך מתחיל כאן
-      </p>
+<p className="mt0 text-[17px] font-medium text-ink-secondary">
+  הטיול הבא שלך מתחיל כאן
+</p>
     </div>
   );
 }

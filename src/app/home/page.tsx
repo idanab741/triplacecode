@@ -103,7 +103,7 @@ export default function HomePage() {
       <div className="mx-auto max-w-xl">
         {/* בלוק עליון מאוחד: ה-Hero ממשיך בצבע האחיד שלו (#e5e6f4, נדגם מתחתית תמונת ה-Hero)
             עד אחרי הקטגוריות, ורק שם מתעגל ועובר לרקע הרגיל של הדף */}
-        <div className="overflow-hidden rounded-b-[40px]" style={{ backgroundColor: "#e5e6f4" }}>
+        <div className="overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
           <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
           <HomeHero />
 
