@@ -16,6 +16,7 @@ export const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
   relaxation_spa: "ספא",
   attractions: "אטרקציות ותיירות",
   hotels: "מלונות",
+  beaches_pools: "חופים ובריכות",
 };
 
 const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
@@ -36,6 +37,7 @@ const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
   tourist_attraction: "attractions",
   lodging: "hotels",
   hotel: "hotels",
+  beach: "beaches_pools",
 };
 
 /** מנרמל את מערך ה-types שגוגל מחזירה למזהה קטגוריה שלנו, אם מוכר. */

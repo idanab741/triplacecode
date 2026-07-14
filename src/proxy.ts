@@ -12,6 +12,7 @@ const PROTECTED_PATHS = [
   "/ai",
   "/search",
   "/destination",
+  "/place",
 ];
 
 export async function proxy(request: NextRequest) {

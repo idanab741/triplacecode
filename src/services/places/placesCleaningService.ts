@@ -61,6 +61,11 @@ export async function cleanGooglePlace(
   }
   if (imageUrls.length === 0) return null;
 
+  // תג "accessible" אמיתי מגוגל. אין ל"kosher" מקבילה בגוגל - יתווסף
+  // ידנית/ממקור אחר בעתיד, לא ממציאים את זה.
+  const tags: string[] = [];
+  if (raw.accessibilityOptions?.wheelchairAccessibleEntrance) tags.push("accessible");
+
   return {
     google_place_id: raw.id,
     name,
@@ -78,7 +83,7 @@ export async function cleanGooglePlace(
     estimated_visit_minutes: null,
     image_urls: imageUrls,
     opening_hours: raw.regularOpeningHours?.weekdayDescriptions ?? null,
-    tags: [],
+    tags,
     source: "google_places",
   };
 }

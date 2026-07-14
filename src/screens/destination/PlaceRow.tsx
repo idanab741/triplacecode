@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { PlaceSummary } from "@/services/places/placesServerService";
 
 interface PlaceRowProps {
@@ -18,7 +19,7 @@ export function PlaceRow({ title, places, emptyMessage }: PlaceRowProps) {
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {places.map((place) => (
-            <div key={place.id} className="w-40 shrink-0">
+            <Link key={place.id} href={`/place/${place.id}`} className="w-40 shrink-0">
               <div className="h-28 w-40 overflow-hidden rounded-card bg-bg-secondary shadow-soft">
                 {place.image_urls[0] && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -33,7 +34,7 @@ export function PlaceRow({ title, places, emptyMessage }: PlaceRowProps) {
               {place.rating != null && (
                 <p className="text-xs text-ink-secondary">★ {place.rating.toFixed(1)}</p>
               )}
-            </div>
+            </Link>
           ))}
         </div>
       )}

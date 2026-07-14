@@ -1,6 +1,17 @@
 import Link from "next/link";
-import { QUICK_CATEGORIES, type QuickCategoryId } from "@/constants/quickCategories";
+import {
+  QUICK_CATEGORIES,
+  QUICK_CATEGORY_SEARCH_LINKS,
+  type QuickCategoryId,
+} from "@/constants/quickCategories";
 import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
+
+function buildSearchHref(id: QuickCategoryId): string {
+  const link = QUICK_CATEGORY_SEARCH_LINKS[id];
+  if (link.categories) return `/search?category=${link.categories.join(",")}`;
+  if (link.query) return `/search?q=${encodeURIComponent(link.query)}`;
+  return "/search";
+}
 
 const ICONS: Record<QuickCategoryId, React.ReactNode> = {
   restaurants_cafes: (
@@ -39,7 +50,7 @@ export function QuickCategories() {
       {QUICK_CATEGORIES.map((category) => (
         <Link
           key={category.id}
-          href="/search"
+          href={buildSearchHref(category.id)}
           className="flex shrink-0 flex-col items-center gap-1.5"
         >
           <span

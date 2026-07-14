@@ -24,13 +24,11 @@ export function FavoriteCard({ place }: { place: UnifiedPlace }) {
     </>
   );
 
-  if (place.type === "destination") {
-    return (
-      <Link href={`/destination/${place.id}`} className="flex flex-col gap-2">
-        {content}
-      </Link>
-    );
-  }
+  const href = place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`;
 
-  return <div className="flex flex-col gap-2">{content}</div>;
+  return (
+    <Link href={href} className="flex flex-col gap-2">
+      {content}
+    </Link>
+  );
 }

@@ -12,6 +12,7 @@ export interface GooglePlaceRaw {
   types?: string[];
   editorialSummary?: { text: string };
   primaryTypeDisplayName?: { text: string };
+  accessibilityOptions?: { wheelchairAccessibleEntrance?: boolean };
 }
 
 const FIELD_MASK = [
@@ -27,6 +28,7 @@ const FIELD_MASK = [
   "places.types",
   "places.editorialSummary",
   "places.primaryTypeDisplayName",
+  "places.accessibilityOptions",
 ].join(",");
 
 async function textSearchGooglePlaces(textQuery: string): Promise<GooglePlaceRaw[]> {
