@@ -40,8 +40,7 @@ export function QuickCategories() {
           className="flex shrink-0 flex-col items-center gap-1.5"
         >
           <span
-            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full shadow-soft"
-            style={{ background: `var(${category.colorVar})` }}
+className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full shadow-soft"            style={{ background: `var(${category.colorVar})` }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

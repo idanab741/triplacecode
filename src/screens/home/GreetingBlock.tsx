@@ -10,8 +10,8 @@ export function GreetingBlock({ name, loading }: GreetingBlockProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center gap-2 px-6 pt-2 text-center">
-        <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-5 w-44" />
       </div>
     );
   }
@@ -20,10 +20,17 @@ export function GreetingBlock({ name, loading }: GreetingBlockProps) {
 
   return (
     <div className="px-6 pt-2 text-center">
-      <h2 className="text-xl font-bold text-ink">
-        {greeting}, {name || "אורח"}!
+      <h2 className="text-3xl font-bold leading-tight text-ink">
+        {greeting},{" "}
+        <span style={{ color: "#166ede" }}>
+          {name || "אורח"}
+        </span>
+        !
       </h2>
-      <p className="mt-1 text-sm text-ink-secondary">הטיול הבא שלך מתחיל כאן</p>
+
+      <p className="mt-2 text-sm text-ink-secondary">
+        הטיול הבא שלך מתחיל כאן
+      </p>
     </div>
   );
 }
