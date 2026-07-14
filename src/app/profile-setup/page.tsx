@@ -95,14 +95,25 @@ export default function ProfileSetupPage() {
         >
           <Icon name="back-chevron" size={18} />
         </button>
-        <div className="absolute inset-x-0 top-[58%] flex -translate-y-1/2 justify-center">
+        {/* ממוקם בדיוק על החור השקוף שבתוך הטבעת הכחולה המצוירת בתמונה
+            (מרכז: 48.6% רוחב / 69.3% גובה, קוטר החור ~39% - מעט גדול יותר
+            כדי להיכנס מתחת לשפת הטבעת בלי מרווח) */}
+        <div
+          className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
+          style={{ left: "48.6%", top: "69.3%", width: "41%" }}
+        >
           {user && (
-            <AvatarUploader userId={user.id} initialUrl={profile?.avatar_url} size={168} />
+            <AvatarUploader
+              userId={user.id}
+              initialUrl={profile?.avatar_url}
+              fluid
+              bordered={false}
+            />
           )}
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-6 px-6 pb-10 pt-20">
+      <div className="mx-auto flex max-w-sm flex-col gap-6 px-6 pb-10 pt-6">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-ink">בניית פרופיל</h1>
           <p className="mt-1 text-ink-secondary">עוד רגע מתחילים לטייל!</p>
