@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/services/supabase/client";
 import { getUnifiedPlace, type UnifiedPlace } from "@/services/places/unifiedPlaceService";
 import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
@@ -6,10 +7,10 @@ export type FavoriteStatus = "liked" | "saved" | "skipped";
 export type PlaceType = "place" | "destination";
 
 export async function getFavoriteStatus(
+  supabase: SupabaseClient,
   userId: string,
   placeId: string
 ): Promise<FavoriteStatus | null> {
-  const supabase = createClient();
   const { data } = await supabase
     .from("favorites")
     .select("status")
@@ -21,13 +22,13 @@ export async function getFavoriteStatus(
 
 /** מפעיל/מבטל לייק או שמירה. לחיצה על אותה פעולה שכבר פעילה מבטלת אותה. */
 export async function toggleFavorite(
+  supabase: SupabaseClient,
   userId: string,
   placeId: string,
   placeType: PlaceType,
   action: "liked" | "saved"
 ): Promise<FavoriteStatus | null> {
-  const supabase = createClient();
-  const current = await getFavoriteStatus(userId, placeId);
+  const current = await getFavoriteStatus(supabase, userId, placeId);
 
   if (current === action) {
     await supabase.from("favorites").delete().eq("user_id", userId).eq("place_id", placeId);
@@ -45,8 +46,12 @@ export async function toggleFavorite(
   return action;
 }
 
-export async function skipPlace(userId: string, placeId: string, placeType: PlaceType) {
-  const supabase = createClient();
+export async function skipPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  placeId: string,
+  placeType: PlaceType
+) {
   await supabase
     .from("favorites")
     .upsert(

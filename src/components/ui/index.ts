@@ -12,3 +12,8 @@ export { Chip } from "./Chip";
 export { Switch } from "./Switch";
 export { Skeleton } from "./Skeleton";
 export { Icon } from "./Icon";
+export { Slider } from "./Slider";
+export { ChipGroup } from "./ChipGroup";
+export { RadioCardGroup } from "./RadioCardGroup";
+export { Stepper } from "./Stepper";
+export { SwipeCard } from "./SwipeCard";
