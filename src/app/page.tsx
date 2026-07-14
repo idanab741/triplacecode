@@ -21,7 +21,7 @@ export default function SplashPage() {
         alt="triplace"
         fill
         priority
-        className="object-cover"
+        className="object-fill"
       />
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-5 bg-[linear-gradient(0deg,var(--color-bg)_45%,transparent)] px-6 pb-10 pt-28 text-center">
