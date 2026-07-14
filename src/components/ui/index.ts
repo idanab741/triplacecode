@@ -11,3 +11,4 @@ export { Field } from "./Field";
 export { Chip } from "./Chip";
 export { Switch } from "./Switch";
 export { Skeleton } from "./Skeleton";
+export { Icon } from "./Icon";

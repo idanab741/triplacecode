@@ -7,10 +7,12 @@ interface AvatarUploaderProps {
   userId: string;
   initialUrl?: string | null;
   onUploaded?: (url: string) => void;
+  /** קוטר העיגול בפיקסלים. ברירת מחדל 112. */
+  size?: number;
 }
 
 /** עיגול תמונת פרופיל עם כפתור פלוס להעלאת תמונה מהמכשיר. */
-export function AvatarUploader({ userId, initialUrl, onUploaded }: AvatarUploaderProps) {
+export function AvatarUploader({ userId, initialUrl, onUploaded, size = 112 }: AvatarUploaderProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +39,22 @@ export function AvatarUploader({ userId, initialUrl, onUploaded }: AvatarUploade
 
   return (
     <div className="mx-auto flex flex-col items-center">
-      <div className="relative h-28 w-28">
-        <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[var(--color-primary-start)] bg-bg-secondary">
+      <div className="relative" style={{ width: size, height: size }}>
+        <div
+          className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-4 border-[var(--color-primary-start)] bg-bg shadow-soft"
+        >
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt="תמונת פרופיל" className="h-full w-full object-cover" />
           ) : (
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink-secondary)" strokeWidth="1.5">
+            <svg
+              width={size * 0.45}
+              height={size * 0.45}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-ink-secondary)"
+              strokeWidth="1.5"
+            >
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
             </svg>
