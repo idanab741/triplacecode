@@ -27,6 +27,7 @@ export default function HomePage() {
   const router = useRouter();
 
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [personalized, setPersonalized] = useState(false);
 
   useEffect(() => {
     if (loading || profileLoading || preferencesLoading || !user) return;
@@ -56,6 +57,46 @@ export default function HomePage() {
   const isGuest = Boolean(user?.is_anonymous);
   const displayName = isGuest ? null : getFirstName(profile?.full_name);
 
+  useEffect(() => {
+    if (isGuest || !user || !isPreferencesComplete(preferences)) return;
+    if (destinations.length === 0 || personalized) return;
+
+    let cancelled = false;
+
+    fetch("/api/match/rank-destinations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destinationIds: destinations.map((d) => d.id) }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.results) return;
+        const scoreById = new Map(
+          (data.results as { destination_id: string; score: number; reason: string }[]).map(
+            (r) => [r.destination_id, r]
+          )
+        );
+        setDestinations((prev) =>
+          [...prev]
+            .map((d) => {
+              const match = scoreById.get(d.id);
+              return match
+                ? { ...d, matchScore: match.score, matchReason: match.reason }
+                : d;
+            })
+            .sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1))
+        );
+        setPersonalized(true);
+      })
+      .catch(() => {
+        // אם הדירוג נכשל, פשוט נשארים עם הסדר הכללי - המסך לא נשבר
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest, user, preferences, destinations, personalized]);
+
   return (
     <div className="min-h-screen bg-bg pb-28">
       <div className="mx-auto max-w-xl">
@@ -66,7 +107,10 @@ export default function HomePage() {
           <SearchBarLink />
           <QuickCategories />
           <DiscoverCard />
-          <HotDestinations destinations={destinations} />
+          <HotDestinations
+            title={personalized ? "מותאם בשבילך" : "יעדים חמים"}
+            destinations={destinations}
+          />
         </div>
       </div>
 

@@ -5,17 +5,20 @@ export interface Destination {
   name: string;
   subtitle: string | null;
   imageUrl: string;
+  matchScore?: number;
+  matchReason?: string;
 }
 
 interface HotDestinationsProps {
+  title: string;
   destinations: Destination[];
 }
 
-/** מקטע "יעדים חמים": מצב ריק מעוצב עד שיהיו נתונים אמיתיים. */
-export function HotDestinations({ destinations }: HotDestinationsProps) {
+/** מקטע "יעדים חמים" / "מותאם בשבילך": מצב ריק מעוצב עד שיהיו נתונים אמיתיים. */
+export function HotDestinations({ title, destinations }: HotDestinationsProps) {
   return (
     <div className="px-6">
-      <h3 className="mb-3 text-lg font-semibold text-ink">יעדים חמים</h3>
+      <h3 className="mb-3 text-lg font-semibold text-ink">{title}</h3>
 
       {destinations.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card bg-bg-secondary px-6 py-10 text-center">
@@ -40,10 +43,20 @@ export function HotDestinations({ destinations }: HotDestinationsProps) {
                 alt={destination.name}
                 className="h-full w-full object-cover"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.55),transparent)] p-3">
+
+              {destination.matchScore != null && (
+                <span className="absolute start-2 top-2 rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-xs font-bold text-white shadow-soft">
+                  {destination.matchScore}% התאמה
+                </span>
+              )}
+
+              <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.7),transparent)] p-3">
                 <p className="font-semibold text-white">{destination.name}</p>
                 {destination.subtitle && (
                   <p className="text-xs text-white/80">{destination.subtitle}</p>
+                )}
+                {destination.matchReason && (
+                  <p className="mt-0.5 truncate text-xs text-white/70">{destination.matchReason}</p>
                 )}
               </div>
             </Link>

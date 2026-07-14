@@ -1,5 +1,6 @@
 import { createClient } from "@/services/supabase/client";
 import { getUnifiedPlace, type UnifiedPlace } from "@/services/places/unifiedPlaceService";
+import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
 
 export type FavoriteStatus = "liked" | "saved" | "skipped";
 export type PlaceType = "place" | "destination";
@@ -30,6 +31,7 @@ export async function toggleFavorite(
 
   if (current === action) {
     await supabase.from("favorites").delete().eq("user_id", userId).eq("place_id", placeId);
+    if (placeType === "place") await recomputeTravelDna(supabase, userId);
     return null;
   }
 
@@ -39,6 +41,7 @@ export async function toggleFavorite(
       { user_id: userId, place_id: placeId, place_type: placeType, status: action },
       { onConflict: "user_id,place_id" }
     );
+  if (placeType === "place") await recomputeTravelDna(supabase, userId);
   return action;
 }
 
@@ -50,6 +53,7 @@ export async function skipPlace(userId: string, placeId: string, placeType: Plac
       { user_id: userId, place_id: placeId, place_type: placeType, status: "skipped" },
       { onConflict: "user_id,place_id" }
     );
+  if (placeType === "place") await recomputeTravelDna(supabase, userId);
 }
 
 /** יעדי המועדפים של המשתמש לפי סטטוס, עם פרטי התצוגה המלאים. */

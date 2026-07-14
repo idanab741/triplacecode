@@ -1,4 +1,5 @@
 import { createClient } from "@/services/supabase/client";
+import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
 
 export interface UserPreferences {
   id: string;
@@ -41,14 +42,20 @@ export async function savePreferences(
   return supabase.from("user_preferences").update(updates).eq("id", userId);
 }
 
-/** שמירה סופית — מסמנת את האשף כהושלם. */
+/** שמירה סופית — מסמנת את האשף כהושלם, ומרעננת את ה-Travel DNA. */
 export async function completePreferences(
   userId: string,
   updates: Partial<PreferencesFields>
 ) {
   const supabase = createClient();
-  return supabase
+  const result = await supabase
     .from("user_preferences")
     .update({ ...updates, onboarding_completed_at: new Date().toISOString() })
     .eq("id", userId);
+
+  if (!result.error) {
+    await recomputeTravelDna(supabase, userId);
+  }
+
+  return result;
 }
