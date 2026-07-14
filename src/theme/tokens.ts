@@ -10,7 +10,7 @@
 export const colors = {
   primaryStart: "#4A9EFF",
   primaryEnd: "#1B6FE8",
-  bg: "#FFFFFF",
+  bg: "#FCFAFC",
   bgSecondary: "#F5F7FA",
   ink: "#1A1A2E",
   inkSecondary: "#8A8FA3",
