@@ -15,7 +15,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
     "bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-white shadow-soft",
-  secondary: "bg-bg-secondary text-ink",
+  secondary: "bg-bg-secondary text-ink shadow-soft",
 };
 
 export function Button({
@@ -26,7 +26,7 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const classes = `inline-flex items-center justify-center gap-2 rounded-pill px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none ${
+  const classes = `inline-flex items-center justify-center gap-2 rounded-pill px-6 py-4 text-base font-bold transition-opacity hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none ${
     fullWidth ? "w-full" : ""
   } ${variantClasses[variant]} ${className}`;
 
