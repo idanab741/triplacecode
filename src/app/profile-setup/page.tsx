@@ -95,7 +95,7 @@ export default function ProfileSetupPage() {
         >
           <Icon name="back-chevron" size={18} />
         </button>
-        <div className="absolute inset-x-0 -bottom-16 flex justify-center">
+        <div className="absolute inset-x-0 top-[58%] flex -translate-y-1/2 justify-center">
           {user && (
             <AvatarUploader userId={user.id} initialUrl={profile?.avatar_url} size={168} />
           )}
