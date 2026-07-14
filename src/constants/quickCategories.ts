@@ -16,15 +16,16 @@ export interface QuickCategoryDefinition {
 }
 
 export const QUICK_CATEGORIES: QuickCategoryDefinition[] = [
-  {
-    id: "restaurants_cafes",
-    colorVar: "--color-category-orange",
-    imageSrc: "/images/categories/cat-restaurants.png",
+    {
+    id: "abroad",
+    // TODO: ודא שהמשתנה הזה מוגדר ב-theme/tokens.css, או החלף בטוקן קיים
+    colorVar: "--color-category-purple",
+    imageSrc: "/images/categories/cat-abroad.png",
   },
   {
-    id: "romantic_date",
-    colorVar: "--color-category-pink",
-    imageSrc: "/images/categories/cat-romantic.png",
+   id: "day_trip",
+    colorVar: "--color-primary-start",
+    imageSrc: "/images/categories/cat-daytrip.png",
   },
   {
     id: "weekend",
@@ -32,20 +33,19 @@ export const QUICK_CATEGORIES: QuickCategoryDefinition[] = [
     imageSrc: "/images/categories/cat-weekend.png",
   },
   {
-    id: "nature_trip",
+        id: "nature_trip",
     colorVar: "--color-category-green",
     imageSrc: "/images/categories/cat-nature.png",
   },
   {
-    id: "day_trip",
-    colorVar: "--color-primary-start",
-    imageSrc: "/images/categories/cat-daytrip.png",
+             id: "restaurants_cafes",
+    colorVar: "--color-category-orange",
+    imageSrc: "/images/categories/cat-restaurants.png",
   },
   {
-    id: "abroad",
-    // TODO: ודא שהמשתנה הזה מוגדר ב-theme/tokens.css, או החלף בטוקן קיים
-    colorVar: "--color-category-purple",
-    imageSrc: "/images/categories/cat-abroad.png",
+        id: "romantic_date",
+    colorVar: "--color-category-pink",
+    imageSrc: "/images/categories/cat-romantic.png",
   },
   {
     id: "nightlife",
