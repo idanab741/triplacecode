@@ -11,7 +11,7 @@ interface IconProps {
 export function Icon({ name, size = 20, className = "" }: IconProps) {
   return (
     <Image
-      src={`/icons/${name}.svg`}
+      src={`/icons/${name}.png`}
       alt=""
       width={size}
       height={size}
