@@ -22,10 +22,12 @@ export async function collectPlacesForCityAndCategory(
 
   const rawPlaces = await searchGooglePlaces({ city, query });
 
-  const cleaned = await Promise.all(
-    rawPlaces.map((raw) => cleanGooglePlace(raw, category, city, country))
-  );
-  const cleanRows = cleaned.filter((row): row is NonNullable<typeof row> => row !== null);
+  // ברצף ולא Promise.all - מונע פגיעה במגבלת קצב הבקשות של גוגל
+  const cleanRows: NonNullable<Awaited<ReturnType<typeof cleanGooglePlace>>>[] = [];
+  for (const raw of rawPlaces) {
+    const row = await cleanGooglePlace(raw, category, city, country);
+    if (row) cleanRows.push(row);
+  }
 
   if (cleanRows.length === 0) {
     return { fetched: rawPlaces.length, saved: 0, skipped: rawPlaces.length };

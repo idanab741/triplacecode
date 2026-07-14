@@ -53,12 +53,12 @@ export async function cleanGooglePlace(
   const rating = raw.rating ?? null;
   if (rating !== null && rating < MIN_RATING) return null;
 
-  const storedUrls = await Promise.all(
-    photos.slice(0, 5).map((photo, index) =>
-      downloadAndStorePhoto(photo.name, `places/${raw.id}/${index}.jpg`)
-    )
-  );
-  const imageUrls = storedUrls.filter((url): url is string => url !== null);
+  // ברצף ולא Promise.all - מונע פגיעה במגבלת קצב הבקשות של גוגל
+  const imageUrls: string[] = [];
+  for (const [index, photo] of photos.slice(0, 5).entries()) {
+    const url = await downloadAndStorePhoto(photo.name, `places/${raw.id}/${index}.jpg`);
+    if (url) imageUrls.push(url);
+  }
   if (imageUrls.length === 0) return null;
 
   return {
