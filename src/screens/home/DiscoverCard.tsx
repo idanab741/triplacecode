@@ -12,7 +12,7 @@ interface DiscoverSlide {
   alt: string;
 }
 
-const SLIDES: DiscoverSlide[] = [
+const SLIDES = [
   {
     href: "/tripmatch",
     image: "/images/discover/tripmatch.png",
@@ -27,11 +27,6 @@ const SLIDES: DiscoverSlide[] = [
     href: "/places",
     image: "/images/discover/places.png",
     alt: "Places",
-  },
-  {
-    href: "/group-trip",
-    image: "/images/discover/group-trip.png",
-    alt: "Group Trip",
   },
 ];
 
