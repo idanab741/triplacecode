@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -66,12 +66,26 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
     step((delta > 0 ? 1 : -1) * RTL_SIGN as 1 | -1);
   }
 
+  // measure the real container width AFTER the browser has actually laid
+  // it out — reading a ref's clientWidth during render itself can return 0
+  // (before layout happens), and with overflow:hidden a 0-width box shows
+  // ABSOLUTELY NOTHING, no matter what's inside it. This was the bug.
+  const [containerW, setContainerW] = useState(0);
+  useLayoutEffect(() => {
+    function measure() {
+      if (containerRef.current) setContainerW(containerRef.current.clientWidth);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   // every card before the focused one in `strip` is NARROW (the focused
   // card is the only WIDE one in the entire strip), so the offset to reach
   // it is a simple, exact multiple — no measuring, no rounding drift
-  const containerW = containerRef.current?.clientWidth ?? 360;
   const offsetToFocused = focusedGlobalIndex * STEP;
-  const translateX = containerW / 2 - offsetToFocused - WIDE / 2;
+  const ready = containerW > 0;
+  const translateX = ready ? containerW / 2 - offsetToFocused - WIDE / 2 : 0;
 
   return (
     <div className="px-6">
@@ -91,14 +105,15 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
           ref={containerRef}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
-          className="-mx-6 overflow-hidden px-6 select-none"
+          className="-mx-6 min-h-[208px] w-full overflow-hidden px-6 select-none"
           style={{ touchAction: "pan-y", cursor: "grab" }}
         >
           <div
             className="flex items-start gap-2"
             style={{
               transform: `translateX(${translateX}px)`,
-              transition: `transform 320ms ${EASE}`,
+              transition: ready ? `transform 320ms ${EASE}` : "none",
+              opacity: ready ? 1 : 0,
               width: "max-content",
             }}
           >
