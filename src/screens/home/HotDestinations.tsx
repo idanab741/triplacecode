@@ -17,8 +17,8 @@ interface HotDestinationsProps {
   destinations: Destination[];
 }
 
-const NARROW = 58;   // collapsed strip width, px
-const WIDE = 220;     // expanded (focused) card width, px
+const NARROW = 52;   // collapsed strip width, px — sized so 1+focused+1 always fits a phone screen
+const WIDE = 208;     // expanded (focused) card width, px
 const GAP = 8;
 const SWIPE_THRESHOLD = 35; // px of horizontal drag needed to count as a swipe
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -53,14 +53,14 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
     dragging.current = false;
     const delta = e.clientX - dragStartX.current;
     if (Math.abs(delta) < SWIPE_THRESHOLD) return;
-    // RTL: dragging left (negative delta) moves to the next card, dragging right goes back
-    step(delta < 0 ? 1 : -1);
+    // RTL: dragging right (positive delta) moves to the next card, dragging left goes back
+    step(delta > 0 ? 1 : -1);
   }
 
   // window of exactly 2 collapsed neighbors on each side + the focused card
   const visible = useMemo(() => {
     if (N === 0) return [];
-    const offsets = N > 4 ? [-2, -1, 0, 1, 2] : Array.from({ length: N }, (_, k) => k - Math.floor(N / 2));
+    const offsets = N >= 3 ? [-1, 0, 1] : Array.from({ length: N }, (_, k) => k - Math.floor(N / 2));
     return offsets.map((off) => {
       const idx = ((focusedIndex + off) % N + N) % N;
       return { destination: destinations[idx], idx, off, isFocused: off === 0 };
@@ -85,7 +85,7 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
           ref={trackRef}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
-          className="flex touch-pan-y items-start justify-center gap-2 select-none"
+          className="flex w-full touch-pan-y items-start justify-center gap-2 overflow-hidden select-none"
           style={{ cursor: "grab" }}
         >
           {visible.map(({ destination, idx, off, isFocused }) => {
