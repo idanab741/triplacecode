@@ -1,34 +1,68 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+
+import { Swiper, SwiperSlide } from "swiper/react";
+import { Autoplay, Pagination } from "swiper/modules";
+
+import "swiper/css";
+import "swiper/css/pagination";
+
+const SLIDES = [
+  {
+    href: "/tripmatch",
+    image: "/images/discover/tripmatch.png",
+    alt: "TripMatch",
+  },
+  {
+    href: "/ai",
+    image: "/images/discover/ai-powered.png",
+    alt: "AI Powered",
+  },
+  {
+    href: "/places",
+    image: "/images/discover/places.png",
+    alt: "Places",
+  },
+];
+
 export function DiscoverCard() {
   return (
-  <section className="px-6">
-    <h3 className="mb-3 text-lg font-semibold text-ink">
-      גלה עוד
-    </h3>
+    <section className="px-6">
+      <h3 className="mb-3 text-lg font-semibold text-ink">
+        גלה עוד
+      </h3>
 
-    <Link href={SLIDES[current].href} className="block">
-      <Image
-        src={SLIDES[current].image}
-        alt={SLIDES[current].alt}
-        width={1200}
-        height={675}
-        className="w-full rounded-3xl shadow-xl"
-        priority
-      />
-    </Link>
-
-    <div className="mt-4 flex justify-center gap-2">
-      {SLIDES.map((_, index) => (
-        <button
-          key={index}
-          onClick={() => setCurrent(index)}
-          className={`h-2 rounded-full transition-all ${
-            current === index
-              ? "w-6 bg-blue-500"
-              : "w-2 bg-blue-300"
-          }`}
-        />
-      ))}
-    </div>
-  </section>
-);
+      <Swiper
+        modules={[Autoplay, Pagination]}
+        slidesPerView={1}
+        spaceBetween={0}
+        loop
+        autoplay={{
+          delay: 5000,
+          disableOnInteraction: false,
+        }}
+        pagination={{
+          clickable: true,
+        }}
+        className="rounded-[30px] shadow-xl"
+      >
+        {SLIDES.map((slide) => (
+          <SwiperSlide key={slide.href}>
+            <Link href={slide.href}>
+              <Image
+                src={slide.image}
+                alt={slide.alt}
+                width={1200}
+                height={675}
+                priority
+                className="block w-full h-auto"
+              />
+            </Link>
+          </SwiperSlide>
+        ))}
+      </Swiper>
+    </section>
+  );
 }
