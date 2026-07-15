@@ -2,15 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import Autoplay from "embla-carousel-autoplay";
-
-interface DiscoverSlide {
-  href: string;
-  image: string;
-  alt: string;
-}
 
 const SLIDES = [
   {
@@ -30,22 +24,23 @@ const SLIDES = [
   },
 ];
 
-const AUTOPLAY_DELAY = 5500;
-
 export function DiscoverCard() {
-  const autoplay = Autoplay({
-    delay: AUTOPLAY_DELAY,
-    stopOnInteraction: false,
-    stopOnMouseEnter: true,
-  });
+  const autoplay = useRef(
+    Autoplay({
+      delay: 5000,
+      stopOnInteraction: false,
+      stopOnMouseEnter: true,
+    })
+  );
 
   const [emblaRef, emblaApi] = useEmblaCarousel(
     {
       loop: true,
-      align: "start",
+      align: "center",
       dragFree: false,
+      skipSnaps: false,
     },
-    [autoplay]
+    [autoplay.current]
   );
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -61,27 +56,29 @@ export function DiscoverCard() {
     onSelect();
 
     emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
 
     return () => {
       emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
     };
   }, [emblaApi, onSelect]);
 
   return (
-    <div className="px-6">
+    <section className="px-6">
       <h3 className="mb-3 text-lg font-semibold text-ink">
         גלה עוד
       </h3>
 
       <div
-        className="overflow-hidden rounded-3xl shadow-lg"
         ref={emblaRef}
+        className="overflow-hidden rounded-3xl shadow-xl"
       >
         <div className="flex">
           {SLIDES.map((slide, index) => (
             <div
-              key={index}
-              className="min-w-0 flex-[0_0_100%]"
+              key={slide.href}
+              className="flex-[0_0_100%]"
             >
               <Link href={slide.href}>
                 <Image
@@ -89,8 +86,9 @@ export function DiscoverCard() {
                   alt={slide.alt}
                   width={1200}
                   height={675}
-                  className="block w-full h-auto"
                   priority={index === 0}
+                  draggable={false}
+                  className="block w-full h-auto select-none"
                 />
               </Link>
             </div>
@@ -98,18 +96,19 @@ export function DiscoverCard() {
         </div>
       </div>
 
-      <div className="mt-3 flex justify-center gap-2">
+      <div className="mt-4 flex justify-center gap-2">
         {SLIDES.map((_, index) => (
-          <span
+          <button
             key={index}
+            onClick={() => emblaApi?.scrollTo(index)}
             className={`h-2 rounded-full transition-all duration-300 ${
-              index === selectedIndex
-                ? "w-6 bg-blue-500"
-                : "w-2 bg-blue-500/30"
+              selectedIndex === index
+                ? "w-7 bg-blue-500"
+                : "w-2 bg-blue-300"
             }`}
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
