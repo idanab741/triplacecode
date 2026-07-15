@@ -78,7 +78,7 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
         </div>
       ) : (
         <div className="-mx-6 overflow-hidden px-6" ref={emblaRef}>
-          <div className="flex gap-2">
+          <div className="flex">
             {destinations.map((destination, i) => {
               const isFocused = i === selectedIndex;
               const key = destination.id + "-" + i;
@@ -87,7 +87,11 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                 <div
                   key={key}
                   className="min-w-0 shrink-0 grow-0 transition-[flex-basis] duration-300 ease-out"
-                  style={{ flexBasis: isFocused ? 200 : 42, zIndex: isFocused ? 2 : 1 }}
+                  style={{
+                    flexBasis: isFocused ? 200 : 42,
+                    zIndex: isFocused ? 2 : 1,
+                    marginInlineEnd: 8, // margin instead of CSS `gap` — Embla's snap-point math can drift with `gap` on variable-width slides
+                  }}
                 >
                   <Link
                     href={`/destination/${destination.id}`}
