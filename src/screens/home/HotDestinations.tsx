@@ -49,6 +49,16 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
     };
   }, [emblaApi, onSelect]);
 
+  // the open/closed card widths change with selectedIndex — Embla caches
+  // slide sizes internally, so it must be told to re-measure every time
+  // that happens, or its snap points would drift out of sync with what's
+  // actually on screen
+  useEffect(() => {
+    if (!emblaApi) return;
+    const id = setTimeout(() => emblaApi.reInit(), 320); // after the width CSS transition finishes
+    return () => clearTimeout(id);
+  }, [emblaApi, selectedIndex]);
+
   function markLoaded(key: string) {
     setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   }
@@ -76,13 +86,8 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
               return (
                 <div
                   key={key}
-                  className="min-w-0 shrink-0 grow-0 transition-transform duration-300 ease-out"
-                  style={{
-                    flexBasis: "38%",
-                    transform: isFocused ? "scale(1.18)" : "scale(1)",
-                    transformOrigin: "center center",
-                    zIndex: isFocused ? 2 : 1,
-                  }}
+                  className="min-w-0 shrink-0 grow-0 transition-[flex-basis] duration-300 ease-out"
+                  style={{ flexBasis: isFocused ? 224 : 56, zIndex: isFocused ? 2 : 1 }}
                 >
                   <Link
                     href={`/destination/${destination.id}`}
