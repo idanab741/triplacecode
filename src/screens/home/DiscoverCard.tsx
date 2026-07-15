@@ -2,9 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import useEmblaCarousel from "embla-carousel-react";
-import Autoplay from "embla-carousel-autoplay";
+import { useEffect, useRef, useState } from "react";
 
 const SLIDES = [
   {
@@ -24,45 +22,49 @@ const SLIDES = [
   },
 ];
 
+const AUTO_PLAY = 5000;
+
 export function DiscoverCard() {
-  const autoplay = useRef(
-    Autoplay({
-      delay: 5000,
-      stopOnInteraction: false,
-      stopOnMouseEnter: true,
-    })
-  );
+  const [current, setCurrent] = useState(0);
 
-  const [emblaRef, emblaApi] = useEmblaCarousel(
-    {
-      loop: true,
-      align: "center",
-      dragFree: false,
-      skipSnaps: false,
-    },
-    [autoplay.current]
-  );
-
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  const onSelect = useCallback(() => {
-    if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
+  const touchStart = useRef(0);
+  const touchEnd = useRef(0);
 
   useEffect(() => {
-    if (!emblaApi) return;
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % SLIDES.length);
+    }, AUTO_PLAY);
 
-    onSelect();
+    return () => clearInterval(interval);
+  }, []);
 
-    emblaApi.on("select", onSelect);
-    emblaApi.on("reInit", onSelect);
+  const next = () => {
+    setCurrent((prev) => (prev + 1) % SLIDES.length);
+  };
 
-    return () => {
-      emblaApi.off("select", onSelect);
-      emblaApi.off("reInit", onSelect);
-    };
-  }, [emblaApi, onSelect]);
+  const prev = () => {
+    setCurrent((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const distance = touchStart.current - touchEnd.current;
+
+    if (distance > 50) {
+      next();
+    }
+
+    if (distance < -50) {
+      prev();
+    }
+  };
 
   return (
     <section className="px-6">
@@ -71,27 +73,33 @@ export function DiscoverCard() {
       </h3>
 
       <div
-        ref={emblaRef}
-        className="overflow-hidden rounded-3xl shadow-xl"
+        className="relative overflow-hidden rounded-3xl shadow-xl"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
-        <div className="flex">
+        <div
+          className="flex transition-transform duration-500 ease-in-out"
+          style={{
+            transform: `translateX(-${current * 100}%)`,
+          }}
+        >
           {SLIDES.map((slide, index) => (
-            <div
-              key={slide.href}
-              className="flex-[0_0_100%]"
+            <Link
+              key={index}
+              href={slide.href}
+              className="w-full shrink-0"
             >
-              <Link href={slide.href}>
-                <Image
-                  src={slide.image}
-                  alt={slide.alt}
-                  width={1200}
-                  height={675}
-                  priority={index === 0}
-                  draggable={false}
-                  className="block w-full h-auto select-none"
-                />
-              </Link>
-            </div>
+              <Image
+                src={slide.image}
+                alt={slide.alt}
+                width={1200}
+                height={675}
+                priority={index === 0}
+                draggable={false}
+                className="block w-full rounded-3xl select-none"
+              />
+            </Link>
           ))}
         </div>
       </div>
@@ -100,9 +108,9 @@ export function DiscoverCard() {
         {SLIDES.map((_, index) => (
           <button
             key={index}
-            onClick={() => emblaApi?.scrollTo(index)}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              selectedIndex === index
+            onClick={() => setCurrent(index)}
+            className={`h-2 rounded-full transition-all ${
+              current === index
                 ? "w-7 bg-blue-500"
                 : "w-2 bg-blue-300"
             }`}
