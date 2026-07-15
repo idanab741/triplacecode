@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -17,50 +17,40 @@ interface HotDestinationsProps {
   destinations: Destination[];
 }
 
-const NARROW = 58;   // collapsed strip width, px
-const WIDE = 220;     // expanded (focused) card width, px
-const GAP = 8;
-const STEP = NARROW + GAP;
-const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth "settle" easing
+const CARD_W = 152; // uniform card width, px
+const GAP = 10;
 
-/** מקטע "יעדים חמים": כרטיס אחד "פתוח" במרכז, השאר "סגורים".
- *  כל הסגנון נגזר מ-state של React (focusedIndex) — אין יותר מניפולציה
- *  ידנית של ה-DOM, כך שהעיצוב לא "נדרס" כשההורה מרנדר מחדש (למשל אחרי
- *  שההתאמה האישית מגיעה מהשרת ומעדכנת את destinations). */
+/** מקטע "יעדים חמים": כרטיסים אחידים, גלילה טבעית של הדפדפן (scroll-snap) —
+ *  בלי JS שנלחם באצבע של המשתמש, כל היעד תמיד גלוי ונגיש, לולאה אינסופית חלקה. */
 export function HotDestinations({ title, destinations }: HotDestinationsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const snapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [focusedIndex, setFocusedIndex] = useState(0);
+  const wrapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   const N = destinations.length;
-  const loop = useMemo(() => (N > 1 ? [...destinations, ...destinations] : destinations), [destinations, N]);
+  const loop = N > 1 ? [...destinations, ...destinations] : destinations;
+  const STEP = CARD_W + GAP;
 
   function markLoaded(key: string) {
     setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   }
 
+  // the browser's native scroll-snap handles all the swipe physics; we only
+  // step in once movement has fully stopped, to silently rewind the loop
+  // copy — the user never feels this happen
   function onScroll() {
     if (N <= 1) return;
-    clearTimeout(snapTimer.current);
-    snapTimer.current = setTimeout(() => {
+    clearTimeout(wrapTimer.current);
+    wrapTimer.current = setTimeout(() => {
       const el = scrollRef.current;
       if (!el) return;
       const raw = el.scrollLeft;
       const sign = Math.sign(raw || -1);
-      let idx = Math.round(Math.abs(raw) / STEP);
+      const idx = Math.round(Math.abs(raw) / STEP);
       if (idx >= N) {
-        // seamlessly jump back to the identical card in the first copy — no visible reset
-        idx -= N;
-        el.scrollLeft = sign * idx * STEP;
-      } else {
-        el.scrollTo({ left: sign * idx * STEP, behavior: "smooth" });
+        el.scrollLeft = sign * (idx - N) * STEP;
       }
-      setFocusedIndex(idx);
-    }, 100);
+    }, 150);
   }
-
-  // reset focus to the first card whenever a genuinely new destination list arrives
-  useEffect(() => { setFocusedIndex(0); }, [destinations]);
 
   return (
     <div className="px-6">
@@ -79,62 +69,45 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
         <div
           ref={scrollRef}
           onScroll={onScroll}
-          className="flex items-start gap-2 overflow-x-auto pb-3 pt-1"
-          style={{ scrollbarWidth: "none", scrollBehavior: "smooth" }}
+          className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory"
+          style={{ scrollbarWidth: "none" }}
         >
           {loop.map((destination, i) => {
             const key = destination.id + "-" + i;
-            const isFocused = i === focusedIndex;
             const isLoaded = loadedIds.has(key);
             return (
-              <div
+              <Link
                 key={key}
-                className="shrink-0 rounded-card"
-                style={{
-                  width: isFocused ? WIDE : NARROW,
-                  transform: isFocused ? "translateY(-2px)" : "translateY(0)",
-                  boxShadow: isFocused
-                    ? "0 14px 28px -8px rgba(16,24,40,.28)"
-                    : "0 3px 10px -2px rgba(16,24,40,.14)",
-                  transition: `width 320ms ${EASE}, transform 320ms ${EASE}, box-shadow 320ms ${EASE}`,
-                }}
+                href={`/destination/${destination.id}`}
+                className="relative block h-52 shrink-0 snap-start overflow-hidden rounded-card bg-bg-secondary shadow-soft"
+                style={{ width: CARD_W }}
               >
-                <Link
-                  href={`/destination/${destination.id}`}
-                  className="relative block h-52 overflow-hidden rounded-card bg-bg-secondary"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={destination.imageUrl}
-                    alt={destination.name}
-                    onLoad={() => markLoaded(key)}
-                    className="h-full w-full object-cover transition-opacity duration-500 ease-out"
-                    style={{ opacity: isLoaded ? 1 : 0 }}
-                  />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={destination.imageUrl}
+                  alt={destination.name}
+                  onLoad={() => markLoaded(key)}
+                  className="h-full w-full object-cover transition-opacity duration-500 ease-out"
+                  style={{ opacity: isLoaded ? 1 : 0 }}
+                />
 
-                  {destination.matchScore != null && (
-                    <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-[11px] font-bold tracking-tight text-white shadow-soft">
-                      {destination.matchScore}% התאמה
-                    </span>
+                {destination.matchScore != null && (
+                  <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-[11px] font-bold tracking-tight text-white shadow-soft">
+                    {destination.matchScore}% התאמה
+                  </span>
+                )}
+
+                {/* caption always visible — no open/closed state to keep the scroll math simple and reliable */}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.72)_0%,rgba(0,0,0,.3)_60%,transparent_100%)] p-2.5 pt-9 text-center">
+                  <p className="truncate text-sm font-bold leading-tight text-white">{destination.name}</p>
+                  {destination.subtitle && (
+                    <p className="truncate text-[11px] text-white/85">{destination.subtitle}</p>
                   )}
-
-                  <div
-                    className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-3 pt-11 text-center"
-                    style={{ opacity: isFocused ? 1 : 0, transition: `opacity 280ms ${EASE}` }}
-                  >
-                    <p className="text-base font-bold leading-tight text-white">{destination.name}</p>
-                    {destination.subtitle && (
-                      <p className="text-xs text-white/85">{destination.subtitle}</p>
-                    )}
-                    {destination.matchReason && (
-                      <p className="mt-0.5 truncate text-xs text-white/70">{destination.matchReason}</p>
-                    )}
-                  </div>
-                </Link>
-              </div>
+                </div>
+              </Link>
             );
           })}
-          <span className="shrink-0" style={{ width: "40%" }} />
+          <span className="shrink-0" style={{ width: 4 }} />
         </div>
       )}
     </div>
