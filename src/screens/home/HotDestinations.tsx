@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -20,71 +20,52 @@ interface HotDestinationsProps {
 const NARROW = 58;   // collapsed strip width, px
 const WIDE = 220;     // expanded (focused) card width, px
 const GAP = 8;
+const SWIPE_THRESHOLD = 35; // px of horizontal drag needed to count as a swipe
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 
-/** מקטע "יעדים חמים": כרטיס אחד "פתוח" במרכז, השאר "סגורים" (2 מכל צד נראים).
- *  ההתמקדות נקבעת ע"י מדידת המיקום האמיתי של כל כרטיס על המסך (לא נוסחת
- *  מרחק קבוע) — כי הרוחב משתנה (פתוח/סגור), ונוסחה קבועה "מתעקלת" ומדלגת. */
+/** מקטע "יעדים חמים": כרטיס אחד "פתוח" במרכז, 2 "סגורים" נראים מכל צד.
+ *  אין יותר גלילה חופשית של הדפדפן — כל החלקה מזיזה **צעד אחד בדיוק**
+ *  (index אחד קדימה/אחורה), נשלט לגמרי בקוד. זה מבטל את כל הבעיות של
+ *  "המרה" בין מיקום גלילה גולמי לאינדקס לוגי, שהיו הגורם לקפיצות. */
 export function HotDestinations({ title, destinations }: HotDestinationsProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
+  const dragStartX = useRef(0);
+  const dragging = useRef(false);
   const N = destinations.length;
-  const loop = useMemo(() => (N > 1 ? [...destinations, ...destinations] : destinations), [destinations, N]);
 
   function markLoaded(key: string) {
     setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   }
 
-  // finds whichever card's center is actually closest to the container's
-  // center right now — robust to RTL and to the variable card widths,
-  // unlike computing an index from scrollLeft / a fixed step size
-  function findClosestIndex(): number {
-    const container = scrollRef.current;
-    if (!container) return focusedIndex;
-    const containerRect = container.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-    let closest = 0;
-    let closestDist = Infinity;
-    cardRefs.current.forEach((card, i) => {
-      if (!card) return;
-      const rect = card.getBoundingClientRect();
-      const dist = Math.abs(rect.left + rect.width / 2 - containerCenter);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = i;
-      }
-    });
-    return closest;
-  }
-
-  function onScroll() {
+  function step(dir: 1 | -1) {
     if (N <= 1) return;
-    clearTimeout(settleTimer.current);
-    settleTimer.current = setTimeout(() => {
-      const idx = findClosestIndex();
-      const card = cardRefs.current[idx];
-      if (card) card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-
-      if (idx >= N) {
-        // we've drifted into the duplicated second copy — silently re-center
-        // on the identical card in the first copy, with no animation, so
-        // the loop feels endless instead of visibly resetting
-        const realIdx = idx - N;
-        setTimeout(() => {
-          const twin = cardRefs.current[realIdx];
-          if (twin) twin.scrollIntoView({ behavior: "instant" as ScrollBehavior, inline: "center", block: "nearest" });
-          setFocusedIndex(realIdx);
-        }, 260); // after the smooth scroll above has visually finished
-      } else {
-        setFocusedIndex(idx);
-      }
-    }, 130);
+    setFocusedIndex((i) => (i + dir + N) % N);
   }
 
-  useEffect(() => { setFocusedIndex(0); }, [destinations]);
+  function onPointerDown(e: React.PointerEvent) {
+    dragging.current = true;
+    dragStartX.current = e.clientX;
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const delta = e.clientX - dragStartX.current;
+    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
+    // RTL: dragging left (negative delta) moves to the next card, dragging right goes back
+    step(delta < 0 ? 1 : -1);
+  }
+
+  // window of exactly 2 collapsed neighbors on each side + the focused card
+  const visible = useMemo(() => {
+    if (N === 0) return [];
+    const offsets = N > 4 ? [-2, -1, 0, 1, 2] : Array.from({ length: N }, (_, k) => k - Math.floor(N / 2));
+    return offsets.map((off) => {
+      const idx = ((focusedIndex + off) % N + N) % N;
+      return { destination: destinations[idx], idx, off, isFocused: off === 0 };
+    });
+  }, [destinations, focusedIndex, N]);
 
   return (
     <div className="px-6">
@@ -101,19 +82,18 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
         </div>
       ) : (
         <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="flex items-start gap-2 overflow-x-auto pb-3 pt-1"
-          style={{ scrollbarWidth: "none" }}
+          ref={trackRef}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          className="flex touch-pan-y items-start justify-center gap-2 select-none"
+          style={{ cursor: "grab" }}
         >
-          {loop.map((destination, i) => {
-            const key = destination.id + "-" + i;
-            const isFocused = i === focusedIndex;
+          {visible.map(({ destination, idx, off, isFocused }) => {
+            const key = destination.id + "-slot-" + idx;
             const isLoaded = loadedIds.has(key);
             return (
               <div
                 key={key}
-                ref={(el) => { cardRefs.current[i] = el; }}
                 className="shrink-0 rounded-card"
                 style={{
                   width: isFocused ? WIDE : NARROW,
@@ -121,11 +101,15 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                   boxShadow: isFocused
                     ? "0 14px 28px -8px rgba(16,24,40,.28)"
                     : "0 3px 10px -2px rgba(16,24,40,.14)",
-                  transition: `width 320ms ${EASE}, transform 320ms ${EASE}, box-shadow 320ms ${EASE}`,
+                  transition: `width 300ms ${EASE}, transform 300ms ${EASE}, box-shadow 300ms ${EASE}`,
                 }}
               >
                 <Link
                   href={`/destination/${destination.id}`}
+                  onClick={(e) => {
+                    // tapping a side (collapsed) card just brings it into focus — doesn't navigate yet
+                    if (!isFocused) { e.preventDefault(); step(off < 0 ? -1 : 1); }
+                  }}
                   className="relative block h-52 overflow-hidden rounded-card bg-bg-secondary"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -145,7 +129,7 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
 
                   <div
                     className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-3 pt-11 text-center"
-                    style={{ opacity: isFocused ? 1 : 0, transition: `opacity 280ms ${EASE}` }}
+                    style={{ opacity: isFocused ? 1 : 0, transition: `opacity 260ms ${EASE}` }}
                   >
                     <p className="text-base font-bold leading-tight text-white">{destination.name}</p>
                     {destination.subtitle && (
@@ -159,7 +143,22 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
               </div>
             );
           })}
-          <span className="shrink-0" style={{ width: "40%" }} />
+        </div>
+      )}
+
+      {N > 1 && (
+        <div className="mt-3 flex justify-center gap-1.5">
+          {destinations.map((_, i) => (
+            <span
+              key={i}
+              className="h-1.5 rounded-full transition-all duration-300"
+              style={{
+                width: i === focusedIndex ? 16 : 6,
+                backgroundColor: i === focusedIndex ? "var(--color-primary-start)" : "var(--color-ink-secondary)",
+                opacity: i === focusedIndex ? 1 : 0.3,
+              }}
+            />
+          ))}
         </div>
       )}
     </div>
