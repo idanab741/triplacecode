@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 
 export interface Destination {
   id: string;
@@ -17,34 +18,39 @@ interface HotDestinationsProps {
   destinations: Destination[];
 }
 
-const CARD_W = 172; // uniform card width, px
-const GAP = 10;
-
-/** מקטע "יעדים חמים": כרטיסים אחידים, גלילה טבעית של הדפדפן (scroll-snap),
- *  עד קצה המסך (edge-to-edge). זו הגרסה היציבה שכבר אישרנו שמציגה תמונות. */
+/** מקטע "יעדים חמים": כרטיס אחד "פתוח"/מוגדל במרכז, השאר "סגורים" קטנים
+ *  יותר סביבו. הגלילה/ההצמדה/הלולאה עצמן מנוהלות ע"י Embla Carousel
+ *  (ספרייה בדוקה) — אנחנו רק שואלים אותה "איזה כרטיס במרכז עכשיו"
+ *  ומוסיפים לו קלאס שמגדיל אותו. */
 export function HotDestinations({ title, destinations }: HotDestinationsProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const wrapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: destinations.length > 1,
+    direction: "rtl",
+    align: "center",
+    containScroll: false,
+    dragFree: false,
+  });
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
-  const N = destinations.length;
-  const loop = N > 1 ? [...destinations, ...destinations] : destinations;
-  const STEP = CARD_W + GAP;
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on("select", onSelect);
+    emblaApi.on("reInit", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+      emblaApi.off("reInit", onSelect);
+    };
+  }, [emblaApi, onSelect]);
 
   function markLoaded(key: string) {
     setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
-  }
-
-  function onScroll() {
-    if (N <= 1) return;
-    clearTimeout(wrapTimer.current);
-    wrapTimer.current = setTimeout(() => {
-      const el = scrollRef.current;
-      if (!el) return;
-      const raw = el.scrollLeft;
-      const sign = Math.sign(raw || -1);
-      const idx = Math.round(Math.abs(raw) / STEP);
-      if (idx >= N) el.scrollLeft = sign * (idx - N) * STEP;
-    }, 150);
   }
 
   return (
@@ -61,46 +67,56 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
           <p className="text-xs text-ink-secondary">בקרוב נציג כאן המלצות מותאמות אישית</p>
         </div>
       ) : (
-        <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="-mx-6 flex gap-2.5 overflow-x-auto px-6 pb-2 snap-x snap-mandatory"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {loop.map((destination, i) => {
-            const key = destination.id + "-" + i;
-            const isLoaded = loadedIds.has(key);
-            return (
-              <Link
-                key={key}
-                href={`/destination/${destination.id}`}
-                className="relative block h-56 shrink-0 snap-start overflow-hidden rounded-card bg-bg-secondary shadow-soft"
-                style={{ width: CARD_W }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={destination.imageUrl}
-                  alt={destination.name}
-                  onLoad={() => markLoaded(key)}
-                  className="h-full w-full object-cover transition-opacity duration-500 ease-out"
-                  style={{ opacity: isLoaded ? 1 : 0 }}
-                />
+        <div className="-mx-6 overflow-hidden px-6" ref={emblaRef}>
+          <div className="flex gap-2.5">
+            {destinations.map((destination, i) => {
+              const isFocused = i === selectedIndex;
+              const key = destination.id + "-" + i;
+              const isLoaded = loadedIds.has(key);
+              return (
+                <div
+                  key={key}
+                  className="min-w-0 shrink-0 grow-0 transition-transform duration-300 ease-out"
+                  style={{
+                    flexBasis: "38%",
+                    transform: isFocused ? "scale(1.18)" : "scale(1)",
+                    transformOrigin: "center center",
+                    zIndex: isFocused ? 2 : 1,
+                  }}
+                >
+                  <Link
+                    href={`/destination/${destination.id}`}
+                    className="relative block h-40 overflow-hidden rounded-card bg-bg-secondary shadow-soft"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={destination.imageUrl}
+                      alt={destination.name}
+                      onLoad={() => markLoaded(key)}
+                      className="h-full w-full object-cover transition-opacity duration-500 ease-out"
+                      style={{ opacity: isLoaded ? 1 : 0 }}
+                    />
 
-                {destination.matchScore != null && (
-                  <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-[11px] font-bold tracking-tight text-white shadow-soft">
-                    {destination.matchScore}% התאמה
-                  </span>
-                )}
+                    {destination.matchScore != null && isFocused && (
+                      <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2 py-0.5 text-[10px] font-bold tracking-tight text-white shadow-soft">
+                        {destination.matchScore}% התאמה
+                      </span>
+                    )}
 
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.72)_0%,rgba(0,0,0,.3)_60%,transparent_100%)] p-3 pt-10 text-center">
-                  <p className="truncate text-base font-bold leading-tight text-white">{destination.name}</p>
-                  {destination.subtitle && (
-                    <p className="truncate text-xs text-white/85">{destination.subtitle}</p>
-                  )}
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.3)_60%,transparent_100%)] p-2 pt-8 text-center transition-opacity duration-300"
+                      style={{ opacity: isFocused ? 1 : 0 }}
+                    >
+                      <p className="truncate text-sm font-bold leading-tight text-white">{destination.name}</p>
+                      {destination.subtitle && (
+                        <p className="truncate text-[10px] text-white/85">{destination.subtitle}</p>
+                      )}
+                    </div>
+                  </Link>
                 </div>
-              </Link>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
