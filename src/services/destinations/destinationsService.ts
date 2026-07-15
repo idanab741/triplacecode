@@ -7,7 +7,7 @@ export interface FeaturedDestination {
   image_url: string | null;
 }
 
-export async function getFeaturedDestinations(limit = 10): Promise<FeaturedDestination[]> {
+export async function getFeaturedDestinations(limit = 20): Promise<FeaturedDestination[]> {
   const supabase = createClient();
   const { data } = await supabase
     .from("destinations")
