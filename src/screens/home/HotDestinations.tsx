@@ -88,14 +88,14 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                   key={key}
                   className="min-w-0 shrink-0 grow-0 transition-[flex-basis] duration-300 ease-out"
                   style={{
-                    flexBasis: isFocused ? 200 : 42,
+                    flexBasis: isFocused ? 230 : 48,
                     zIndex: isFocused ? 2 : 1,
                     marginInlineEnd: 8, // margin instead of CSS `gap` — Embla's snap-point math can drift with `gap` on variable-width slides
                   }}
                 >
                   <Link
                     href={`/destination/${destination.id}`}
-                    className="relative block h-40 overflow-hidden rounded-card bg-bg-secondary shadow-soft"
+                    className="relative block h-[180px] overflow-hidden rounded-card bg-bg-secondary shadow-soft"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
