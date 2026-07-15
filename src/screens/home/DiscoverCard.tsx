@@ -1,9 +1,11 @@
 export function DiscoverCard() {
   return (
     <div className="px-6">
-      <h1 className="text-4xl font-bold text-red-600">
-        TEST DISCOVER CARD
-      </h1>
+      <img
+        src="/images/discover/tripmatch.png"
+        alt=""
+        style={{ width: "100%", display: "block" }}
+      />
     </div>
   );
 }
