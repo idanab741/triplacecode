@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -17,75 +17,35 @@ interface HotDestinationsProps {
   destinations: Destination[];
 }
 
-const NARROW = 64;   // collapsed strip width, px — a bit bigger than before
-const WIDE = 240;     // expanded (focused) card width, px — a bit bigger than before
-const GAP = 8;
-const STEP = NARROW + GAP;
-const SWIPE_THRESHOLD = 35;
-const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
-// if a swipe ever turns out to move the wrong direction, flip this to -1 — nothing else needs to change
-const RTL_SIGN = 1;
+const CARD_W = 172; // uniform card width, px
+const GAP = 10;
 
-/** מקטע "יעדים חמים": כרטיס פתוח במרכז, שכנים סגורים מסביב (אפשר כמה שנכנס,
- *  גם חתוכים בקצה המסך — אין הגבלה למספר קבוע). המיקום נגזר ישירות מ-state
- *  (transform: translateX), בלי גלילה חופשית ובלי מדידה — אין יותר "רץ לבד". */
+/** מקטע "יעדים חמים": כרטיסים אחידים, גלילה טבעית של הדפדפן (scroll-snap),
+ *  עד קצה המסך (edge-to-edge). זו הגרסה היציבה שכבר אישרנו שמציגה תמונות. */
 export function HotDestinations({ title, destinations }: HotDestinationsProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [focusedIndex, setFocusedIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const wrapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
-  const dragStartX = useRef(0);
-  const dragging = useRef(false);
   const N = destinations.length;
-
-  // triple copy: a full buffer on each side of the "real" middle copy, so
-  // peeking neighbors are always correct with zero special-case wrap logic
-  const strip = useMemo(
-    () => (N > 0 ? [...destinations, ...destinations, ...destinations] : []),
-    [destinations, N]
-  );
-  const focusedGlobalIndex = N + focusedIndex; // position of the focused card inside `strip`
+  const loop = N > 1 ? [...destinations, ...destinations] : destinations;
+  const STEP = CARD_W + GAP;
 
   function markLoaded(key: string) {
     setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   }
 
-  function step(dir: 1 | -1) {
+  function onScroll() {
     if (N <= 1) return;
-    setFocusedIndex((i) => (i + dir + N) % N);
+    clearTimeout(wrapTimer.current);
+    wrapTimer.current = setTimeout(() => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const raw = el.scrollLeft;
+      const sign = Math.sign(raw || -1);
+      const idx = Math.round(Math.abs(raw) / STEP);
+      if (idx >= N) el.scrollLeft = sign * (idx - N) * STEP;
+    }, 150);
   }
-
-  function onPointerDown(e: React.PointerEvent) {
-    dragging.current = true;
-    dragStartX.current = e.clientX;
-  }
-  function onPointerUp(e: React.PointerEvent) {
-    if (!dragging.current) return;
-    dragging.current = false;
-    const delta = e.clientX - dragStartX.current;
-    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
-    step((delta > 0 ? 1 : -1) * RTL_SIGN as 1 | -1);
-  }
-
-  // use the window's own width instead of measuring this specific element —
-  // measuring the ref's clientWidth was returning 0 in production for a
-  // reason we couldn't pin down; window.innerWidth is always reliable and
-  // doesn't depend on this element's own layout timing at all.
-  const [containerW, setContainerW] = useState(0);
-  useEffect(() => {
-    function measure() {
-      setContainerW(Math.max(0, window.innerWidth - 48)); // minus our own px-6 (24px) on each side
-    }
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  // every card before the focused one in `strip` is NARROW (the focused
-  // card is the only WIDE one in the entire strip), so the offset to reach
-  // it is a simple, exact multiple — no measuring, no rounding drift
-  const offsetToFocused = focusedGlobalIndex * STEP;
-  const ready = containerW > 0;
-  const translateX = ready ? containerW / 2 - offsetToFocused - WIDE / 2 : 0;
 
   return (
     <div className="px-6">
@@ -102,98 +62,45 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
         </div>
       ) : (
         <div
-          ref={containerRef}
-          onPointerDown={onPointerDown}
-          onPointerUp={onPointerUp}
-          className="-mx-6 min-h-[208px] w-full overflow-hidden px-6 select-none"
-          style={{ touchAction: "pan-y", cursor: "grab" }}
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="-mx-6 flex gap-2.5 overflow-x-auto px-6 pb-2 snap-x snap-mandatory"
+          style={{ scrollbarWidth: "none" }}
         >
-          {/* TEMPORARY DEBUG LINE — tells us the real numbers instead of guessing.
-              Delete this <p> once the carousel is confirmed working. */}
-          <p style={{ fontSize: 11, color: "red", background: "#fff", padding: 2 }}>
-            DEBUG: containerW={containerW} ready={String(ready)} N={N} stripLen={strip.length} translateX={Math.round(translateX)}
-          </p>
-          <div
-            className="flex items-start gap-2"
-            style={{
-              transform: `translateX(${translateX}px)`,
-              transition: ready ? `transform 320ms ${EASE}` : "none",
-              opacity: ready ? 1 : 0,
-              width: "max-content",
-            }}
-          >
-            {strip.map((destination, gi) => {
-              const isFocused = gi === focusedGlobalIndex;
-              const key = destination.id + "-pos-" + gi;
-              const isLoaded = loadedIds.has(key);
-              return (
-                <div
-                  key={key}
-                  className="shrink-0 rounded-card"
-                  style={{
-                    width: isFocused ? WIDE : NARROW,
-                    transform: isFocused ? "translateY(-2px)" : "translateY(0)",
-                    boxShadow: isFocused
-                      ? "0 14px 28px -8px rgba(16,24,40,.28)"
-                      : "0 3px 10px -2px rgba(16,24,40,.14)",
-                    transition: `width 320ms ${EASE}, transform 320ms ${EASE}, box-shadow 320ms ${EASE}`,
-                  }}
-                >
-                  <Link
-                    href={`/destination/${destination.id}`}
-                    onClick={(e) => {
-                      if (!isFocused) { e.preventDefault(); step(gi < focusedGlobalIndex ? -1 : 1); }
-                    }}
-                    className="relative block h-52 overflow-hidden rounded-card bg-bg-secondary"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={destination.imageUrl}
-                      alt={destination.name}
-                      onLoad={() => markLoaded(key)}
-                      className="h-full w-full object-cover transition-opacity duration-500 ease-out"
-                      style={{ opacity: isLoaded ? 1 : 0 }}
-                    />
+          {loop.map((destination, i) => {
+            const key = destination.id + "-" + i;
+            const isLoaded = loadedIds.has(key);
+            return (
+              <Link
+                key={key}
+                href={`/destination/${destination.id}`}
+                className="relative block h-56 shrink-0 snap-start overflow-hidden rounded-card bg-bg-secondary shadow-soft"
+                style={{ width: CARD_W }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={destination.imageUrl}
+                  alt={destination.name}
+                  onLoad={() => markLoaded(key)}
+                  className="h-full w-full object-cover transition-opacity duration-500 ease-out"
+                  style={{ opacity: isLoaded ? 1 : 0 }}
+                />
 
-                    {destination.matchScore != null && (
-                      <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-[11px] font-bold tracking-tight text-white shadow-soft">
-                        {destination.matchScore}% התאמה
-                      </span>
-                    )}
+                {destination.matchScore != null && (
+                  <span className="absolute start-2 top-2 whitespace-nowrap rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-2.5 py-1 text-[11px] font-bold tracking-tight text-white shadow-soft">
+                    {destination.matchScore}% התאמה
+                  </span>
+                )}
 
-                    <div
-                      className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-3 pt-11 text-center"
-                      style={{ opacity: isFocused ? 1 : 0, transition: `opacity 260ms ${EASE}` }}
-                    >
-                      <p className="text-base font-bold leading-tight text-white">{destination.name}</p>
-                      {destination.subtitle && (
-                        <p className="text-xs text-white/85">{destination.subtitle}</p>
-                      )}
-                      {destination.matchReason && (
-                        <p className="mt-0.5 truncate text-xs text-white/70">{destination.matchReason}</p>
-                      )}
-                    </div>
-                  </Link>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.72)_0%,rgba(0,0,0,.3)_60%,transparent_100%)] p-3 pt-10 text-center">
+                  <p className="truncate text-base font-bold leading-tight text-white">{destination.name}</p>
+                  {destination.subtitle && (
+                    <p className="truncate text-xs text-white/85">{destination.subtitle}</p>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {N > 1 && (
-        <div className="mt-3 flex justify-center gap-1.5">
-          {destinations.map((_, i) => (
-            <span
-              key={i}
-              className="h-1.5 rounded-full transition-all duration-300"
-              style={{
-                width: i === focusedIndex ? 16 : 6,
-                backgroundColor: i === focusedIndex ? "var(--color-primary-start)" : "var(--color-ink-secondary)",
-                opacity: i === focusedIndex ? 1 : 0.3,
-              }}
-            />
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
