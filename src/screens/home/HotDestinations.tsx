@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { Destination } from "@/screens/home/HotDestinations";
 
 export interface Destination {
   id: string;
