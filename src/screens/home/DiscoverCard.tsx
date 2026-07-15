@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
@@ -11,25 +12,25 @@ interface DiscoverSlide {
   alt: string;
 }
 
-const SLIDES: DiscoverSlide[] = [
+const SLIDES = [
   {
-    href: "#",
+    href: "/tripmatch",
     image: "/images/discover/tripmatch.png",
     alt: "TripMatch",
   },
   {
-    href: "#",
+    href: "/ai",
     image: "/images/discover/ai-powered.png",
     alt: "AI Powered",
   },
   {
-    href: "#",
+    href: "/places",
     image: "/images/discover/places.png",
     alt: "Places",
   },
 ];
 
-const AUTOPLAY_DELAY = 7000;
+const AUTOPLAY_DELAY = 5500;
 
 export function DiscoverCard() {
   const autoplay = Autoplay({
@@ -58,6 +59,7 @@ export function DiscoverCard() {
     if (!emblaApi) return;
 
     onSelect();
+
     emblaApi.on("select", onSelect);
 
     return () => {
@@ -72,21 +74,23 @@ export function DiscoverCard() {
       </h3>
 
       <div
-        className="overflow-hidden rounded-[24px] shadow-xl"
+        className="overflow-hidden rounded-3xl shadow-lg"
         ref={emblaRef}
       >
         <div className="flex">
           {SLIDES.map((slide, index) => (
             <div
               key={index}
-              className="flex-[0_0_100%]"
+              className="min-w-0 flex-[0_0_100%]"
             >
               <Link href={slide.href}>
-                <img
+                <Image
                   src={slide.image}
                   alt={slide.alt}
-                  className="block w-full rounded-[24px]"
-                  draggable={false}
+                  width={1200}
+                  height={675}
+                  className="block w-full h-auto"
+                  priority={index === 0}
                 />
               </Link>
             </div>
@@ -96,7 +100,7 @@ export function DiscoverCard() {
 
       <div className="mt-3 flex justify-center gap-2">
         {SLIDES.map((_, index) => (
-          <div
+          <span
             key={index}
             className={`h-2 rounded-full transition-all duration-300 ${
               index === selectedIndex
