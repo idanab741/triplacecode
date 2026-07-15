@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -66,14 +66,14 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
     step((delta > 0 ? 1 : -1) * RTL_SIGN as 1 | -1);
   }
 
-  // measure the real container width AFTER the browser has actually laid
-  // it out — reading a ref's clientWidth during render itself can return 0
-  // (before layout happens), and with overflow:hidden a 0-width box shows
-  // ABSOLUTELY NOTHING, no matter what's inside it. This was the bug.
+  // use the window's own width instead of measuring this specific element —
+  // measuring the ref's clientWidth was returning 0 in production for a
+  // reason we couldn't pin down; window.innerWidth is always reliable and
+  // doesn't depend on this element's own layout timing at all.
   const [containerW, setContainerW] = useState(0);
-  useLayoutEffect(() => {
+  useEffect(() => {
     function measure() {
-      if (containerRef.current) setContainerW(containerRef.current.clientWidth);
+      setContainerW(Math.max(0, window.innerWidth - 48)); // minus our own px-6 (24px) on each side
     }
     measure();
     window.addEventListener("resize", measure);
