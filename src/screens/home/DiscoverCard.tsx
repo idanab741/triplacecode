@@ -84,12 +84,11 @@ export function DiscoverCard() {
               className="min-w-0 flex-[0_0_100%]"
             >
               <Link href={slide.href}>
-                <Image
-                  src={slide.image}
-                  alt={slide.alt}
-                  width={1200}
-                  height={675}
-                  className="block w-full h-auto"
+               <img
+  src={slide.image}
+  alt={slide.alt}
+  className="block w-full h-auto"
+/>
                   priority={index === 0}
                 />
               </Link>
