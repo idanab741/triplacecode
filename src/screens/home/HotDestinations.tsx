@@ -108,6 +108,11 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
           className="-mx-6 min-h-[208px] w-full overflow-hidden px-6 select-none"
           style={{ touchAction: "pan-y", cursor: "grab" }}
         >
+          {/* TEMPORARY DEBUG LINE — tells us the real numbers instead of guessing.
+              Delete this <p> once the carousel is confirmed working. */}
+          <p style={{ fontSize: 11, color: "red", background: "#fff", padding: 2 }}>
+            DEBUG: containerW={containerW} ready={String(ready)} N={N} stripLen={strip.length} translateX={Math.round(translateX)}
+          </p>
           <div
             className="flex items-start gap-2"
             style={{
