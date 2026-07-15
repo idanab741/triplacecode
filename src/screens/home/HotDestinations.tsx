@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface Destination {
   id: string;
@@ -21,39 +21,22 @@ const NARROW = 58;   // collapsed strip width, px
 const WIDE = 220;     // expanded (focused) card width, px
 const GAP = 8;
 const STEP = NARROW + GAP;
-const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth "settle" easing, not linear
+const EASE = "cubic-bezier(0.22, 1, 0.36, 1)"; // smooth "settle" easing
 
-/** מקטע "יעדים חמים": כרטיס אחד "פתוח" במרכז עם כיתוב בתוך התמונה, השאר "סגורים".
- *  הגודל משתנה רק אחרי שהגלילה נעצרת (לא באופן רציף תוך כדי גרירה). */
+/** מקטע "יעדים חמים": כרטיס אחד "פתוח" במרכז, השאר "סגורים".
+ *  כל הסגנון נגזר מ-state של React (focusedIndex) — אין יותר מניפולציה
+ *  ידנית של ה-DOM, כך שהעיצוב לא "נדרס" כשההורה מרנדר מחדש (למשל אחרי
+ *  שההתאמה האישית מגיעה מהשרת ומעדכנת את destinations). */
 export function HotDestinations({ title, destinations }: HotDestinationsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const labelRefs = useRef<Array<HTMLDivElement | null>>([]);
   const snapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   const N = destinations.length;
-  const loop = N > 1 ? [...destinations, ...destinations] : destinations;
+  const loop = useMemo(() => (N > 1 ? [...destinations, ...destinations] : destinations), [destinations, N]);
 
-  function markLoaded(id: string) {
-    setLoadedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
-  }
-
-  // sets the open/closed state for whichever index is currently focused —
-  // called only once scrolling has settled, never on every scroll frame
-  function settle(focusedIndex: number) {
-    loop.forEach((_, i) => {
-      const isFocused = i === focusedIndex;
-      const card = cardRefs.current[i];
-      const label = labelRefs.current[i];
-      if (card) {
-        card.style.width = `${isFocused ? WIDE : NARROW}px`;
-        card.style.transform = isFocused ? "translateY(-2px)" : "translateY(0)";
-        card.style.boxShadow = isFocused
-          ? "0 14px 28px -8px rgba(16,24,40,.28)"
-          : "0 3px 10px -2px rgba(16,24,40,.14)";
-      }
-      if (label) label.style.opacity = isFocused ? "1" : "0";
-    });
+  function markLoaded(key: string) {
+    setLoadedIds((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
   }
 
   function onScroll() {
@@ -72,11 +55,12 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
       } else {
         el.scrollTo({ left: sign * idx * STEP, behavior: "smooth" });
       }
-      settle(idx);
-    }, 120);
+      setFocusedIndex(idx);
+    }, 100);
   }
 
-  useEffect(() => { settle(0); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // reset focus to the first card whenever a genuinely new destination list arrives
+  useEffect(() => { setFocusedIndex(0); }, [destinations]);
 
   return (
     <div className="px-6">
@@ -96,21 +80,23 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
           ref={scrollRef}
           onScroll={onScroll}
           className="flex items-start gap-2 overflow-x-auto pb-3 pt-1"
-          style={{ scrollbarWidth: "none" }}
+          style={{ scrollbarWidth: "none", scrollBehavior: "smooth" }}
         >
           {loop.map((destination, i) => {
-            const isLoaded = loadedIds.has(destination.id + "-" + i);
+            const key = destination.id + "-" + i;
+            const isFocused = i === focusedIndex;
+            const isLoaded = loadedIds.has(key);
             return (
               <div
-                key={destination.id + "-" + i}
-                ref={(el) => { cardRefs.current[i] = el; }}
+                key={key}
                 className="shrink-0 rounded-card"
                 style={{
-                  width: i === 0 ? WIDE : NARROW,
-                  transition: `width 320ms ${EASE}, transform 320ms ${EASE}, box-shadow 320ms ${EASE}`,
-                  boxShadow: i === 0
+                  width: isFocused ? WIDE : NARROW,
+                  transform: isFocused ? "translateY(-2px)" : "translateY(0)",
+                  boxShadow: isFocused
                     ? "0 14px 28px -8px rgba(16,24,40,.28)"
                     : "0 3px 10px -2px rgba(16,24,40,.14)",
+                  transition: `width 320ms ${EASE}, transform 320ms ${EASE}, box-shadow 320ms ${EASE}`,
                 }}
               >
                 <Link
@@ -121,7 +107,7 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                   <img
                     src={destination.imageUrl}
                     alt={destination.name}
-                    onLoad={() => markLoaded(destination.id + "-" + i)}
+                    onLoad={() => markLoaded(key)}
                     className="h-full w-full object-cover transition-opacity duration-500 ease-out"
                     style={{ opacity: isLoaded ? 1 : 0 }}
                   />
@@ -132,11 +118,9 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                     </span>
                   )}
 
-                  {/* caption is overlaid INSIDE the photo, bottom gradient */}
                   <div
-                    ref={(el) => { labelRefs.current[i] = el; }}
-                    className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-3 pt-11 text-center opacity-0"
-                    style={{ transition: `opacity 280ms ${EASE}` }}
+                    className="pointer-events-none absolute inset-x-0 bottom-0 whitespace-nowrap bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-3 pt-11 text-center"
+                    style={{ opacity: isFocused ? 1 : 0, transition: `opacity 280ms ${EASE}` }}
                   >
                     <p className="text-base font-bold leading-tight text-white">{destination.name}</p>
                     {destination.subtitle && (
