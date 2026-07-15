@@ -22,18 +22,20 @@ const SLIDES = [
   },
 ];
 
-const AUTOPLAY_DELAY = 5000;
+const AUTO_PLAY = 5000;
 
 export function DiscoverCard() {
   const [current, setCurrent] = useState(0);
-  const startX = useRef(0);
+
+  const touchStart = useRef(0);
+  const touchEnd = useRef(0);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % SLIDES.length);
-    }, AUTOPLAY_DELAY);
+    }, AUTO_PLAY);
 
-    return () => clearInterval(timer);
+    return () => clearInterval(interval);
   }, []);
 
   const next = () => {
@@ -44,6 +46,26 @@ export function DiscoverCard() {
     setCurrent((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const distance = touchStart.current - touchEnd.current;
+
+    if (distance > 50) {
+      next();
+    }
+
+    if (distance < -50) {
+      prev();
+    }
+  };
+
   return (
     <section className="px-6">
       <h3 className="mb-3 text-lg font-semibold text-ink">
@@ -51,44 +73,32 @@ export function DiscoverCard() {
       </h3>
 
       <div
-        className="overflow-hidden rounded-3xl shadow-xl"
-        onTouchStart={(e) => {
-          startX.current = e.touches[0].clientX;
-        }}
-        onTouchEnd={(e) => {
-          const diff = startX.current - e.changedTouches[0].clientX;
-
-          if (diff > 50) next();
-          if (diff < -50) prev();
-        }}
+        className="relative overflow-hidden rounded-3xl shadow-xl"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div
-          className="flex transition-transform duration-500 ease-in-out"
-          style={{
-            width: `${SLIDES.length * 100}%`,
-            transform: `translateX(-${current * (100 / SLIDES.length)}%)`,
+  className="flex w-full transition-transform duration-500 ease-in-out"          style={{
+            transform: `translateX(-${current * 100}%)`,
           }}
         >
           {SLIDES.map((slide, index) => (
-            <div
-              key={index}
-              style={{
-                width: `${100 / SLIDES.length}%`,
-              }}
-              className="flex-shrink-0"
-            >
-              <Link href={slide.href} className="block">
-                <Image
-                  src={slide.image}
-                  alt={slide.alt}
-                  width={1200}
-                  height={675}
-                  priority={index === 0}
-                  draggable={false}
-                  className="block w-full h-auto"
-                />
-              </Link>
-            </div>
+        <Link
+  key={index}
+  href={slide.href}
+  className="block min-w-full flex-none"
+>
+              <Image
+                src={slide.image}
+                alt={slide.alt}
+                width={1200}
+                height={675}
+                priority={index === 0}
+                draggable={false}
+                className="block w-full rounded-3xl select-none"
+              />
+            </Link>
           ))}
         </div>
       </div>
@@ -100,7 +110,7 @@ export function DiscoverCard() {
             onClick={() => setCurrent(index)}
             className={`h-2 rounded-full transition-all ${
               current === index
-                ? "w-6 bg-blue-500"
+                ? "w-7 bg-blue-500"
                 : "w-2 bg-blue-300"
             }`}
           />
