@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 export interface BottomNavItem {
@@ -17,45 +17,20 @@ interface BottomNavProps {
   onChange?: (id: string) => void;
 }
 
-/** בר ניווט תחתון צף עם אפקט זכוכית (glass), ופס כחול נע שמחליק לכפתור הפעיל. */
+/** בר ניווט תחתון קבוע, לבן ומתוח לכל רוחב/עד תחתית המסך, עם כפתור AI מוגבה ומיוחד במרכז. */
 export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
-  const itemRefs = useRef<Record<string, HTMLElement | null>>({});
-  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
-
-  useLayoutEffect(() => {
-    const activeItem = items.find((i) => i.id === activeId);
-    if (!activeItem || activeItem.elevated) {
-      setIndicator(null);
-      return;
-    }
-    const el = itemRefs.current[activeId];
-    if (el) {
-      setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
-    }
-  }, [activeId, items]);
-
   return (
-    <nav className="fixed inset-x-0 bottom-6 z-50 flex justify-center">
-      <div className="relative flex items-end gap-1 rounded-pill border border-white/60 bg-bg/70 p-2 shadow-soft backdrop-blur-xl">
-        {indicator && (
-          <span
-            className="pointer-events-none absolute bottom-2 top-2 z-0 rounded-pill transition-all duration-300 ease-out"
-            style={{
-              left: indicator.left,
-              width: indicator.width,
-              background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))",
-            }}
-          />
-        )}
-
+    <nav className="fixed inset-x-0 bottom-0 z-50">
+      <div className="relative flex items-center justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),10px)] pt-2.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">
         {items.map((item) => {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
             const content = (
-              <span className="relative -mt-8 flex h-16 w-16 items-center justify-center">
-                <span className="ai-ring absolute inset-0 rounded-full" />
-                <span className="relative z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-sm font-bold tracking-wide text-white shadow-soft">
+              <span className="relative -mt-9 flex h-[72px] w-[72px] items-center justify-center">
+                <span className="ai-glow absolute inset-0 rounded-full" />
+                <span className="ai-ring absolute inset-[3px] rounded-full" />
+                <span className="relative z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-sm font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
                   <span className="ai-orb absolute" />
                   <span className="relative z-10">{item.icon}</span>
                 </span>
@@ -77,21 +52,17 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             );
           }
 
-          const itemClasses = `relative z-10 flex flex-col items-center gap-0.5 rounded-pill px-4 py-2 text-xs font-medium transition-colors ${
-            isActive ? "text-white" : "text-ink-secondary hover:text-ink"
+          const itemClasses = `flex flex-col items-center gap-1 px-3 py-1 text-[11px] font-medium transition-colors ${
+            isActive ? "text-ink" : "text-ink-secondary"
           }`;
 
-          const setRef = (el: HTMLAnchorElement | HTMLButtonElement | null) => {
-            itemRefs.current[item.id] = el;
-          };
-
           return item.href ? (
-            <Link key={item.id} href={item.href} ref={setRef} className={itemClasses}>
+            <Link key={item.id} href={item.href} className={itemClasses}>
               <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ) : (
-            <button key={item.id} type="button" ref={setRef} onClick={() => onChange?.(item.id)} className={itemClasses}>
+            <button key={item.id} type="button" onClick={() => onChange?.(item.id)} className={itemClasses}>
               <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </button>
@@ -100,24 +71,31 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
       </div>
 
       <style jsx global>{`
+        .ai-glow {
+          background: radial-gradient(circle, rgba(24, 119, 242, 0.35), transparent 70%);
+          filter: blur(6px);
+          animation: ai-glow-pulse 2.6s ease-in-out infinite;
+        }
+        @keyframes ai-glow-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.08); }
+        }
         .ai-ring {
           background: conic-gradient(
             from 0deg,
             transparent 0%,
-            var(--color-primary-start) 35%,
+            var(--color-primary-start) 30%,
             var(--color-primary-end) 50%,
-            transparent 75%
+            transparent 70%
           );
           padding: 3px;
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: ai-ring-spin 2.4s linear infinite;
+          animation: ai-ring-spin 2.2s linear infinite;
         }
         @keyframes ai-ring-spin {
-          to {
-            transform: rotate(360deg);
-          }
+          to { transform: rotate(360deg); }
         }
         .ai-orb {
           inset: -25%;
@@ -127,22 +105,12 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           animation: ai-orb-move 5s ease-in-out infinite, ai-orb-pulse 2.6s ease-in-out infinite;
         }
         @keyframes ai-orb-move {
-          0%,
-          100% {
-            transform: rotate(0deg) scale(1);
-          }
-          50% {
-            transform: rotate(20deg) scale(1.12);
-          }
+          0%, 100% { transform: rotate(0deg) scale(1); }
+          50% { transform: rotate(20deg) scale(1.12); }
         }
         @keyframes ai-orb-pulse {
-          0%,
-          100% {
-            filter: brightness(1);
-          }
-          50% {
-            filter: brightness(1.18);
-          }
+          0%, 100% { filter: brightness(1); }
+          50% { filter: brightness(1.18); }
         }
       `}</style>
     </nav>
