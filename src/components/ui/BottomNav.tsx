@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { AiGlobeIcon } from "./AiGlobeIcon";
 
 export interface BottomNavItem {
   id: string;
@@ -21,33 +22,41 @@ interface BottomNavProps {
 export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50">
-      <div className="relative flex items-center justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">
-        {items.map((item) => {
+<div className="relative flex items-end justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">        {items.map((item) => {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
             const content = (
-              <span className="relative -mt-8 flex h-[70px] w-[70px] items-center justify-center">
-                <span className="ai-glow absolute inset-0 rounded-full" />
-                <span className="ai-ring absolute inset-[3px] rounded-full" />
-                <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full text-base font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
-                  <span className="ai-orb absolute" />
-                  <span className="relative z-10">{item.icon}</span>
+              <span className="relative -mt-9 flex h-[70px] w-[70px] items-center justify-center">
+                  <span className="ai-glow absolute inset-0 rounded-full" style={isActive ? undefined : { opacity: 0 }} />
+                <span
+                  className="ai-ring absolute inset-[3px] rounded-full"
+                  style={!isActive ? { background: "conic-gradient(from 0deg, transparent 0%, #0f1522 30%, #3a4150 50%, transparent 70%)" } : undefined}
+                />                <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
+                  <AiGlobeIcon active={isActive} size={56} />
                 </span>
               </span>
             );
+          const elevatedLabel = item.label ? (
+              <span className="text-xs font-medium" style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+                {item.label}
+              </span>
+            ) : null;
+
             return item.href ? (
-              <Link key={item.id} href={item.href} className="relative z-10 flex flex-col items-center px-2">
+          <Link key={item.id} href={item.href} className="relative z-10 flex flex-col items-center gap-px px-2 py-1">
                 {content}
+                {elevatedLabel}
               </Link>
             ) : (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => onChange?.(item.id)}
-                className="relative z-10 flex flex-col items-center px-2"
+                className="relative z-10 flex flex-col items-center gap-px px-2 py-1"
               >
                 {content}
+                {elevatedLabel}
               </button>
             );
           }
@@ -56,10 +65,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
 
           return item.href ? (
             <Link key={item.id} href={item.href} className={itemClasses}>
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-full leading-none"
-                style={isActive ? { background: "rgba(24,119,242,0.12)" } : undefined}
-              >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
                 <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
               </span>
               <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
@@ -68,10 +74,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             </Link>
           ) : (
             <button key={item.id} type="button" onClick={() => onChange?.(item.id)} className={itemClasses}>
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-full leading-none"
-                style={isActive ? { background: "rgba(24,119,242,0.12)" } : undefined}
-              >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
                 <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
               </span>
               <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
@@ -108,21 +111,6 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
         }
         @keyframes ai-ring-spin {
           to { transform: rotate(360deg); }
-        }
-        .ai-orb {
-          inset: -25%;
-          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), transparent 45%),
-            radial-gradient(circle at 70% 75%, var(--color-primary-end), transparent 55%),
-            linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end));
-          animation: ai-orb-move 5s ease-in-out infinite, ai-orb-pulse 2.6s ease-in-out infinite;
-        }
-        @keyframes ai-orb-move {
-          0%, 100% { transform: rotate(0deg) scale(1); }
-          50% { transform: rotate(20deg) scale(1.12); }
-        }
-        @keyframes ai-orb-pulse {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.18); }
         }
       `}</style>
     </nav>

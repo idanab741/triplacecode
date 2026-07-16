@@ -60,7 +60,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
       ),
       href: "/community",
     },
-    { id: "ai", label: "", icon: "AI", href: "/ai", elevated: true },
+    { id: "ai", label: "trippy AI", icon: "AI", href: "/ai", elevated: true },
     {
       id: "favorites",
       label: "טיולים",
