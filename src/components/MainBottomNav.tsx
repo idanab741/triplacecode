@@ -3,30 +3,29 @@
 import Image from "next/image";
 import { BottomNav, type BottomNavItem } from "@/components/ui";
 
-/** אייקון ניווט שמתחלף בין גרסה פעילה ולא-פעילה, לפי הטאב הנבחר. */
+/** אייקון ניווט שמתחלף בין גרסה פעילה ולא-פעילה, לפי הטאב הנבחר.
+ *  scale אופציונלי — פיצוי זמני על אייקונים שנשמרו עם שוליים לא אחידים בקובץ. */
 function NavIcon({
   active,
   activeSrc,
   inactiveSrc,
   alt,
+  scale = 1,
 }: {
   active: boolean;
   activeSrc: string;
   inactiveSrc: string;
   alt: string;
+  scale?: number;
 }) {
   return (
-    <span className="relative block h-5 w-5">
-      <Image src={active ? activeSrc : inactiveSrc} alt={alt} fill className="object-contain" />
+    <span className="relative flex h-6 w-6 items-center justify-center">
+      <span className="relative h-full w-full" style={{ transform: `scale(${scale})` }}>
+        <Image src={active ? activeSrc : inactiveSrc} alt={alt} fill className="object-contain" />
+      </span>
     </span>
   );
 }
-
-const AiIcon = (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.5 15.5l2.9 2.9M5.6 18.4l2.8-2.8M15.5 8.5l2.9-2.9" />
-  </svg>
-);
 
 interface MainBottomNavProps {
   active: "home" | "favorites" | "ai" | "community" | "profile";
@@ -61,7 +60,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
       ),
       href: "/community",
     },
-    { id: "ai", label: "", icon: AiIcon, href: "/ai", elevated: true },
+    { id: "ai", label: "", icon: "AI", href: "/ai", elevated: true },
     {
       id: "favorites",
       label: "טיולים",
@@ -71,6 +70,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
           activeSrc="/images/icon-trips-active.png"
           inactiveSrc="/images/icon-trips-inactive.png"
           alt="טיולים"
+          scale={1.35}
         />
       ),
       href: "/favorites",
