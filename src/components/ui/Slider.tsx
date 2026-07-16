@@ -31,6 +31,7 @@ export function Slider({ steps, value, onChange }: SliderProps) {
         onChange={(e) => onChange(steps[Number(e.target.value)].value)}
         className="h-2 w-full appearance-none rounded-pill bg-bg-secondary accent-accent"
         style={{
+          transform: "scaleX(-1)",
           background: `linear-gradient(to right, var(--color-primary-start) ${percent}%, var(--color-bg-secondary) ${percent}%)`,
         }}
       />

@@ -61,11 +61,18 @@ export default function DayTripQuestionnairePage() {
     setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
   }
 
-  // מציג את השאלה הראשונה פעם אחת, כשהעמוד נטען
+ // מציג את הודעת הפתיחה ואז את השאלה הראשונה, פעם אחת כשהעמוד נטען
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    addBot(DAY_TRIP_QUESTIONS[0].title);
+    addBot(
+      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאז בואו נתחיל!"
+    );
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      addBot(DAY_TRIP_QUESTIONS[0].title);
+    }, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -79,6 +86,10 @@ export default function DayTripQuestionnairePage() {
 
   function labelFor(options: { value: string; label: string }[] | undefined, value: string) {
     return options?.find((o) => o.value === value)?.label ?? value;
+  }
+
+  function labelsFor(options: { value: string; label: string }[] | undefined, values: string[]) {
+    return values.map((v) => labelFor(options, v));
   }
 
   function resetTempAnswerState() {
@@ -131,8 +142,9 @@ export default function DayTripQuestionnairePage() {
   }
 
   function confirmChildAges() {
+    if (step.type !== "companions") return;
     updateField("childAgeBands", tempMulti as DayTripAnswers["childAgeBands"]);
-    addUser(tempMulti.length > 0 ? tempMulti.join("، ") : "לא רלוונטי");
+    addUser(tempMulti.length > 0 ? labelsFor(step.childAgeOptions, tempMulti).join("، ") : "לא רלוונטי");
     goToNextStep();
   }
 
@@ -165,8 +177,9 @@ export default function DayTripQuestionnairePage() {
   }
 
   function confirmInterests() {
+    if (step.type !== "multi-emoji") return;
     updateField("interests", tempMulti);
-    addUser(tempMulti.length > 0 ? tempMulti.join("، ") : "לא משנה לי");
+    addUser(tempMulti.length > 0 ? labelsFor(step.options, tempMulti).join("، ") : "לא משנה לי");
     goToNextStep();
   }
 
@@ -236,9 +249,10 @@ export default function DayTripQuestionnairePage() {
   const footerAction = getFooterAction();
 
   return (
-    <Screen withBottomNavSpacing={false}>
-      <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} />
-
+<Screen withBottomNavSpacing={false}>
+      <div className="-mx-5 -mt-8">
+        <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} />
+      </div>
       <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
         {messages.map((m) =>
           m.role === "assistant" ? (
@@ -303,7 +317,7 @@ export default function DayTripQuestionnairePage() {
           </div>
         )}
 
-        {submitting && <ChatBubble>בונים את הטיול שלכם... 🧭</ChatBubble>}
+        {submitting && <ChatBubble>מחשב את המסלול הטוב ביותר עבורכם</ChatBubble>}
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
         <div ref={bottomRef} />
