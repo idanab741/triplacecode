@@ -21,16 +21,16 @@ interface BottomNavProps {
 export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50">
-      <div className="relative flex items-center justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),10px)] pt-2.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">
+      <div className="relative flex items-center justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">
         {items.map((item) => {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
             const content = (
-              <span className="relative -mt-9 flex h-[72px] w-[72px] items-center justify-center">
+              <span className="relative -mt-8 flex h-[70px] w-[70px] items-center justify-center">
                 <span className="ai-glow absolute inset-0 rounded-full" />
                 <span className="ai-ring absolute inset-[3px] rounded-full" />
-                <span className="relative z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-sm font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
+                <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full text-base font-bold tracking-wide text-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
                   <span className="ai-orb absolute" />
                   <span className="relative z-10">{item.icon}</span>
                 </span>
@@ -52,19 +52,31 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             );
           }
 
-          const itemClasses = `flex flex-col items-center gap-1 px-3 py-1 text-[11px] font-medium transition-colors ${
-            isActive ? "text-ink" : "text-ink-secondary"
-          }`;
+          const itemClasses = "flex flex-col items-center gap-px px-3 py-1 text-xs font-medium transition-colors";
 
           return item.href ? (
             <Link key={item.id} href={item.href} className={itemClasses}>
-              <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
-              <span>{item.label}</span>
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-full leading-none"
+                style={isActive ? { background: "rgba(24,119,242,0.12)" } : undefined}
+              >
+                <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
+              </span>
+              <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+                {item.label}
+              </span>
             </Link>
           ) : (
             <button key={item.id} type="button" onClick={() => onChange?.(item.id)} className={itemClasses}>
-              <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
-              <span>{item.label}</span>
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-full leading-none"
+                style={isActive ? { background: "rgba(24,119,242,0.12)" } : undefined}
+              >
+                <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
+              </span>
+              <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+                {item.label}
+              </span>
             </button>
           );
         })}
