@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 export interface BottomNavItem {
@@ -17,11 +17,37 @@ interface BottomNavProps {
   onChange?: (id: string) => void;
 }
 
-/** בר ניווט תחתון צף עם אפקט זכוכית (glass), מרחף מעל תוכן המסך. */
+/** בר ניווט תחתון צף עם אפקט זכוכית (glass), ופס כחול נע שמחליק לכפתור הפעיל. */
 export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
+  const itemRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const activeItem = items.find((i) => i.id === activeId);
+    if (!activeItem || activeItem.elevated) {
+      setIndicator(null);
+      return;
+    }
+    const el = itemRefs.current[activeId];
+    if (el) {
+      setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
+    }
+  }, [activeId, items]);
+
   return (
     <nav className="fixed inset-x-0 bottom-6 z-50 flex justify-center">
-      <div className="flex items-end gap-1 rounded-pill border border-white/60 bg-bg/70 p-2 shadow-soft backdrop-blur-xl">
+      <div className="relative flex items-end gap-1 rounded-pill border border-white/60 bg-bg/70 p-2 shadow-soft backdrop-blur-xl">
+        {indicator && (
+          <span
+            className="pointer-events-none absolute bottom-2 top-2 z-0 rounded-pill transition-all duration-300 ease-out"
+            style={{
+              left: indicator.left,
+              width: indicator.width,
+              background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))",
+            }}
+          />
+        )}
+
         {items.map((item) => {
           const isActive = item.id === activeId;
 
@@ -30,13 +56,13 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               <span className="relative -mt-8 flex h-16 w-16 items-center justify-center">
                 <span className="ai-ring absolute inset-0 rounded-full" />
                 <span className="relative z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-sm font-bold tracking-wide text-white shadow-soft">
-                  <span className="ai-bg absolute inset-0" />
+                  <span className="ai-orb absolute" />
                   <span className="relative z-10">{item.icon}</span>
                 </span>
               </span>
             );
             return item.href ? (
-              <Link key={item.id} href={item.href} className="flex flex-col items-center px-2">
+              <Link key={item.id} href={item.href} className="relative z-10 flex flex-col items-center px-2">
                 {content}
               </Link>
             ) : (
@@ -44,31 +70,28 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
                 key={item.id}
                 type="button"
                 onClick={() => onChange?.(item.id)}
-                className="flex flex-col items-center px-2"
+                className="relative z-10 flex flex-col items-center px-2"
               >
                 {content}
               </button>
             );
           }
 
-          const itemClasses = "flex flex-col items-center gap-0.5 rounded-pill px-4 py-2 text-xs font-medium transition-colors";
-          const textStyle = isActive
-            ? { color: "var(--color-primary-start)" }
-            : undefined;
+          const itemClasses = `relative z-10 flex flex-col items-center gap-0.5 rounded-pill px-4 py-2 text-xs font-medium transition-colors ${
+            isActive ? "text-white" : "text-ink-secondary hover:text-ink"
+          }`;
+
+          const setRef = (el: HTMLAnchorElement | HTMLButtonElement | null) => {
+            itemRefs.current[item.id] = el;
+          };
 
           return item.href ? (
-            <Link key={item.id} href={item.href} className={itemClasses} style={textStyle}>
+            <Link key={item.id} href={item.href} ref={setRef} className={itemClasses}>
               <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ) : (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onChange?.(item.id)}
-              className={itemClasses}
-              style={textStyle}
-            >
+            <button key={item.id} type="button" ref={setRef} onClick={() => onChange?.(item.id)} className={itemClasses}>
               <span className="flex h-6 w-6 items-center justify-center leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </button>
@@ -89,35 +112,4 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: ai-ring-spin 2.4s linear infinite;
-        }
-        @keyframes ai-ring-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-        .ai-bg {
-          background: linear-gradient(
-            120deg,
-            var(--color-primary-start),
-            var(--color-primary-end),
-            var(--color-primary-start)
-          );
-          background-size: 250% 250%;
-          animation: ai-bg-shift 4s ease-in-out infinite;
-        }
-        @keyframes ai-bg-shift {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-      `}</style>
-    </nav>
-  );
-}
+          animation: ai-ring-spin 2.4s
