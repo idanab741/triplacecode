@@ -33,7 +33,7 @@ function TripTypeBadge({ label }: { label: string }) {
     <div className="flex justify-end">
       <div className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 shadow-[0_2px_8px_rgba(16,24,40,0.06)]">
         <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full">
-          <Image src="/images/day-trip-icon.png" alt="" fill className="object-cover" />
+          <Image src="/images/day-trip-icon.png.png" alt="" fill className="object-cover" />
         </div>
         <span className="text-[13.5px] font-medium text-ink">{label}</span>
       </div>
