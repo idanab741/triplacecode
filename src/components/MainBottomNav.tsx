@@ -70,7 +70,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
           activeSrc="/images/icon-trips-active.png"
           inactiveSrc="/images/icon-trips-inactive.png"
           alt="טיולים"
-          scale={1.35}
+          scale={1}
         />
       ),
       href: "/favorites",
