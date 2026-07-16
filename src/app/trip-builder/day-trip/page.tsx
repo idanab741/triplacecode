@@ -24,7 +24,19 @@ const DEFAULT_ANSWERS: DayTripAnswers = {
   freeText: "",
 };
 
-type ChatMessage = { id: number; role: "assistant" | "user"; text: string };
+type ChatMessage = { id: number; role: "assistant" | "user" | "icon"; text: string };
+
+/** תג עגול קטן שמציג את סוג הטיול, בין הודעת הפתיחה לשאלה הראשונה. */
+function TripTypeBadge({ label }: { label: string }) {
+  return (
+    <div className="flex justify-center py-1">
+      <div className="flex items-center gap-2 rounded-pill bg-white px-4 py-2 shadow-[0_2px_8px_rgba(16,24,40,0.06)]">
+        <span className="text-lg leading-none">🗺️</span>
+        <span className="text-[13px] font-medium text-ink">{label}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function DayTripQuestionnairePage() {
   const router = useRouter();
@@ -47,12 +59,6 @@ export default function DayTripQuestionnairePage() {
   const idRef = useRef(0);
   const startedRef = useRef(false);
 
-  // --- מנגנון "חזרה לשאלה הקודמת" ---
-  const messagesLenRef = useRef(0); // תמיד שווה למספר ההודעות הנוכחי במערך
-  const questionBoundaries = useRef<Record<number, number>>({}); // גבול ההודעות מיד אחרי שנוספה שאלת השלב הזה
-  const stepFormSnapshots = useRef<Record<number, DayTripAnswers>>({}); // מצב הטופס לפני מענה לשלב הזה
-  const suppressNextQuestionEffect = useRef(false);
-
   const step = DAY_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
 
@@ -62,32 +68,26 @@ export default function DayTripQuestionnairePage() {
   }
   function addBot(text: string) {
     setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
-    messagesLenRef.current += 1;
   }
   function addUser(text: string) {
     setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
-    messagesLenRef.current += 1;
+  }
+  function addIconBadge(label: string) {
+    setMessages((m) => [...m, { id: nextId(), role: "icon", text: label }]);
   }
 
-  // מציג את שאלת השלב stepIndex, ושומר "צ'ק-פוינט" (גבול הודעות + מצב טופס)
-  // כדי שכפתור החזרה ידע בדיוק לאן לחזור
-  function showQuestion(idx: number) {
-    stepFormSnapshots.current[idx] = { ...form };
-    addBot(DAY_TRIP_QUESTIONS[idx].title);
-    questionBoundaries.current[idx] = messagesLenRef.current;
-  }
-
-  // מציג את הודעת הפתיחה ואז את השאלה הראשונה, פעם אחת כשהעמוד נטען
+  // מציג את הודעת הפתיחה, את תג סוג הטיול, ואז את השאלה הראשונה — פעם אחת כשהעמוד נטען
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     addBot(
-      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nבואו נבנה יחד טיול יומי 🗺️ שמתוכנן במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאני כאן כדי להכיר אתכם ולהבין בדיוק מה אתם מחפשים.\nאז בואו נתחיל!"
+      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאז בואו נתחיל!"
     );
+    addIconBadge("טיול יומי");
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      showQuestion(0);
+      addBot(DAY_TRIP_QUESTIONS[0].title);
     }, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -130,34 +130,12 @@ export default function DayTripQuestionnairePage() {
   }
 
   // מוסיף את בועת הבוט של השאלה החדשה כשה-step משתנה בפועל — מקום יחיד
-  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות.
-  // כשחוזרים אחורה (suppressNextQuestionEffect), השאלה כבר נמצאת בהיסטוריה — לא מוסיפים שוב.
+  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות
   useEffect(() => {
     if (stepIndex === 0) return; // השאלה הראשונה כבר נוספה ב-mount
-    if (suppressNextQuestionEffect.current) {
-      suppressNextQuestionEffect.current = false;
-      return;
-    }
-    showQuestion(stepIndex);
+    addBot(DAY_TRIP_QUESTIONS[stepIndex].title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
-
-  // ---------- חזרה לשאלה הקודמת ----------
-
-  function handleBack() {
-    if (stepIndex === 0 || typing || submitting) return;
-    const prevIndex = stepIndex - 1;
-    const boundary = questionBoundaries.current[prevIndex];
-    const prevForm = stepFormSnapshots.current[prevIndex];
-    if (boundary === undefined || prevForm === undefined) return;
-
-    setMessages((m) => m.slice(0, boundary));
-    messagesLenRef.current = boundary;
-    setForm(prevForm);
-    resetTempAnswerState();
-    suppressNextQuestionEffect.current = true;
-    setStepIndex(prevIndex);
-  }
 
   // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
@@ -263,8 +241,6 @@ export default function DayTripQuestionnairePage() {
     }
   }
 
-  // קובע איזה כפתור "המשך" קבוע יופיע למטה, לפי מצב השאלה הנוכחית —
-  // undefined כשלא צריך כפתור (למשל כשהתשובה היא בחירת צ'יפ בודדת)
   function getFooterAction(): { label: string; onClick: () => void; disabled?: boolean } | null {
     if (typing || submitting) return null;
     if (step.type === "companions" && awaitingChildAges) {
@@ -290,17 +266,15 @@ export default function DayTripQuestionnairePage() {
   return (
     <Screen withBottomNavSpacing={false}>
       <div className="-mx-5 -mt-8">
-        <ChatHeader
-          current={stepIndex + 1}
-          total={DAY_TRIP_QUESTIONS.length}
-          onBack={stepIndex > 0 ? handleBack : undefined}
-        />
+        <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.back()} />
       </div>
 
       <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
         {messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
+          ) : m.role === "icon" ? (
+            <TripTypeBadge key={m.id} label={m.text} />
           ) : (
             <UserBubble key={m.id}>{m.text}</UserBubble>
           )
@@ -367,7 +341,6 @@ export default function DayTripQuestionnairePage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* כפתור "המשך" קבוע בתחתית המסך, לאורך כל השאלות שדורשות אישור */}
       {footerAction && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
           <div className="mx-auto max-w-md">
