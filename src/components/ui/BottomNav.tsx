@@ -112,4 +112,39 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: ai-ring-spin 2.4s
+          animation: ai-ring-spin 2.4s linear infinite;
+        }
+        @keyframes ai-ring-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .ai-orb {
+          inset: -25%;
+          background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), transparent 45%),
+            radial-gradient(circle at 70% 75%, var(--color-primary-end), transparent 55%),
+            linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end));
+          animation: ai-orb-move 5s ease-in-out infinite, ai-orb-pulse 2.6s ease-in-out infinite;
+        }
+        @keyframes ai-orb-move {
+          0%,
+          100% {
+            transform: rotate(0deg) scale(1);
+          }
+          50% {
+            transform: rotate(20deg) scale(1.12);
+          }
+        }
+        @keyframes ai-orb-pulse {
+          0%,
+          100% {
+            filter: brightness(1);
+          }
+          50% {
+            filter: brightness(1.18);
+          }
+        }
+      `}</style>
+    </nav>
+  );
+}
