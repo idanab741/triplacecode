@@ -24,6 +24,7 @@ export function Slider({ steps, value, onChange }: SliderProps) {
       </div>
       <input
         type="range"
+        dir="ltr"
         min={0}
         max={steps.length - 1}
         step={1}

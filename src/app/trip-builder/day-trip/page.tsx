@@ -47,6 +47,12 @@ export default function DayTripQuestionnairePage() {
   const idRef = useRef(0);
   const startedRef = useRef(false);
 
+  // --- מנגנון "חזרה לשאלה הקודמת" ---
+  const messagesLenRef = useRef(0); // תמיד שווה למספר ההודעות הנוכחי במערך
+  const questionBoundaries = useRef<Record<number, number>>({}); // גבול ההודעות מיד אחרי שנוספה שאלת השלב הזה
+  const stepFormSnapshots = useRef<Record<number, DayTripAnswers>>({}); // מצב הטופס לפני מענה לשלב הזה
+  const suppressNextQuestionEffect = useRef(false);
+
   const step = DAY_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
 
@@ -56,22 +62,32 @@ export default function DayTripQuestionnairePage() {
   }
   function addBot(text: string) {
     setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
+    messagesLenRef.current += 1;
   }
   function addUser(text: string) {
     setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
+    messagesLenRef.current += 1;
   }
 
- // מציג את הודעת הפתיחה ואז את השאלה הראשונה, פעם אחת כשהעמוד נטען
+  // מציג את שאלת השלב stepIndex, ושומר "צ'ק-פוינט" (גבול הודעות + מצב טופס)
+  // כדי שכפתור החזרה ידע בדיוק לאן לחזור
+  function showQuestion(idx: number) {
+    stepFormSnapshots.current[idx] = { ...form };
+    addBot(DAY_TRIP_QUESTIONS[idx].title);
+    questionBoundaries.current[idx] = messagesLenRef.current;
+  }
+
+  // מציג את הודעת הפתיחה ואז את השאלה הראשונה, פעם אחת כשהעמוד נטען
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     addBot(
-      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאז בואו נתחיל!"
+      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nבואו נבנה יחד טיול יומי 🗺️ שמתוכנן במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאני כאן כדי להכיר אתכם ולהבין בדיוק מה אתם מחפשים.\nאז בואו נתחיל!"
     );
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      addBot(DAY_TRIP_QUESTIONS[0].title);
+      showQuestion(0);
     }, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,12 +130,34 @@ export default function DayTripQuestionnairePage() {
   }
 
   // מוסיף את בועת הבוט של השאלה החדשה כשה-step משתנה בפועל — מקום יחיד
-  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות
+  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות.
+  // כשחוזרים אחורה (suppressNextQuestionEffect), השאלה כבר נמצאת בהיסטוריה — לא מוסיפים שוב.
   useEffect(() => {
     if (stepIndex === 0) return; // השאלה הראשונה כבר נוספה ב-mount
-    addBot(DAY_TRIP_QUESTIONS[stepIndex].title);
+    if (suppressNextQuestionEffect.current) {
+      suppressNextQuestionEffect.current = false;
+      return;
+    }
+    showQuestion(stepIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
+
+  // ---------- חזרה לשאלה הקודמת ----------
+
+  function handleBack() {
+    if (stepIndex === 0 || typing || submitting) return;
+    const prevIndex = stepIndex - 1;
+    const boundary = questionBoundaries.current[prevIndex];
+    const prevForm = stepFormSnapshots.current[prevIndex];
+    if (boundary === undefined || prevForm === undefined) return;
+
+    setMessages((m) => m.slice(0, boundary));
+    messagesLenRef.current = boundary;
+    setForm(prevForm);
+    resetTempAnswerState();
+    suppressNextQuestionEffect.current = true;
+    setStepIndex(prevIndex);
+  }
 
   // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
@@ -172,7 +210,8 @@ export default function DayTripQuestionnairePage() {
     if (step.type !== "slider") return;
     const value = tempSlider ?? (form[step.key as keyof DayTripAnswers] as string) ?? step.steps[0];
     updateField(step.key as keyof DayTripAnswers, value as never);
-    addUser(value);
+    const label = labelFor(step.steps as unknown as { value: string; label: string }[], value);
+    addUser(label);
     goToNextStep();
   }
 
@@ -249,10 +288,15 @@ export default function DayTripQuestionnairePage() {
   const footerAction = getFooterAction();
 
   return (
-<Screen withBottomNavSpacing={false}>
+    <Screen withBottomNavSpacing={false}>
       <div className="-mx-5 -mt-8">
-        <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} />
+        <ChatHeader
+          current={stepIndex + 1}
+          total={DAY_TRIP_QUESTIONS.length}
+          onBack={stepIndex > 0 ? handleBack : undefined}
+        />
       </div>
+
       <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
         {messages.map((m) =>
           m.role === "assistant" ? (
