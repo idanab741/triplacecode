@@ -27,15 +27,21 @@ const DEFAULT_ANSWERS: DayTripAnswers = {
 
 type ChatMessage = { id: number; role: "assistant" | "user" | "icon"; text: string };
 
-/** תג שמציג את סוג הטיול, בצד שמאל — כמו תשובות המשתמש. */
+/** תג שמציג את סוג הטיול, בצד שמאל — כמו תשובות המשתמש, עם גרדיאנט המותג. */
 function TripTypeBadge({ label }: { label: string }) {
   return (
     <div className="flex justify-end">
-      <div className="flex items-center gap-2 rounded-pill bg-white px-3 py-2 shadow-[0_2px_8px_rgba(16,24,40,0.06)]">
-        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full">
-          <Image src="/images/day-trip-icon.png.png" alt="" fill className="object-cover" />
+      <div
+        className="flex items-center gap-2 rounded-pill px-3 py-2"
+        style={{
+          background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))",
+          boxShadow: "0 4px 12px rgba(24,119,242,0.28)",
+        }}
+      >
+        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/40">
+          <Image src="/images/day-trip-icon.png" alt="" fill className="object-cover" />
         </div>
-        <span className="text-[13.5px] font-medium text-ink">{label}</span>
+        <span className="text-[13.5px] font-medium text-white">{label}</span>
       </div>
     </div>
   );
