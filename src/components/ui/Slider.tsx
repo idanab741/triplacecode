@@ -1,3 +1,5 @@
+"use client";
+
 interface SliderStep {
   value: string;
   label: string;
