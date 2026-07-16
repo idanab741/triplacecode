@@ -7,9 +7,7 @@ export interface BottomNavItem {
   id: string;
   label: string;
   icon: ReactNode;
-  /** ניווט בפועל. אם לא מועבר, נשען על onChange (שימושי בעמוד ה-design). */
   href?: string;
-  /** פריט מורם ובולט (כפתור ה-AI במרכז). */
   elevated?: boolean;
 }
 
@@ -29,8 +27,11 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
 
           if (item.elevated) {
             const content = (
-              <span className="-mt-8 flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-2xl text-white shadow-soft">
-                {item.icon}
+              <span className="relative -mt-8 flex h-16 w-16 items-center justify-center">
+                <span className="ai-ring absolute inset-0 rounded-full" />
+                <span className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-2xl text-white shadow-soft">
+                  {item.icon}
+                </span>
               </span>
             );
             return item.href ? (
@@ -73,6 +74,28 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           );
         })}
       </div>
+
+      <style jsx global>{`
+        .ai-ring {
+          background: conic-gradient(
+            from 0deg,
+            transparent 0%,
+            var(--color-primary-start) 35%,
+            var(--color-primary-end) 50%,
+            transparent 75%
+          );
+          padding: 3px;
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          animation: ai-ring-spin 2.4s linear infinite;
+        }
+        @keyframes ai-ring-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </nav>
   );
 }
