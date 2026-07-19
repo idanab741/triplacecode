@@ -71,6 +71,19 @@ export interface CandidatePlace {
   score?: number;
   reason?: string;
   source?: "ai" | "fallback";
+  tripTypeTags: string[];
+  cuisineTags: string[];
+  kosher: boolean | null;
+  accessible: boolean | null;
+  suitableChildAges: string[];
+  budgetTier: string | null;
+}
+  tripTypeTags: string[];
+  cuisineTags: string[];
+  kosher: boolean | null;
+  accessible: boolean | null;
+  suitableChildAges: string[];
+  budgetTier: string | null;
 }
 
 export interface FinalItineraryStop {

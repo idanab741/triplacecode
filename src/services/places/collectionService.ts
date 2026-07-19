@@ -29,22 +29,37 @@ export async function collectPlacesForCityAndCategory(
     if (row) cleanRows.push(row);
   }
 
-  if (cleanRows.length === 0) {
+ if (cleanRows.length === 0) {
     return { fetched: rawPlaces.length, saved: 0, skipped: rawPlaces.length };
   }
 
   const supabase = createAdminClient();
-  const { error } = await supabase
-    .from("places")
-    .upsert(cleanRows, { onConflict: "google_place_id" });
 
-  if (error) {
-    throw new Error(`שמירה ל-Supabase נכשלה: ${error.message}`);
+  // בודקים אילו מהמקומות האלה כבר נערכו ידנית - לא נוגעים בהם בכלל
+  const placeIds = cleanRows.map((r) => r.google_place_id);
+  const { data: existing } = await supabase
+    .from("places")
+    .select("google_place_id")
+    .in("google_place_id", placeIds)
+    .eq("is_manually_edited", true);
+
+  const protectedIds = new Set((existing ?? []).map((r) => r.google_place_id));
+  const rowsToSave = cleanRows.filter((r) => !protectedIds.has(r.google_place_id));
+  const protectedCount = cleanRows.length - rowsToSave.length;
+
+  if (rowsToSave.length > 0) {
+    const { error } = await supabase
+      .from("places")
+      .upsert(rowsToSave, { onConflict: "google_place_id" });
+
+    if (error) {
+      throw new Error(`שמירה ל-Supabase נכשלה: ${error.message}`);
+    }
   }
 
   return {
     fetched: rawPlaces.length,
-    saved: cleanRows.length,
-    skipped: rawPlaces.length - cleanRows.length,
+    saved: rowsToSave.length,
+    skipped: rawPlaces.length - cleanRows.length + protectedCount,
   };
 }

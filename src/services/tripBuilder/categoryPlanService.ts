@@ -48,7 +48,7 @@ ${JSON.stringify({
 [{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint", "order": 0}, ...]
 כאשר "category" הוא אחד מהערכים: ${
     params.answers.interests.filter((i) => i !== "events_festivals").join(", ") ||
-    "nature_landscapes, restaurants_culinary"
+    "nature_trails, wineries_dining"
   }.`;
 
   const { text, error } = await callClaude(prompt);
@@ -91,15 +91,41 @@ function describeDna(dna: TravelDna | null) {
 }
 
 /** תוכנית גיבוי דטרמיניסטית, ללא AI - מרחיבה את חוקי משך הטיול לפי תחומי העניין שנבחרו. */
+const FREE_TEXT_SMALL_HINTS = ["קטן", "קצר", "לא רחוק", "פשוט", "שקט", "רגוע", "לא הרבה"];
+const FREE_TEXT_CATEGORY_HINTS: Record<string, string[]> = {
+  nature_trails: ["טבע", "ירוק", "שביל", "יער", "הרים", "מעיין", "נחל"],
+  beaches_pools: ["חוף", "ים", "בריכה"],
+  coffee_carts_cafes: ["קפה", "בית קפה"],
+};
+
 function buildFallbackPlan(
   answers: DayTripAnswers,
   durationRules: Record<string, { roles: StopRole[] }>
 ): CategoryPlanItem[] {
-  const rule = durationRules[answers.durationBand] ?? durationRules["2-4h"];
+  const freeText = (answers.freeText || "").toLowerCase();
+  const wantsSmall = FREE_TEXT_SMALL_HINTS.some((hint) => freeText.includes(hint));
+
+  let rule = durationRules[answers.durationBand] ?? durationRules["2-4h"];
+  // מלל חופשי שמרמז על טיול קטן/שקט - מצמצם את מספר התחנות בפועל,
+  // גם אם נבחר משך זמן ארוך יותר, כדי לכבד את מה שהמשתמש כתב במפורש
+  if (wantsSmall && rule.roles.length > 3) {
+    rule = { roles: rule.roles.slice(0, 3) };
+  }
+
   // אירועים/פסטיבלים תלויי-תאריך מוצגים כהמלצה משלימה בסוף, לא כתחנה מוחלקת
   const attractionInterests = answers.interests.filter((i) => i !== "events_festivals");
-  const interests = attractionInterests.length > 0 ? attractionInterests : ["attractions"];
-  const foodCategory = interests.includes("restaurants_culinary") ? "restaurants_culinary" : "restaurants_culinary";
+  let interests = attractionInterests.length > 0 ? attractionInterests : ["attractions_activities"];
+
+  // אם המלל החופשי מזכיר קטגוריה ספציפית מתוך מה שכבר נבחר - מקדמים אותה
+  // לראש התור, כדי שהיא תופיע קודם בתחנות האטרקציה
+  for (const [category, hints] of Object.entries(FREE_TEXT_CATEGORY_HINTS)) {
+    if (interests.includes(category) && hints.some((hint) => freeText.includes(hint))) {
+      interests = [category, ...interests.filter((i) => i !== category)];
+      break;
+    }
+  }
+
+  const foodCategory = "wineries_dining";
   const coffeeCategory = "coffee_carts_cafes";
 
   let attractionCursor = 0;

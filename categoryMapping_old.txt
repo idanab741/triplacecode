@@ -1,0 +1,56 @@
+﻿/**
+ * ╫₧╫Ö╫ñ╫ò╫Ö ╫æ╫Ö╫ƒ ╫ö╫º╫ÿ╫Æ╫ò╫¿╫Ö╫ò╫¬ ╫⌐╫£╫á╫ò (╫É╫ò╫¬╫¥ ╫₧╫û╫ö╫Ö╫¥ ╫¢╫₧╫ò ╫æ-locales/he/preferences.ts,
+ * ╫¬╫ù╫¬ INTERESTS) ╫£╫æ╫Ö╫ƒ ╫₧╫ù╫¿╫ò╫û╫ò╫¬ ╫ù╫Ö╫ñ╫ò╫⌐ ╫æ-Google Places ╫ò╫í╫ò╫Æ╫Ö ╫ö╫₧╫º╫ò╫₧╫ò╫¬
+ * (types) ╫⌐╫Æ╫ò╫Æ╫£ ╫₧╫ù╫û╫Ö╫¿╫ö.
+ */
+
+/** ╫⌐╫É╫Ö╫£╫¬╫¬ ╫ÿ╫º╫í╫ÿ ╫£╫ù╫Ö╫ñ╫ò╫⌐ ╫æ-Google Places, ╫£╫ñ╫Ö ╫ö╫º╫ÿ╫Æ╫ò╫¿╫Ö╫ö ╫⌐╫£╫á╫ò. */
+export const CATEGORY_SEARCH_QUERIES: Record<string, string> = {
+  coffee_carts_cafes: "╫æ╫¬╫Ö ╫º╫ñ╫ö",
+  restaurants_culinary: "╫₧╫í╫ó╫ô╫ò╫¬",
+  nature_landscapes: "╫ÿ╫æ╫ó ╫ò╫á╫ò╫ñ╫Ö╫¥",
+  museums_history: "╫₧╫ò╫û╫Ö╫É╫ò╫á╫Ö╫¥",
+  culture_art: "╫Æ╫£╫¿╫Ö╫ò╫¬ ╫ò╫É╫₧╫á╫ò╫¬",
+  shopping: "╫º╫á╫Ö╫ò╫¬",
+  nightlife: "╫ù╫Ö╫Ö ╫£╫Ö╫£╫ö",
+  relaxation_spa: "╫í╫ñ╫É",
+  attractions: "╫É╫ÿ╫¿╫º╫ª╫Ö╫ò╫¬ ╫ò╫¬╫Ö╫Ö╫¿╫ò╫¬",
+  hotels: "╫₧╫£╫ò╫á╫ò╫¬",
+  beaches_pools: "╫ù╫ò╫ñ╫Ö╫¥ ╫ò╫æ╫¿╫Ö╫¢╫ò╫¬",
+  springs_streams: "╫₧╫ó╫Ö╫Ö╫á╫ò╫¬ ╫ò╫á╫ù╫£╫Ö╫¥",
+  wineries_breweries: "╫Ö╫º╫æ╫Ö╫¥ ╫ò╫₧╫æ╫⌐╫£╫ò╫¬ ╫æ╫Ö╫¿╫ö",
+  water_attractions: "╫ñ╫É╫¿╫º ╫₧╫Ö╫¥ ╫É╫ÿ╫¿╫º╫ª╫Ö╫ò╫¬ ╫₧╫Ö╫¥",
+  sports_extreme: "╫í╫ñ╫ò╫¿╫ÿ ╫É╫¬╫Æ╫¿╫Ö ╫É╫º╫í╫ÿ╫¿╫Ö╫¥",
+  live_shows: "╫É╫ò╫£╫¥ ╫ö╫ò╫ñ╫ó╫ò╫¬",
+};
+
+const GOOGLE_TYPE_TO_CATEGORY: Record<string, string> = {
+  cafe: "coffee_carts_cafes",
+  coffee_shop: "coffee_carts_cafes",
+  restaurant: "restaurants_culinary",
+  meal_takeaway: "restaurants_culinary",
+  park: "nature_landscapes",
+  natural_feature: "nature_landscapes",
+  hiking_area: "nature_landscapes",
+  museum: "museums_history",
+  art_gallery: "culture_art",
+  shopping_mall: "shopping",
+  store: "shopping",
+  night_club: "nightlife",
+  bar: "nightlife",
+  spa: "relaxation_spa",
+  tourist_attraction: "attractions",
+  lodging: "hotels",
+  hotel: "hotels",
+  beach: "beaches_pools",
+};
+
+/** ╫₧╫á╫¿╫₧╫£ ╫É╫¬ ╫₧╫ó╫¿╫Ü ╫ö-types ╫⌐╫Æ╫ò╫Æ╫£ ╫₧╫ù╫û╫Ö╫¿╫ö ╫£╫₧╫û╫ö╫ö ╫º╫ÿ╫Æ╫ò╫¿╫Ö╫ö ╫⌐╫£╫á╫ò, ╫É╫¥ ╫₧╫ò╫¢╫¿. */
+export function normalizeGoogleCategory(types: string[] | undefined): string | null {
+  if (!types) return null;
+  for (const type of types) {
+    const mapped = GOOGLE_TYPE_TO_CATEGORY[type];
+    if (mapped) return mapped;
+  }
+  return null;
+}

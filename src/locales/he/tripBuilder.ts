@@ -45,22 +45,19 @@ export const BUDGET_STEPS: StepOption[] = [
 ];
 
 export const DAY_TRIP_INTEREST_OPTIONS: StepOption[] = [
-  { value: "nature_landscapes", label: "טבע ונופים", emoji: "🌿" },
-  { value: "springs_streams", label: "מעיינות ונחלים", emoji: "💧" },
+  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
+  { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },
   { value: "beaches_pools", label: "חופי ים ובריכות", emoji: "🏖️" },
-  { value: "museums_history", label: "מוזיאונים והיסטוריה", emoji: "🏛️" },
-  { value: "culture_art", label: "תרבות ואמנות", emoji: "🎭" },
-  { value: "coffee_carts_cafes", label: "בתי קפה ועגלות קפה", emoji: "☕" },
-  { value: "restaurants_culinary", label: "מסעדות וקולינריה", emoji: "🍷" },
-  { value: "wineries_breweries", label: "יקבים ומבשלות", emoji: "🍇" },
-  { value: "shopping", label: "שופינג", emoji: "🛍️" },
-  { value: "attractions", label: "אטרקציות", emoji: "🎢" },
-  { value: "water_attractions", label: "אטרקציות מים", emoji: "🌊" },
+  { value: "viewpoints", label: "תצפיות, זריחות ושקיעות", emoji: "🌅" },
+  { value: "parks_gardens", label: "פארקים וגנים", emoji: "🌳" },
+  { value: "water_amusement_parks", label: "פארקי מים, שעשועים ומתקנים", emoji: "🎡" },
+  { value: "attractions_activities", label: "אטרקציות ופעילויות", emoji: "🎯" },
   { value: "sports_extreme", label: "ספורט ואקסטרים", emoji: "🚴" },
-  { value: "relaxation_spa", label: "ספא ורוגע", emoji: "🧖" },
-  { value: "nightlife", label: "חיי לילה", emoji: "🌃" },
-  { value: "live_shows", label: "הופעות", emoji: "🎤" },
-  { value: "events_festivals", label: "אירועים ופסטיבלים", emoji: "📸" },
+  { value: "wineries_dining", label: "יקבים, מבשלות ומסעדות", emoji: "🍷" },
+  { value: "culture_history", label: "תרבות, מוזיאונים והיסטוריה", emoji: "🏛️" },
+  { value: "shopping", label: "שופינג, קניות ושווקים", emoji: "🛍️" },
+  { value: "events_festivals", label: "אירועים ופסטיבלים", emoji: "🎪" },
+  { value: "spa_relaxation", label: "ספא ורוגע", emoji: "🧖" },
 ];
 
 export const DURATION_OPTIONS: StepOption[] = [

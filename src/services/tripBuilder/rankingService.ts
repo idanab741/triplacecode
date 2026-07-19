@@ -9,36 +9,78 @@ interface RankCandidatesParams {
   freeText: string;
   remainingBudgetLabel: string;
   rankingPromptRules: string;
+  attributeScoreMap?: Map<string, number>;
+  learnedAttributes?: {
+    liked: string[];
+    disliked: string[];
+  };
 }
 
-/** מדרג מאגר מועמדים לתחנה נוכחית - קריאת Claude אחת למאגר כולו, לא לכל מועמד. */
-export async function rankCandidates(params: RankCandidatesParams): Promise<CandidatePlace[]> {
-  if (params.candidates.length === 0) return [];
+const MAX_CANDIDATES_FOR_AI_RANKING = 6;
 
-  const aiRanked = await tryClaudeRanking(params);
-  if (aiRanked) return aiRanked;
+export async function rankCandidates(
+  params: RankCandidatesParams
+): Promise<CandidatePlace[]> {
+  if (params.candidates.length === 0) {
+    return [];
+  }
+
+  // לא מדרגים לפי מרחק אלא רק לפי דירוג מינימלי
+  const reasonablyRated = params.candidates.filter(
+    (candidate) => (candidate.rating ?? 3.5) >= 3.5
+  );
+
+  const pool =
+    reasonablyRated.length >= MAX_CANDIDATES_FOR_AI_RANKING
+      ? reasonablyRated
+      : params.candidates;
+
+  const preFiltered = [...pool]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, MAX_CANDIDATES_FOR_AI_RANKING);
+
+  const aiRanked = await tryClaudeRanking({
+    ...params,
+    candidates: preFiltered,
+  });
+
+  if (aiRanked) {
+    return aiRanked;
+  }
 
   return params.candidates
     .map((candidate) => ({
       ...candidate,
-      score: computeFallbackScore(params.dna, candidate),
-      reason: "התאמה בסיסית לפי מרחק ודירוג",
+      score: computeFallbackScore(
+        params.dna,
+        candidate,
+        params.freeText,
+        params.attributeScoreMap
+      ),
+      reason: params.freeText
+        ? `התאמה לפי "${params.freeText}", מרחק ודירוג`
+        : "התאמה בסיסית לפי מרחק ודירוג",
       source: "fallback" as const,
     }))
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
-async function tryClaudeRanking(params: RankCandidatesParams): Promise<CandidatePlace[] | null> {
-  const dnaSummary = describeDna(params.dna);
+async function tryClaudeRanking(
+  params: RankCandidatesParams
+): Promise<CandidatePlace[] | null> {
+  const dnaSummary = describeDna(
+    params.dna,
+    params.learnedAttributes
+  );
 
-  const candidatesPayload = params.candidates.map((c) => ({
-    id: c.id,
-    name: c.name,
-    category: getCategoryLabel(c.category),
-    description: c.shortDescription,
-    distance_km: Math.round(c.distanceKm * 10) / 10,
-    price_level: c.priceLevel,
-    rating: c.rating,
+  const candidatesPayload = params.candidates.map((candidate) => ({
+    id: candidate.id,
+    name: candidate.name,
+    category: getCategoryLabel(candidate.category),
+    description: candidate.shortDescription,
+    distance_km: Math.round(candidate.distanceKm * 10) / 10,
+    price_level: candidate.priceLevel,
+    rating: candidate.rating,
   }));
 
   const prompt = `${params.rankingPromptRules}
@@ -46,71 +88,226 @@ async function tryClaudeRanking(params: RankCandidatesParams): Promise<Candidate
 Travel DNA:
 ${JSON.stringify(dnaSummary)}
 
-מלל חופשי מהמשתמש: ${JSON.stringify(params.freeText || null)}
-תקציב שנותר: ${params.remainingBudgetLabel}
+מלל חופשי מהמשתמש:
+${JSON.stringify(params.freeText || null)}
+
+תקציב שנותר:
+${params.remainingBudgetLabel}
 
 מועמדים:
 ${JSON.stringify(candidatesPayload)}
 
-השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
-[{"id": "...", "score": 0-100, "reason": "..."}, ...]`;
+השב אך ורק במבנה JSON הבא:
+
+[
+  {
+    "id":"...",
+    "score":95,
+    "reason":"..."
+  }
+]`;
 
   const { text, error } = await callClaude(prompt);
-  if (error || !text) return null;
+
+  if (error || !text) {
+    return null;
+  }
 
   try {
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error("לא נמצא JSON בתשובת Claude");
-    const parsed = JSON.parse(jsonMatch[0]) as { id: string; score: number; reason: string }[];
 
-    const scoreById = new Map(parsed.map((item) => [item.id, item]));
+    if (!jsonMatch) {
+      throw new Error("לא נמצא JSON");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      id: string;
+      score: number;
+      reason: string;
+    }[];
+
+    const scoreById = new Map(
+      parsed.map((item) => [item.id, item])
+    );
+
     const ranked: CandidatePlace[] = [];
+
     for (const candidate of params.candidates) {
       const match = scoreById.get(candidate.id);
-      if (!match) continue;
+
+      if (!match) {
+        continue;
+      }
+
       ranked.push({
         ...candidate,
-        score: Math.max(0, Math.min(100, Math.round(match.score))),
+        score: Math.max(
+          0,
+          Math.min(100, Math.round(match.score))
+        ),
         reason: match.reason,
         source: "ai",
       });
     }
+
     ranked.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-    return ranked.length > 0 ? ranked : null;
+    return ranked.length ? ranked : null;
   } catch (parseError) {
-    logAiError("כשל בפענוח תשובת JSON מ-Claude בדירוג מועמדים", {
-      message: parseError instanceof Error ? parseError.message : String(parseError),
+    logAiError("כשל בפענוח תשובת Claude", {
+      message:
+        parseError instanceof Error
+          ? parseError.message
+          : String(parseError),
       rawText: text.slice(0, 300),
     });
+
     return null;
   }
 }
 
-function describeDna(dna: TravelDna | null) {
-  if (!dna) {
-    return { note: "אין עדיין מידע על המשתמש - יש להתייחס לכל המועמדים באופן ניטרלי" };
+function describeDna(
+  dna: TravelDna | null,
+  learnedAttributes?: {
+    liked: string[];
+    disliked: string[];
   }
-  return {
-    interests: dna.interests.map(getCategoryLabel),
-    culinary_styles: dna.culinary_styles,
-    dietary_restrictions: dna.dietary_restrictions,
-    kosher: dna.kosher,
-    accessibility: dna.accessibility,
-    preferred_categories_from_behavior: dna.preferred_categories.map(getCategoryLabel),
-    disliked_categories_from_behavior: dna.disliked_categories.map(getCategoryLabel),
-  };
+) {
+  const base = dna
+    ? {
+        interests: dna.interests.map(getCategoryLabel),
+        culinary_styles: dna.culinary_styles,
+        dietary_restrictions: dna.dietary_restrictions,
+        kosher: dna.kosher,
+        accessibility: dna.accessibility,
+        preferred_categories_from_behavior:
+          dna.preferred_categories.map(getCategoryLabel),
+        disliked_categories_from_behavior:
+          dna.disliked_categories.map(getCategoryLabel),
+      }
+    : {
+        note: "אין עדיין מידע על המשתמש",
+      };
+
+  if (
+    learnedAttributes &&
+    (learnedAttributes.liked.length ||
+      learnedAttributes.disliked.length)
+  ) {
+    return {
+      ...base,
+      learned_from_swipes_liked:
+        learnedAttributes.liked,
+      learned_from_swipes_disliked:
+        learnedAttributes.disliked,
+    };
+  }
+
+  return base;
 }
 
-function computeFallbackScore(dna: TravelDna | null, candidate: CandidatePlace): number {
-  const ratingScore = candidate.rating != null ? (candidate.rating / 5) * 100 : 50;
-  const distanceScore = Math.max(0, 100 - candidate.distanceKm * 5);
+const FREE_TEXT_SIZE_HINTS = {
+  small: [
+    "קטן",
+    "קטן ושקט",
+    "לא גדול",
+    "שקט",
+    "אינטימי",
+  ],
+  large: [
+    "גדול",
+    "מרכזי",
+    "מפורסם",
+    "ידוע",
+  ],
+};
 
-  const likedSet = new Set([...(dna?.interests ?? []), ...(dna?.preferred_categories ?? [])]);
-  const dislikedSet = new Set(dna?.disliked_categories ?? []);
-  const profileBonus = likedSet.has(candidate.category) ? 15 : 0;
-  const profilePenalty = dislikedSet.has(candidate.category) ? 20 : 0;
+function computeFallbackScore(
+  dna: TravelDna | null,
+  candidate: CandidatePlace,
+  freeText: string,
+  attributeScoreMap?: Map<string, number>
+): number {
+  const learnedBonus =
+    (attributeScoreMap?.get(candidate.category) ?? 0) * 0.2;
 
-  const combined = ratingScore * 0.5 + distanceScore * 0.5 + profileBonus - profilePenalty;
-  return Math.max(0, Math.min(100, Math.round(combined)));
+  const ratingScore =
+    candidate.rating != null
+      ? (candidate.rating / 5) * 100
+      : 50;
+
+  const distanceScore = 70 + Math.random() * 30;
+
+  const likedSet = new Set([
+    ...(dna?.interests ?? []),
+    ...(dna?.preferred_categories ?? []),
+  ]);
+
+  const dislikedSet = new Set(
+    dna?.disliked_categories ?? []
+  );
+
+  const profileBonus = likedSet.has(candidate.category)
+    ? 15
+    : 0;
+
+  const profilePenalty = dislikedSet.has(candidate.category)
+    ? 20
+    : 0;
+
+  let freeTextBonus = 0;
+
+  const normalized = freeText.trim().toLowerCase();
+
+  if (normalized) {
+    const haystack = `${candidate.name} ${
+      candidate.shortDescription ?? ""
+    }`.toLowerCase();
+
+    const words = normalized
+      .split(/\s+/)
+      .filter((word) => word.length > 2);
+
+    const directHits = words.filter((word) =>
+      haystack.includes(word)
+    ).length;
+
+    freeTextBonus += directHits * 25;
+
+    const wantsSmall =
+      FREE_TEXT_SIZE_HINTS.small.some((hint) =>
+        normalized.includes(hint)
+      );
+
+    const wantsLarge =
+      FREE_TEXT_SIZE_HINTS.large.some((hint) =>
+        normalized.includes(hint)
+      );
+
+    const looksLarge =
+      /קניון|מרכז מסחרי|מרכז קניות|פארק שעשועים|אצטדיון|מגדל|כיכר מרכזית/.test(
+        `${candidate.name} ${candidate.shortDescription ?? ""}`
+      );
+
+    if (wantsSmall && looksLarge) {
+      freeTextBonus -= 30;
+    }
+
+    if (wantsLarge && looksLarge) {
+      freeTextBonus += 10;
+    }
+  }
+
+  const combined =
+    ratingScore * 0.25 +
+    distanceScore * 0.25 +
+    profileBonus -
+    profilePenalty +
+    freeTextBonus * 1.5 +
+    learnedBonus;
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round(combined))
+  );
 }

@@ -1,7 +1,7 @@
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const MODEL = "claude-sonnet-5";
-const TIMEOUT_MS = 15000;
+const MODEL = "claude-haiku-4-5-20251001";
+const TIMEOUT_MS = 12000;
 
 export interface ClaudeCallResult {
   text: string | null;
@@ -22,9 +22,10 @@ export async function callClaude(prompt: string, maxTokens = 2048): Promise<Clau
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  try {
+try {
+    const fetchStart = Date.now();
     const response = await fetch(ANTHROPIC_API_URL, {
-      method: "POST",
+            method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
@@ -38,15 +39,24 @@ export async function callClaude(prompt: string, maxTokens = 2048): Promise<Clau
       signal: controller.signal,
     });
 
+console.log(`[Claude Timing] fetch לקח ${Date.now() - fetchStart}ms, סטטוס: ${response.status}`);
+
     if (!response.ok) {
       const errorBody = await response.text();
       throw new Error(`Claude API החזיר שגיאה (${response.status}): ${errorBody.slice(0, 300)}`);
     }
 
-    const data = await response.json();
-    const text: string | undefined = data.content?.[0]?.text;
+ const data = await response.json();
+    // מחפש את בלוק הטקסט בכל המערך, לא רק content[0] - Claude יכול להחזיר
+    // כמה בלוקים ולא תמיד הטקסט ראשון (במיוחד בתשובות ארוכות/מורכבות)
+    const textBlock = (data.content as { type: string; text?: string }[] | undefined)?.find(
+      (block) => block.type === "text" && block.text
+    );
+    const text = textBlock?.text;
     if (!text) {
-      throw new Error("תשובת Claude לא הכילה טקסט");
+      throw new Error(
+        `תשובת Claude לא הכילה טקסט (stop_reason: ${data.stop_reason ?? "unknown"}, content types: ${(data.content ?? []).map((b: { type: string }) => b.type).join(",")})`
+      );
     }
 
     return { text, error: null };

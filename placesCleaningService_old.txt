@@ -1,7 +1,7 @@
-import type { GooglePlaceRaw } from "./googlePlacesService";
+﻿import type { GooglePlaceRaw } from "./googlePlacesService";
 import { downloadAndStorePhoto } from "./photoStorageService";
 
-/** מתחת לדירוג הזה, יעד לא נשמר. */
+/** ╫₧╫¬╫ù╫¬ ╫£╫ô╫Ö╫¿╫ò╫Æ ╫ö╫û╫ö, ╫Ö╫ó╫ô ╫£╫É ╫á╫⌐╫₧╫¿. */
 export const MIN_RATING = 3.5;
 
 const PRICE_LEVEL_MAP: Record<string, number> = {
@@ -31,17 +31,12 @@ export interface CleanPlaceRow {
   opening_hours: string[] | null;
   tags: string[];
   source: string;
-  phone?: string | null;
-  website?: string | null;
-  google_maps_url?: string | null;
-  google_raw?: unknown;
-  trip_type_tags: string[];
 }
 
 /**
- * מנקה ומשלימה שדות חסרים ביעד גולמי מגוגל, ומורידה את התמונות שלו
- * פעם אחת בלבד לאחסון הקבוע שלנו (ראו photoStorageService).
- * מחזיר null אם היעד לא עומד בסף האיכות (בלי תמונה, או דירוג נמוך מדי).
+ * ╫₧╫á╫º╫ö ╫ò╫₧╫⌐╫£╫Ö╫₧╫ö ╫⌐╫ô╫ò╫¬ ╫ù╫í╫¿╫Ö╫¥ ╫æ╫Ö╫ó╫ô ╫Æ╫ò╫£╫₧╫Ö ╫₧╫Æ╫ò╫Æ╫£, ╫ò╫₧╫ò╫¿╫Ö╫ô╫ö ╫É╫¬ ╫ö╫¬╫₧╫ò╫á╫ò╫¬ ╫⌐╫£╫ò
+ * ╫ñ╫ó╫¥ ╫É╫ù╫¬ ╫æ╫£╫æ╫ô ╫£╫É╫ù╫í╫ò╫ƒ ╫ö╫º╫æ╫ò╫ó ╫⌐╫£╫á╫ò (╫¿╫É╫ò photoStorageService).
+ * ╫₧╫ù╫û╫Ö╫¿ null ╫É╫¥ ╫ö╫Ö╫ó╫ô ╫£╫É ╫ó╫ò╫₧╫ô ╫æ╫í╫ú ╫ö╫É╫Ö╫¢╫ò╫¬ (╫æ╫£╫Ö ╫¬╫₧╫ò╫á╫ö, ╫É╫ò ╫ô╫Ö╫¿╫ò╫Æ ╫á╫₧╫ò╫Ü ╫₧╫ô╫Ö).
  */
 export async function cleanGooglePlace(
   raw: GooglePlaceRaw,
@@ -58,14 +53,16 @@ export async function cleanGooglePlace(
   const rating = raw.rating ?? null;
   if (rating !== null && rating < MIN_RATING) return null;
 
-// רק תמונת פרופיל אחת - חוסך משמעותית בעלויות Google Places Photo
+  // ╫æ╫¿╫ª╫ú ╫ò╫£╫É Promise.all - ╫₧╫ò╫á╫ó ╫ñ╫Æ╫Ö╫ó╫ö ╫æ╫₧╫Æ╫æ╫£╫¬ ╫º╫ª╫æ ╫ö╫æ╫º╫⌐╫ò╫¬ ╫⌐╫£ ╫Æ╫ò╫Æ╫£
   const imageUrls: string[] = [];
-  const url = await downloadAndStorePhoto(photos[0].name, `places/${raw.id}/0.jpg`);
-  if (url) imageUrls.push(url);
+  for (const [index, photo] of photos.slice(0, 5).entries()) {
+    const url = await downloadAndStorePhoto(photo.name, `places/${raw.id}/${index}.jpg`);
+    if (url) imageUrls.push(url);
+  }
   if (imageUrls.length === 0) return null;
 
-  // תג "accessible" אמיתי מגוגל. אין ל"kosher" מקבילה בגוגל - יתווסף
-  // ידנית/ממקור אחר בעתיד, לא ממציאים את זה.
+  // ╫¬╫Æ "accessible" ╫É╫₧╫Ö╫¬╫Ö ╫₧╫Æ╫ò╫Æ╫£. ╫É╫Ö╫ƒ ╫£"kosher" ╫₧╫º╫æ╫Ö╫£╫ö ╫æ╫Æ╫ò╫Æ╫£ - ╫Ö╫¬╫ò╫ò╫í╫ú
+  // ╫Ö╫ô╫á╫Ö╫¬/╫₧╫₧╫º╫ò╫¿ ╫É╫ù╫¿ ╫æ╫ó╫¬╫Ö╫ô, ╫£╫É ╫₧╫₧╫ª╫Ö╫É╫Ö╫¥ ╫É╫¬ ╫û╫ö.
   const tags: string[] = [];
   if (raw.accessibilityOptions?.wheelchairAccessibleEntrance) tags.push("accessible");
 
@@ -85,13 +82,8 @@ export async function cleanGooglePlace(
     price_level: raw.priceLevel ? PRICE_LEVEL_MAP[raw.priceLevel] ?? null : null,
     estimated_visit_minutes: null,
     image_urls: imageUrls,
-   opening_hours: raw.regularOpeningHours?.weekdayDescriptions ?? null,
+    opening_hours: raw.regularOpeningHours?.weekdayDescriptions ?? null,
     tags,
-source: "google_places",
-    phone: raw.nationalPhoneNumber ?? null,
-    website: raw.websiteUri ?? null,
-    google_maps_url: raw.googleMapsUri ?? null,
-    google_raw: raw,
-    trip_type_tags: [category],
+    source: "google_places",
   };
 }

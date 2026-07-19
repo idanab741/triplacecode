@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toggleFavorite, skipPlace } from "@/services/favorites/favoritesService";
+import { recordSwipeSignal } from "@/services/travelDna/attributeLearningService";
 import type { CandidatePlace } from "./types";
 
 export async function likeStop(
@@ -18,7 +19,8 @@ export async function likeStop(
     })
     .eq("id", stopId);
 
-  await toggleFavorite(supabase, userId, candidate.id, "place", "liked");
+await toggleFavorite(supabase, userId, candidate.id, "place", "liked");
+  await recordSwipeSignal(supabase, userId, candidate.id, true);
 }
 
 export async function unlikeStop(
@@ -41,5 +43,6 @@ export async function unlikeStop(
       .eq("id", stopId);
   }
 
-  await skipPlace(supabase, userId, candidate.id, "place");
+await skipPlace(supabase, userId, candidate.id, "place");
+  await recordSwipeSignal(supabase, userId, candidate.id, false);
 }

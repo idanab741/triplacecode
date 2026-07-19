@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CandidatePlace, LatLng } from "./types";
-import { distanceBandToRadiusKm, haversineDistanceKm, estimateTravelMinutes, kmToDegreesLat, kmToDegreesLng } from "./geo";
-import type { DistanceBand } from "./types";
+import type { CandidatePlace, LatLng, DistanceBand } from "./types";
+import {
+  distanceBandToRadiusKm,
+  haversineDistanceKm,
+  estimateTravelMinutes,
+  kmToDegreesLat,
+  kmToDegreesLng,
+} from "./geo";
 
 interface FetchCandidatePoolParams {
   category: string;
@@ -9,6 +14,10 @@ interface FetchCandidatePoolParams {
   distanceBand: DistanceBand;
   maxPriceLevel: number | null;
   excludePlaceIds: string[];
+  /** אילוץ קשיח: אם true, פוסלים רק מקומות שסומנו במפורש kosher=false. לא נוגע במקומות שעדיין לא תויגו (null). */
+  requireKosher?: boolean;
+  /** אילוץ קשיח: אם true, פוסלים רק מקומות שסומנו במפורש accessible=false. */
+  requireAccessible?: boolean;
 }
 
 interface PlaceRow {
@@ -24,12 +33,18 @@ interface PlaceRow {
   estimated_visit_minutes: number | null;
   latitude: number | null;
   longitude: number | null;
+  trip_type_tags: string[] | null;
+  cuisine_tags: string[] | null;
+  kosher: boolean | null;
+  accessible: boolean | null;
+  suitable_child_ages: string[] | null;
+  budget_tier: string | null;
 }
 
 /**
- * שולף מאגר מועמדים מטבלת places לקטגוריה נתונה, מסונן לפי רדיוס נסיעה
- * (Haversine, לא API ניתוב) ותקציב. נופל בעדינות אם המאגר ריק - ראשית
- * מוותר על מגבלת התקציב, ואז מחזיר [] כדי שהמסך יציג הודעה במקום לקרוס.
+ * שולף מאגר מועמדים מטבלת places לקטגוריה נתונה.
+ * הסינון מתבצע לפי רדיוס (Haversine) ותקציב.
+ * אם אין תוצאות - מנסה שוב ללא מגבלת תקציב.
  */
 export async function fetchCandidatePool(
   supabase: SupabaseClient,
@@ -38,11 +53,13 @@ export async function fetchCandidatePool(
   const radiusKm = distanceBandToRadiusKm(params.distanceBand);
 
   const pool = await queryPool(supabase, params, radiusKm, true);
-  if (pool.length > 0) return pool;
 
-  // נסיגה 1: בלי מגבלת תקציב
-  const withoutBudget = await queryPool(supabase, params, radiusKm, false);
-  return withoutBudget;
+  if (pool.length > 0) {
+    return pool;
+  }
+
+  // נסיגה - ללא מגבלת תקציב
+  return queryPool(supabase, params, radiusKm, false);
 }
 
 async function queryPool(
@@ -57,9 +74,9 @@ async function queryPool(
   let query = supabase
     .from("places")
     .select(
-      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude"
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier"
     )
-    .eq("category", params.category)
+    .overlaps("trip_type_tags", [params.category])
     .gte("latitude", params.origin.lat - latDelta)
     .lte("latitude", params.origin.lat + latDelta)
     .gte("longitude", params.origin.lng - lngDelta)
@@ -69,17 +86,41 @@ async function queryPool(
     query = query.or(`price_level.is.null,price_level.lte.${params.maxPriceLevel}`);
   }
 
+  // אילוצים קשיחים: פוסלים רק סימון מפורש "לא" - מקומות שעדיין לא תויגו (null) נשארים בפנים
+  if (params.requireKosher) {
+    query = query.or("kosher.is.null,kosher.eq.true");
+  }
+  if (params.requireAccessible) {
+    query = query.or("accessible.is.null,accessible.eq.true");
+  }
+
   if (params.excludePlaceIds.length > 0) {
     query = query.not("id", "in", `(${params.excludePlaceIds.join(",")})`);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("[CandidatePool Error]", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      category: params.category,
+    });
+
+    return [];
+  }
+
   const rows = (data ?? []) as PlaceRow[];
 
   return rows
     .filter((row) => row.latitude != null && row.longitude != null)
     .map((row) => {
-      const distanceKm = haversineDistanceKm(params.origin, { lat: row.latitude!, lng: row.longitude! });
+      const distanceKm = haversineDistanceKm(params.origin, {
+        lat: row.latitude!,
+        lng: row.longitude!,
+      });
+
       return {
         id: row.id,
         name: row.name,
@@ -95,8 +136,14 @@ async function queryPool(
         longitude: row.longitude!,
         distanceKm,
         etaMinutes: estimateTravelMinutes(distanceKm, "drive"),
+        tripTypeTags: row.trip_type_tags ?? [],
+        cuisineTags: row.cuisine_tags ?? [],
+        kosher: row.kosher,
+        accessible: row.accessible,
+        suitableChildAges: row.suitable_child_ages ?? [],
+        budgetTier: row.budget_tier,
       } satisfies CandidatePlace;
     })
     .filter((candidate) => candidate.distanceKm <= radiusKm)
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+    .sort(() => Math.random() - 0.5); // ערבוב רנדומלי - לא תמיד הקרוב ביותר ראשון
 }

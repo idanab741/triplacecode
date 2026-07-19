@@ -66,7 +66,10 @@ export async function GET(request: Request) {
 
 async function getWeatherSummary(lat: number, lng: number): Promise<string | null> {
   try {
-    const forecast = await getWeeklyForecast(lat, lng);
+    const forecast = await Promise.race([
+      getWeeklyForecast(lat, lng),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("weather timeout")), 4000)),
+    ]);
     const today = forecast[0];
     if (!today) return null;
     const { label } = describeWeatherCode(today.weatherCode);

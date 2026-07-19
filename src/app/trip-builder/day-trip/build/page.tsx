@@ -151,7 +151,7 @@ function DayTripBuildContent() {
         <Stepper
           current={doneStops + 1}
           total={totalStops}
-          label={nextStop ? `הבא: ${getCategoryLabel(nextStop.category)}` : undefined}
+          label={getCategoryLabel(currentStop.category)}
         />
 
         {!candidates ? (

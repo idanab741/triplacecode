@@ -3,6 +3,7 @@ export interface GooglePlaceRaw {
   id: string;
   displayName?: { text: string };
   formattedAddress?: string;
+  addressComponents?: { longText: string; shortText: string; types: string[] }[];
   location?: { latitude: number; longitude: number };
   rating?: number;
   userRatingCount?: number;
@@ -13,12 +14,16 @@ export interface GooglePlaceRaw {
   editorialSummary?: { text: string };
   primaryTypeDisplayName?: { text: string };
   accessibilityOptions?: { wheelchairAccessibleEntrance?: boolean };
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
+  googleMapsUri?: string;
 }
 
 const FIELD_MASK = [
   "places.id",
   "places.displayName",
   "places.formattedAddress",
+  "places.addressComponents",
   "places.location",
   "places.rating",
   "places.userRatingCount",
@@ -29,6 +34,9 @@ const FIELD_MASK = [
   "places.editorialSummary",
   "places.primaryTypeDisplayName",
   "places.accessibilityOptions",
+  "places.nationalPhoneNumber",
+  "places.websiteUri",
+  "places.googleMapsUri",
 ].join(",");
 
 async function textSearchGooglePlaces(textQuery: string): Promise<GooglePlaceRaw[]> {
@@ -73,4 +81,16 @@ export async function searchGooglePlaces({
 export async function searchCityPlace(searchQuery: string): Promise<GooglePlaceRaw | null> {
   const results = await textSearchGooglePlaces(searchQuery);
   return results[0] ?? null;
+}
+
+/** מחלץ עיר ומדינה מתוך addressComponents של גוגל, אם קיימים. */
+export function extractCityAndCountry(raw: GooglePlaceRaw): { city: string | null; country: string | null } {
+  const components = raw.addressComponents ?? [];
+  const city =
+    components.find((c) => c.types.includes("locality"))?.longText ??
+    components.find((c) => c.types.includes("postal_town"))?.longText ??
+    components.find((c) => c.types.includes("administrative_area_level_2"))?.longText ??
+    null;
+  const country = components.find((c) => c.types.includes("country"))?.longText ?? null;
+  return { city, country };
 }
