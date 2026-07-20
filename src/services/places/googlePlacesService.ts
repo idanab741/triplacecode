@@ -3,7 +3,7 @@ export interface GooglePlaceRaw {
   id: string;
   displayName?: { text: string };
   formattedAddress?: string;
-  addressComponents?: { longText: string; shortText: string; types: string[] }[];
+  addressComponents?: { longText: string; shortText: string; types?: string[] }[];
   location?: { latitude: number; longitude: number };
   rating?: number;
   userRatingCount?: number;
@@ -87,10 +87,10 @@ export async function searchCityPlace(searchQuery: string): Promise<GooglePlaceR
 export function extractCityAndCountry(raw: GooglePlaceRaw): { city: string | null; country: string | null } {
   const components = raw.addressComponents ?? [];
   const city =
-    components.find((c) => c.types.includes("locality"))?.longText ??
-    components.find((c) => c.types.includes("postal_town"))?.longText ??
-    components.find((c) => c.types.includes("administrative_area_level_2"))?.longText ??
+    components.find((c) => c.types?.includes("locality"))?.longText ??
+    components.find((c) => c.types?.includes("postal_town"))?.longText ??
+    components.find((c) => c.types?.includes("administrative_area_level_2"))?.longText ??
     null;
-  const country = components.find((c) => c.types.includes("country"))?.longText ?? null;
+  const country = components.find((c) => c.types?.includes("country"))?.longText ?? null;
   return { city, country };
 }
