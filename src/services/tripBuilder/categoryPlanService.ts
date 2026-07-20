@@ -1,8 +1,11 @@
 import { callClaude, logAiError } from "@/services/ai/claudeService";
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
+import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 import type { CategoryPlanItem, DayTripAnswers, StopRole, TripType } from "./types";
 import { getTripTypeRules } from "./rules";
+
+const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 
 interface DecideCategoryPlanParams {
   tripType: TripType;
@@ -46,10 +49,10 @@ ${JSON.stringify({
 
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 [{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint", "order": 0}, ...]
-כאשר "category" הוא אחד מהערכים: ${
-    params.answers.interests.filter((i) => i !== "events_festivals").join(", ") ||
-    "nature_trails, wineries_dining"
-  }.`;
+"category" חייב להיות אחד מתוך הרשימה המלאה: ${ALL_CATEGORY_IDS}.
+תחומי העניין שסומנו בתיבות הסימון: ${
+    params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן כלום"
+  } - אלה עדיפות ראשונית, אך אם המלל החופשי מצביע על קטגוריה אחרת (למשל מזכיר "תצפית" והיא לא סומנה) - תשתמש בקטגוריה שהמלל מבקש, גם אם היא לא ברשימת הסימון.`;
 
   const { text, error } = await callClaude(prompt);
   if (error || !text) return null;

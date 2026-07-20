@@ -48,7 +48,7 @@ export async function rankCandidates(
     return aiRanked;
   }
 
-  return params.candidates
+return params.candidates
     .map((candidate) => ({
       ...candidate,
       score: computeFallbackScore(
@@ -62,7 +62,7 @@ export async function rankCandidates(
         : "התאמה בסיסית לפי מרחק ודירוג",
       source: "fallback" as const,
     }))
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    .sort((a, b) => ((b.score ?? 0) + Math.random() * 2) - ((a.score ?? 0) + Math.random() * 2));
 }
 
 async function tryClaudeRanking(
@@ -150,7 +150,8 @@ ${JSON.stringify(candidatesPayload)}
       });
     }
 
-    ranked.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+// רעש קטן שובר שוויון בין ציונים קרובים - מונע אותה תוצאה בדיוק בכל פעם
+    ranked.sort((a, b) => ((b.score ?? 0) + Math.random() * 2) - ((a.score ?? 0) + Math.random() * 2));
 
     return ranked.length ? ranked : null;
   } catch (parseError) {

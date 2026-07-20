@@ -51,10 +51,13 @@ export async function GET(
   }
 
   const answers = session.answers as unknown as DayTripAnswers;
-  const alreadyUsedPlaceIds = stops
+const alreadyUsedPlaceIds = stops
     .filter((s) => s.place_id && s.id !== stopId)
     .map((s) => s.place_id as string);
-  const excludePlaceIds = [...alreadyUsedPlaceIds, ...stop.rejected_place_ids];
+  // דחיות (Unlike) מכל התחנות בטיול - לא רק התחנה הנוכחית, כדי שמקום שנדחה
+  // פעם אחת לעולם לא יחזור, גם אם הוא מתאים לקטגוריה אחרת בהמשך
+  const allRejectedPlaceIds = stops.flatMap((s) => s.rejected_place_ids ?? []);
+  const excludePlaceIds = Array.from(new Set([...alreadyUsedPlaceIds, ...allRejectedPlaceIds]));
 
   try {
 const dnaForFilters = await getTravelDna(supabase, user.id);
