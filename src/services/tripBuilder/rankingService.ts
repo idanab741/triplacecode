@@ -237,8 +237,7 @@ function computeFallbackScore(
       ? (candidate.rating / 5) * 100
       : 50;
 
-  const distanceScore = 70 + Math.random() * 30;
-
+  const distanceScore = Math.max(0, 100 - candidate.distanceKm * 5);
   const likedSet = new Set([
     ...(dna?.interests ?? []),
     ...(dna?.preferred_categories ?? []),
