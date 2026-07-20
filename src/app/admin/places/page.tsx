@@ -245,8 +245,8 @@ async function handleBulkTag(mode: "untagged" | "all") {
     let totalFailed = 0;
     let afterId: string | null = null;
     try {
-      while (true) {
-        const res = await fetch("/api/admin/places/bulk-suggest-tags", {
+while (true) {
+        const res: Response = await fetch("/api/admin/places/bulk-suggest-tags", {
           method: "POST",
           headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
           body: JSON.stringify({ mode, afterId }),
