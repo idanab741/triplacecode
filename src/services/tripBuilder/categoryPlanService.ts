@@ -128,12 +128,43 @@ function buildFallbackPlan(
   const foodCategory = "wineries_dining";
   const coffeeCategory = "coffee_carts_cafes";
 
-  let attractionCursor = 0;
-  return rule.roles.map((role, order) => {
-    if (role === "food") return { category: foodCategory, role, order };
-    if (role === "coffee_dessert") return { category: coffeeCategory, role, order };
-    const category = interests[attractionCursor % interests.length];
-    attractionCursor += 1;
-    return { category, role, order };
-  });
+ export interface DecideNextStopParams {
+  dna: TravelDna | null;
+  answers: DayTripAnswers;
+  usedCategories: string[];
+}
+
+/** קובעת קטגוריה+תפקיד לתחנה בודדת נוספת, בזמן ריצה (זרימת החלקות דינמית). */
+export async function decideNextStop(params: DecideNextStopParams): Promise<{ category: string; role: StopRole }> {
+  const prompt = `אתה מנוע ה-AI של TRIPLACE. המשתמש כבר אישר כמה תחנות בטיול, וביקש להוסיף עוד תחנה אחת.
+
+מלל חופשי מהמשתמש: ${JSON.stringify(params.answers.freeText || null)}
+תחומי עניין שסומנו: ${params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן"}
+קטגוריות שכבר נכנסו למסלול: ${params.usedCategories.join(", ") || "אין"}
+
+*** קבע קטגוריה אחת נוספת שתתאים הכי טוב. אם יש מלל חופשי משמעותי - התבסס עליו בעיקר (כ-90% מההחלטה).
+אם אין מלל חופשי משמעותי, בחר מתוך תחומי העניין שסומנו, עדיף כזה שעדיין לא נוצל. ***
+
+השב אך ורק במבנה JSON: {"category": "...", "role": "attraction|food|coffee_dessert|viewpoint"}`;
+
+  const { text, error } = await callClaude(prompt);
+  if (!error && text) {
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as { category: string; role: string };
+        return { category: parsed.category, role: normalizeRole(parsed.role) };
+      }
+    } catch (parseError) {
+      logAiError("כשל בפענוח תשובת JSON מ-Claude בתחנה דינמית", {
+        message: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+    }
+  }
+
+  // פולבאק: תחום עניין שעוד לא נוצל, אחרת הראשון ברשימה
+  const interests = params.answers.interests.filter((i) => i !== "events_festivals");
+  const pool = interests.length > 0 ? interests : ["attractions_activities"];
+  const notUsed = pool.find((c) => !params.usedCategories.includes(c));
+  return { category: notUsed ?? pool[0], role: "attraction" };
 }

@@ -98,3 +98,36 @@ export async function saveFinalItinerary(
     .update({ final_itinerary: itinerary, status: "completed" })
     .eq("id", sessionId);
 }
+
+/** מוסיפה תחנה בודדת נוספת ל-session קיים, בזמן ריצה (זרימת החלקות דינמית). */
+export async function addDynamicStop(
+  supabase: SupabaseClient,
+  sessionId: string,
+  category: string,
+  role: TripBuilderStop["role"]
+): Promise<TripBuilderStop> {
+  const { data: existingStops } = await supabase
+    .from("trip_builder_stops")
+    .select("slot_index")
+    .eq("session_id", sessionId)
+    .order("slot_index", { ascending: false })
+    .limit(1);
+
+  const nextSlotIndex = (existingStops?.[0]?.slot_index ?? -1) + 1;
+
+  const { data, error } = await supabase
+    .from("trip_builder_stops")
+    .insert({
+      session_id: sessionId,
+      category,
+      role,
+      slot_index: nextSlotIndex,
+    })
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "הוספת תחנה דינמית נכשלה");
+  }
+  return data as TripBuilderStop;
+}
