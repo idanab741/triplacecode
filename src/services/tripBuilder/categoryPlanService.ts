@@ -126,9 +126,19 @@ function buildFallbackPlan(
   }
 
   const foodCategory = "wineries_dining";
-  const coffeeCategory = "coffee_carts_cafes";
+const coffeeCategory = "coffee_carts_cafes";
 
- export interface DecideNextStopParams {
+  let attractionCursor = 0;
+  return rule.roles.map((role, order) => {
+    if (role === "food") return { category: foodCategory, role, order };
+    if (role === "coffee_dessert") return { category: coffeeCategory, role, order };
+    const category = interests[attractionCursor % interests.length];
+    attractionCursor += 1;
+    return { category, role, order };
+  });
+}
+
+export interface DecideNextStopParams {
   dna: TravelDna | null;
   answers: DayTripAnswers;
   usedCategories: string[];
