@@ -25,8 +25,21 @@ const body = await request.json().catch(() => null);
   try {
     const result = await collectPlacesForCityAndCategory(city, category, country, subTagQuery, subTagId);
     return NextResponse.json(result);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
-    return NextResponse.json({ error: message }, { status: 500 });
+} catch (error) {
+  console.error(error);
+
+  if (error instanceof Error) {
+    return NextResponse.json(
+      {
+        error: error.message,
+        stack: error.stack,
+      },
+      { status: 500 }
+    );
   }
+
+  return NextResponse.json(
+    { error: "Unknown error" },
+    { status: 500 }
+  );
 }
