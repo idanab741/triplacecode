@@ -7,11 +7,13 @@ import { collectPlacesForCityAndCategory } from "@/services/places/collectionSer
  */
 export async function POST(request: Request) {
   const secret = request.headers.get("x-admin-secret");
+
   if (!secret || secret !== process.env.ADMIN_API_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-const body = await request.json().catch(() => null);
+  const body = await request.json().catch(() => null);
+
   const city: string | undefined = body?.city;
   const category: string | undefined = body?.category;
   const country: string | undefined = body?.country;
@@ -19,36 +21,38 @@ const body = await request.json().catch(() => null);
   const subTagId: string | undefined = body?.subTagId;
 
   if (!city || !category) {
-    return NextResponse.json({ error: "יש לספק city ו-category" }, { status: 400 });
-  }
-
-  try {
-  const result = await collectPlacesForCityAndCategory(
-    city,
-    category,
-    country,
-    subTagQuery,
-    subTagId
-  );
-
-  return NextResponse.json(result);
-
-} catch (error) {
-  console.error(error);
-
-  if (error instanceof Error) {
     return NextResponse.json(
-      {
-        error: error.message,
-        stack: error.stack,
-      },
-      { status: 500 }
+      { error: "יש לספק city ו-category" },
+      { status: 400 }
     );
   }
 
-  return NextResponse.json(
-    { error: "Unknown error" },
-    { status: 500 }
-  );
-}
+  try {
+    const result = await collectPlacesForCityAndCategory(
+      city,
+      category,
+      country,
+      subTagQuery,
+      subTagId
+    );
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error(error);
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          stack: error.stack,
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Unknown error" },
+      { status: 500 }
+    );
+  }
 }
