@@ -13,9 +13,12 @@ export interface CollectPlacesResult {
 export async function collectPlacesForCityAndCategory(
   city: string,
   category: string,
-  country = "ישראל"
+  country = "ישראל",
+  subTagQuery?: string,
+  subTagId?: string
 ): Promise<CollectPlacesResult> {
-  const query = CATEGORY_SEARCH_QUERIES[category];
+  // אם נבחרה תת-קטגוריה ספציפית - מחפשים בגוגל אותה ממש, במקום הקבוצה הכללית
+  const query = subTagQuery || CATEGORY_SEARCH_QUERIES[category];
   if (!query) {
     throw new Error(`קטגוריה לא מוכרת: ${category}`);
   }
@@ -26,6 +29,9 @@ export async function collectPlacesForCityAndCategory(
   const cleanRows: NonNullable<Awaited<ReturnType<typeof cleanGooglePlace>>>[] = [];
   for (const raw of rawPlaces) {
     const row = await cleanGooglePlace(raw, category, city, country);
+    if (row && subTagId) {
+      row.trip_type_tags = Array.from(new Set([...row.trip_type_tags, subTagId]));
+    }
     if (row) cleanRows.push(row);
   }
 

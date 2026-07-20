@@ -1,4 +1,5 @@
 import type { GooglePlaceRaw } from "./googlePlacesService";
+import { extractCityAndCountry } from "./googlePlacesService";
 import { downloadAndStorePhoto } from "./photoStorageService";
 
 /** מתחת לדירוג הזה, יעד לא נשמר. */
@@ -69,14 +70,18 @@ export async function cleanGooglePlace(
   const tags: string[] = [];
   if (raw.accessibilityOptions?.wheelchairAccessibleEntrance) tags.push("accessible");
 
+// מחלצים עיר/מדינה אמיתיות מהכתובת של גוגל, לפי המקום הספציפי הזה -
+  // לא "מה שהוקלד בחיפוש" (שיכול להיות "ישראל"/אזור כללי, לא עיר מדויקת)
+  const extracted = extractCityAndCountry(raw);
+
   return {
     google_place_id: raw.id,
     name,
     category,
     subcategory: raw.primaryTypeDisplayName?.text ?? null,
     short_description: raw.editorialSummary?.text ?? null,
-    city,
-    country,
+    city: extracted.city ?? city,
+    country: extracted.country ?? country,
     address: raw.formattedAddress ?? null,
     latitude: raw.location?.latitude ?? null,
     longitude: raw.location?.longitude ?? null,

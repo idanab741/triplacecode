@@ -11,17 +11,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => null);
+const body = await request.json().catch(() => null);
   const city: string | undefined = body?.city;
   const category: string | undefined = body?.category;
   const country: string | undefined = body?.country;
+  const subTagQuery: string | undefined = body?.subTagQuery;
+  const subTagId: string | undefined = body?.subTagId;
 
   if (!city || !category) {
     return NextResponse.json({ error: "יש לספק city ו-category" }, { status: 400 });
   }
 
   try {
-    const result = await collectPlacesForCityAndCategory(city, category, country);
+    const result = await collectPlacesForCityAndCategory(city, category, country, subTagQuery, subTagId);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";

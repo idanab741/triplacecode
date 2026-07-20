@@ -141,10 +141,13 @@ export default function AdminPlacesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [bulkCity, setBulkCity] = useState("");
+const [bulkCity, setBulkCity] = useState("");
   const [bulkCategory, setBulkCategory] = useState(CATEGORIES[0]);
+  const [bulkSubTag, setBulkSubTag] = useState(""); // ריק = כל הקטגוריה, לא תת-תגית ספציפית
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ fetched: number; saved: number; skipped: number } | null>(null);
+
+  const bulkCategoryGroup = TRIP_TYPE_GROUPS.find((g) => g.id === bulkCategory);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -212,15 +215,21 @@ const filteredPlaces = places.filter((p) => {
     }
   }
 
-  async function handleBulkAdd() {
+async function handleBulkAdd() {
     if (!bulkCity.trim()) return;
     setBulkLoading(true);
     setBulkResult(null);
     try {
+      const selectedSubTag = bulkCategoryGroup?.subTags.find((t) => t.id === bulkSubTag);
       const res = await fetch("/api/admin/collect-places", {
         method: "POST",
         headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
-        body: JSON.stringify({ city: bulkCity, category: bulkCategory }),
+        body: JSON.stringify({
+          city: bulkCity,
+          category: bulkCategory,
+          subTagId: selectedSubTag?.id,
+          subTagQuery: selectedSubTag?.label,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "שגיאה");
@@ -390,14 +399,29 @@ while (true) {
             placeholder="עיר (למשל: תל אביב)"
             className="flex-1 rounded border border-gray-300 px-3 py-2"
           />
-   <select
+<select
             value={bulkCategory}
-            onChange={(e) => setBulkCategory(e.target.value)}
+            onChange={(e) => {
+              setBulkCategory(e.target.value);
+              setBulkSubTag("");
+            }}
             className="rounded border border-gray-300 px-3 py-2"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {getCategoryLabel(c)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={bulkSubTag}
+            onChange={(e) => setBulkSubTag(e.target.value)}
+            className="rounded border border-gray-300 px-3 py-2"
+          >
+            <option value="">כל תת-הקטגוריות</option>
+            {bulkCategoryGroup?.subTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.label}
               </option>
             ))}
           </select>
