@@ -23,8 +23,16 @@ const body = await request.json().catch(() => null);
   }
 
   try {
-    const result = await collectPlacesForCityAndCategory(city, category, country, subTagQuery, subTagId);
-    return NextResponse.json(result);
+  const result = await collectPlacesForCityAndCategory(
+    city,
+    category,
+    country,
+    subTagQuery,
+    subTagId
+  );
+
+  return NextResponse.json(result);
+
 } catch (error) {
   console.error(error);
 
@@ -42,4 +50,5 @@ const body = await request.json().catch(() => null);
     { error: "Unknown error" },
     { status: 500 }
   );
+}
 }
