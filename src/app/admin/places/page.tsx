@@ -233,22 +233,30 @@ const filteredPlaces = places.filter((p) => {
     }
   }
 
-async function handleBulkTag() {
-    if (!confirm("להריץ תיוג אוטומטי על כל המקומות שעדיין לא תויגו? זה ירוץ באצוות של 15 בכל פעם.")) return;
+async function handleBulkTag(mode: "untagged" | "all") {
+    const confirmText =
+      mode === "all"
+        ? "לתייג מחדש את כל המקומות (כולל כאלה שכבר תויגו)? זה ירוץ באצוות של 15 בכל פעם וידרוס תיוג קיים."
+        : "להריץ תיוג אוטומטי על כל המקומות שעדיין לא תויגו? זה ירוץ באצוות של 15 בכל פעם.";
+    if (!confirm(confirmText)) return;
+
     setBulkTagging(true);
     let totalTagged = 0;
     let totalFailed = 0;
+    let afterId: string | null = null;
     try {
       while (true) {
         const res = await fetch("/api/admin/places/bulk-suggest-tags", {
           method: "POST",
-          headers: { [ADMIN_SECRET_HEADER]: adminSecret },
+          headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+          body: JSON.stringify({ mode, afterId }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "שגיאה");
 
         totalTagged += data.tagged;
         totalFailed += data.failed;
+        afterId = data.lastId ?? afterId;
         setBulkTagResult({ total: totalTagged + totalFailed + data.remaining, tagged: totalTagged, failed: totalFailed });
 
         if (data.processedNow === 0 || data.remaining === 0) break;
@@ -408,19 +416,28 @@ async function handleBulkTag() {
         )}
       </div>
 
-      <div className="mb-6 rounded border border-gray-200 p-3">
-        <div className="mb-2 flex items-center justify-between">
+  <div className="mb-6 rounded border border-gray-200 p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-sm font-medium">תיוג אוטומטי בכמות</p>
-          <button
-            onClick={handleBulkTag}
-            disabled={bulkTagging}
-            className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {bulkTagging ? "מתייג... (זה ייקח כמה דקות)" : "🤖 תייג הכל אוטומטית"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleBulkTag("untagged")}
+              disabled={bulkTagging}
+              className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {bulkTagging ? "מתייג..." : "🤖 תייג לא-מתויגים"}
+            </button>
+            <button
+              onClick={() => handleBulkTag("all")}
+              disabled={bulkTagging}
+              className="rounded bg-orange-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {bulkTagging ? "מתייג..." : "🔄 תייג הכל מחדש"}
+            </button>
+          </div>
         </div>
         <p className="text-xs text-gray-500">
-          מריץ Claude על כל המקומות שעדיין לא תויגו ולא נערכו ידנית. שומר אוטומטית - בלי אישור בודד לכל מקום.
+          "תייג לא-מתויגים" - רק מקומות בלי תגיות. "תייג הכל מחדש" - דורס תיוג קיים (חוץ ממקומות שנערכו ידנית).
         </p>
         {bulkTagResult && (
           <p className="mt-2 text-sm text-gray-600">

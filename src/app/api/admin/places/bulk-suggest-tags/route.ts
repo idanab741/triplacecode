@@ -13,15 +13,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+const body = await request.json().catch(() => ({}));
+  const mode: "untagged" | "all" = body?.mode === "all" ? "all" : "untagged";
+  const afterId: string | null = body?.afterId ?? null;
+
   const BATCH_SIZE = 15;
 
   const supabase = createAdminClient();
-  const { data: places, error, count } = await supabase
+  let query = supabase
     .from("places")
     .select("id, name, category, subcategory, short_description", { count: "exact" })
     .eq("is_manually_edited", false)
-    .or("trip_type_tags.eq.{},trip_type_tags.is.null")
-    .limit(BATCH_SIZE);
+    .order("id", { ascending: true });
+
+  if (mode === "untagged") {
+    query = query.or("trip_type_tags.eq.{},trip_type_tags.is.null");
+  } else if (afterId) {
+    // "cursor" - ממשיכים מהמקום שנעצרנו, כדי לא לחזור על אותם מקומות שוב ושוב
+    query = query.gt("id", afterId);
+  }
+
+  const { data: places, error, count } = await query.limit(BATCH_SIZE);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -42,6 +54,11 @@ export async function POST(request: Request) {
 trip_type_tags אפשריים: ${allTripTypeIds}
 תתי-תגיות אפשריים: ${allSubTagIds}
 cuisine_tags אפשריים (רק אם רלוונטי): ${allCuisineIds}
+
+*** חשוב מאוד: תייג בצמצום ובדיוק, לא בנדיבות!
+- trip_type_tags: בחר לכל היותר 1-2 (רק אם המקום *באמת* משרת שתי מטרות עיקריות, אחרת 1 בלבד). אל תוסיף קטגוריה רק כי יש קשר רופף.
+- sub_tags: עד 3, רק הכי מדויקים.
+- עדיף תיוג חד ומצומצם על פני תיוג רחב ומטושטש. ***
 
 השב אך ורק JSON: {"trip_type_tags": ["..."], "sub_tags": ["..."], "cuisine_tags": ["..."], "kosher": true/false/null, "accessible": true/false/null, "seasons": ["..."], "suitable_child_ages": ["..."], "budget_tier": "$/$$/$$$/$$$$" or null}`;
 
@@ -79,10 +96,13 @@ cuisine_tags אפשריים (רק אם רלוונטי): ${allCuisineIds}
     }
   }
 
-return NextResponse.json({
+const lastId = places && places.length > 0 ? places[places.length - 1].id : afterId;
+
+  return NextResponse.json({
     processedNow: (places ?? []).length,
     tagged,
     failed,
     remaining: Math.max(0, (count ?? 0) - (places ?? []).length),
-  })
+    lastId,
+  });
 }

@@ -37,6 +37,11 @@ trip_type_tags אפשריים: ${allTripTypeIds}
 תתי-תגיות אפשריים: ${allSubTagIds}
 cuisine_tags אפשריים (רק אם רלוונטי, אחרת מערך ריק): ${allCuisineIds}
 
+*** חשוב מאוד: תייג בצמצום ובדיוק, לא בנדיבות!
+- trip_type_tags: בחר לכל היותר 1-2 (רק אם המקום *באמת* משרת שתי מטרות עיקריות, אחרת 1 בלבד). אל תוסיף קטגוריה רק כי יש קשר רופף.
+- sub_tags: עד 3, רק הכי מדויקים.
+- עדיף תיוג חד ומצומצם על פני תיוג רחב ומטושטש - זה משפיע ישירות על איכות ההתאמה למשתמשים. ***
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
 {"trip_type_tags": ["..."], "sub_tags": ["..."], "cuisine_tags": ["..."], "kosher": true/false/null, "accessible": true/false/null, "seasons": ["..."], "suitable_child_ages": ["..."], "budget_tier": "$/$$/$$$/$$$$" or null}`;
 
