@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Screen, Stepper, SwipeCard, Button } from "@/components/ui";
 import { getCategoryLabel } from "@/utils/categoryLabels";
@@ -26,6 +26,9 @@ function DayTripBuildContent() {
   const [error, setError] = useState<string | null>(null);
   const [awaitingContinueDecision, setAwaitingContinueDecision] = useState(false);
 
+  // מטמון "טעינה מוקדמת" - מועמדים שכבר נטענו ברקע לתחנה הבאה, לפי מזהה תחנה
+  const prefetchCache = useRef<Record<string, CandidatePlace[]>>({});
+
   const currentStop = stops?.find((s) => s.status === "pending");
 
   const loadSession = useCallback(async (): Promise<TripBuilderStop[] | null> => {
@@ -46,21 +49,39 @@ function DayTripBuildContent() {
     })();
   }, [loadSession]);
 
+  const fetchCandidatesForStop = useCallback(
+    async (stopId: string): Promise<CandidatePlace[] | null> => {
+      if (!sessionId) return null;
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/stops/${stopId}/candidates`);
+      const data = await response.json();
+      if (!response.ok) return null;
+      return data.candidates as CandidatePlace[];
+    },
+    [sessionId]
+  );
+
   const loadCandidates = useCallback(async () => {
     if (!sessionId || !currentStop) return;
+
+    // אם כבר טענו את זה מראש ברקע - משתמשים מיד, בלי לחכות שוב
+    const cached = prefetchCache.current[currentStop.id];
+    if (cached) {
+      setCandidates(cached);
+      setCandidateIndex(0);
+      delete prefetchCache.current[currentStop.id];
+      return;
+    }
+
     setCandidates(null);
     setCandidateIndex(0);
-    const response = await fetch(
-      `/api/trip-builder/sessions/${sessionId}/stops/${currentStop.id}/candidates`
-    );
-    const data = await response.json();
-    if (!response.ok) {
+    const result = await fetchCandidatesForStop(currentStop.id);
+    if (result === null) {
       setError("לא הצלחנו לטעון מועמדים לתחנה הזו");
       return;
     }
-    setCandidates(data.candidates);
+    setCandidates(result);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, currentStop?.id]);
+  }, [sessionId, currentStop?.id, fetchCandidatesForStop]);
 
   useEffect(() => {
     (async () => {
@@ -88,8 +109,20 @@ function DayTripBuildContent() {
       body: JSON.stringify({ candidate }),
     });
     setBusy(false);
-    // במקום להמשיך אוטומטית לתחנה הבאה - שואלים את המשתמש אם בכלל רוצה עוד תחנה
     setAwaitingContinueDecision(true);
+
+    // טעינה מוקדמת ברקע: אם כבר יש תחנה "ממתינה" נוספת בתוכנית המקורית,
+    // מתחילים לטעון את המועמדים שלה מיד - בזמן שהמשתמש קורא את השאלה "עוד יעד?"
+    const updatedStops = await loadSession();
+    const nextStop = updatedStops
+      ?.filter((s) => s.status === "pending" && s.id !== currentStop.id)
+      .sort((a, b) => a.slot_index - b.slot_index)[0];
+
+    if (nextStop && !prefetchCache.current[nextStop.id]) {
+      fetchCandidatesForStop(nextStop.id).then((result) => {
+        if (result) prefetchCache.current[nextStop.id] = result;
+      });
+    }
   }
 
   async function handleUnlike() {
