@@ -717,8 +717,6 @@ return m.role === "assistant" ? (
             </Button>
           </div>
         )
-      )}
-
 )
       )}
 
