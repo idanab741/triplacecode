@@ -93,17 +93,6 @@ export const MAX_STOP_DISTANCE_KM: Record<DurationBand, number> = {
   full_day: 10,
   custom: 5,
 };
-
-/**
- * מרחק מקסימלי (ק"מ) בין תחנה לתחנה העוקבת לה - לא מהבית!
- */
-export const MAX_STOP_DISTANCE_KM: Record<DurationBand, number> = {
-  "1-2h": 1,
-  "2-4h": 3,
-  "4-6h": 6,
-  full_day: 10,
-  custom: 5,
-};
 export const DAY_TRIP_PLAN_PROMPT_RULES = `אתה מנוע ה-AI של TRIPLACE, בונה "טיול יומי" (Day Trip).
 המטרה אינה רשימת מקומות, אלא יום שלם, זורם ומותאם אישית.
 
