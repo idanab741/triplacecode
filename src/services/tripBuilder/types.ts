@@ -124,6 +124,7 @@ export type DurationBand = "1-2h" | "2-4h" | "4-6h" | "full_day" | "custom";
 
 export interface DayTripAnswers {
   companions: CompanionType;
+  hasPet: boolean;
   childAgeBands: ChildAgeBand[];
   timing: TimingChoice;
   otherDate: string | null;

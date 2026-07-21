@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
@@ -12,9 +11,11 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
+import Image from "next/image";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
   companions: "solo",
+  hasPet: false,
   childAgeBands: [],
   timing: "today",
   otherDate: null,
@@ -60,9 +61,11 @@ export default function DayTripQuestionnairePage() {
   const [typing, setTyping] = useState(false);
   const [awaitingChildAges, setAwaitingChildAges] = useState(false);
   const [awaitingOtherDate, setAwaitingOtherDate] = useState(false);
-  const [tempMulti, setTempMulti] = useState<string[]>([]);
+const [tempMulti, setTempMulti] = useState<string[]>([]);
   const [tempSlider, setTempSlider] = useState<string | null>(null);
   const [tempText, setTempText] = useState("");
+  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+  const [tempHasPet, setTempHasPet] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -70,7 +73,6 @@ export default function DayTripQuestionnairePage() {
 
   const step = DAY_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
-  const isLastTextStep = step.type === "text" && isLastStep;
 
   function nextId() {
     idRef.current += 1;
@@ -86,6 +88,7 @@ export default function DayTripQuestionnairePage() {
     setMessages((m) => [...m, { id: nextId(), role: "icon", text: label }]);
   }
 
+  // מציג את הודעת הפתיחה, את תג סוג הטיול, ואז את השאלה הראשונה — פעם אחת כשהעמוד נטען
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -117,37 +120,56 @@ export default function DayTripQuestionnairePage() {
     return values.map((v) => labelFor(options, v));
   }
 
-  function resetTempAnswerState() {
+function resetTempAnswerState() {
     setTempMulti([]);
     setTempSlider(null);
     setTempText("");
+    setTempCompanion(null);
+    setTempHasPet(false);
     setAwaitingChildAges(false);
     setAwaitingOtherDate(false);
   }
 
   function goToNextStep() {
     resetTempAnswerState();
-    if (isLastStep) return; // השלב האחרון (מלל חופשי) מטופל דרך confirmFreeTextAndGo, לא כאן
+    if (isLastStep) {
+      submit();
+      return;
+    }
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      setStepIndex((i) => i + 1);
+      setStepIndex((i) => i + 1); // pure state update only — no side effects here
     }, 550);
   }
 
+  // מוסיף את בועת הבוט של השאלה החדשה כשה-step משתנה בפועל — מקום יחיד
+  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות
   useEffect(() => {
-    if (stepIndex === 0) return;
+    if (stepIndex === 0) return; // השאלה הראשונה כבר נוספה ב-mount
     addBot(DAY_TRIP_QUESTIONS[stepIndex].title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
 
-  function handleCompanionsSelect(value: string) {
-    if (step.type !== "companions") return;
-    updateField("companions", value as DayTripAnswers["companions"]);
-    const label = labelFor(step.options, value);
-    addUser(label);
+  // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
-    if (value === step.childAgeTriggerValue) {
+function handleCompanionsSelect(value: string) {
+    setTempCompanion(value);
+  }
+
+  function togglePet() {
+    setTempHasPet((v) => !v);
+  }
+
+  function confirmCompanions() {
+    if (step.type !== "companions" || !tempCompanion) return;
+    updateField("companions", tempCompanion as DayTripAnswers["companions"]);
+    updateField("hasPet", tempHasPet);
+
+    const label = labelFor(step.options, tempCompanion);
+    addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label);
+
+    if (tempCompanion === step.childAgeTriggerValue) {
       setAwaitingChildAges(true);
       setTyping(true);
       setTimeout(() => {
@@ -210,15 +232,15 @@ export default function DayTripQuestionnairePage() {
     goToNextStep();
   }
 
-  /** בשלב האחרון (מלל חופשי) - שולח את התשובה ומיד ממשיך לפי הבחירה: TripLace/TripMatch. */
-  async function confirmFreeTextAndGo(mode: "triplace" | "tripmatch") {
+  function confirmFreeText() {
     updateField("freeText", tempText);
     addUser(tempText || "—");
-    resetTempAnswerState();
-    await submit(mode, tempText);
+    goToNextStep();
   }
 
-  async function submit(mode: "triplace" | "tripmatch", freeTextOverride?: string) {
+  // ---------- שליחה סופית ----------
+
+  async function submit() {
     if (!user) {
       router.push("/auth");
       return;
@@ -227,27 +249,14 @@ export default function DayTripQuestionnairePage() {
     setLocationError(null);
     try {
       const origin = await getCurrentPosition();
-      const finalAnswers = freeTextOverride !== undefined ? { ...form, freeText: freeTextOverride } : form;
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "day_trip", answers: finalAnswers, origin }),
+        body: JSON.stringify({ tripType: "day_trip", answers: form, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
-
-      const sessionId = data.session.id;
-
-      if (mode === "triplace") {
-        // בונה את כל המסלול אוטומטית (בלי החלקות), ואז עובר ישר לתוצאה
-        const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, {
-          method: "POST",
-        });
-        if (!buildResponse.ok) throw new Error("בניית המסלול האוטומטית נכשלה");
-        router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
-      } else {
-        router.push(`/trip-builder/day-trip/build?sessionId=${sessionId}`);
-      }
+      router.push(`/trip-builder/day-trip/build?sessionId=${data.session.id}`);
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו לקבל את המיקום שלך. יש לאשר גישה למיקום כדי להמשיך."
@@ -261,6 +270,9 @@ export default function DayTripQuestionnairePage() {
     if (step.type === "companions" && awaitingChildAges) {
       return { label: "המשך", onClick: confirmChildAges };
     }
+    if (step.type === "companions" && !awaitingChildAges) {
+      return { label: "המשך", onClick: confirmCompanions, disabled: !tempCompanion };
+    }
     if (step.type === "date" && awaitingOtherDate) {
       return { label: "המשך", onClick: confirmOtherDate, disabled: !tempText };
     }
@@ -270,14 +282,13 @@ export default function DayTripQuestionnairePage() {
     if (step.type === "multi-emoji") {
       return { label: "המשך", onClick: confirmInterests };
     }
-    if (step.type === "text" && !isLastStep) {
-      return { label: "המשך", onClick: () => {} }; // כרגע אין שאלת טקסט שאינה אחרונה, אבל נשאר לעתיד
+    if (step.type === "text") {
+      return { label: "המשך", onClick: confirmFreeText };
     }
     return null;
   }
 
   const footerAction = getFooterAction();
-  const showBottomBar = footerAction || isLastTextStep;
 
   return (
     <Screen withBottomNavSpacing={false}>
@@ -285,7 +296,7 @@ export default function DayTripQuestionnairePage() {
         <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.back()} />
       </div>
 
-      <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${showBottomBar ? "pb-28" : "pb-10"}`}>
+      <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
         {messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
@@ -300,8 +311,22 @@ export default function DayTripQuestionnairePage() {
 
         {!typing && !submitting && (
           <div className="mt-1">
-            {step.type === "companions" && !awaitingChildAges && (
-              <AnswerOptions options={step.options} onSelect={handleCompanionsSelect} />
+{step.type === "companions" && !awaitingChildAges && (
+              <div className="flex flex-col gap-3">
+                <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
+                <button
+                  type="button"
+                  onClick={togglePet}
+                  className="flex w-fit items-center gap-1.5 rounded-pill border px-3.5 py-2 text-[13px] font-medium transition active:scale-95"
+                  style={{
+                    borderColor: "#9C6B30",
+                    background: tempHasPet ? "#9C6B30" : "#ffffff",
+                    color: tempHasPet ? "#ffffff" : "#9C6B30",
+                  }}
+                >
+                  🐶 עם בעל חיים
+                </button>
+              </div>
             )}
             {step.type === "companions" && awaitingChildAges && (
               <ChipGroup options={step.childAgeOptions} selected={tempMulti} onChange={setTempMulti} />
@@ -357,22 +382,7 @@ export default function DayTripQuestionnairePage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* בשלב האחרון (מלל חופשי) - שני כפתורים: TripLace (אוטומטי) או TripMatch (החלקות) */}
-      {isLastTextStep && !typing && !submitting && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
-          <div className="mx-auto flex max-w-md gap-3">
-            <Button variant="secondary" fullWidth onClick={() => confirmFreeTextAndGo("triplace")}>
-              TripLace
-            </Button>
-            <Button variant="primary" fullWidth onClick={() => confirmFreeTextAndGo("tripmatch")}>
-              TripMatch
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* כפתור "המשך" קבוע בתחתית המסך, לשאר השאלות שדורשות אישור */}
-      {!isLastTextStep && footerAction && (
+      {footerAction && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
           <div className="mx-auto max-w-md">
             <Button variant="primary" fullWidth onClick={footerAction.onClick} disabled={footerAction.disabled}>

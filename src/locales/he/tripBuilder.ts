@@ -5,8 +5,9 @@ export const COMPANION_OPTIONS: StepOption[] = [
   { value: "family", label: "משפחה עם ילדים", emoji: "👨‍👩‍👧‍👦" },
   { value: "friends", label: "חברים", emoji: "🙋" },
   { value: "solo", label: "לבד", emoji: "🧍" },
-  { value: "with_pet", label: "עם בעל חיים", emoji: "🐶" },
 ];
+
+export const PET_OPTION: StepOption = { value: "with_pet", label: "עם בעל חיים", emoji: "🐶" };
 
 export const CHILD_AGE_OPTIONS: StepOption[] = [
   { value: "0-3", label: "0-3" },
