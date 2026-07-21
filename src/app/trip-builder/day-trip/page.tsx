@@ -282,6 +282,9 @@ if (key === "companions") {
       setEditTempSlider(form[key] as string);
     } else if (key === "freeText") {
       setEditTempText(form.freeText);
+    } else if (key === "timing") {
+      setEditTempValue(form.timing);
+      setEditTempText(form.otherDate ?? "");
     } else {
       setEditTempValue(form[key] as string);
     }
@@ -312,10 +315,17 @@ const key = editingFieldKey;
       updateField("hasPet", editTempHasPet);
       const label = labelFor(editStep.options, editTempCompanion);
       newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
-    } else if (key === "timing" && editStep.type === "date") {
+} else if (key === "timing" && editStep.type === "date") {
       if (!editTempValue) return;
-      updateField("timing", editTempValue as DayTripAnswers["timing"]);
-      newLabel = labelFor(editStep.options, editTempValue);
+      if (editTempValue === editStep.otherDateTriggerValue) {
+        if (!editTempText) return;
+        updateField("timing", editTempValue as DayTripAnswers["timing"]);
+        updateField("otherDate", editTempText);
+        newLabel = editTempText;
+      } else {
+        updateField("timing", editTempValue as DayTripAnswers["timing"]);
+        newLabel = labelFor(editStep.options, editTempValue);
+      }
     } else if ((key === "distanceBand" || key === "budgetBand") && editStep.type === "slider") {
       const value = editTempSlider ?? (form[key] as string);
       updateField(key, value as never);
@@ -440,11 +450,25 @@ function confirmFreeText() {
                     );
                   })()}
 
-                {editingFieldKey === "timing" &&
+           {editingFieldKey === "timing" &&
                   (() => {
                     const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "timing");
                     if (!editStep || editStep.type !== "date") return null;
-                    return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />
+                        {editTempValue === editStep.otherDateTriggerValue && (
+                          <Field label="בחר תאריך">
+                            <input
+                              type="date"
+                              value={editTempText}
+                              onChange={(e) => setEditTempText(e.target.value)}
+                              className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+                            />
+                          </Field>
+                        )}
+                      </div>
+                    );
                   })()}
 
                 {(editingFieldKey === "distanceBand" || editingFieldKey === "budgetBand") &&
