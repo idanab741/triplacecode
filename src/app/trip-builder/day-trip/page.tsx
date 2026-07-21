@@ -382,13 +382,11 @@ function handleCompanionsSelect(value: string) {
         <div ref={bottomRef} />
       </div>
 
-      {footerAction && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
-          <div className="mx-auto max-w-md">
-            <Button variant="primary" fullWidth onClick={footerAction.onClick} disabled={footerAction.disabled}>
-              {footerAction.label}
-            </Button>
-          </div>
+{footerAction && (
+        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
+          <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
+            {footerAction.label}
+          </Button>
         </div>
       )}
     </Screen>
