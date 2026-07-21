@@ -98,11 +98,9 @@ finalStops.push({
     warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
   }
 
-  const events = await fetchNearbyEvents(origin);
-
-  const itinerary: FinalItinerary = {
+const itinerary: FinalItinerary = {
     stops: finalStops,
-    events,
+    events: [],
     totalEtaMinutes: cumulativeMinutes,
     warnings,
   };

@@ -146,30 +146,33 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           }))}
         />
 
-        <div className="flex flex-col gap-3">
+<div className="flex flex-col gap-3">
           {itinerary.stops.map((stop, index) => (
-            <div key={stop.stopId} className="overflow-hidden rounded-card bg-white shadow-soft">
-              {stop.imageUrls[0] && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={stop.imageUrls[0]} alt={stop.name} className="h-32 w-full object-cover" />
-              )}
-     <div className="p-4">
-                <div className="flex items-center justify-between">
+            <div key={stop.stopId} className="flex gap-3 overflow-hidden rounded-card bg-white p-3 shadow-soft">
+              <div className="flex min-w-0 flex-1 flex-col justify-center">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-ink-secondary">
                     תחנה {index + 1} · {getCategoryLabel(stop.category)}
                   </p>
-                  <p className="text-sm font-bold text-accent">
+                  <p className="shrink-0 text-sm font-bold text-accent">
                     🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
                   </p>
                 </div>
-                <p className="mt-0.5 font-semibold text-ink">{stop.name}</p>
-                {stop.reason && <p className="mt-1 text-sm text-ink-secondary">{stop.reason}</p>}
-                <div className="mt-2 flex gap-3 text-xs text-ink-secondary">
+                <p className="truncate font-semibold text-ink">{stop.name}</p>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-secondary">
                   <span>🚗 {stop.etaMinutes} דק&apos; נסיעה</span>
                   {stop.estimatedVisitMinutes && <span>⏱️ {stop.estimatedVisitMinutes} דק&apos; ביקור</span>}
                   {stop.rating != null && <span>⭐ {stop.rating}</span>}
                 </div>
               </div>
+              {stop.imageUrls[0] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={stop.imageUrls[0]}
+                  alt={stop.name}
+                  className="h-20 w-20 shrink-0 rounded-2xl object-cover"
+                />
+              )}
             </div>
           ))}
         </div>

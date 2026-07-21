@@ -76,7 +76,7 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
           learnedAttributes,
         });
 
-        const top = ranked[0];
+const top = ranked[0];
         if (!top) return;
 
         await likeStop(supabase, user.id, stop.id, top);
