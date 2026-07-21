@@ -134,7 +134,7 @@ function DayTripResultContent() {
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-ink">אירועים בסביבה השבוע</h2>
             <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-              {itinerary.events.map((event) => (
+   {itinerary.events.map((event) => (
                 
                   key={event.id}
                   href={event.url}
