@@ -45,6 +45,28 @@ type ChatMessage = {
   fieldKey?: EditableFieldKey;
 };
 
+/** עיגול אווטאר קטן ליד כל הודעת משתמש — תמונת פרופיל אם קיימת, אחרת אות ראשונה. */
+function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: string | null }) {
+  const initial = name?.trim()?.[0]?.toUpperCase() ?? "👤";
+
+  if (avatarUrl) {
+    return (
+      <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5">
+        <Image src={avatarUrl} alt="" fill className="object-cover" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+    >
+      {initial}
+    </div>
+  );
+}
+
 /** שתי כרטיסיות לוגו לבחירה בין TripPlace (אוטומטי) ל-TripMatch (החלקות). */
 function TripChoiceCards({
   onChoose,
@@ -103,8 +125,8 @@ function TripTypeBadge({ label }: { label: string }) {
 }
 
 export default function DayTripQuestionnairePage() {
-  const router = useRouter();
-  const { user } = useAuth();
+const router = useRouter();
+  const { user, profile } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<DayTripAnswers>(DEFAULT_ANSWERS);
@@ -577,14 +599,15 @@ function promptTripChoice() {
             );
           }
 
-          return m.role === "assistant" ? (
+return m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
           ) : m.role === "icon" ? (
             <TripTypeBadge key={m.id} label={m.text} />
           ) : (
-            <UserBubble key={m.id} onClick={m.fieldKey ? () => openEdit(m) : undefined}>
-              {m.text}
-            </UserBubble>
+            <div key={m.id} className="flex items-end justify-end gap-2">
+              <UserBubble onClick={m.fieldKey ? () => openEdit(m) : undefined}>{m.text}</UserBubble>
+              <UserAvatar avatarUrl={profile?.avatar_url ?? null} name={profile?.full_name ?? null} />
+            </div>
           );
         })}
 
