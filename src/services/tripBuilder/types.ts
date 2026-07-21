@@ -93,6 +93,7 @@ export interface FinalItineraryStop {
   reason: string | null;
   latitude: number;
   longitude: number;
+  openingHours: string[] | null;
 }
 
 export interface FinalItineraryEvent {

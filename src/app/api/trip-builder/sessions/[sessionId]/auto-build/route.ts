@@ -45,43 +45,43 @@ export async function POST(
     const rules = getTripTypeRules(session.trip_type);
     const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
 
-    let currentOrigin = { lat: session.origin_latitude, lng: session.origin_longitude };
+const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
     const pendingStops = stops
       .filter((s) => s.status === "pending")
       .sort((a, b) => a.slot_index - b.slot_index);
+    const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
 
-    for (const stop of pendingStops) {
-      const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
+    // מריצים את כל התחנות במקביל (מהיר!) מנקודת המוצא המקורית - הסדר
+    // הגיאוגרפי הנכון בין התחנות נקבע ממילא בהמשך, ב-finalizeItinerary
+    // (סידור מחדש לפי המרחק הקרוב ביותר) - אז אין פגיעה בדיוק המסלול הסופי.
+    await Promise.all(
+      pendingStops.map(async (stop) => {
+        const pool = await fetchCandidatePool(supabase, {
+          category: stop.category,
+          origin,
+          distanceBand: answers.distanceBand,
+          maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+          excludePlaceIds,
+        });
 
-      const pool = await fetchCandidatePool(supabase, {
-        category: stop.category,
-        origin: currentOrigin,
-        distanceBand: answers.distanceBand,
-        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
-        excludePlaceIds,
-      });
+        if (pool.length === 0) return;
 
-      if (pool.length === 0) continue; // אין מועמדים - מדלגים על התחנה הזו
+        const ranked = await rankCandidates({
+          dna,
+          candidates: pool,
+          freeText: answers.freeText,
+          remainingBudgetLabel,
+          rankingPromptRules: rules.rankingPromptRules,
+          attributeScoreMap,
+          learnedAttributes,
+        });
 
-      const ranked = await rankCandidates({
-        dna,
-        candidates: pool,
-        freeText: answers.freeText,
-        remainingBudgetLabel,
-        rankingPromptRules: rules.rankingPromptRules,
-        attributeScoreMap,
-        learnedAttributes,
-      });
+        const top = ranked[0];
+        if (!top) return;
 
-      const top = ranked[0];
-      if (!top) continue;
-
-      await likeStop(supabase, user.id, stop.id, top);
-
-      if (top.latitude != null && top.longitude != null) {
-        currentOrigin = { lat: top.latitude, lng: top.longitude };
-      }
-    }
+        await likeStop(supabase, user.id, stop.id, top);
+      })
+    );
 
     const itinerary = await finalizeItinerary(
       supabase,

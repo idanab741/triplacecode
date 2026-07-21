@@ -1,13 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Button, Screen } from "@/components/ui";
 import { getCategoryLabel } from "@/utils/categoryLabels";
-import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
+import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
+import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -19,8 +20,11 @@ function DayTripResultContent() {
   const sessionId = searchParams.get("sessionId");
   const [session, setSession] = useState<TripBuilderSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
+  const [editingTime, setEditingTime] = useState(false);
 
   useEffect(() => {
+
     if (!sessionId) return;
     fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
       .then((res) => res.json())
@@ -33,6 +37,18 @@ function DayTripResultContent() {
       })
       .catch(() => setError("לא הצלחנו לטעון את הטיול"));
   }, [sessionId]);
+const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
+  const answers = session?.answers as unknown as DayTripAnswers | undefined;
+
+  const defaultStartMinutes = useMemo(() => {
+    if (!itinerary || !answers || itinerary.stops.length === 0) return 9 * 60; // ברירת מחדל 09:00
+    const dayOfWeek = getTripDayOfWeek(answers.timing, answers.otherDate);
+    const hours = parseOpeningHoursForDay(itinerary.stops[0].openingHours, dayOfWeek);
+    if (hours && hours !== "closed") return hours.openMinutes;
+    return 9 * 60;
+  }, [itinerary, answers]);
+
+  const startMinutes = manualStartMinutes ?? defaultStartMinutes;
 
   if (error) {
     return (
@@ -49,8 +65,6 @@ function DayTripResultContent() {
       </Screen>
     );
   }
-
-  const itinerary: FinalItinerary | null = session.final_itinerary;
 
   if (!itinerary || itinerary.stops.length === 0) {
     return (
@@ -88,7 +102,32 @@ function DayTripResultContent() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-5">
+<div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-5">
+        <div className="flex items-center justify-between rounded-card bg-white px-4 py-3 shadow-soft">
+          <span className="text-sm text-ink-secondary">שעת יציאה</span>
+          {editingTime ? (
+            <input
+              type="time"
+              defaultValue={minutesToTimeLabel(startMinutes)}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(":").map(Number);
+                setManualStartMinutes(h * 60 + m);
+              }}
+              onBlur={() => setEditingTime(false)}
+              autoFocus
+              className="rounded border border-ink-secondary/25 px-2 py-1 text-sm"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingTime(true)}
+              className="text-sm font-semibold text-accent"
+            >
+              {minutesToTimeLabel(startMinutes)} ✏️
+            </button>
+          )}
+        </div>
+
         {itinerary.warnings.length > 0 && (
           <div className="rounded-card bg-bg-secondary p-3 text-sm text-ink-secondary">
             {itinerary.warnings.map((warning) => (
@@ -114,15 +153,20 @@ function DayTripResultContent() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={stop.imageUrls[0]} alt={stop.name} className="h-32 w-full object-cover" />
               )}
-              <div className="p-4">
-                <p className="text-xs text-ink-secondary">
-                  תחנה {index + 1} · {getCategoryLabel(stop.category)}
-                </p>
-                <p className="font-semibold text-ink">{stop.name}</p>
+     <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-ink-secondary">
+                    תחנה {index + 1} · {getCategoryLabel(stop.category)}
+                  </p>
+                  <p className="text-sm font-bold text-accent">
+                    🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
+                  </p>
+                </div>
+                <p className="mt-0.5 font-semibold text-ink">{stop.name}</p>
                 {stop.reason && <p className="mt-1 text-sm text-ink-secondary">{stop.reason}</p>}
                 <div className="mt-2 flex gap-3 text-xs text-ink-secondary">
-                  <span>{stop.etaMinutes} דק&apos; נסיעה</span>
-                  {stop.estimatedVisitMinutes && <span>{stop.estimatedVisitMinutes} דק&apos; ביקור</span>}
+                  <span>🚗 {stop.etaMinutes} דק&apos; נסיעה</span>
+                  {stop.estimatedVisitMinutes && <span>⏱️ {stop.estimatedVisitMinutes} דק&apos; ביקור</span>}
                   {stop.rating != null && <span>⭐ {stop.rating}</span>}
                 </div>
               </div>
