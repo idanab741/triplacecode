@@ -595,7 +595,7 @@ async function submit() {
 
         {!editingFieldKey && typing && <TypingIndicator />}
 
-        {!editingFieldKey && !typing && !submitting && (
+  {!editingFieldKey && !typing && !submitting && !awaitingTripChoice && (
           <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
