@@ -20,8 +20,7 @@ export function UserBubble({ children, onClick }: UserBubbleProps) {
           boxShadow: "0 4px 12px rgba(24,119,242,0.28)",
         }}
       >
-        <p className="whitespace-pre-wrap text-[14.5px] font-medium leading-6 text-white">{children}</p>
-        {onClick && <p className="mt-1 text-[11px] text-white/70">✏️ הקש לעריכה</p>}
+<p className="whitespace-pre-wrap text-[14.5px] font-medium leading-6 text-white">{children}</p>
       </div>
     </div>
   );
