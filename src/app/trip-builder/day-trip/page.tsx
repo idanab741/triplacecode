@@ -11,6 +11,7 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
+import { MainBottomNav } from "@/components/navigation/MainBottomNav";
 import Image from "next/image";
 
 type TripChoice = "triplace" | "tripmatch";
@@ -696,7 +697,7 @@ return m.role === "assistant" ? (
       </div>
 
 {editingFieldKey && !awaitingTripChoice ? (
-        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center gap-2 px-4">
+        <div className="fixed inset-x-0 bottom-24 z-30 flex justify-center gap-2 px-4">
           <button
             type="button"
             onClick={closeEdit}
@@ -704,23 +705,19 @@ return m.role === "assistant" ? (
           >
             ביטול
           </button>
-          <Button variant="primary" onClick={confirmEdit}>
+          <Button variant="primary" onClick={confirmEdit} className="min-w-40">
             עדכן
           </Button>
         </div>
-) : (
+      ) : (
         !awaitingTripChoice &&
         footerAction && (
-          <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
-            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
-              {footerAction.label}
+<div className="fixed inset-x-0 bottom-24 z-30 flex justify-center px-4">
+            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled} className="min-w-40">              {footerAction.label}
             </Button>
           </div>
         )
       )}
-    </Screen>
-  );
-}
 
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
