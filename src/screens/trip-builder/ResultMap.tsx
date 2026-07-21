@@ -37,8 +37,12 @@ function FitBounds({ stops }: { stops: MapStop[] }) {
   const map = useMap();
   useEffect(() => {
     if (stops.length === 0) return;
+    if (stops.length === 1) {
+      map.setView([stops[0].latitude, stops[0].longitude], 15);
+      return;
+    }
     const bounds = L.latLngBounds(stops.map((s) => [s.latitude, s.longitude]));
-    map.fitBounds(bounds, { padding: [40, 40] });
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   }, [stops, map]);
   return null;
 }

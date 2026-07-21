@@ -15,6 +15,7 @@ interface LikedStopWithPlace extends TripBuilderStop {
     rating: number | null;
     estimated_visit_minutes: number | null;
     opening_hours: string[] | null;
+    short_description: string | null;
   } | null;
 }
 
@@ -47,8 +48,8 @@ export async function finalizeItinerary(
 
 const { data: stops } = await supabase
     .from("trip_builder_stops")
-    .select(
-      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours)"
+.select(
+      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description)"
     )
     .eq("session_id", sessionId)
     .eq("status", "liked");
@@ -82,6 +83,7 @@ finalStops.push({
       priceLevel: stop.place!.price_level,
       rating: stop.place!.rating,
       reason: stop.reason,
+      shortDescription: stop.place!.short_description,
       latitude: placeLatLng.lat,
       longitude: placeLatLng.lng,
       openingHours: stop.place!.opening_hours,

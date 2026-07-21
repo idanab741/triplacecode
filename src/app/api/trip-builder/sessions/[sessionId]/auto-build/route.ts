@@ -7,7 +7,7 @@ import { fetchCandidatePool } from "@/services/tripBuilder/candidatePoolService"
 import { rankCandidates } from "@/services/tripBuilder/rankingService";
 import { likeStop } from "@/services/tripBuilder/swipeService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
-import { dayTripBudgetToMaxPriceLevel } from "@/services/tripBuilder/rules/dayTrip";
+import { dayTripBudgetToMaxPriceLevel, MAX_STOP_DISTANCE_KM } from "@/services/tripBuilder/rules/dayTrip";
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
@@ -51,37 +51,43 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
       .sort((a, b) => a.slot_index - b.slot_index);
     const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
 
-    // מריצים את כל התחנות במקביל (מהיר!) מנקודת המוצא המקורית - הסדר
-    // הגיאוגרפי הנכון בין התחנות נקבע ממילא בהמשך, ב-finalizeItinerary
-    // (סידור מחדש לפי המרחק הקרוב ביותר) - אז אין פגיעה בדיוק המסלול הסופי.
-    await Promise.all(
-      pendingStops.map(async (stop) => {
-        const pool = await fetchCandidatePool(supabase, {
-          category: stop.category,
-          origin,
-          distanceBand: answers.distanceBand,
-          maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
-          excludePlaceIds,
-        });
+    // רץ ברצף (לא במקביל): כל תחנה יוצאת מהתחנה הקודמת שבאמת נבחרה,
+    // לא מהבית - כדי שהמסלול יהיה קרוב פיזית ולא מפוזר.
+    let cursor = origin;
 
-        if (pool.length === 0) return;
+    for (let i = 0; i < pendingStops.length; i++) {
+      const stop = pendingStops[i];
+      const isFirstStop = i === 0;
 
-        const ranked = await rankCandidates({
-          dna,
-          candidates: pool,
-          freeText: answers.freeText,
-          remainingBudgetLabel,
-          rankingPromptRules: rules.rankingPromptRules,
-          attributeScoreMap,
-          learnedAttributes,
-        });
+      const pool = await fetchCandidatePool(supabase, {
+        category: stop.category,
+        origin: cursor,
+        distanceBand: answers.distanceBand,
+        maxDistanceKm: isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand],
+        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+        excludePlaceIds,
+      });
 
-const top = ranked[0];
-        if (!top) return;
+      if (pool.length === 0) continue;
 
-        await likeStop(supabase, user.id, stop.id, top);
-      })
-    );
+      const ranked = await rankCandidates({
+        dna,
+        candidates: pool,
+        freeText: answers.freeText,
+        remainingBudgetLabel,
+        rankingPromptRules: rules.rankingPromptRules,
+        attributeScoreMap,
+        learnedAttributes,
+      });
+
+      const top = ranked[0];
+      if (!top) continue;
+
+      await likeStop(supabase, user.id, stop.id, top);
+
+      excludePlaceIds.push(top.id);
+      cursor = { lat: top.latitude, lng: top.longitude };
+    }
 
     const itinerary = await finalizeItinerary(
       supabase,

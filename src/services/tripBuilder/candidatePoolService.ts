@@ -12,6 +12,8 @@ interface FetchCandidatePoolParams {
   category: string;
   origin: LatLng;
   distanceBand: DistanceBand;
+  /** מגבלה קשיחה בין תחנות עוקבות (לא מהבית). כשמוגדר - עוקף את distanceBand. */
+  maxDistanceKm?: number;
   maxPriceLevel: number | null;
   excludePlaceIds: string[];
   /** אילוץ קשיח: אם true, פוסלים רק מקומות שסומנו במפורש kosher=false. לא נוגע במקומות שעדיין לא תויגו (null). */
@@ -50,16 +52,23 @@ export async function fetchCandidatePool(
   supabase: SupabaseClient,
   params: FetchCandidatePoolParams
 ): Promise<CandidatePlace[]> {
-  const radiusKm = distanceBandToRadiusKm(params.distanceBand);
+  const tightRadiusKm = params.maxDistanceKm ?? distanceBandToRadiusKm(params.distanceBand);
 
-  const pool = await queryPool(supabase, params, radiusKm, true);
+  let pool = await queryPool(supabase, params, tightRadiusKm, true);
+  if (pool.length > 0) return pool;
 
-  if (pool.length > 0) {
-    return pool;
+  pool = await queryPool(supabase, params, tightRadiusKm, false);
+  if (pool.length > 0) return pool;
+
+  // אם היה רדיוס צר (בין תחנות) ועדיין אין מועמדים - מרחיבים בהדרגה
+  if (params.maxDistanceKm != null) {
+    const widerRadiusKm = distanceBandToRadiusKm(params.distanceBand);
+    pool = await queryPool(supabase, params, widerRadiusKm, true);
+    if (pool.length > 0) return pool;
+    return queryPool(supabase, params, widerRadiusKm, false);
   }
 
-  // נסיגה - ללא מגבלת תקציב
-  return queryPool(supabase, params, radiusKm, false);
+  return pool;
 }
 
 async function queryPool(

@@ -158,7 +158,12 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
                     🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
                   </p>
                 </div>
-                <p className="truncate font-semibold text-ink">{stop.name}</p>
+         <p className="truncate font-semibold text-ink">{stop.name}</p>
+                {stop.shortDescription && (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">
+                    {stop.shortDescription}
+                  </p>
+                )}
                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-secondary">
                   <span>🚗 {stop.etaMinutes} דק&apos; נסיעה</span>
                   {stop.estimatedVisitMinutes && <span>⏱️ {stop.estimatedVisitMinutes} דק&apos; ביקור</span>}

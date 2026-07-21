@@ -91,6 +91,7 @@ export interface FinalItineraryStop {
   priceLevel: number | null;
   rating: number | null;
   reason: string | null;
+  shortDescription: string | null;
   latitude: number;
   longitude: number;
   openingHours: string[] | null;
