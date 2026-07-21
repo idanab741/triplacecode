@@ -111,7 +111,6 @@ export default function DayTripQuestionnairePage() {
 const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 const [awaitingTripChoice, setAwaitingTripChoice] = useState(false);
-  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
   const [busyChoice, setBusyChoice] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -195,10 +194,10 @@ function resetTempAnswerState() {
     setAwaitingOtherDate(false);
   }
 
-  function goToNextStep() {
+function goToNextStep() {
     resetTempAnswerState();
     if (isLastStep) {
-      submit();
+      promptTripChoice();
       return;
     }
     setTyping(true);
@@ -399,13 +398,24 @@ function confirmFreeText() {
 
   // ---------- שליחה סופית ----------
 
-async function submit() {
+function promptTripChoice() {
     if (!user) {
       router.push("/auth");
       return;
     }
-    setSubmitting(true);
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      addBot("מעולה! עכשיו תבחרו איך תרצו לבנות את הטיול שלכם:");
+      setAwaitingTripChoice(true);
+    }, 700);
+  }
+
+  async function handleTripChoice(choice: TripChoice) {
+    if (busyChoice) return;
+    setBusyChoice(true);
     setLocationError(null);
+
     try {
       const origin = await getCurrentPosition();
       const response = await fetch("/api/trip-builder/sessions", {
@@ -416,41 +426,26 @@ async function submit() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
 
-      setCreatedSessionId(data.session.id);
-      setSubmitting(false);
-      setTyping(true);
-      setTimeout(() => {
-        setTyping(false);
-        addBot("מעולה! עכשיו תבחרו איך תרצו לבנות את הטיול שלכם:");
-        setAwaitingTripChoice(true);
-      }, 700);
-    } catch (error) {
-      setLocationError(
-        error instanceof Error ? error.message : "לא הצלחנו לקבל את המיקום שלך. יש לאשר גישה למיקום כדי להמשיך."
-      );
-      setSubmitting(false);
-    }
-  }
+      const sessionId = data.session.id;
 
-  async function handleTripChoice(choice: TripChoice) {
-    if (!createdSessionId || busyChoice) return;
-    setBusyChoice(true);
+      if (choice === "tripmatch") {
+        router.push(`/trip-builder/day-trip/build?sessionId=${sessionId}`);
+        return;
+      }
 
-    if (choice === "tripmatch") {
-      router.push(`/trip-builder/day-trip/build?sessionId=${createdSessionId}`);
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/trip-builder/sessions/${createdSessionId}/auto-build`, {
+      setSubmitting(true);
+      const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, {
         method: "POST",
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "בניית הטיול נכשלה");
-      router.push(`/trip-builder/day-trip/result?sessionId=${createdSessionId}`);
+      const buildData = await buildResponse.json();
+      if (!buildResponse.ok) throw new Error(buildData.error ?? "בניית הטיול נכשלה");
+      router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
     } catch (error) {
-      setLocationError(error instanceof Error ? error.message : "בניית הטיול נכשלה, נסו שוב.");
+      setLocationError(
+        error instanceof Error ? error.message : "לא הצלחנו לבנות את הטיול. יש לאשר גישה למיקום ולנסות שוב."
+      );
       setBusyChoice(false);
+      setSubmitting(false);
     }
   }
 
@@ -662,10 +657,11 @@ async function submit() {
           </div>
         )}
 
-{!editingFieldKey && submitting && <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>}
-
-        {!editingFieldKey && awaitingTripChoice && (
-          <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
+{!editingFieldKey && awaitingTripChoice && (
+          <>
+            <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
+            {submitting && <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>}
+          </>
         )}
 
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
