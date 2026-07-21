@@ -602,7 +602,10 @@ function promptTripChoice() {
 return m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
           ) : m.role === "icon" ? (
-            <TripTypeBadge key={m.id} label={m.text} />
+            <div key={m.id} className="flex items-end justify-end gap-2">
+              <TripTypeBadge label={m.text} />
+              <UserAvatar avatarUrl={profile?.avatar_url ?? null} name={profile?.full_name ?? null} />
+            </div>
           ) : (
             <div key={m.id} className="flex items-end justify-end gap-2">
               <UserBubble onClick={m.fieldKey ? () => openEdit(m) : undefined}>{m.text}</UserBubble>
