@@ -28,6 +28,7 @@ const DEFAULT_ANSWERS: DayTripAnswers = {
 
 type EditableFieldKey =
   | "companions"
+  | "childAgeBands"
   | "timing"
   | "distanceBand"
   | "budgetBand"
@@ -203,10 +204,13 @@ const label = labelFor(step.options, tempCompanion);
     goToNextStep();
   }
 
-  function confirmChildAges() {
+function confirmChildAges() {
     if (step.type !== "companions") return;
     updateField("childAgeBands", tempMulti as DayTripAnswers["childAgeBands"]);
-    addUser(tempMulti.length > 0 ? labelsFor(step.childAgeOptions, tempMulti).join("، ") : "לא רלוונטי");
+    addUser(
+      tempMulti.length > 0 ? labelsFor(step.childAgeOptions, tempMulti).join("، ") : "לא רלוונטי",
+      "childAgeBands"
+    );
     goToNextStep();
   }
 
@@ -254,17 +258,26 @@ if (step.type !== "single") return;
     goToNextStep();
   }
 
+  function getEditQuestionTitle(key: EditableFieldKey): string {
+    if (key === "childAgeBands") {
+      const companionsStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+      return companionsStep && companionsStep.type === "companions" ? companionsStep.childAgeTitle : "";
+    }
+    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === key);
+    return editStep?.title ?? "";
+  }
+
   function openEdit(message: ChatMessage) {
     if (!message.fieldKey || typing || submitting || editingFieldKey) return;
     const key = message.fieldKey;
     setEditingFieldKey(key);
     setEditingMessageId(message.id);
 
-    if (key === "companions") {
+if (key === "companions") {
       setEditTempCompanion(form.companions);
       setEditTempHasPet(form.hasPet);
-    } else if (key === "interests") {
-      setEditTempMulti(form.interests);
+    } else if (key === "childAgeBands" || key === "interests") {
+      setEditTempMulti(key === "childAgeBands" ? form.childAgeBands : form.interests);
     } else if (key === "distanceBand" || key === "budgetBand") {
       setEditTempSlider(form[key] as string);
     } else if (key === "freeText") {
@@ -287,8 +300,8 @@ if (step.type !== "single") return;
 
   function confirmEdit() {
     if (!editingFieldKey || editingMessageId == null) return;
-    const key = editingFieldKey;
-    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === key);
+const key = editingFieldKey;
+    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === (key === "childAgeBands" ? "companions" : key));
     if (!editStep) return;
 
     let newLabel = "";
@@ -307,9 +320,12 @@ if (step.type !== "single") return;
       const value = editTempSlider ?? (form[key] as string);
       updateField(key, value as never);
       newLabel = labelFor(editStep.steps as unknown as { value: string; label: string }[], value);
-    } else if (key === "interests" && editStep.type === "multi-emoji") {
+} else if (key === "interests" && editStep.type === "multi-emoji") {
       updateField("interests", editTempMulti);
       newLabel = editTempMulti.length > 0 ? labelsFor(editStep.options, editTempMulti).join("، ") : "לא משנה לי";
+    } else if (key === "childAgeBands" && editStep.type === "companions") {
+      updateField("childAgeBands", editTempMulti as DayTripAnswers["childAgeBands"]);
+      newLabel = editTempMulti.length > 0 ? labelsFor(editStep.childAgeOptions, editTempMulti).join("، ") : "לא רלוונטי";
     } else if (key === "durationBand" && editStep.type === "single") {
       if (!editTempValue) return;
       updateField("durationBand", editTempValue as DayTripAnswers["durationBand"]);
@@ -400,10 +416,92 @@ function confirmFreeText() {
           )
         )}
 
-        {typing && <TypingIndicator />}
+{editingFieldKey ? (
+          <>
+            <ChatBubble>{getEditQuestionTitle(editingFieldKey)}</ChatBubble>
+            <div className="mt-1">
+              {editingFieldKey === "companions" &&
+                (() => {
+                  const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+                  if (!editStep || editStep.type !== "companions") return null;
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <AnswerOptions options={editStep.options} selected={editTempCompanion} onSelect={setEditTempCompanion} />
+                      <button
+                        type="button"
+                        onClick={() => setEditTempHasPet((v) => !v)}
+                        className="flex w-fit items-center gap-1.5 rounded-pill border px-3.5 py-2 text-[13px] font-medium transition active:scale-95"
+                        style={{
+                          borderColor: "#9C6B30",
+                          background: editTempHasPet ? "#9C6B30" : "#ffffff",
+                          color: editTempHasPet ? "#ffffff" : "#9C6B30",
+                        }}
+                      >
+                        🐶 עם בעל חיים
+                      </button>
+                    </div>
+                  );
+                })()}
 
-        {!typing && !submitting && (
-          <div className="mt-1">
+              {editingFieldKey === "childAgeBands" &&
+                (() => {
+                  const companionsStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+                  if (!companionsStep || companionsStep.type !== "companions") return null;
+                  return (
+                    <ChipGroup options={companionsStep.childAgeOptions} selected={editTempMulti} onChange={setEditTempMulti} />
+                  );
+                })()}
+
+              {editingFieldKey === "timing" &&
+                (() => {
+                  const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "timing");
+                  if (!editStep || editStep.type !== "date") return null;
+                  return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
+                })()}
+
+              {(editingFieldKey === "distanceBand" || editingFieldKey === "budgetBand") &&
+                (() => {
+                  const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey);
+                  if (!editStep || editStep.type !== "slider") return null;
+                  return (
+                    <Slider
+                      steps={editStep.steps}
+                      value={editTempSlider ?? (form[editingFieldKey] as string)}
+                      onChange={setEditTempSlider}
+                    />
+                  );
+                })()}
+
+              {editingFieldKey === "interests" &&
+                (() => {
+                  const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "interests");
+                  if (!editStep || editStep.type !== "multi-emoji") return null;
+                  return <ChipGroup options={editStep.options} selected={editTempMulti} onChange={setEditTempMulti} />;
+                })()}
+
+              {editingFieldKey === "durationBand" &&
+                (() => {
+                  const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "durationBand");
+                  if (!editStep || editStep.type !== "single") return null;
+                  return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
+                })()}
+
+              {editingFieldKey === "freeText" && (
+                <textarea
+                  value={editTempText}
+                  onChange={(e) => setEditTempText(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {typing && <TypingIndicator />}
+
+            {!typing && !submitting && (
+              <div className="mt-1">
 {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
                 <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
@@ -457,7 +555,7 @@ function confirmFreeText() {
               <AnswerOptions options={step.options} onSelect={handleSingleSelect} />
             )}
 
-            {step.type === "text" && (
+{step.type === "text" && (
               <textarea
                 value={tempText}
                 onChange={(e) => setTempText(e.target.value)}
@@ -469,113 +567,35 @@ function confirmFreeText() {
           </div>
         )}
 
-        {submitting && <ChatBubble>מחשב את המסלול הטוב ביותר עבורכם</ChatBubble>}
+            {submitting && <ChatBubble>מחשב את המסלול הטוב ביותר עבורכם</ChatBubble>}
+          </>
+        )}
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
         <div ref={bottomRef} />
       </div>
 
-{footerAction && (
-        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
-          <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
-            {footerAction.label}
+{editingFieldKey ? (
+        <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center gap-2 px-4">
+          <button
+            type="button"
+            onClick={closeEdit}
+            className="rounded-pill border border-ink-secondary/25 bg-white px-5 py-2.5 text-sm font-medium text-ink-secondary shadow-md"
+          >
+            ביטול
+          </button>
+          <Button variant="primary" onClick={confirmEdit}>
+            עדכן
           </Button>
         </div>
-      )}
-
-      {editingFieldKey && (
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 px-4 pb-6"
-          onClick={closeEdit}
-        >
-          <div
-            className="w-full max-w-md rounded-card bg-white p-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="mb-3 text-sm font-semibold text-ink">
-              {DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey)?.title}
-            </p>
-
-            {editingFieldKey === "companions" &&
-              (() => {
-                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
-                if (!editStep || editStep.type !== "companions") return null;
-                return (
-                  <div className="flex flex-col gap-3">
-                    <AnswerOptions options={editStep.options} selected={editTempCompanion} onSelect={setEditTempCompanion} />
-                    <button
-                      type="button"
-                      onClick={() => setEditTempHasPet((v) => !v)}
-                      className="flex w-fit items-center gap-1.5 rounded-pill border px-3.5 py-2 text-[13px] font-medium transition active:scale-95"
-                      style={{
-                        borderColor: "#9C6B30",
-                        background: editTempHasPet ? "#9C6B30" : "#ffffff",
-                        color: editTempHasPet ? "#ffffff" : "#9C6B30",
-                      }}
-                    >
-                      🐶 עם בעל חיים
-                    </button>
-                  </div>
-                );
-              })()}
-
-            {editingFieldKey === "timing" &&
-              (() => {
-                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "timing");
-                if (!editStep || editStep.type !== "date") return null;
-                return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
-              })()}
-
-            {(editingFieldKey === "distanceBand" || editingFieldKey === "budgetBand") &&
-              (() => {
-                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey);
-                if (!editStep || editStep.type !== "slider") return null;
-                return (
-                  <Slider
-                    steps={editStep.steps}
-                    value={editTempSlider ?? (form[editingFieldKey] as string)}
-                    onChange={setEditTempSlider}
-                  />
-                );
-              })()}
-
-            {editingFieldKey === "interests" &&
-              (() => {
-                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "interests");
-                if (!editStep || editStep.type !== "multi-emoji") return null;
-                return <ChipGroup options={editStep.options} selected={editTempMulti} onChange={setEditTempMulti} />;
-              })()}
-
-            {editingFieldKey === "durationBand" &&
-              (() => {
-                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "durationBand");
-                if (!editStep || editStep.type !== "single") return null;
-                return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
-              })()}
-
-            {editingFieldKey === "freeText" && (
-              <textarea
-                value={editTempText}
-                onChange={(e) => setEditTempText(e.target.value)}
-                rows={3}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            )}
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={closeEdit}
-                className="flex-1 rounded-pill border border-ink-secondary/25 py-2.5 text-sm font-medium text-ink-secondary"
-              >
-                ביטול
-              </button>
-              <Button variant="primary" fullWidth onClick={confirmEdit}>
-                עדכן
-              </Button>
-            </div>
+      ) : (
+        footerAction && (
+          <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
+            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
+              {footerAction.label}
+            </Button>
           </div>
-        </div>
+        )
       )}
     </Screen>
   );
