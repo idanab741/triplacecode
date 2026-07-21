@@ -13,6 +13,8 @@ import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import Image from "next/image";
 
+type TripChoice = "triplace" | "tripmatch";
+
 const DEFAULT_ANSWERS: DayTripAnswers = {
   companions: "solo",
   hasPet: false,
@@ -43,6 +45,43 @@ type ChatMessage = {
   fieldKey?: EditableFieldKey;
 };
 
+/** שתי כרטיסיות לוגו לבחירה בין TripPlace (אוטומטי) ל-TripMatch (החלקות). */
+function TripChoiceCards({
+  onChoose,
+  disabled,
+}: {
+  onChoose: (choice: TripChoice) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex gap-3">
+      <button
+        type="button"
+        onClick={() => onChoose("triplace")}
+        disabled={disabled}
+        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
+      >
+        <div className="relative mx-auto h-8 w-full">
+          <Image src="/images/trip-triplace-logo.png" alt="TripPlace" fill className="object-contain" />
+        </div>
+        <p className="mt-2 text-center text-[11px] text-ink-secondary">ה-AI בונה הכל אוטומטית</p>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onChoose("tripmatch")}
+        disabled={disabled}
+        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
+      >
+        <div className="relative mx-auto h-8 w-full">
+          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" fill className="object-contain" />
+        </div>
+        <p className="mt-2 text-center text-[11px] text-ink-secondary">בוחרים לבד עם החלקות</p>
+      </button>
+    </div>
+  );
+}
+
 /** תג שמציג את סוג הטיול, בצד שמאל — כמו תשובות המשתמש, עם גרדיאנט המותג. */
 function TripTypeBadge({ label }: { label: string }) {
   return (
@@ -69,8 +108,11 @@ export default function DayTripQuestionnairePage() {
 
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<DayTripAnswers>(DEFAULT_ANSWERS);
-  const [submitting, setSubmitting] = useState(false);
+const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+const [awaitingTripChoice, setAwaitingTripChoice] = useState(false);
+  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
+  const [busyChoice, setBusyChoice] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -357,7 +399,7 @@ function confirmFreeText() {
 
   // ---------- שליחה סופית ----------
 
-  async function submit() {
+async function submit() {
     if (!user) {
       router.push("/auth");
       return;
@@ -373,12 +415,42 @@ function confirmFreeText() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
-      router.push(`/trip-builder/day-trip/build?sessionId=${data.session.id}`);
+
+      setCreatedSessionId(data.session.id);
+      setSubmitting(false);
+      setTyping(true);
+      setTimeout(() => {
+        setTyping(false);
+        addBot("מעולה! עכשיו תבחרו איך תרצו לבנות את הטיול שלכם:");
+        setAwaitingTripChoice(true);
+      }, 700);
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו לקבל את המיקום שלך. יש לאשר גישה למיקום כדי להמשיך."
       );
       setSubmitting(false);
+    }
+  }
+
+  async function handleTripChoice(choice: TripChoice) {
+    if (!createdSessionId || busyChoice) return;
+    setBusyChoice(true);
+
+    if (choice === "tripmatch") {
+      router.push(`/trip-builder/day-trip/build?sessionId=${createdSessionId}`);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${createdSessionId}/auto-build`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "בניית הטיול נכשלה");
+      router.push(`/trip-builder/day-trip/result?sessionId=${createdSessionId}`);
+    } catch (error) {
+      setLocationError(error instanceof Error ? error.message : "בניית הטיול נכשלה, נסו שוב.");
+      setBusyChoice(false);
     }
   }
 
@@ -590,13 +662,18 @@ function confirmFreeText() {
           </div>
         )}
 
-        {!editingFieldKey && submitting && <ChatBubble>מחשב את המסלול הטוב ביותר עבורכם</ChatBubble>}
+{!editingFieldKey && submitting && <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>}
+
+        {!editingFieldKey && awaitingTripChoice && (
+          <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
+        )}
+
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
         <div ref={bottomRef} />
       </div>
 
-{editingFieldKey ? (
+{editingFieldKey && !awaitingTripChoice ? (
         <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center gap-2 px-4">
           <button
             type="button"
@@ -609,7 +686,8 @@ function confirmFreeText() {
             עדכן
           </Button>
         </div>
-      ) : (
+) : (
+        !awaitingTripChoice &&
         footerAction && (
           <div className="fixed inset-x-0 bottom-6 z-30 flex justify-center px-4">
             <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
