@@ -67,7 +67,7 @@ export async function finalizeItinerary(
     const etaMinutes = estimateTravelMinutes(distanceKm, "drive");
     cumulativeMinutes += etaMinutes;
 
-    finalStops.push({
+finalStops.push({
       stopId: stop.id,
       placeId: stop.place!.id,
       name: stop.place!.name,
@@ -79,6 +79,8 @@ export async function finalizeItinerary(
       priceLevel: stop.place!.price_level,
       rating: stop.place!.rating,
       reason: stop.reason,
+      latitude: placeLatLng.lat,
+      longitude: placeLatLng.lng,
     });
 
     cumulativeMinutes += stop.place!.estimated_visit_minutes ?? 60;

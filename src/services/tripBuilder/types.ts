@@ -91,6 +91,8 @@ export interface FinalItineraryStop {
   priceLevel: number | null;
   rating: number | null;
   reason: string | null;
+  latitude: number;
+  longitude: number;
 }
 
 export interface FinalItineraryEvent {

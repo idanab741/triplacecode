@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
@@ -11,7 +12,6 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
-import Image from "next/image";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
   companions: "solo",
@@ -70,6 +70,7 @@ export default function DayTripQuestionnairePage() {
 
   const step = DAY_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
+  const isLastTextStep = step.type === "text" && isLastStep;
 
   function nextId() {
     idRef.current += 1;
@@ -85,7 +86,6 @@ export default function DayTripQuestionnairePage() {
     setMessages((m) => [...m, { id: nextId(), role: "icon", text: label }]);
   }
 
-  // מציג את הודעת הפתיחה, את תג סוג הטיול, ואז את השאלה הראשונה — פעם אחת כשהעמוד נטען
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -127,26 +127,19 @@ export default function DayTripQuestionnairePage() {
 
   function goToNextStep() {
     resetTempAnswerState();
-    if (isLastStep) {
-      submit();
-      return;
-    }
+    if (isLastStep) return; // השלב האחרון (מלל חופשי) מטופל דרך confirmFreeTextAndGo, לא כאן
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      setStepIndex((i) => i + 1); // pure state update only — no side effects here
+      setStepIndex((i) => i + 1);
     }, 550);
   }
 
-  // מוסיף את בועת הבוט של השאלה החדשה כשה-step משתנה בפועל — מקום יחיד
-  // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות
   useEffect(() => {
-    if (stepIndex === 0) return; // השאלה הראשונה כבר נוספה ב-mount
+    if (stepIndex === 0) return;
     addBot(DAY_TRIP_QUESTIONS[stepIndex].title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
-
-  // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
   function handleCompanionsSelect(value: string) {
     if (step.type !== "companions") return;
@@ -217,15 +210,15 @@ export default function DayTripQuestionnairePage() {
     goToNextStep();
   }
 
-  function confirmFreeText() {
+  /** בשלב האחרון (מלל חופשי) - שולח את התשובה ומיד ממשיך לפי הבחירה: TripLace/TripMatch. */
+  async function confirmFreeTextAndGo(mode: "triplace" | "tripmatch") {
     updateField("freeText", tempText);
     addUser(tempText || "—");
-    goToNextStep();
+    resetTempAnswerState();
+    await submit(mode, tempText);
   }
 
-  // ---------- שליחה סופית ----------
-
-  async function submit() {
+  async function submit(mode: "triplace" | "tripmatch", freeTextOverride?: string) {
     if (!user) {
       router.push("/auth");
       return;
@@ -234,14 +227,27 @@ export default function DayTripQuestionnairePage() {
     setLocationError(null);
     try {
       const origin = await getCurrentPosition();
+      const finalAnswers = freeTextOverride !== undefined ? { ...form, freeText: freeTextOverride } : form;
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "day_trip", answers: form, origin }),
+        body: JSON.stringify({ tripType: "day_trip", answers: finalAnswers, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
-      router.push(`/trip-builder/day-trip/build?sessionId=${data.session.id}`);
+
+      const sessionId = data.session.id;
+
+      if (mode === "triplace") {
+        // בונה את כל המסלול אוטומטית (בלי החלקות), ואז עובר ישר לתוצאה
+        const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, {
+          method: "POST",
+        });
+        if (!buildResponse.ok) throw new Error("בניית המסלול האוטומטית נכשלה");
+        router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
+      } else {
+        router.push(`/trip-builder/day-trip/build?sessionId=${sessionId}`);
+      }
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו לקבל את המיקום שלך. יש לאשר גישה למיקום כדי להמשיך."
@@ -264,13 +270,14 @@ export default function DayTripQuestionnairePage() {
     if (step.type === "multi-emoji") {
       return { label: "המשך", onClick: confirmInterests };
     }
-    if (step.type === "text") {
-      return { label: "המשך", onClick: confirmFreeText };
+    if (step.type === "text" && !isLastStep) {
+      return { label: "המשך", onClick: () => {} }; // כרגע אין שאלת טקסט שאינה אחרונה, אבל נשאר לעתיד
     }
     return null;
   }
 
   const footerAction = getFooterAction();
+  const showBottomBar = footerAction || isLastTextStep;
 
   return (
     <Screen withBottomNavSpacing={false}>
@@ -278,7 +285,7 @@ export default function DayTripQuestionnairePage() {
         <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.back()} />
       </div>
 
-      <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
+      <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${showBottomBar ? "pb-28" : "pb-10"}`}>
         {messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
@@ -350,7 +357,22 @@ export default function DayTripQuestionnairePage() {
         <div ref={bottomRef} />
       </div>
 
-      {footerAction && (
+      {/* בשלב האחרון (מלל חופשי) - שני כפתורים: TripLace (אוטומטי) או TripMatch (החלקות) */}
+      {isLastTextStep && !typing && !submitting && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
+          <div className="mx-auto flex max-w-md gap-3">
+            <Button variant="secondary" fullWidth onClick={() => confirmFreeTextAndGo("triplace")}>
+              TripLace
+            </Button>
+            <Button variant="primary" fullWidth onClick={() => confirmFreeTextAndGo("tripmatch")}>
+              TripMatch
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* כפתור "המשך" קבוע בתחתית המסך, לשאר השאלות שדורשות אישור */}
+      {!isLastTextStep && footerAction && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-secondary/10 bg-white px-4 py-3 shadow-[0_-2px_8px_rgba(16,24,40,0.06)]">
           <div className="mx-auto max-w-md">
             <Button variant="primary" fullWidth onClick={footerAction.onClick} disabled={footerAction.disabled}>
