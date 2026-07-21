@@ -499,10 +499,10 @@ function promptTripChoice() {
   return (
     <Screen withBottomNavSpacing={false}>
       <div className="-mx-5 -mt-8">
-        <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.back()} />
-      </div>
+<ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
+        </div>
 
-<div className={`mx-auto flex max-w-md flex-col gap-4 px-2.5 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
+<div className={`mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
   {messages.map((m) => {
           if (editingFieldKey && m.id === editingMessageId) {
             return (
