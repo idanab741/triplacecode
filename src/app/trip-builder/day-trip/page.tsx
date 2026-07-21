@@ -498,8 +498,8 @@ function promptTripChoice() {
   const footerAction = getFooterAction();
 
   return (
-    <Screen withBottomNavSpacing={false}>
-      <div className="-mx-5 -mt-8">
+    <Screen withBottomNavSpacing>
+            <div className="-mx-5 -mt-8">
 <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
         </div>
 
@@ -719,8 +719,16 @@ return m.role === "assistant" ? (
         )
       )}
 
+)
+      )}
+
+      <MainBottomNav active="ai" />
+    </Screen>
+  );
+}
+
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("הדפדפן שלך לא תומך באיתור מיקום"));
       return;
