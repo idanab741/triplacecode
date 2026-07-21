@@ -22,11 +22,25 @@ const DEFAULT_ANSWERS: DayTripAnswers = {
   distanceBand: "1h",
   budgetBand: "300-600",
   interests: [],
-  durationBand: "2-4h",
+  durationBand: "half_day",
   freeText: "",
 };
 
-type ChatMessage = { id: number; role: "assistant" | "user" | "icon"; text: string };
+type EditableFieldKey =
+  | "companions"
+  | "timing"
+  | "distanceBand"
+  | "budgetBand"
+  | "interests"
+  | "durationBand"
+  | "freeText";
+
+type ChatMessage = {
+  id: number;
+  role: "assistant" | "user" | "icon";
+  text: string;
+  fieldKey?: EditableFieldKey;
+};
 
 /** תג שמציג את סוג הטיול, בצד שמאל — כמו תשובות המשתמש, עם גרדיאנט המותג. */
 function TripTypeBadge({ label }: { label: string }) {
@@ -64,9 +78,17 @@ export default function DayTripQuestionnairePage() {
 const [tempMulti, setTempMulti] = useState<string[]>([]);
   const [tempSlider, setTempSlider] = useState<string | null>(null);
   const [tempText, setTempText] = useState("");
-  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [tempHasPet, setTempHasPet] = useState(false);
 
+  const [editingFieldKey, setEditingFieldKey] = useState<EditableFieldKey | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editTempValue, setEditTempValue] = useState<string | null>(null);
+  const [editTempSlider, setEditTempSlider] = useState<string | null>(null);
+  const [editTempMulti, setEditTempMulti] = useState<string[]>([]);
+  const [editTempText, setEditTempText] = useState("");
+  const [editTempCompanion, setEditTempCompanion] = useState<string | null>(null);
+  const [editTempHasPet, setEditTempHasPet] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
   const startedRef = useRef(false);
@@ -81,8 +103,8 @@ const [tempMulti, setTempMulti] = useState<string[]>([]);
   function addBot(text: string) {
     setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
   }
-  function addUser(text: string) {
-    setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
+function addUser(text: string, fieldKey?: EditableFieldKey) {
+    setMessages((m) => [...m, { id: nextId(), role: "user", text, fieldKey }]);
   }
   function addIconBadge(label: string) {
     setMessages((m) => [...m, { id: nextId(), role: "icon", text: label }]);
@@ -166,8 +188,8 @@ function handleCompanionsSelect(value: string) {
     updateField("companions", tempCompanion as DayTripAnswers["companions"]);
     updateField("hasPet", tempHasPet);
 
-    const label = labelFor(step.options, tempCompanion);
-    addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label);
+const label = labelFor(step.options, tempCompanion);
+    addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
 
     if (tempCompanion === step.childAgeTriggerValue) {
       setAwaitingChildAges(true);
@@ -189,10 +211,10 @@ function handleCompanionsSelect(value: string) {
   }
 
   function handleDateSelect(value: string) {
-    if (step.type !== "date") return;
+if (step.type !== "date") return;
     updateField("timing", value as DayTripAnswers["timing"]);
     const label = labelFor(step.options, value);
-    addUser(label);
+    addUser(label, "timing");
 
     if (value === step.otherDateTriggerValue) {
       setAwaitingOtherDate(true);
@@ -210,31 +232,100 @@ function handleCompanionsSelect(value: string) {
 
   function confirmSlider() {
     if (step.type !== "slider") return;
-    const value = tempSlider ?? (form[step.key as keyof DayTripAnswers] as string) ?? step.steps[0];
+const value = tempSlider ?? (form[step.key as keyof DayTripAnswers] as string) ?? step.steps[0];
     updateField(step.key as keyof DayTripAnswers, value as never);
     const label = labelFor(step.steps as unknown as { value: string; label: string }[], value);
-    addUser(label);
+    addUser(label, step.key as EditableFieldKey);
     goToNextStep();
   }
 
   function confirmInterests() {
-    if (step.type !== "multi-emoji") return;
+if (step.type !== "multi-emoji") return;
     updateField("interests", tempMulti);
-    addUser(tempMulti.length > 0 ? labelsFor(step.options, tempMulti).join("، ") : "לא משנה לי");
+    addUser(tempMulti.length > 0 ? labelsFor(step.options, tempMulti).join("، ") : "לא משנה לי", "interests");
     goToNextStep();
   }
 
   function handleSingleSelect(value: string) {
-    if (step.type !== "single") return;
+if (step.type !== "single") return;
     updateField(step.key as keyof DayTripAnswers, value as never);
     const label = labelFor(step.options, value);
-    addUser(label);
+    addUser(label, step.key as EditableFieldKey);
     goToNextStep();
   }
 
-  function confirmFreeText() {
+  function openEdit(message: ChatMessage) {
+    if (!message.fieldKey || typing || submitting || editingFieldKey) return;
+    const key = message.fieldKey;
+    setEditingFieldKey(key);
+    setEditingMessageId(message.id);
+
+    if (key === "companions") {
+      setEditTempCompanion(form.companions);
+      setEditTempHasPet(form.hasPet);
+    } else if (key === "interests") {
+      setEditTempMulti(form.interests);
+    } else if (key === "distanceBand" || key === "budgetBand") {
+      setEditTempSlider(form[key] as string);
+    } else if (key === "freeText") {
+      setEditTempText(form.freeText);
+    } else {
+      setEditTempValue(form[key] as string);
+    }
+  }
+
+  function closeEdit() {
+    setEditingFieldKey(null);
+    setEditingMessageId(null);
+    setEditTempValue(null);
+    setEditTempSlider(null);
+    setEditTempMulti([]);
+    setEditTempText("");
+    setEditTempCompanion(null);
+    setEditTempHasPet(false);
+  }
+
+  function confirmEdit() {
+    if (!editingFieldKey || editingMessageId == null) return;
+    const key = editingFieldKey;
+    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === key);
+    if (!editStep) return;
+
+    let newLabel = "";
+
+    if (key === "companions" && editStep.type === "companions") {
+      if (!editTempCompanion) return;
+      updateField("companions", editTempCompanion as DayTripAnswers["companions"]);
+      updateField("hasPet", editTempHasPet);
+      const label = labelFor(editStep.options, editTempCompanion);
+      newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
+    } else if (key === "timing" && editStep.type === "date") {
+      if (!editTempValue) return;
+      updateField("timing", editTempValue as DayTripAnswers["timing"]);
+      newLabel = labelFor(editStep.options, editTempValue);
+    } else if ((key === "distanceBand" || key === "budgetBand") && editStep.type === "slider") {
+      const value = editTempSlider ?? (form[key] as string);
+      updateField(key, value as never);
+      newLabel = labelFor(editStep.steps as unknown as { value: string; label: string }[], value);
+    } else if (key === "interests" && editStep.type === "multi-emoji") {
+      updateField("interests", editTempMulti);
+      newLabel = editTempMulti.length > 0 ? labelsFor(editStep.options, editTempMulti).join("، ") : "לא משנה לי";
+    } else if (key === "durationBand" && editStep.type === "single") {
+      if (!editTempValue) return;
+      updateField("durationBand", editTempValue as DayTripAnswers["durationBand"]);
+      newLabel = labelFor(editStep.options, editTempValue);
+    } else if (key === "freeText") {
+      updateField("freeText", editTempText);
+      newLabel = editTempText || "—";
+    }
+
+    setMessages((msgs) => msgs.map((m) => (m.id === editingMessageId ? { ...m, text: newLabel } : m)));
+    closeEdit();
+  }
+
+function confirmFreeText() {
     updateField("freeText", tempText);
-    addUser(tempText || "—");
+    addUser(tempText || "—", "freeText");
     goToNextStep();
   }
 
@@ -297,13 +388,15 @@ function handleCompanionsSelect(value: string) {
       </div>
 
       <div className={`mx-auto flex max-w-md flex-col gap-4 px-4 pt-4 ${footerAction ? "pb-28" : "pb-10"}`}>
-        {messages.map((m) =>
+{messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
           ) : m.role === "icon" ? (
             <TripTypeBadge key={m.id} label={m.text} />
           ) : (
-            <UserBubble key={m.id}>{m.text}</UserBubble>
+            <UserBubble key={m.id} onClick={m.fieldKey ? () => openEdit(m) : undefined}>
+              {m.text}
+            </UserBubble>
           )
         )}
 
@@ -387,6 +480,101 @@ function handleCompanionsSelect(value: string) {
           <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled}>
             {footerAction.label}
           </Button>
+        </div>
+      )}
+
+      {editingFieldKey && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 px-4 pb-6"
+          onClick={closeEdit}
+        >
+          <div
+            className="w-full max-w-md rounded-card bg-white p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="mb-3 text-sm font-semibold text-ink">
+              {DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey)?.title}
+            </p>
+
+            {editingFieldKey === "companions" &&
+              (() => {
+                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+                if (!editStep || editStep.type !== "companions") return null;
+                return (
+                  <div className="flex flex-col gap-3">
+                    <AnswerOptions options={editStep.options} selected={editTempCompanion} onSelect={setEditTempCompanion} />
+                    <button
+                      type="button"
+                      onClick={() => setEditTempHasPet((v) => !v)}
+                      className="flex w-fit items-center gap-1.5 rounded-pill border px-3.5 py-2 text-[13px] font-medium transition active:scale-95"
+                      style={{
+                        borderColor: "#9C6B30",
+                        background: editTempHasPet ? "#9C6B30" : "#ffffff",
+                        color: editTempHasPet ? "#ffffff" : "#9C6B30",
+                      }}
+                    >
+                      🐶 עם בעל חיים
+                    </button>
+                  </div>
+                );
+              })()}
+
+            {editingFieldKey === "timing" &&
+              (() => {
+                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "timing");
+                if (!editStep || editStep.type !== "date") return null;
+                return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
+              })()}
+
+            {(editingFieldKey === "distanceBand" || editingFieldKey === "budgetBand") &&
+              (() => {
+                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey);
+                if (!editStep || editStep.type !== "slider") return null;
+                return (
+                  <Slider
+                    steps={editStep.steps}
+                    value={editTempSlider ?? (form[editingFieldKey] as string)}
+                    onChange={setEditTempSlider}
+                  />
+                );
+              })()}
+
+            {editingFieldKey === "interests" &&
+              (() => {
+                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "interests");
+                if (!editStep || editStep.type !== "multi-emoji") return null;
+                return <ChipGroup options={editStep.options} selected={editTempMulti} onChange={setEditTempMulti} />;
+              })()}
+
+            {editingFieldKey === "durationBand" &&
+              (() => {
+                const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "durationBand");
+                if (!editStep || editStep.type !== "single") return null;
+                return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
+              })()}
+
+            {editingFieldKey === "freeText" && (
+              <textarea
+                value={editTempText}
+                onChange={(e) => setEditTempText(e.target.value)}
+                rows={3}
+                className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+            )}
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={closeEdit}
+                className="flex-1 rounded-pill border border-ink-secondary/25 py-2.5 text-sm font-medium text-ink-secondary"
+              >
+                ביטול
+              </button>
+              <Button variant="primary" fullWidth onClick={confirmEdit}>
+                עדכן
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </Screen>

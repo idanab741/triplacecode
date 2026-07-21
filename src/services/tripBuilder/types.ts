@@ -120,8 +120,7 @@ export type DistanceBand =
   | "10min" | "20min" | "30min" | "40min" | "50min"
   | "1h" | "1.5h" | "2h" | "2.5h" | "3h" | "4h" | "5h";
 export type BudgetBand = "0-100" | "100-300" | "300-600" | "600-1000" | "unlimited";
-export type DurationBand = "1-2h" | "2-4h" | "4-6h" | "full_day" | "custom";
-
+export type DurationBand = "1-2h" | "half_day" | "full_day";
 export interface DayTripAnswers {
   companions: CompanionType;
   hasPet: boolean;

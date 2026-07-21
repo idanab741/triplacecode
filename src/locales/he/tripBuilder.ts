@@ -63,8 +63,6 @@ export const DAY_TRIP_INTEREST_OPTIONS: StepOption[] = [
 
 export const DURATION_OPTIONS: StepOption[] = [
   { value: "1-2h", label: "שעה-שעתיים" },
-  { value: "2-4h", label: "2-4 שעות" },
-  { value: "4-6h", label: "4-6 שעות" },
+  { value: "half_day", label: "חצי יום" },
   { value: "full_day", label: "יום שלם" },
-  { value: "custom", label: "זמן מותאם אישית" },
 ];

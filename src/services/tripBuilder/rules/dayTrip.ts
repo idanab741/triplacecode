@@ -67,20 +67,17 @@ interface DurationRule {
 /**
  * חוקי בניית המסלול לפי משך הטיול - לפי המפרט המדויק:
  * 1-2 שעות: אטרקציה אחת (או אטרקציה + קפה). ללא מסעדה.
- * 2-4 שעות: 1-2 אטרקציות + עצירת קפה/אוכל קליל אחת.
- * 4-6 שעות: 2-3 אטרקציות + מקום אוכל אחד בלבד + קפה/קינוח/תצפית.
+ * חצי יום: 2-3 אטרקציות + מקום אוכל אחד בלבד + קפה/קינוח/תצפית.
  * יום שלם: 3-4 אטרקציות + 1-2 מקומות אוכל + קפה + תצפית/סיום.
  * המערך כאן = אמצע הטווח (משמש את הפולבאק הדטרמיניסטי בלבד);
  * הטווח המלא מועבר ל-Claude בפרומפט והוא מחליט בתוכו לפי ההעדפות.
  */
 export const DAY_TRIP_DURATION_RULES: Record<DurationBand, DurationRule> = {
   "1-2h": { roles: ["attraction", "coffee_dessert"] },
-  "2-4h": { roles: ["attraction", "attraction", "coffee_dessert"] },
-  "4-6h": { roles: ["attraction", "attraction", "food", "attraction", "coffee_dessert"] },
+  half_day: { roles: ["attraction", "attraction", "food", "attraction", "coffee_dessert"] },
   full_day: {
     roles: ["attraction", "attraction", "food", "attraction", "coffee_dessert", "attraction", "coffee_dessert"],
   },
-custom: { roles: ["attraction", "attraction", "food", "coffee_dessert"] },
 };
 
 /**
@@ -88,10 +85,8 @@ custom: { roles: ["attraction", "attraction", "food", "coffee_dessert"] },
  */
 export const MAX_STOP_DISTANCE_KM: Record<DurationBand, number> = {
   "1-2h": 1,
-  "2-4h": 3,
-  "4-6h": 6,
+  half_day: 6,
   full_day: 10,
-  custom: 5,
 };
 export const DAY_TRIP_PLAN_PROMPT_RULES = `אתה מנוע ה-AI של TRIPLACE, בונה "טיול יומי" (Day Trip).
 המטרה אינה רשימת מקומות, אלא יום שלם, זורם ומותאם אישית.
@@ -108,8 +103,7 @@ export const DAY_TRIP_PLAN_PROMPT_RULES = `אתה מנוע ה-AI של TRIPLACE, 
 
 חוקי הרכב לפי משך (חובה, אסור לחרוג):
 - 1-2 שעות: אטרקציה אחת בלבד, או אטרקציה + עצירת קפה. ללא מסעדה.
-- 2-4 שעות: 1-2 אטרקציות + עצירת קפה או אוכל קליל אחת. לא יותר.
-- 4-6 שעות: 2-3 אטרקציות + מקום אוכל אחד בלבד + עצירת קפה/קינוח/תצפית אחת.
+- חצי יום: 2-3 אטרקציות + מקום אוכל אחד בלבד + עצירת קפה/קינוח/תצפית אחת.
 - יום שלם: 3-4 אטרקציות + 1-2 מקומות אוכל + עצירת קפה + תצפית/נקודת סיום.
 
 חוקי סדר יום:

@@ -4,13 +4,15 @@ import { ReactNode } from "react";
 
 interface UserBubbleProps {
   children: ReactNode;
+  onClick?: () => void;
 }
 
-export function UserBubble({ children }: UserBubbleProps) {
+export function UserBubble({ children, onClick }: UserBubbleProps) {
   return (
     <div className="flex justify-end">
       <div
-        className="max-w-[82%] px-4 py-3"
+        onClick={onClick}
+        className={`max-w-[82%] px-4 py-3 ${onClick ? "cursor-pointer transition active:scale-95" : ""}`}
         style={{
           borderRadius: "18px",
           borderBottomLeftRadius: "5px",
@@ -19,6 +21,7 @@ export function UserBubble({ children }: UserBubbleProps) {
         }}
       >
         <p className="whitespace-pre-wrap text-[14.5px] font-medium leading-6 text-white">{children}</p>
+        {onClick && <p className="mt-1 text-[11px] text-white/70">✏️ הקש לעריכה</p>}
       </div>
     </div>
   );
