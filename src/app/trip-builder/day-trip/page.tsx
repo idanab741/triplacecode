@@ -154,9 +154,10 @@ const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [editTempText, setEditTempText] = useState("");
   const [editTempCompanion, setEditTempCompanion] = useState<string | null>(null);
   const [editTempHasPet, setEditTempHasPet] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
   const startedRef = useRef(false);
+
 
   const step = DAY_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
@@ -191,9 +192,10 @@ function addUser(text: string, fieldKey?: EditableFieldKey) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
+
 
   function updateField<K extends keyof DayTripAnswers>(key: K, value: DayTripAnswers[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -495,7 +497,11 @@ function promptTripChoice() {
     return null;
   }
 
-  const footerAction = getFooterAction();
+const footerAction = getFooterAction();
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [footerAction, editingFieldKey, awaitingTripChoice]);
 
   return (
     <Screen withBottomNavSpacing>
@@ -503,8 +509,8 @@ function promptTripChoice() {
 <ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
         </div>
 
-<div className={`mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 ${footerAction || (editingFieldKey && !awaitingTripChoice) ? "pb-52" : "pb-10"}`}>\
-    {messages.map((m) => {
+<div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
+        {messages.map((m) => {
           if (editingFieldKey && m.id === editingMessageId) {
             return (
               <div key={m.id} className="mt-1">
@@ -617,8 +623,8 @@ return m.role === "assistant" ? (
 
         {!editingFieldKey && typing && <TypingIndicator />}
 
-  {!editingFieldKey && !typing && !submitting && !awaitingTripChoice && (
-          <div className="mt-1">
+ {!editingFieldKey && !typing && !submitting && !awaitingTripChoice && (
+       <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
                 <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
@@ -691,34 +697,45 @@ return m.role === "assistant" ? (
           </>
         )}
 
-        {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
+{locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
+
+        {((editingFieldKey && !awaitingTripChoice) || (!awaitingTripChoice && footerAction)) && (
+          <div className="flex justify-center gap-2 pt-2">
+            {editingFieldKey && !awaitingTripChoice && (
+              <>
+                <button
+                  type="button"
+                  onClick={closeEdit}
+                  className="flex-1 rounded-pill border border-ink-secondary/25 bg-white py-2 text-sm font-medium text-ink-secondary shadow-md"
+                >
+                  ביטול
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmEdit}
+                  className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                >
+                  עדכן
+                </button>
+              </>
+            )}
+            {!editingFieldKey && !awaitingTripChoice && footerAction && (
+              <button
+                type="button"
+                onClick={footerAction.onClick}
+                disabled={footerAction.disabled}
+                className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              >
+                {footerAction.label}
+              </button>
+            )}
+          </div>
+        )}
 
         <div ref={bottomRef} />
       </div>
-
-{editingFieldKey && !awaitingTripChoice ? (
-        <div className="fixed inset-x-0 bottom-32 z-30 flex justify-center gap-2 px-4">
-          <button
-            type="button"
-            onClick={closeEdit}
-            className="rounded-pill border border-ink-secondary/25 bg-white px-5 py-2.5 text-sm font-medium text-ink-secondary shadow-md"
-          >
-            ביטול
-          </button>
-          <Button variant="primary" onClick={confirmEdit} className="min-w-64">
-            עדכן
-          </Button>
-        </div>
-      ) : (
-        !awaitingTripChoice &&
-footerAction && (
-          <div className="fixed inset-x-0 bottom-40 z-30 flex justify-center px-4">
-            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled} className="min-w-64">
-              {footerAction.label}
-            </Button>
-          </div>
-        )
-      )}
 
       <MainBottomNav active="ai" />
     </Screen>

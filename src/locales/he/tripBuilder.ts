@@ -10,10 +10,10 @@ export const COMPANION_OPTIONS: StepOption[] = [
 export const PET_OPTION: StepOption = { value: "with_pet", label: "עם בעל חיים", emoji: "🐶" };
 
 export const CHILD_AGE_OPTIONS: StepOption[] = [
-  { value: "0-3", label: "0-3" },
-  { value: "3-7", label: "3-7" },
-  { value: "7-12", label: "7-12" },
-  { value: "12-18", label: "12-18" },
+  { value: "0-3", label: "0‑3" },
+  { value: "3-7", label: "3‑7" },
+  { value: "7-12", label: "7‑12" },
+  { value: "12-18", label: "12‑18" },
 ];
 
 export const TIMING_OPTIONS: StepOption[] = [
@@ -38,10 +38,10 @@ export const DISTANCE_STEPS: StepOption[] = [
 ];
 
 export const BUDGET_STEPS: StepOption[] = [
-  { value: "0-100", label: "₪0-100" },
-  { value: "100-300", label: "₪100-300" },
-  { value: "300-600", label: "₪300-600" },
-  { value: "600-1000", label: "₪600-1,000" },
+  { value: "0-100", label: "₪0‑100" },
+  { value: "100-300", label: "₪100‑300" },
+  { value: "300-600", label: "₪300‑600" },
+  { value: "600-1000", label: "₪600‑1,000" },
   { value: "unlimited", label: "ללא הגבלה" },
 ];
 
