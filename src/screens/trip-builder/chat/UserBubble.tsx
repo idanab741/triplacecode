@@ -8,11 +8,17 @@ interface UserBubbleProps {
 }
 
 export function UserBubble({ children, onClick }: UserBubbleProps) {
+  // תשובות קצרות (טווחי גילאים, מרחקים, תקציב וכו') - לעולם לא ישברו שורה,
+  // וממורכזות באמצעות flexbox (לא text-align, כי הוא לא אמין עם תערובת עברית/מספרים).
+  const isShort = typeof children === "string" && children.length <= 14;
+
   return (
     <div className="flex justify-end">
       <div
         onClick={onClick}
-        className={`max-w-[82%] px-4 py-3 ${onClick ? "cursor-pointer transition active:scale-95" : ""}`}
+        className={`flex max-w-[82%] px-5 py-3.5 ${isShort ? "justify-center" : "justify-start"} ${
+          onClick ? "cursor-pointer transition active:scale-95" : ""
+        }`}
         style={{
           borderRadius: "18px",
           borderBottomLeftRadius: "5px",
@@ -20,13 +26,16 @@ export function UserBubble({ children, onClick }: UserBubbleProps) {
           boxShadow: "0 4px 12px rgba(24,119,242,0.28)",
         }}
       >
-<p
-          className="whitespace-pre-wrap text-[14.5px] font-medium leading-6 text-white"
-          style={{ unicodeBidi: "plaintext" }}
+        <p
+          className="text-[14.5px] font-medium leading-6 text-white"
+          style={{
+            whiteSpace: isShort ? "nowrap" : "pre-wrap",
+            direction: "rtl",
+          }}
         >
           {children}
         </p>
-              </div>
+      </div>
     </div>
   );
 }

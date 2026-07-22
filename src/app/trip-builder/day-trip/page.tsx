@@ -166,8 +166,8 @@ const bottomRef = useRef<HTMLDivElement>(null);
     idRef.current += 1;
     return idRef.current;
   }
-  function addBot(text: string) {
-    setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
+ function addBot(text: string, fieldKey?: EditableFieldKey) {
+    setMessages((m) => [...m, { id: nextId(), role: "assistant", text, fieldKey }]);
   }
 function addUser(text: string, fieldKey?: EditableFieldKey) {
     setMessages((m) => [...m, { id: nextId(), role: "user", text, fieldKey }]);
@@ -263,7 +263,7 @@ const label = labelFor(step.options, tempCompanion);
       setTyping(true);
       setTimeout(() => {
         setTyping(false);
-        addBot(step.childAgeTitle);
+        addBot(step.childAgeTitle, "childAgeBands");
       }, 500);
       return;
     }
