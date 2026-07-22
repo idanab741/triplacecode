@@ -41,6 +41,7 @@ interface PlaceRow {
   accessible: boolean | null;
   suitable_child_ages: string[] | null;
   budget_tier: string | null;
+  is_area_experience: boolean | null;
 }
 
 /**
@@ -80,10 +81,10 @@ async function queryPool(
   const latDelta = kmToDegreesLat(radiusKm);
   const lngDelta = kmToDegreesLng(radiusKm, params.origin.lat);
 
-  let query = supabase
+let query = supabase
     .from("places")
     .select(
-      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier"
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
     )
     .overlaps("trip_type_tags", [params.category])
     .gte("latitude", params.origin.lat - latDelta)
@@ -149,8 +150,9 @@ async function queryPool(
         cuisineTags: row.cuisine_tags ?? [],
         kosher: row.kosher,
         accessible: row.accessible,
-        suitableChildAges: row.suitable_child_ages ?? [],
+suitableChildAges: row.suitable_child_ages ?? [],
         budgetTier: row.budget_tier,
+        isAreaExperience: row.is_area_experience ?? false,
       } satisfies CandidatePlace;
     })
     .filter((candidate) => candidate.distanceKm <= radiusKm)

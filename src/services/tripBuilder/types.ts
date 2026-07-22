@@ -78,6 +78,7 @@ tripTypeTags: string[];
   accessible: boolean | null;
   suitableChildAges: string[];
   budgetTier: string | null;
+  isAreaExperience: boolean;
 }
 
 export interface FinalItineraryStop {

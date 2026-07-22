@@ -101,13 +101,23 @@ const ranked = await rankCandidates({
         tripIntent,
       });
 
-      const top = ranked[0];
+const top = ranked[0];
       if (!top) continue;
 
       await likeStop(supabase, user.id, stop.id, top);
 
       excludePlaceIds.push(top.id);
       cursor = { lat: top.latitude, lng: top.longitude };
+
+      // Area Experience: אם התחנה שנבחרה היא אזור חוויה שלם (למשל "נווה צדק"),
+      // התחנות הבאות לא אמורות להיבחר מתוכו - הן כבר "בפנים" את החוויה הזו.
+      // מרחיבים משמעותית את המרחק המינימלי הבא, כדי לא לבחור עוד תחנה
+      // שנמצאת בתוך אותו אזור ממש.
+      if (top.isAreaExperience) {
+        excludePlaceIds.push(
+          ...(await getPlaceIdsWithinRadius(supabase, cursor, 0.8, excludePlaceIds))
+        );
+      }
     }
 
 const itinerary = await finalizeItinerary(
@@ -124,4 +134,32 @@ const itinerary = await finalizeItinerary(
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+/**
+ * מוצא מזהי מקומות שנמצאים ברדיוס נתון מנקודה - משמש למניעת בחירת עוד תחנות
+ * בתוך אזור חוויה שכבר נבחר (Area Experience), כי הן כבר חלק מאותה חוויה.
+ */
+async function getPlaceIdsWithinRadius(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  center: { lat: number; lng: number },
+  radiusKm: number,
+  alreadyExcluded: string[]
+): Promise<string[]> {
+  const latDelta = radiusKm / 111;
+  const lngDelta = radiusKm / (111 * Math.cos((center.lat * Math.PI) / 180));
+
+  let query = supabase
+    .from("places")
+    .select("id")
+    .gte("latitude", center.lat - latDelta)
+    .lte("latitude", center.lat + latDelta)
+    .gte("longitude", center.lng - lngDelta)
+    .lte("longitude", center.lng + lngDelta);
+
+  if (alreadyExcluded.length > 0) {
+    query = query.not("id", "in", `(${alreadyExcluded.join(",")})`);
+  }
+
+  const { data } = await query;
+  return (data ?? []).map((row) => row.id as string);
 }
