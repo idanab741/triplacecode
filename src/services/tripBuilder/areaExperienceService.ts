@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callClaude, logAiError } from "@/services/ai/claudeService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
+import { findPlacePhotoReference } from "./placePhotoService";
 import type { CandidatePlace, LatLng } from "./types";
 
 interface GetOrCreateParams {
@@ -75,6 +76,7 @@ interface SavedPlaceRow {
   latitude: number;
   longitude: number;
   estimated_visit_minutes: number | null;
+  image_urls?: string[];
 }
 
 async function saveAsPlace(
@@ -82,6 +84,9 @@ async function saveAsPlace(
   generated: { name: string; description: string; visitMinutes: number },
   params: GetOrCreateParams
 ): Promise<SavedPlaceRow | null> {
+  const photoRef = await findPlacePhotoReference(`${params.areaName} ישראל`);
+  const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
+
   const { data, error } = await supabase
     .from("places")
     .insert({
@@ -93,8 +98,9 @@ async function saveAsPlace(
       trip_type_tags: [params.category],
       is_area_experience: true,
       estimated_visit_minutes: generated.visitMinutes,
+      image_urls: imageUrls,
     })
-    .select("id,name,short_description,latitude,longitude,estimated_visit_minutes")
+    .select("id,name,short_description,latitude,longitude,estimated_visit_minutes,image_urls")
     .single();
 
   if (error || !data) {
@@ -128,7 +134,7 @@ function toCandidatePlace(row: SavedPlaceRow, origin: LatLng): CandidatePlace {
     category: "",
     subcategory: null,
     shortDescription: row.short_description,
-    imageUrls: [],
+    imageUrls: row.image_urls ?? [],
     rating: null,
     ratingCount: null,
     priceLevel: null,

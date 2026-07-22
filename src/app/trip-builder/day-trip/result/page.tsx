@@ -25,6 +25,35 @@ function DayTripResultContent() {
   const [swappingStopId, setSwappingStopId] = useState<string | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
 
+  const [trippyOpen, setTrippyOpen] = useState(false);
+  const [trippyText, setTrippyText] = useState("");
+  const [trippyLoading, setTrippyLoading] = useState(false);
+  const [trippyMessage, setTrippyMessage] = useState<string | null>(null);
+  const [trippyError, setTrippyError] = useState<string | null>(null);
+
+  async function handleTrippySubmit() {
+    if (!sessionId || !trippyText.trim() || trippyLoading) return;
+    setTrippyLoading(true);
+    setTrippyError(null);
+    setTrippyMessage(null);
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/chat-edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction: trippyText }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "לא הצלחנו לבצע את השינוי");
+      setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
+      setTrippyMessage(data.message ?? "בוצע בהצלחה!");
+      setTrippyText("");
+    } catch (error) {
+      setTrippyError(error instanceof Error ? error.message : "לא הצלחנו לבצע את השינוי");
+    } finally {
+      setTrippyLoading(false);
+    }
+  }
+
   async function handleSwapStop(stopId: string) {
     if (!sessionId || swappingStopId) return;
     setSwappingStopId(stopId);
@@ -155,6 +184,56 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
             ))}
           </div>
         )}
+<div className="rounded-card bg-white p-3 shadow-soft">
+          {!trippyOpen ? (
+            <button
+              type="button"
+              onClick={() => setTrippyOpen(true)}
+              className="flex w-full items-center gap-2 text-sm text-ink-secondary"
+            >
+              <Image src="/images/tripy.png" alt="" width={28} height={28} className="rounded-full" />
+              <span>רוצים לשנות משהו במסלול? ספרו לי...</span>
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Image src="/images/tripy.png" alt="" width={28} height={28} className="rounded-full" />
+                <span className="text-sm font-semibold text-ink">מה תרצו לשנות?</span>
+              </div>
+              <textarea
+                value={trippyText}
+                onChange={(e) => setTrippyText(e.target.value)}
+                placeholder='לדוגמה: "תחליפו לי את המסעדה למשהו זול יותר"'
+                rows={2}
+                className="w-full rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTrippyOpen(false);
+                    setTrippyText("");
+                    setTrippyError(null);
+                  }}
+                  className="flex-1 rounded-pill border border-ink-secondary/25 py-2 text-sm font-medium text-ink-secondary"
+                >
+                  ביטול
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTrippySubmit}
+                  disabled={trippyLoading || !trippyText.trim()}
+                  className="flex-1 rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                >
+                  {trippyLoading ? "מעדכן..." : "שלחו"}
+                </button>
+              </div>
+              {trippyMessage && <p className="text-sm text-green-700">✓ {trippyMessage}</p>}
+              {trippyError && <p className="text-sm text-danger">{trippyError}</p>}
+            </div>
+          )}
+        </div>
 
         {/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
         <ResultMap
