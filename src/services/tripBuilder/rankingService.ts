@@ -2,6 +2,7 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "./types";
+import type { TripIntent } from "./tripIntentService";
 
 interface RankCandidatesParams {
   dna: TravelDna | null;
@@ -14,6 +15,7 @@ interface RankCandidatesParams {
     liked: string[];
     disliked: string[];
   };
+  tripIntent?: TripIntent | null;
 }
 
 const MAX_CANDIDATES_FOR_AI_RANKING = 6;
@@ -83,7 +85,10 @@ async function tryClaudeRanking(
     rating: candidate.rating,
   }));
 
-  const prompt = `${params.rankingPromptRules}
+const prompt = `${params.rankingPromptRules}
+
+*** מסמך כוונת הטיול (Trip Intent) - כבר סיכם עבורך את הבנת המשתמש, השתמש בו כבסיס עיקרי: ***
+${JSON.stringify(params.tripIntent ?? { note: "לא זמין - נתח את המלל החופשי ישירות" })}
 
 Travel DNA:
 ${JSON.stringify(dnaSummary)}

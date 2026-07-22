@@ -3,8 +3,9 @@ import { createClient } from "@/services/supabase/server";
 import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { describeWeatherCode } from "@/utils/weatherCodes";
-import { createSession, getSessionWithStops, saveCategoryPlan } from "@/services/tripBuilder/sessionService";
+import { createSession, getSessionWithStops, saveCategoryPlan, saveTripIntent } from "@/services/tripBuilder/sessionService";
 import { decideCategoryPlan } from "@/services/tripBuilder/categoryPlanService";
+import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import type { DayTripAnswers, TripType } from "@/services/tripBuilder/types";
 
 export async function POST(request: Request) {
@@ -33,13 +34,23 @@ export async function POST(request: Request) {
       origin
     );
 
-    const dna = await getTravelDna(supabase, user.id);
+const dna = await getTravelDna(supabase, user.id);
     const weatherSummary = await getWeatherSummary(origin.lat, origin.lng);
 
-    const plan = await decideCategoryPlan({ tripType, dna, answers, weatherSummary });
+    // Trip Intent: קריאת Claude אחת שמסכמת את הבנת המשתמש - נוצרת פעם אחת כאן,
+    // ומשמשת את כל שאר תהליך התכנון (בחירת קטגוריות, ובהמשך גם דירוג מועמדים).
+    const tripIntent = await generateTripIntent({ dna, answers, weatherSummary });
+    if (tripIntent) {
+      await saveTripIntent(supabase, session.id, tripIntent);
+    }
+
+    const plan = await decideCategoryPlan({ tripType, dna, answers, weatherSummary, tripIntent });
     const stops = await saveCategoryPlan(supabase, session.id, plan);
 
-    return NextResponse.json({ session: { ...session, category_plan: plan, status: "building" }, stops });
+    return NextResponse.json({
+      session: { ...session, category_plan: plan, status: "building", trip_intent: tripIntent },
+      stops,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
     return NextResponse.json({ error: message }, { status: 500 });

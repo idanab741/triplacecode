@@ -4,6 +4,7 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 import type { CategoryPlanItem, DayTripAnswers, StopRole, TripType } from "./types";
 import { getTripTypeRules } from "./rules";
+import type { TripIntent } from "./tripIntentService";
 
 const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 
@@ -12,6 +13,7 @@ interface DecideCategoryPlanParams {
   dna: TravelDna | null;
   answers: DayTripAnswers;
   weatherSummary: string | null;
+  tripIntent?: TripIntent | null;
 }
 
 /** קובע את רשימת הקטגוריות/תפקידים למסלול - קריאת Claude אחת, עם fallback דטרמיניסטי. */
@@ -28,7 +30,11 @@ async function tryClaudePlan(
   params: DecideCategoryPlanParams,
   planPromptRules: string
 ): Promise<CategoryPlanItem[] | null> {
-  const prompt = `${planPromptRules}
+const prompt = `${planPromptRules}
+
+*** מסמך כוונת הטיול (Trip Intent) - זה כבר סיכם עבורך את הבנת המשתמש, השתמש בו כבסיס
+העיקרי להחלטה, לא תתחיל לנתח מחדש: ***
+${JSON.stringify(params.tripIntent ?? { note: "לא זמין - נתח את המלל החופשי ישירות" })}
 
 Travel DNA:
 ${JSON.stringify(describeDna(params.dna))}

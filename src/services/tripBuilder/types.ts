@@ -28,6 +28,7 @@ export interface TripBuilderSession {
   origin_longitude: number | null;
   category_plan: CategoryPlanItem[];
   final_itinerary: FinalItinerary | null;
+  trip_intent: import("./tripIntentService").TripIntent | null;
   created_at: string;
   updated_at: string;
 }

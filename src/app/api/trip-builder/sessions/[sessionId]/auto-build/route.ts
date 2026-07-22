@@ -36,7 +36,8 @@ export async function POST(
     return NextResponse.json({ error: "חסר מיקום מוצא ל-session" }, { status: 400 });
   }
 
-  const answers = session.answers as unknown as DayTripAnswers;
+const answers = session.answers as unknown as DayTripAnswers;
+  const tripIntent = session.trip_intent;
 
   try {
     const dna = await getTravelDna(supabase, user.id);
@@ -70,7 +71,7 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
 
       if (pool.length === 0) continue;
 
-      const ranked = await rankCandidates({
+const ranked = await rankCandidates({
         dna,
         candidates: pool,
         freeText: answers.freeText,
@@ -78,6 +79,7 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
         rankingPromptRules: rules.rankingPromptRules,
         attributeScoreMap,
         learnedAttributes,
+        tripIntent,
       });
 
       const top = ranked[0];

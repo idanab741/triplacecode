@@ -88,6 +88,15 @@ export async function updateSessionStatus(
   await supabase.from("trip_builder_sessions").update({ status }).eq("id", sessionId);
 }
 
+/** שומר את "מסמך הכוונה" (Trip Intent) שנוצר פעם אחת בתחילת התהליך. */
+export async function saveTripIntent(
+  supabase: SupabaseClient,
+  sessionId: string,
+  tripIntent: import("./tripIntentService").TripIntent
+): Promise<void> {
+  await supabase.from("trip_builder_sessions").update({ trip_intent: tripIntent }).eq("id", sessionId);
+}
+
 export async function saveFinalItinerary(
   supabase: SupabaseClient,
   sessionId: string,
