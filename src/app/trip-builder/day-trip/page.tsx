@@ -697,7 +697,7 @@ return m.role === "assistant" ? (
       </div>
 
 {editingFieldKey && !awaitingTripChoice ? (
-        <div className="fixed inset-x-0 bottom-24 z-30 flex justify-center gap-2 px-4">
+        <div className="fixed inset-x-0 bottom-32 z-30 flex justify-center gap-2 px-4">
           <button
             type="button"
             onClick={closeEdit}
@@ -705,15 +705,15 @@ return m.role === "assistant" ? (
           >
             ביטול
           </button>
-          <Button variant="primary" onClick={confirmEdit} className="min-w-40">
+          <Button variant="primary" onClick={confirmEdit} className="min-w-64">
             עדכן
           </Button>
         </div>
       ) : (
         !awaitingTripChoice &&
-        footerAction && (
-          <div className="fixed inset-x-0 bottom-24 z-30 flex justify-center px-4">
-            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled} className="min-w-40">
+footerAction && (
+          <div className="fixed inset-x-0 bottom-32 z-30 flex justify-center px-4">
+            <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled} className="min-w-64">
               {footerAction.label}
             </Button>
           </div>
