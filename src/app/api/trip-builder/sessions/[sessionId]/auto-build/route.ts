@@ -110,11 +110,13 @@ const ranked = await rankCandidates({
       cursor = { lat: top.latitude, lng: top.longitude };
     }
 
-    const itinerary = await finalizeItinerary(
+const itinerary = await finalizeItinerary(
       supabase,
       sessionId,
       { lat: session.origin_latitude, lng: session.origin_longitude },
-      answers.budgetBand
+      answers.budgetBand,
+      answers.durationBand,
+      tripIntent
     );
 
     return NextResponse.json({ itinerary });

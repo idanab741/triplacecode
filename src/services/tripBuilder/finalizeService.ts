@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary } from "./sessionService";
+import { reviewItinerary } from "./qualityCheckService";
+import type { TripIntent } from "./tripIntentService";
 import type { FinalItinerary, FinalItineraryEvent, FinalItineraryStop, LatLng, TripBuilderStop } from "./types";
 
 interface LikedStopWithPlace extends TripBuilderStop {
@@ -36,7 +38,9 @@ export async function finalizeItinerary(
   supabase: SupabaseClient,
   sessionId: string,
   origin: LatLng,
-  budgetBand: string
+  budgetBand: string,
+  durationBand?: string,
+  tripIntent?: TripIntent | null
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -94,10 +98,16 @@ finalStops.push({
     cursor = placeLatLng;
   }
 
-  const warnings: string[] = [];
+const warnings: string[] = [];
   const maxBudget = BUDGET_BAND_MAX_TOTAL[budgetBand];
   if (maxBudget != null && cumulativeCost > maxBudget) {
     warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
+  }
+
+  // בקרת איכות אחרונה - רק למסלולים ארוכים יותר, שבהם הסיכון לחוסר איזון גבוה יותר
+  if ((durationBand === "half_day" || durationBand === "full_day") && finalStops.length > 0) {
+    const issues = await reviewItinerary({ stops: finalStops, tripIntent });
+    warnings.push(...issues);
   }
 
 const itinerary: FinalItinerary = {
