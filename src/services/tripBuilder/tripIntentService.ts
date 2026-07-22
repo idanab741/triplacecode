@@ -9,6 +9,7 @@ export interface TripIntent {
   priorities: string[];
   avoid: string[];
   accessibilityNotes: string[];
+  requestedArea: string | null;
 }
 
 const TRIP_INTENT_PROMPT_RULES = `אתה מתכנן טיולים מקצועי ב-TRIPLACE. המשתמש אינו ממלא טופס - הוא
@@ -27,13 +28,18 @@ const TRIP_INTENT_PROMPT_RULES = `אתה מתכנן טיולים מקצועי ב
 - "בא לנו לראות נופים" -> תצפיות/טבע, להקטין משקל מסעדות.
 - "יום של אוכל" -> כל המסלול סביב חוויה קולינרית.
 
+אם המלל החופשי מזכיר שם מקום ספציפי (עיר, שכונה, אתר, רחוב) שבו המשתמש רוצה שהטיול יתקיים
+(למשל "יום ביפו", "רוצים לבלות בנווה צדק", "טיול בזכרון יעקב") - חלץ את השם המדויק לשדה
+requestedArea. אם לא הוזכר מקום ספציפי, החזר null.
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 {
   "summary": "משפט או שניים בעברית שמתארים את הטיול הרצוי, כאילו מתארים אותו לחבר שיתכנן אותו",
   "pace": "relaxed" | "moderate" | "fast",
   "priorities": ["...", "..."],
   "avoid": ["...", "..."],
-  "accessibilityNotes": ["...", "..."]
+  "accessibilityNotes": ["...", "..."],
+  "requestedArea": "שם המקום או null"
 }`;
 
 interface GenerateTripIntentParams {
@@ -88,12 +94,13 @@ ${JSON.stringify(
     if (!jsonMatch) throw new Error("לא נמצא JSON בתשובת Claude");
     const parsed = JSON.parse(jsonMatch[0]) as Partial<TripIntent>;
 
-    return {
+return {
       summary: parsed.summary ?? "",
       pace: parsed.pace === "relaxed" || parsed.pace === "fast" ? parsed.pace : "moderate",
       priorities: Array.isArray(parsed.priorities) ? parsed.priorities : [],
       avoid: Array.isArray(parsed.avoid) ? parsed.avoid : [],
       accessibilityNotes: Array.isArray(parsed.accessibilityNotes) ? parsed.accessibilityNotes : [],
+      requestedArea: typeof parsed.requestedArea === "string" && parsed.requestedArea.trim() ? parsed.requestedArea : null,
     };
   } catch (parseError) {
     logAiError("כשל בפענוח Trip Intent", {

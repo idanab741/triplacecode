@@ -10,6 +10,7 @@ import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel, MAX_STOP_DISTANCE_KM } from "@/services/tripBuilder/rules/dayTrip";
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import { findBestCluster } from "@/services/tripBuilder/clusterService";
+import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
 /**
@@ -53,23 +54,34 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
       .sort((a, b) => a.slot_index - b.slot_index);
     const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
 
+    // אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
+    // סביב האזור הזה, לא סביב הבית של המשתמש. משתמשים בבית רק לחישוב
+    // זמני נסיעה אמיתיים בהמשך (ב-finalizeItinerary), לא לחיפוש המקומות עצמם.
+    let searchOrigin = origin;
+    if (tripIntent?.requestedArea) {
+      const geocoded = await geocodePlaceName(tripIntent.requestedArea);
+      if (geocoded) {
+        searchOrigin = geocoded;
+      }
+    }
+
 // Area Detection: לפני שבוחרים תחנה אחת, אוספים מועמדים מכל הקטגוריות
     // בתוכנית ומזהים את האזור הגיאוגרפי הצפוף ביותר במקומות איכותיים.
     // כל המסלול נבנה סביב האזור הזה, במקום לזחול תחנה-אחר-תחנה בלי לראות
     // את התמונה הכוללת - מונע קפיצות גיאוגרפיות ומסלולים לא רציפים.
-    const clusteringPools = await Promise.all(
+const clusteringPools = await Promise.all(
       pendingStops.map(async (stop) => ({
         category: stop.category,
         candidates: await fetchCandidatePool(supabase, {
           category: stop.category,
-          origin,
+          origin: searchOrigin,
           distanceBand: answers.distanceBand,
           maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
           excludePlaceIds,
         }),
       }))
     );
-    const clusterCenter = findBestCluster(clusteringPools, origin);
+    const clusterCenter = findBestCluster(clusteringPools, searchOrigin);
 
     // רץ ברצף (לא במקביל): כל תחנה יוצאת מהתחנה הקודמת שבאמת נבחרה,
     // ומתחיל מהאזור שזוהה (לא מהבית) - כדי שהמסלול יהיה קרוב פיזית ולא מפוזר.
