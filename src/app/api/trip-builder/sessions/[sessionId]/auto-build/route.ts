@@ -97,13 +97,15 @@ const clusteringPools = await Promise.all(
       const stop = pendingStops[i];
       const isFirstStop = i === 0;
 
-const pool = await fetchCandidatePool(supabase, {
+// כשיש אזור מבוקש מפורש - כל התחנות (לא רק הראשונה) נשארות ברדיוס קטן
+      // וקבוע ממרכז האזור עצמו, לא מהתחנה הקודמת. אחרת כל תחנה "מרשה לעצמה"
+      // לנוע עוד קצת רחוק יותר, ולאורך כמה תחנות זה מצטבר לדליפה גדולה
+      // הרחק מהאזור שהמשתמש ביקש בפועל.
+      const pool = await fetchCandidatePool(supabase, {
         category: stop.category,
-        origin: cursor,
+        origin: requestedAreaRadiusKm ? searchOrigin : cursor,
         distanceBand: answers.distanceBand,
-        maxDistanceKm: isFirstStop
-          ? requestedAreaRadiusKm
-          : MAX_STOP_DISTANCE_KM[answers.durationBand],
+        maxDistanceKm: requestedAreaRadiusKm ?? (isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand]),
         maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
       });
