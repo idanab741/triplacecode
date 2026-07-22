@@ -11,7 +11,7 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
-import { MainBottomNav } from "@/components/navigation/MainBottomNav";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
 
 type TripChoice = "triplace" | "tripmatch";
