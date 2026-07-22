@@ -11,6 +11,7 @@ import { dayTripBudgetToMaxPriceLevel, MAX_STOP_DISTANCE_KM } from "@/services/t
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
+import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
 /**
@@ -106,6 +107,25 @@ const pool = await fetchCandidatePool(supabase, {
         maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
       });
+
+      // אין מועמד מתאים ב-DB, אבל המשתמש ביקש אזור ספציפי - ה-AI יוצר בעצמו
+      // חוויית הסתובבות באזור, במקום פשוט לדלג על התחנה. ה-DB הוא רק גיבוי,
+      // לא תנאי מקדים - ככה המנוע "מוביל" את התוצאה, לא מוגבל לרשימה קיימת.
+      if (pool.length === 0 && tripIntent?.requestedArea) {
+        const generatedStop = await getOrCreateAreaExperience(supabase, {
+          areaName: tripIntent.requestedArea,
+          category: stop.category,
+          coords: cursor,
+          origin: cursor,
+        });
+
+        if (generatedStop) {
+          await likeStop(supabase, user.id, stop.id, generatedStop);
+          excludePlaceIds.push(generatedStop.id);
+          cursor = { lat: generatedStop.latitude, lng: generatedStop.longitude };
+          continue;
+        }
+      }
 
       if (pool.length === 0) continue;
 
