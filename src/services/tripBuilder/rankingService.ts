@@ -75,22 +75,33 @@ async function tryClaudeRanking(
     params.learnedAttributes
   );
 
-  const candidatesPayload = params.candidates.map((candidate) => ({
+const candidatesPayload = params.candidates.map((candidate) => ({
     id: candidate.id,
     name: candidate.name,
     category: getCategoryLabel(candidate.category),
+    subcategory_tags: candidate.tripTypeTags,
+    cuisine_tags: candidate.cuisineTags,
     description: candidate.shortDescription,
     distance_km: Math.round(candidate.distanceKm * 10) / 10,
     price_level: candidate.priceLevel,
     rating: candidate.rating,
+    kosher: candidate.kosher,
+    accessible: candidate.accessible,
+    suitable_child_ages: candidate.suitableChildAges,
+    budget_tier: candidate.budgetTier,
   }));
 
 const prompt = `${params.rankingPromptRules}
 
-*** חשוב: אם לתחנה מסוימת חסר תיאור (description=null) או שיש לך רק מעט מידע עליה - אסור לך
-לטעון "התאמה מדויקת" או "תואם בדיוק". במקרה כזה נסח את ה-reason בזהירות ("יתכן ש...", "בהיעדר
-מידע נוסף...", "לפי הקטגוריה בלבד..."), ואל תמציא פרטים שאין לך דרך לדעת (כמו "אווירה טבעית"
-או "נגישות לעגלה") רק כי הקטגוריה או השם נשמעים מתאימים. ***
+*** חשוב: כל מועמד כולל subcategory_tags (תגי תת-קטגוריה מדויקים, כמו "בית קפה עם נוף",
+"נגישות לעגלה" וכו') ו-accessible/suitable_child_ages/budget_tier - אלה נתונים אמיתיים
+שתויגו מראש, לא ניחוש. תמיד תבדוק אותם לפני שאתה קובע התאמה. אם ה-subcategory_tags של
+מקום כן תואמים את מה שהמשתמש ביקש (למשל "נגישות לעגלה" כשהמשתמש ביקש עגלה, או תג שמרמז
+על טבע/נוף) - ציין את זה במפורש ב-reason, זה הבסיס האמין ביותר להתאמה.
+
+אם לתחנה מסוימת חסר תיאור (description=null) וגם אין לה subcategory_tags רלוונטיים -
+אסור לך לטעון "התאמה מדויקת" או "תואם בדיוק". במקרה כזה נסח את ה-reason בזהירות ("יתכן ש...",
+"בהיעדר מידע נוסף...", "לפי הקטגוריה בלבד..."), ואל תמציא פרטים שאין לך דרך לדעת. ***
 
 *** מסמך כוונת הטיול (Trip Intent) - כבר סיכם עבורך את הבנת המשתמש, השתמש בו כבסיס עיקרי: ***
 ${JSON.stringify(params.tripIntent ?? { note: "לא זמין - נתח את המלל החופשי ישירות" })}
