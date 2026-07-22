@@ -103,11 +103,18 @@ const warnings: string[] = [];
   if (maxBudget != null && cumulativeCost > maxBudget) {
     warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
   }
-
-  // בקרת איכות אחרונה - רק למסלולים ארוכים יותר, שבהם הסיכון לחוסר איזון גבוה יותר
+  
+// בקרת איכות אחרונה - רק למסלולים ארוכים יותר, שבהם הסיכון לחוסר איזון גבוה יותר.
+  // זהו כלי ניטור פנימי בלבד - הבעיות נרשמות ביומן (Vercel logs) לצורך מעקב איכות,
+  // ולא מוצגות למשתמש כאזהרה. משתמש שרואה "רשימת תלונות" על הטיול שלו זו חוויה גרועה.
   if ((durationBand === "half_day" || durationBand === "full_day") && finalStops.length > 0) {
     const issues = await reviewItinerary({ stops: finalStops, tripIntent });
-    warnings.push(...issues);
+    if (issues.length > 0) {
+      console.warn("[Quality Check] נמצאו בעיות איכות במסלול", {
+        sessionId,
+        issues,
+      });
+    }
   }
 
 const itinerary: FinalItinerary = {

@@ -54,14 +54,18 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
       .sort((a, b) => a.slot_index - b.slot_index);
     const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
 
-    // אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
+// אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
     // סביב האזור הזה, לא סביב הבית של המשתמש. משתמשים בבית רק לחישוב
     // זמני נסיעה אמיתיים בהמשך (ב-finalizeItinerary), לא לחיפוש המקומות עצמם.
+    // כשיש אזור מבוקש מפורש - משתמשים ברדיוס קטן וקבוע סביבו (לא ב-distanceBand,
+    // שהוא "מרחק מקסימלי מהבית" ולא רלוונטי כשהמשתמש כבר ציין איפה הוא רוצה להיות).
     let searchOrigin = origin;
+    let requestedAreaRadiusKm: number | undefined;
     if (tripIntent?.requestedArea) {
       const geocoded = await geocodePlaceName(tripIntent.requestedArea);
       if (geocoded) {
         searchOrigin = geocoded;
+        requestedAreaRadiusKm = 3;
       }
     }
 
@@ -76,6 +80,7 @@ const clusteringPools = await Promise.all(
           category: stop.category,
           origin: searchOrigin,
           distanceBand: answers.distanceBand,
+          maxDistanceKm: requestedAreaRadiusKm,
           maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
           excludePlaceIds,
         }),
@@ -91,11 +96,13 @@ const clusteringPools = await Promise.all(
       const stop = pendingStops[i];
       const isFirstStop = i === 0;
 
-      const pool = await fetchCandidatePool(supabase, {
+const pool = await fetchCandidatePool(supabase, {
         category: stop.category,
         origin: cursor,
         distanceBand: answers.distanceBand,
-        maxDistanceKm: isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand],
+        maxDistanceKm: isFirstStop
+          ? requestedAreaRadiusKm
+          : MAX_STOP_DISTANCE_KM[answers.durationBand],
         maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
       });
