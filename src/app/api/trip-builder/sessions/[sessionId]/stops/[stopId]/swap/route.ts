@@ -83,13 +83,14 @@ export async function POST(
 
     await likeStop(supabase, user.id, stopId, top);
 
-    const updatedItinerary = await finalizeItinerary(
+const updatedItinerary = await finalizeItinerary(
       supabase,
       sessionId,
       { lat: session.origin_latitude!, lng: session.origin_longitude! },
       answers.budgetBand,
       answers.durationBand,
-      tripIntent
+      tripIntent,
+      answers.freeText
     );
 
     return NextResponse.json({ itinerary: updatedItinerary });

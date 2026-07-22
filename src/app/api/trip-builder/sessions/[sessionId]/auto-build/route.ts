@@ -167,7 +167,8 @@ const itinerary = await finalizeItinerary(
       { lat: session.origin_latitude, lng: session.origin_longitude },
       answers.budgetBand,
       answers.durationBand,
-      tripIntent
+      tripIntent,
+      answers.freeText
     );
 
     return NextResponse.json({ itinerary });

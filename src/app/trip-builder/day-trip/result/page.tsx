@@ -5,9 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
+import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Button, Screen } from "@/components/ui";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
+import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
+import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
@@ -25,36 +29,25 @@ function DayTripResultContent() {
   const [swappingStopId, setSwappingStopId] = useState<string | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
 
-  const [trippyOpen, setTrippyOpen] = useState(false);
-  const [trippyText, setTrippyText] = useState("");
-  const [trippyLoading, setTrippyLoading] = useState(false);
-  const [trippyMessage, setTrippyMessage] = useState<string | null>(null);
-  const [trippyError, setTrippyError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  async function handleTrippySubmit() {
-    if (!sessionId || !trippyText.trim() || trippyLoading) return;
-    setTrippyLoading(true);
-    setTrippyError(null);
-    setTrippyMessage(null);
+  async function handleSaveTrip() {
+    if (!sessionId || saving) return;
+    setSaving(true);
     try {
-      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/chat-edit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction: trippyText }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "לא הצלחנו לבצע את השינוי");
-      setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
-      setTrippyMessage(data.message ?? "בוצע בהצלחה!");
-      setTrippyText("");
-    } catch (error) {
-      setTrippyError(error instanceof Error ? error.message : "לא הצלחנו לבצע את השינוי");
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/save`, { method: "POST" });
+      if (!response.ok) throw new Error();
+      setSaved(true);
+    } catch {
+      // שקט - לא חוסם את המשתמש אם השמירה נכשלת
     } finally {
-      setTrippyLoading(false);
+      setSaving(false);
     }
   }
 
-  async function handleSwapStop(stopId: string) {
+  
+async function handleSwapStop(stopId: string) {
     if (!sessionId || swappingStopId) return;
     setSwappingStopId(stopId);
     setSwapError(null);
@@ -69,6 +62,37 @@ function DayTripResultContent() {
       setSwapError(error instanceof Error ? error.message : "ההחלפה נכשלה, נסו שוב");
     } finally {
       setSwappingStopId(null);
+    }
+  }
+
+const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const itinerary = session?.final_itinerary;
+    if (!session || !itinerary || !event.over || event.active.id === event.over.id) return;
+
+    const oldIndex = itinerary.stops.findIndex((s) => s.stopId === event.active.id);
+    const newIndex = itinerary.stops.findIndex((s) => s.stopId === event.over!.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(itinerary.stops, oldIndex, newIndex);
+    const recalculated = recalculateStopTimes(reordered, {
+      lat: session.origin_latitude!,
+      lng: session.origin_longitude!,
+    });
+
+    const updatedItinerary = { ...itinerary, stops: recalculated };
+    setSession((s) => (s ? { ...s, final_itinerary: updatedItinerary } : s));
+
+    if (sessionId) {
+      fetch(`/api/trip-builder/sessions/${sessionId}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary: updatedItinerary }),
+      }).catch(() => {});
     }
   }
 
@@ -131,7 +155,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
   return (
     <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
       {/* Hero עליון עם הלוגו בפינה */}
-      <div className="relative w-full">
+<div className="relative w-full">
         <Image
           src="/images/hero-day-trip-result.png"
           alt="הטיול שלכם מוכן"
@@ -140,102 +164,54 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           priority
           className="h-56 w-full object-cover"
         />
-        <div className="absolute right-4 top-4">
-          <Image src="/images/tripy.png" alt="TRIPLACE" width={40} height={40} className="rounded-full" />
+<div className="absolute left-2 top-4 flex items-center gap-2">
+            <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
+<Link
+            href="/home"
+            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
+            aria-label="חזרה לדף הבית"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </Link>
         </div>
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-5 pb-4 pt-10">
-          <h1 className="text-xl font-bold text-white">הטיול שלכם מוכן!</h1>
-          <p className="mt-1 text-sm text-white/90">
-            {itinerary.stops.length} תחנות · כ-{Math.round(itinerary.totalEtaMinutes / 60)} שעות נסיעה
-          </p>
-        </div>
-      </div>
+</div>
 
-<div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-5">
-        <div className="flex items-center justify-between rounded-card bg-white px-4 py-3 shadow-soft">
-          <span className="text-sm text-ink-secondary">שעת יציאה</span>
-          {editingTime ? (
-            <input
-              type="time"
-              defaultValue={minutesToTimeLabel(startMinutes)}
-              onChange={(e) => {
-                const [h, m] = e.target.value.split(":").map(Number);
-                setManualStartMinutes(h * 60 + m);
-              }}
-              onBlur={() => setEditingTime(false)}
-              autoFocus
-              className="rounded border border-ink-secondary/25 px-2 py-1 text-sm"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditingTime(true)}
-              className="text-sm font-semibold text-accent"
-            >
-              {minutesToTimeLabel(startMinutes)} ✏️
-            </button>
-          )}
-        </div>
-
-        {itinerary.warnings.length > 0 && (
-          <div className="rounded-card bg-bg-secondary p-3 text-sm text-ink-secondary">
-            {itinerary.warnings.map((warning) => (
-              <p key={warning}>⚠️ {warning}</p>
-            ))}
+<div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-0">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-ink">הטיול שלכם מוכן!</h1>
+            <p className="mt-1 text-sm text-ink-secondary">
+              {itinerary.stops.length} תחנות{session?.trip_intent?.requestedArea ? ` · ${session.trip_intent.requestedArea}` : ""}
+            </p>
           </div>
-        )}
-<div className="rounded-card bg-white p-3 shadow-soft">
-          {!trippyOpen ? (
-            <button
-              type="button"
-              onClick={() => setTrippyOpen(true)}
-              className="flex w-full items-center gap-2 text-sm text-ink-secondary"
-            >
-              <Image src="/images/tripy.png" alt="" width={28} height={28} className="rounded-full" />
-              <span>רוצים לשנות משהו במסלול? ספרו לי...</span>
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Image src="/images/tripy.png" alt="" width={28} height={28} className="rounded-full" />
-                <span className="text-sm font-semibold text-ink">מה תרצו לשנות?</span>
-              </div>
-              <textarea
-                value={trippyText}
-                onChange={(e) => setTrippyText(e.target.value)}
-                placeholder='לדוגמה: "תחליפו לי את המסעדה למשהו זול יותר"'
-                rows={2}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+          <div className="shrink-0">
+            {editingTime ? (
+              <input
+                type="time"
+                defaultValue={minutesToTimeLabel(startMinutes)}
+                onChange={(e) => {
+                  const [h, m] = e.target.value.split(":").map(Number);
+                  setManualStartMinutes(h * 60 + m);
+                }}
+                onBlur={() => setEditingTime(false)}
+                autoFocus
+                className="w-20 rounded-pill border border-accent/30 px-2 py-1.5 text-sm font-semibold"
               />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTrippyOpen(false);
-                    setTrippyText("");
-                    setTrippyError(null);
-                  }}
-                  className="flex-1 rounded-pill border border-ink-secondary/25 py-2 text-sm font-medium text-ink-secondary"
-                >
-                  ביטול
-                </button>
-                <button
-                  type="button"
-                  onClick={handleTrippySubmit}
-                  disabled={trippyLoading || !trippyText.trim()}
-                  className="flex-1 rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-                >
-                  {trippyLoading ? "מעדכן..." : "שלחו"}
-                </button>
-              </div>
-              {trippyMessage && <p className="text-sm text-green-700">✓ {trippyMessage}</p>}
-              {trippyError && <p className="text-sm text-danger">{trippyError}</p>}
-            </div>
-          )}
+            ) : (
+<button
+                type="button"
+                onClick={() => setEditingTime(true)}
+                className="rounded-pill border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm font-semibold text-accent"
+              >
+                {minutesToTimeLabel(startMinutes)}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
+{/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
         <ResultMap
           stops={itinerary.stops.map((s) => ({
             stopId: s.stopId,
@@ -245,49 +221,29 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           }))}
         />
 
-<div className="flex flex-col gap-3">
-          {itinerary.stops.map((stop, index) => (
- <div key={stop.stopId} className="flex gap-3 overflow-hidden rounded-card bg-white p-3 shadow-soft">
-              {stop.imageUrls[0] && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={stop.imageUrls[0]}
-                  alt={stop.name}
-                  className="h-20 w-20 shrink-0 rounded-2xl object-cover"
-                />
-              )}
-              <div className="flex min-w-0 flex-1 flex-col justify-center">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-ink-secondary">
-                    תחנה {index + 1} · {getCategoryLabel(stop.category)}
-                  </p>
-                  <p className="shrink-0 text-sm font-bold text-accent">
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={itinerary.stops.map((s) => s.stopId)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-3">
+{itinerary.stops.map((stop) => (
+                <div key={stop.stopId} className="flex flex-col gap-1">
+                  <p className="pr-1 text-sm font-bold text-accent">
                     🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
                   </p>
+                  <SortableStopCard
+                    stop={stop}
+                    sessionId={sessionId}
+                    onItineraryUpdate={(updated) =>
+                      setSession((s) => (s ? { ...s, final_itinerary: updated } : s))
+                    }
+                  />
                 </div>
-                <p className="truncate font-semibold text-ink">{stop.name}</p>
-                {stop.shortDescription && (
-                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">
-                    {stop.shortDescription}
-                  </p>
-                )}
-<div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-secondary">
-                  <span>🚗 {stop.etaMinutes} דק&apos; נסיעה</span>
-                  {stop.estimatedVisitMinutes && <span>⏱️ {stop.estimatedVisitMinutes} דק&apos; ביקור</span>}
-                  {stop.rating != null && <span>⭐ {stop.rating}</span>}
-                  <button
-                    type="button"
-                    onClick={() => handleSwapStop(stop.stopId)}
-                    disabled={swappingStopId === stop.stopId}
-                    className="mr-auto text-xs font-medium text-accent disabled:opacity-50"
-                  >
-                    {swappingStopId === stop.stopId ? "מחפש חלופה..." : "🔄 החלף"}
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
 
         {swapError && <p className="text-center text-sm text-danger">{swapError}</p>}
 
@@ -318,11 +274,16 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
         )}
 
-        <Link href="/home">
-          <Button variant="primary" fullWidth>
-            סיום
-          </Button>
-        </Link>
+<button
+          type="button"
+          onClick={handleSaveTrip}
+          disabled={saving}
+          className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
+          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+        >
+          {saving ? "שומר..." : saved ? "✓ המסלול נשמר" : "שמור מסלול"}
+        </button>
+      
       </div>
     </Screen>
   );

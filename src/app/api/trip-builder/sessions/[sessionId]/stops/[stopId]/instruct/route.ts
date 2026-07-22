@@ -13,15 +13,15 @@ import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
 /**
- * "טריפי" - עריכת המסלול בשיחה חופשית. המשתמש כותב בקשה ("תחליף את המסעדה
- * למשהו זול יותר", "תוריד את התצפית") - Claude מפרש את הבקשה ומבצע אותה:
- * מזהה איזו תחנה רלוונטית, ומחליט אם להחליף אותה במקום אחר או להסיר אותה.
+ * "טריפי" לפי תחנה ספציפית - בשונה מ-chat-edit הכללי, כאן כבר יודעים בוודאות
+ * לאיזו תחנה הבקשה מתייחסת (הגיע מכפתור TRIPPY על הכרטיס עצמו) - אז Claude
+ * צריך רק לקבוע *מה* לעשות (החלף/הסר), לא *לאיזו תחנה*.
  */
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ sessionId: string }> }
+  { params }: { params: Promise<{ sessionId: string; stopId: string }> }
 ) {
-  const { sessionId } = await params;
+  const { sessionId, stopId } = await params;
   const supabase = await createClient();
   const {
     data: { user },
@@ -42,26 +42,18 @@ export async function POST(
   const itinerary = session.final_itinerary;
   if (!itinerary) return NextResponse.json({ error: "אין עדיין מסלול סופי" }, { status: 400 });
 
+  const targetStop = itinerary.stops.find((s) => s.stopId === stopId);
+  if (!targetStop) return NextResponse.json({ error: "התחנה לא נמצאה" }, { status: 404 });
+
   const answers = session.answers as unknown as DayTripAnswers;
 
   try {
-    const interpretation = await interpretInstruction(instruction, itinerary.stops);
+    const action = await interpretAction(instruction);
 
-    if (!interpretation || interpretation.action === "unclear") {
-      return NextResponse.json(
-        { error: "לא הצלחנו להבין את הבקשה. אפשר לנסח אחרת?" },
-        { status: 400 }
-      );
-    }
-
-    const targetStop = itinerary.stops.find((s) => s.stopId === interpretation.stopId);
-    if (!targetStop) {
-      return NextResponse.json({ error: "לא זיהינו לאיזו תחנה הכוונה" }, { status: 400 });
-    }
-
-    if (interpretation.action === "remove") {
+    if (action === "remove") {
       await supabase.from("trip_builder_stops").delete().eq("id", targetStop.stopId);
-    } else if (interpretation.action === "swap") {
+    } else {
+      // ברירת מחדל: "swap" - אם לא בטוחים, עדיף להחליף (פחות הרסני מהסרה מוחלטת)
       const dna = await getTravelDna(supabase, user.id);
       const attributeScoreMap = await getAttributeScoreMap(supabase, user.id);
       const learnedAttributes = summarizeTopAttributes(attributeScoreMap);
@@ -82,7 +74,7 @@ export async function POST(
         return NextResponse.json({ error: "לא נמצא מקום חלופי מתאים" }, { status: 404 });
       }
 
-      const combinedFreeText = `${answers.freeText}. בקשה נוספת: ${instruction}`;
+      const combinedFreeText = `${answers.freeText}. בקשה ספציפית לתחנה הזו: ${instruction}`;
 
       const ranked = await rankCandidates({
         dna,
@@ -103,57 +95,33 @@ export async function POST(
       await likeStop(supabase, user.id, targetStop.stopId, top);
     }
 
-    const updatedItinerary = await finalizeItinerary(
+const updatedItinerary = await finalizeItinerary(
       supabase,
       sessionId,
       { lat: session.origin_latitude!, lng: session.origin_longitude! },
       answers.budgetBand,
       answers.durationBand,
-      session.trip_intent
+      session.trip_intent,
+      answers.freeText
     );
 
-    return NextResponse.json({ itinerary: updatedItinerary, message: interpretation.confirmationMessage });
+    return NextResponse.json({ itinerary: updatedItinerary });
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-interface Interpretation {
-  action: "swap" | "remove" | "unclear";
-  stopId: string;
-  confirmationMessage: string;
-}
-
-async function interpretInstruction(
-  instruction: string,
-  stops: { stopId: string; name: string; category: string }[]
-): Promise<Interpretation | null> {
-  const prompt = `המשתמש מבקש לשנות משהו במסלול הטיול שלו. פרש את הבקשה שלו וקבע:
-1. לאיזו תחנה הבקשה מתייחסת (לפי ה-stopId מהרשימה למטה).
-2. מה הפעולה המבוקשת: "swap" (להחליף את התחנה במקום אחר, למשל "יותר זול", "משהו אחר") או
-   "remove" (להסיר את התחנה לגמרי מהמסלול, בלי תחליף).
-אם אי אפשר לזהות בבירור לאיזו תחנה הכוונה, החזר action: "unclear".
+async function interpretAction(instruction: string): Promise<"swap" | "remove"> {
+  const prompt = `המשתמש מבקש לשנות תחנה ספציפית במסלול הטיול שלו. קבע:
+"remove" - אם המשתמש מבקש להסיר/למחוק את התחנה לגמרי, בלי תחליף.
+"swap" - בכל מקרה אחר (בקשה להחליף למשהו אחר, זול יותר, שונה וכו').
 
 בקשת המשתמש: "${instruction}"
 
-התחנות במסלול:
-${JSON.stringify(stops.map((s) => ({ stopId: s.stopId, name: s.name, category: s.category })))}
+השב אך ורק במילה אחת: swap או remove`;
 
-השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
-{"action": "swap" | "remove" | "unclear", "stopId": "...", "confirmationMessage": "משפט קצר בעברית שמאשר מה נעשה"}`;
-
-  const { text, error } = await callClaude(prompt, 400);
-  if (error || !text) return null;
-
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as Interpretation;
-  } catch (parseError) {
-    logAiError("כשל בפענוח פרשנות בקשת שינוי", {
-      message: parseError instanceof Error ? parseError.message : String(parseError),
-    });
-    return null;
-  }
+  const { text } = await callClaude(prompt, 20);
+  if (text?.trim().toLowerCase().includes("remove")) return "remove";
+  return "swap";
 }

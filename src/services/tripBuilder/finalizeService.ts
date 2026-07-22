@@ -3,6 +3,7 @@ import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
+import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
 import type { FinalItinerary, FinalItineraryEvent, FinalItineraryStop, LatLng, TripBuilderStop } from "./types";
 
@@ -40,7 +41,8 @@ export async function finalizeItinerary(
   origin: LatLng,
   budgetBand: string,
   durationBand?: string,
-  tripIntent?: TripIntent | null
+  tripIntent?: TripIntent | null,
+  freeText?: string
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -114,6 +116,16 @@ const warnings: string[] = [];
         sessionId,
         issues,
       });
+    }
+  }
+
+  // תיאורים אישיים - Claude מייצר תיאור לכל תחנה על סמך ידע כללי + הבקשה של
+  // המשתמש, לא רק על סמך short_description שיכול להיות ריק/גנרי ב-DB.
+  if (finalStops.length > 0) {
+    const descriptions = await generatePersonalizedDescriptions(finalStops, freeText ?? "", tripIntent);
+    for (const stop of finalStops) {
+      const generated = descriptions.get(stop.stopId);
+      if (generated) stop.shortDescription = generated;
     }
   }
 
