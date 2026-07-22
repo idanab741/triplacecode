@@ -712,7 +712,7 @@ return m.role === "assistant" ? (
       ) : (
         !awaitingTripChoice &&
 footerAction && (
-          <div className="fixed inset-x-0 bottom-32 z-30 flex justify-center px-4">
+          <div className="fixed inset-x-0 bottom-40 z-30 flex justify-center px-4">
             <Button variant="primary" onClick={footerAction.onClick} disabled={footerAction.disabled} className="min-w-64">
               {footerAction.label}
             </Button>
