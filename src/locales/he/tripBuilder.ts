@@ -23,18 +23,18 @@ export const TIMING_OPTIONS: StepOption[] = [
 ];
 
 export const DISTANCE_STEPS: StepOption[] = [
-  { value: "10min", label: "10 דקות" },
-  { value: "20min", label: "20 דקות" },
-  { value: "30min", label: "30 דקות" },
-  { value: "40min", label: "40 דקות" },
-  { value: "50min", label: "50 דקות" },
+  { value: "10min", label: "10\u00A0דקות" },
+  { value: "20min", label: "20\u00A0דקות" },
+  { value: "30min", label: "30\u00A0דקות" },
+  { value: "40min", label: "40\u00A0דקות" },
+  { value: "50min", label: "50\u00A0דקות" },
   { value: "1h", label: "שעה" },
-  { value: "1.5h", label: "שעה וחצי" },
+  { value: "1.5h", label: "שעה\u00A0וחצי" },
   { value: "2h", label: "שעתיים" },
-  { value: "2.5h", label: "שעתיים וחצי" },
-  { value: "3h", label: "3 שעות" },
-  { value: "4h", label: "4 שעות" },
-  { value: "5h", label: "5 שעות" },
+  { value: "2.5h", label: "שעתיים\u00A0וחצי" },
+  { value: "3h", label: "3\u00A0שעות" },
+  { value: "4h", label: "4\u00A0שעות" },
+  { value: "5h", label: "5\u00A0שעות" },
 ];
 
 export const BUDGET_STEPS: StepOption[] = [
@@ -63,6 +63,6 @@ export const DAY_TRIP_INTEREST_OPTIONS: StepOption[] = [
 
 export const DURATION_OPTIONS: StepOption[] = [
   { value: "1-2h", label: "שעה-שעתיים" },
-  { value: "half_day", label: "חצי יום" },
-  { value: "full_day", label: "יום שלם" },
+  { value: "half_day", label: "חצי\u00A0יום" },
+  { value: "full_day", label: "יום\u00A0שלם" },
 ];

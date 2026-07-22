@@ -375,12 +375,18 @@ const key = editingFieldKey;
 
     let newLabel = "";
 
-    if (key === "companions" && editStep.type === "companions") {
+if (key === "companions" && editStep.type === "companions") {
       if (!editTempCompanion) return;
       updateField("companions", editTempCompanion as DayTripAnswers["companions"]);
       updateField("hasPet", editTempHasPet);
       const label = labelFor(editStep.options, editTempCompanion);
       newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
+
+      // אם עברו מ"משפחה עם ילדים" לאופציה אחרת - שאלת/תשובת הגילאים כבר לא רלוונטית, מוחקים אותה
+      if (editTempCompanion !== editStep.childAgeTriggerValue) {
+        updateField("childAgeBands", [] as DayTripAnswers["childAgeBands"]);
+        setMessages((msgs) => msgs.filter((m) => m.fieldKey !== "childAgeBands"));
+      }
 } else if (key === "timing" && editStep.type === "date") {
       if (!editTempValue) return;
       if (editTempValue === editStep.otherDateTriggerValue) {
@@ -594,7 +600,7 @@ const footerAction = getFooterAction();
                     return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
                   })()}
 
-                {editingFieldKey === "freeText" && (
+        {editingFieldKey === "freeText" && (
                   <textarea
                     value={editTempText}
                     onChange={(e) => setEditTempText(e.target.value)}
@@ -602,6 +608,24 @@ const footerAction = getFooterAction();
                     className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                 )}
+
+                <div className="mt-3 flex justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={closeEdit}
+                    className="flex-1 rounded-pill border border-ink-secondary/25 bg-white py-2 text-sm font-medium text-ink-secondary shadow-md"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmEdit}
+                    className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+                    style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                  >
+                    עדכן
+                  </button>
+                </div>
               </div>
             );
           }
@@ -699,38 +723,17 @@ return m.role === "assistant" ? (
 
 {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
-        {((editingFieldKey && !awaitingTripChoice) || (!awaitingTripChoice && footerAction)) && (
-          <div className="flex justify-center gap-2 pt-2">
-            {editingFieldKey && !awaitingTripChoice && (
-              <>
-                <button
-                  type="button"
-                  onClick={closeEdit}
-                  className="flex-1 rounded-pill border border-ink-secondary/25 bg-white py-2 text-sm font-medium text-ink-secondary shadow-md"
-                >
-                  ביטול
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmEdit}
-                  className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md"
-                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-                >
-                  עדכן
-                </button>
-              </>
-            )}
-            {!editingFieldKey && !awaitingTripChoice && footerAction && (
-              <button
-                type="button"
-                onClick={footerAction.onClick}
-                disabled={footerAction.disabled}
-                className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-              >
-                {footerAction.label}
-              </button>
-            )}
+ {!editingFieldKey && !awaitingTripChoice && footerAction && (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={footerAction.onClick}
+              disabled={footerAction.disabled}
+              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              {footerAction.label}
+            </button>
           </div>
         )}
 
