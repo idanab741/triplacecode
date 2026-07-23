@@ -172,9 +172,9 @@ return (
           </div>
         )}
 
-        {stage === "interests" && (
+{stage === "interests" && (
           <div className="flex flex-col gap-3">
-            <p className="text-lg font-bold text-ink">מה בא לכם לעשות ב{selectedCity}?</p>
+            <ChatBubble>מה בא לכם לעשות ב{selectedCity}?</ChatBubble>
             <ChipGroup options={TRIPMATCH_INTEREST_OPTIONS} selected={selectedInterests} onChange={setSelectedInterests} />
             <button
               type="button"
