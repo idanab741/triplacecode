@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
-import { recordTripMatchDecision, getTripMatchSession, fetchTripMatchCandidates } from "@/services/tripMatch/tripMatchService";
+import { recordTripMatchDecision, getTripMatchSession, fetchTripMatchCandidates } from "@/services/tripmatch/tripMatchService";
 import { recordSwipeSignal } from "@/services/travelDna/attributeLearningService";
 import { toggleFavorite, skipPlace } from "@/services/favorites/favoritesService";
 
