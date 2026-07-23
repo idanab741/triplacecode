@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createTripMatchSession, fetchTripMatchCandidates } from "@/services/tripMatch/tripMatchService";
-import { generateAndSaveDestinationAttractions } from "@/services/tripMatch/destinationAttractionsService";
+import { generateAndSaveDestinationAttractions } from "@/services/tripmatch/destinationAttractionsService";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
