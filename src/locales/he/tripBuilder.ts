@@ -66,3 +66,26 @@ export const DURATION_OPTIONS: StepOption[] = [
   { value: "half_day", label: "חצי יום" },
   { value: "full_day", label: "יום שלם" },
 ];
+
+/** קטגוריות ל-TripMatch (התאמת יעדים כלליים) - רשימה נפרדת לגמרי מ-DAY_TRIP_INTEREST_OPTIONS, לא משפיעה על הטיול היומי. */
+export const TRIPMATCH_INTEREST_OPTIONS: StepOption[] = [
+  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
+  { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },
+  { value: "beaches_pools", label: "חופי ים, אגמים ובריכות", emoji: "🏖️" },
+  { value: "viewpoints", label: "תצפיות, זריחות ושקיעות", emoji: "🌅" },
+  { value: "parks_gardens", label: "פארקים, גנים ופינות פיקניק", emoji: "🌳" },
+  { value: "water_amusement_parks", label: "פארקי מים, פארקי שעשועים ומתקנים", emoji: "🎡" },
+  { value: "attractions_activities", label: "אטרקציות ופעילויות", emoji: "🎯" },
+  { value: "sports_extreme", label: "ספורט ואקסטרים", emoji: "🚴" },
+  { value: "wineries_dining", label: "מסעדות, יקבים ומבשלות", emoji: "🍽️" },
+  { value: "culture_history", label: "תרבות, מוזיאונים והיסטוריה", emoji: "🏛️" },
+  { value: "shopping", label: "שופינג, קניות ושווקים", emoji: "🛍️" },
+  { value: "events_festivals", label: "אירועים, הופעות ופסטיבלים", emoji: "🎪" },
+  { value: "nightlife_entertainment", label: "חיי לילה ובילויים", emoji: "🎭" },
+  { value: "spa_relaxation", label: "ספא, מרחצאות ורוגע", emoji: "🧖" },
+  { value: "boating_water_attractions", label: "שיט ואטרקציות מים", emoji: "🛶" },
+  { value: "heritage_holy_sites", label: "אתרי מורשת ומקומות קדושים", emoji: "🛕" },
+  { value: "kids_family_activities", label: "פעילויות לילדים ומשפחות", emoji: "👨‍👩‍👧‍👦" },
+  { value: "art_galleries", label: "אמנות וגלריות", emoji: "🎨" },
+  { value: "photo_spots", label: "נקודות צילום ונופי אינסטגרם", emoji: "📸" },
+];
