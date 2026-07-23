@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
-import { createTripmatchSession, fetchTripmatchCandidates } from "@/services/tripmatch/tripmatchService";
+import { createTripMatchSession, fetchTripMatchCandidates } from "@/services/tripmatch/tripMatchService";
 import { generateAndSaveDestinationAttractions } from "@/services/tripmatch/destinationAttractionsService";
 
 export async function POST(request: Request) {
