@@ -71,9 +71,6 @@ console.log(`[Claude Timing] fetch לקח ${Date.now() - fetchStart}ms, סטטו
 
 /** רישום שגיאות AI ללוג השרת (Vercel לוכד console.error אוטומטית). */
 export function logAiError(message: string, context?: Record<string, unknown>) {
-  console.error("[AI Error]", {
-    timestamp: new Date().toISOString(),
-    message,
-    ...context,
-  });
+  const contextStr = context && Object.keys(context).length > 0 ? ` | ${JSON.stringify(context)}` : "";
+  console.error(`[AI Error] ${new Date().toISOString()} - ${message}${contextStr}`);
 }

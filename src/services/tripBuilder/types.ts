@@ -9,7 +9,7 @@ export type TripType =
 
 export type SessionStatus = "questionnaire" | "planning" | "building" | "completed" | "abandoned";
 
-export type StopRole = "attraction" | "food" | "coffee_dessert" | "viewpoint";
+export type StopRole = "attraction" | "food" | "coffee_dessert" | "viewpoint" | "bar" | "spa";
 
 export type StopStatus = "pending" | "liked" | "rejected" | "skipped";
 
@@ -209,3 +209,35 @@ export type TripBuilderStep =
   | SliderStep
   | MultiEmojiStep
   | TextStep;
+
+  export type DateWithType =
+  | "partner"
+  | "first_date"
+  | "multiple_dates"
+  | "anniversary"
+  | "proposal"
+  | "special_event";
+
+export interface RomanticDateAnswers {
+  dateWith: DateWithType;
+  timing: TimingChoice;
+  otherDate: string | null;
+  distanceBand: DistanceBand;
+  budgetBand: BudgetBand;
+  dateType: string[];
+  freeText: string;
+ }
+  
+export type NightlifeCompanionType = "couple" | "friends" | "group" | "solo";
+export type GroupSizeBand = "5-10" | "10-20" | "20+";
+
+export interface NightlifeAnswers {
+  companions: NightlifeCompanionType;
+  groupSize: GroupSizeBand | null;
+  timing: TimingChoice;
+  otherDate: string | null;
+  distanceBand: DistanceBand;
+  budgetBand: BudgetBand;
+  venueTypes: string[];
+  freeText: string;
+}

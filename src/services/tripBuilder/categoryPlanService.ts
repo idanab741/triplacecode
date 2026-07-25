@@ -5,13 +5,14 @@ import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 import type { CategoryPlanItem, DayTripAnswers, RestaurantAnswers, StopRole, TripType } from "./types";
 import { getTripTypeRules } from "./rules";
 import type { TripIntent } from "./tripIntentService";
+import { NIGHTLIFE_VENUE_TYPE_TO_CATEGORY } from "@/locales/he/nightlife";
 
 const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 
 interface DecideCategoryPlanParams {
   tripType: TripType;
   dna: TravelDna | null;
-  answers: DayTripAnswers | RestaurantAnswers;
+  answers: DayTripAnswers | RestaurantAnswers | import("./types").RomanticDateAnswers | import("./types").NightlifeAnswers;
   weatherSummary: string | null;
   tripIntent?: TripIntent | null;
 }
@@ -20,13 +21,52 @@ interface DecideCategoryPlanParams {
  * ממיר תשובות מכל סוג טיול לצורה אחידה (כמו DayTripAnswers) - כדי ש-tryClaudePlan
  * ו-buildFallbackPlan יוכלו להישאר בלי שינוי, לא משנה מאיזה שאלון הגיעו התשובות.
  */
-export function normalizeAnswers(tripType: TripType, answers: DayTripAnswers | RestaurantAnswers): DayTripAnswers {
-    if (tripType === "restaurants_cafes") {
+export function normalizeAnswers(
+  tripType: TripType,
+  answers: DayTripAnswers | RestaurantAnswers | import("./types").RomanticDateAnswers | import("./types").NightlifeAnswers
+): DayTripAnswers {
+  if (tripType === "restaurants_cafes") {
     const restaurantAnswers = answers as RestaurantAnswers;
     return {
       ...restaurantAnswers,
+      companions: "couple",
+      hasPet: false,
+      childAgeBands: [],
       interests: restaurantAnswers.cuisine,
       durationBand: "default" as DayTripAnswers["durationBand"],
+    };
+  }
+if (tripType === "romantic_date") {
+    const dateAnswers = answers as import("./types").RomanticDateAnswers;
+    return {
+      ...dateAnswers,
+      companions: "couple",
+      hasPet: false,
+      childAgeBands: [],
+      interests: dateAnswers.dateType,
+      durationBand: "default" as DayTripAnswers["durationBand"],
+    };
+  }
+if (tripType === "nightlife") {
+    const nightlifeAnswers = answers as import("./types").NightlifeAnswers;
+    const mappedCategories = Array.from(
+      new Set(
+        nightlifeAnswers.venueTypes.map(
+          (v: string) => NIGHTLIFE_VENUE_TYPE_TO_CATEGORY[v] ?? "attractions_activities"
+        )
+      )
+    ) as string[];
+    return {
+      companions: nightlifeAnswers.companions === "group" || nightlifeAnswers.companions === "friends" ? "friends" : nightlifeAnswers.companions === "solo" ? "solo" : "couple",
+      hasPet: false,
+      childAgeBands: [],
+      timing: nightlifeAnswers.timing,
+      otherDate: nightlifeAnswers.otherDate,
+      distanceBand: nightlifeAnswers.distanceBand,
+      budgetBand: nightlifeAnswers.budgetBand,
+      interests: mappedCategories,
+      durationBand: "default" as DayTripAnswers["durationBand"],
+      freeText: nightlifeAnswers.freeText,
     };
   }
   return answers as DayTripAnswers;
@@ -72,7 +112,7 @@ ${JSON.stringify({
 מזג אוויר: ${JSON.stringify(params.weatherSummary)}
 
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
-[{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint", "order": 0}, ...]
+[{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint|bar|spa", "order": 0}, ...]
 "category" חייב להיות אחד מתוך הרשימה המלאה: ${ALL_CATEGORY_IDS}.
 תחומי העניין שסומנו בתיבות הסימון: ${
     params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן כלום"
@@ -101,7 +141,7 @@ ${JSON.stringify({
 }
 
 function normalizeRole(role: string): StopRole {
-  if (role === "food" || role === "coffee_dessert" || role === "viewpoint") return role;
+  if (role === "food" || role === "coffee_dessert" || role === "viewpoint" || role === "bar" || role === "spa") return role;
   return "attraction";
 }
 
@@ -155,10 +195,12 @@ function buildFallbackPlan(
   const foodCategory = "wineries_dining";
 const coffeeCategory = "coffee_carts_cafes";
 
-  let attractionCursor = 0;
+let attractionCursor = 0;
   return rule.roles.map((role, order) => {
     if (role === "food") return { category: foodCategory, role, order };
     if (role === "coffee_dessert") return { category: coffeeCategory, role, order };
+    if (role === "bar") return { category: "wineries_dining", role, order };
+    if (role === "spa") return { category: "spa_relaxation", role, order };
     const category = interests[attractionCursor % interests.length];
     attractionCursor += 1;
     return { category, role, order };

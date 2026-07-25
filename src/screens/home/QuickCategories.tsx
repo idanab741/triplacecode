@@ -12,6 +12,8 @@ import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 function buildSearchHref(id: QuickCategoryId): string {
   if (id === "day_trip") return "/trip-builder/day-trip";
   if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes";
+  if (id === "romantic_date") return "/trip-builder/romantic-date";
+  if (id === "nightlife") return "/trip-builder/nightlife";
 
   const link = QUICK_CATEGORY_SEARCH_LINKS[id];
   if (link.categories) return `/search?category=${link.categories.join(",")}`;

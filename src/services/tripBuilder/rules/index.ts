@@ -11,6 +11,18 @@ import {
   RESTAURANTS_CAFES_PLAN_PROMPT_RULES,
   RESTAURANTS_CAFES_RANKING_PROMPT_RULES,
 } from "./restaurantsCafes";
+import {
+  ROMANTIC_DATE_QUESTIONS,
+  ROMANTIC_DATE_DURATION_RULES,
+  ROMANTIC_DATE_PLAN_PROMPT_RULES,
+  ROMANTIC_DATE_RANKING_PROMPT_RULES,
+} from "./romanticDate";
+import {
+  NIGHTLIFE_QUESTIONS,
+  NIGHTLIFE_DURATION_RULES,
+  NIGHTLIFE_PLAN_PROMPT_RULES,
+  NIGHTLIFE_RANKING_PROMPT_RULES,
+} from "./nightlife";
 
 export interface TripTypeRulesConfig {
   questions: TripBuilderStep[];
@@ -31,11 +43,23 @@ export const TRIP_TYPE_RULES: Partial<Record<TripType, TripTypeRulesConfig>> = {
     planPromptRules: DAY_TRIP_PLAN_PROMPT_RULES,
     rankingPromptRules: DAY_TRIP_RANKING_PROMPT_RULES,
   },
-  restaurants_cafes: {
+restaurants_cafes: {
     questions: RESTAURANTS_CAFES_QUESTIONS,
     durationRules: RESTAURANTS_CAFES_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
     planPromptRules: RESTAURANTS_CAFES_PLAN_PROMPT_RULES,
     rankingPromptRules: RESTAURANTS_CAFES_RANKING_PROMPT_RULES,
+  },
+romantic_date: {
+    questions: ROMANTIC_DATE_QUESTIONS,
+    durationRules: ROMANTIC_DATE_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
+    planPromptRules: ROMANTIC_DATE_PLAN_PROMPT_RULES,
+    rankingPromptRules: ROMANTIC_DATE_RANKING_PROMPT_RULES,
+  },
+  nightlife: {
+    questions: NIGHTLIFE_QUESTIONS,
+    durationRules: NIGHTLIFE_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
+    planPromptRules: NIGHTLIFE_PLAN_PROMPT_RULES,
+    rankingPromptRules: NIGHTLIFE_RANKING_PROMPT_RULES,
   },
 };
 
