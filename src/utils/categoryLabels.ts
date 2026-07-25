@@ -16,7 +16,24 @@ const EXTRA_CATEGORY_LABELS: Record<string, string> = {
   culture_history: "תרבות, מוזיאונים והיסטוריה",
   shopping: "שופינג, קניות ושווקים",
   events_festivals: "אירועים ופסטיבלים",
-  spa_relaxation: "ספא ורוגע",
+spa_relaxation: "ספא ורוגע",
+
+  // סוגי מטבח - למסעדות ובתי קפה
+  israeli: "ישראלי",
+  italian: "איטלקי",
+  asian: "אסייתי",
+  bbq: "בשרים ועל האש",
+  burger_diner: "המבורגר ודיינר אמריקאי",
+  mexican: "מקסיקני",
+  greek: "יווני",
+  french_bistro: "ביסטרו צרפתי",
+  indian: "הודי",
+  mediterranean: "ים־תיכוני",
+  seafood: "דגים ופירות ים",
+  pizza: "פיצה",
+  brunch: "ארוחת בוקר ובראנץ'",
+  cafe: "בית קפה",
+  sweets: "מאנצ'ים ומתוקים",
 };
 
 export function getCategoryLabel(categoryId: string): string {

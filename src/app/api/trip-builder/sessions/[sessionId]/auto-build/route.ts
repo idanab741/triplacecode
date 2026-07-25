@@ -13,6 +13,7 @@ import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 
 /**
  * "TripLace" - בונה מסלול מלא אוטומטית, בלי לשאול את המשתמש בכלל.
@@ -131,10 +132,18 @@ const clusteringPools = await Promise.all(
 
       if (pool.length === 0) continue;
 
-const ranked = await rankCandidates({
+// עבור מסעדות (ורק שם) - בחירת סוג המטבח לא מגיעה דרך "interests" הרגיל,
+      // אלא דרך שדה "cuisine" נפרד. מוסיפים אותה למלל שנשלח לדירוג, אחרת
+      // הבחירה הספציפית של המשתמש (למשל "המבורגר") אף פעם לא מגיעה ל-Claude.
+      const cuisineSelection = (answers as unknown as { cuisine?: string[] }).cuisine;
+      const combinedFreeText = cuisineSelection?.length
+        ? `${answers.freeText}. סוג מטבח מועדף: ${cuisineSelection.map(getCategoryLabel).join(", ")}`
+        : answers.freeText;
+
+      const ranked = await rankCandidates({
         dna,
         candidates: pool,
-        freeText: answers.freeText,
+        freeText: combinedFreeText,
         remainingBudgetLabel,
         rankingPromptRules: rules.rankingPromptRules,
         attributeScoreMap,
