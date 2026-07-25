@@ -12,6 +12,7 @@ import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
+import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggestionService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 
@@ -98,7 +99,26 @@ const clusteringPools = await Promise.all(
       const stop = pendingStops[i];
       const isFirstStop = i === 0;
 
-// כשיש אזור מבוקש מפורש - כל התחנות (לא רק הראשונה) נשארות ברדיוס קטן
+// עבור מסעדות ובתי קפה - Claude מוביל עם המלצה אמיתית מהידע הכללי שלו,
+      // לא רק בוחר מתוך המאגר הקיים. המאגר הוא רק גיבוי אם Claude לא בטוח.
+      if (session.trip_type === "restaurants_cafes") {
+        const restaurantAnswers = answers as unknown as { cuisine?: string[] };
+        const aiSuggestion = await suggestRealRestaurant({
+          city: tripIntent?.requestedArea ?? "האזור המבוקש",
+          cuisine: restaurantAnswers.cuisine ?? [],
+          freeText: answers.freeText,
+          budgetLabel: remainingBudgetLabel,
+        });
+
+        if (aiSuggestion) {
+          await likeStop(supabase, user.id, stop.id, aiSuggestion);
+          excludePlaceIds.push(aiSuggestion.id);
+          cursor = { lat: aiSuggestion.latitude, lng: aiSuggestion.longitude };
+          continue;
+        }
+      }
+
+      // כשיש אזור מבוקש מפורש - כל התחנות (לא רק הראשונה) נשארות ברדיוס קטן
       // וקבוע ממרכז האזור עצמו, לא מהתחנה הקודמת. אחרת כל תחנה "מרשה לעצמה"
       // לנוע עוד קצת רחוק יותר, ולאורך כמה תחנות זה מצטבר לדליפה גדולה
       // הרחק מהאזור שהמשתמש ביקש בפועל.
