@@ -5,6 +5,12 @@ import {
   DAY_TRIP_PLAN_PROMPT_RULES,
   DAY_TRIP_RANKING_PROMPT_RULES,
 } from "./dayTrip";
+import {
+  RESTAURANTS_CAFES_QUESTIONS,
+  RESTAURANTS_CAFES_DURATION_RULES,
+  RESTAURANTS_CAFES_PLAN_PROMPT_RULES,
+  RESTAURANTS_CAFES_RANKING_PROMPT_RULES,
+} from "./restaurantsCafes";
 
 export interface TripTypeRulesConfig {
   questions: TripBuilderStep[];
@@ -24,6 +30,12 @@ export const TRIP_TYPE_RULES: Partial<Record<TripType, TripTypeRulesConfig>> = {
     durationRules: DAY_TRIP_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
     planPromptRules: DAY_TRIP_PLAN_PROMPT_RULES,
     rankingPromptRules: DAY_TRIP_RANKING_PROMPT_RULES,
+  },
+  restaurants_cafes: {
+    questions: RESTAURANTS_CAFES_QUESTIONS,
+    durationRules: RESTAURANTS_CAFES_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
+    planPromptRules: RESTAURANTS_CAFES_PLAN_PROMPT_RULES,
+    rankingPromptRules: RESTAURANTS_CAFES_RANKING_PROMPT_RULES,
   },
 };
 

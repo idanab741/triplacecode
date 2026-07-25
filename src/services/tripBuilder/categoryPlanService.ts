@@ -2,7 +2,7 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
-import type { CategoryPlanItem, DayTripAnswers, StopRole, TripType } from "./types";
+import type { CategoryPlanItem, DayTripAnswers, RestaurantAnswers, StopRole, TripType } from "./types";
 import { getTripTypeRules } from "./rules";
 import type { TripIntent } from "./tripIntentService";
 
@@ -11,19 +11,37 @@ const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 interface DecideCategoryPlanParams {
   tripType: TripType;
   dna: TravelDna | null;
-  answers: DayTripAnswers;
+  answers: DayTripAnswers | RestaurantAnswers;
   weatherSummary: string | null;
   tripIntent?: TripIntent | null;
+}
+
+/**
+ * ממיר תשובות מכל סוג טיול לצורה אחידה (כמו DayTripAnswers) - כדי ש-tryClaudePlan
+ * ו-buildFallbackPlan יוכלו להישאר בלי שינוי, לא משנה מאיזה שאלון הגיעו התשובות.
+ */
+export function normalizeAnswers(tripType: TripType, answers: DayTripAnswers | RestaurantAnswers): DayTripAnswers {
+    if (tripType === "restaurants_cafes") {
+    const restaurantAnswers = answers as RestaurantAnswers;
+    return {
+      ...restaurantAnswers,
+      interests: restaurantAnswers.cuisine,
+      durationBand: "default" as DayTripAnswers["durationBand"],
+    };
+  }
+  return answers as DayTripAnswers;
 }
 
 /** קובע את רשימת הקטגוריות/תפקידים למסלול - קריאת Claude אחת, עם fallback דטרמיניסטי. */
 export async function decideCategoryPlan(params: DecideCategoryPlanParams): Promise<CategoryPlanItem[]> {
   const rules = getTripTypeRules(params.tripType);
+  const normalizedAnswers = normalizeAnswers(params.tripType, params.answers);
+  const normalizedParams = { ...params, answers: normalizedAnswers };
 
-  const aiPlan = await tryClaudePlan(params, rules.planPromptRules);
+  const aiPlan = await tryClaudePlan(normalizedParams, rules.planPromptRules);
   if (aiPlan && aiPlan.length > 0) return aiPlan;
 
-  return buildFallbackPlan(params.answers, rules.durationRules);
+  return buildFallbackPlan(normalizedAnswers, rules.durationRules);
 }
 
 async function tryClaudePlan(

@@ -136,6 +136,18 @@ export interface DayTripAnswers {
   freeText: string;
 }
 
+export interface RestaurantAnswers {
+  companions: CompanionType;
+  hasPet: boolean;
+  childAgeBands: ChildAgeBand[];
+  timing: TimingChoice;
+  otherDate: string | null;
+  distanceBand: DistanceBand;
+  budgetBand: BudgetBand;
+  cuisine: string[];
+  freeText: string;
+}
+
 export interface StepOption {
   value: string;
   label: string;

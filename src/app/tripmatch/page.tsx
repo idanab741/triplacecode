@@ -135,9 +135,7 @@ return (
       <div className="mx-auto flex max-w-sm flex-col gap-4 px-5 pb-10 pt-5">
         {stage === "city" && (
           <div className="flex flex-col gap-3">
-            <ChatBubble>
-             {"\n"}
-              החליקו ימינה למקומות שאהבתם ושמאלה לאלה
+            <ChatBubble>{"\n"}החליקו ימינה למקומות שאהבתם ושמאלה לאלה
               שפחות. ככל שתמשיכו להחליק, נכיר טוב יותר את הטעם שלכם ונמצא עבורכם את ההתאמה
               המושלמת.{"\n\n"}
               אז בואו נתחיל - איפה תרצו לטייל?

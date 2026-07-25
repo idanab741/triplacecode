@@ -6,6 +6,7 @@ import { describeWeatherCode } from "@/utils/weatherCodes";
 import { createSession, getSessionWithStops, saveCategoryPlan, saveTripIntent } from "@/services/tripBuilder/sessionService";
 import { decideCategoryPlan } from "@/services/tripBuilder/categoryPlanService";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
+import { normalizeAnswers } from "@/services/tripBuilder/categoryPlanService";
 import type { DayTripAnswers, TripType } from "@/services/tripBuilder/types";
 
 export async function POST(request: Request) {
@@ -39,7 +40,7 @@ const dna = await getTravelDna(supabase, user.id);
 
     // Trip Intent: קריאת Claude אחת שמסכמת את הבנת המשתמש - נוצרת פעם אחת כאן,
     // ומשמשת את כל שאר תהליך התכנון (בחירת קטגוריות, ובהמשך גם דירוג מועמדים).
-    const tripIntent = await generateTripIntent({ dna, answers, weatherSummary });
+const tripIntent = await generateTripIntent({ dna, answers: normalizeAnswers(tripType, answers), weatherSummary });
     if (tripIntent) {
       await saveTripIntent(supabase, session.id, tripIntent);
     }
