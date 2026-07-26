@@ -220,7 +220,7 @@ src="/images/hero-nightlife.png"
   );
 }
 
-export default function RomanticDateResultPage() {
+export default function NightlifeResultPage() {
   return (
     <Suspense
       fallback={
@@ -233,4 +233,5 @@ export default function RomanticDateResultPage() {
     </Suspense>
   );
 }
+
 
