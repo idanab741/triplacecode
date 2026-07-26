@@ -104,7 +104,7 @@ function capRoleCount(plan: CategoryPlanItem[], role: StopRole, max: number): Ca
 }
 
 async function tryClaudePlan(
-  params: DecideCategoryPlanParams,
+  params: Omit<DecideCategoryPlanParams, "answers"> & { answers: DayTripAnswers },
   planPromptRules: string
 ): Promise<CategoryPlanItem[] | null> {
 const prompt = `${planPromptRules}
