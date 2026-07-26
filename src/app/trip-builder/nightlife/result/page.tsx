@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
@@ -229,7 +229,8 @@ export default function RomanticDateResultPage() {
         </Screen>
       }
     >
-      <RomanticDateResultContent />
+      <NightlifeResultContent />
     </Suspense>
   );
 }
+

@@ -35,7 +35,7 @@ function NightlifeBuildContent() {
     const response = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
     const data: SessionResponse = await response.json();
     if (!response.ok) {
-      setError("לא הצלחנו לטעון את הדייט");
+      setError("לא הצלחנו לטעון את הערב");
       return null;
     }
     setStops(data.stops);
@@ -180,7 +180,7 @@ function NightlifeBuildContent() {
   if (!stops) {
     return (
       <Screen>
-        <p className="pt-10 text-center text-ink-secondary">בונים את הדייט שלכם...</p>
+        <p className="pt-10 text-center text-ink-secondary">בונים את הערב שלכם...</p>
       </Screen>
     );
   }
@@ -200,19 +200,19 @@ function NightlifeBuildContent() {
 
         {awaitingContinueDecision ? (
           <div className="flex flex-col items-center gap-4 pt-16 text-center">
-            <p className="text-lg font-bold text-ink">רוצים להוסיף עוד תחנה לדייט?</p>
+            <p className="text-lg font-bold text-ink">רוצים להוסיף עוד תחנה לערב?</p>
             <p className="text-sm text-ink-secondary">אפשר לסיים כאן, או להוסיף עוד תחנה אחת</p>
             <div className="flex w-full max-w-xs flex-col gap-3">
               <Button variant="primary" fullWidth onClick={handleContinueYes} disabled={busy}>
                 כן, עוד תחנה
               </Button>
               <Button variant="secondary" fullWidth onClick={handleContinueNo} disabled={busy}>
-                לא, סיימתי - בנו לי את הדייט
+                לא, סיימתי - בנו לי את הערב
               </Button>
             </div>
           </div>
         ) : !currentStop ? (
-          <p className="pt-16 text-center text-ink-secondary">בונים את הדייט הסופי...</p>
+          <p className="pt-16 text-center text-ink-secondary">בונים את הערב הסופי...</p>
         ) : !candidates ? (
           <p className="pt-16 text-center text-ink-secondary">מחפשים מקומות מתאימים...</p>
         ) : candidates.length === 0 ? (

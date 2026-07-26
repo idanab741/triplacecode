@@ -229,7 +229,7 @@ export default function RomanticDateResultPage() {
         </Screen>
       }
     >
-      <RomanticDateResultContent />
+      <NightlifeResultContent />
     </Suspense>
   );
 }

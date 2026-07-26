@@ -79,9 +79,28 @@ export async function decideCategoryPlan(params: DecideCategoryPlanParams): Prom
   const normalizedParams = { ...params, answers: normalizedAnswers };
 
   const aiPlan = await tryClaudePlan(normalizedParams, rules.planPromptRules);
-  if (aiPlan && aiPlan.length > 0) return aiPlan;
+  if (aiPlan && aiPlan.length > 0) {
+    // אכיפה קשיחה בקוד (לא רק הנחיה בפרומפט): לכל היותר תחנת attraction אחת
+    // בחיי לילה - כי Claude לפעמים "סוטה" מההנחיה הטקסטואלית בפרומפט.
+    if (params.tripType === "nightlife") {
+      return capRoleCount(aiPlan, "attraction", 1);
+    }
+    return aiPlan;
+  }
 
   return buildFallbackPlan(normalizedAnswers, rules.durationRules);
+}
+
+/** משאיר לכל היותר `max` תחנות מתפקיד נתון, לפי הסדר המקורי (order), ומסיר את השאר. */
+function capRoleCount(plan: CategoryPlanItem[], role: StopRole, max: number): CategoryPlanItem[] {
+  let count = 0;
+  return plan
+    .filter((item) => {
+      if (item.role !== role) return true;
+      count += 1;
+      return count <= max;
+    })
+    .map((item, index) => ({ ...item, order: index }));
 }
 
 async function tryClaudePlan(
