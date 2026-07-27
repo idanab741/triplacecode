@@ -63,13 +63,13 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
     { id: "ai", label: "trippy AI", icon: "AI", href: "/ai", elevated: true },
  {
       id: "favorites",
-      label: "טיולים",
+      label: "tripmatch",
       icon: (
         <NavIcon
           active={active === "favorites"}
           activeSrc="/images/icon-trips-active.png"
           inactiveSrc="/images/icon-trips-inactive.png"
-          alt="טיולים"
+          alt="tripmatch"
           scale={1}
         />
       ),
