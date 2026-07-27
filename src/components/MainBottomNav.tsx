@@ -61,7 +61,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
       href: "/community",
     },
     { id: "ai", label: "trippy AI", icon: "AI", href: "/ai", elevated: true },
-    {
+ {
       id: "favorites",
       label: "טיולים",
       icon: (
@@ -73,7 +73,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
           scale={1}
         />
       ),
-      href: "/favorites",
+      href: "/trip-builder/tripmatch",
     },
     {
       id: "profile",
