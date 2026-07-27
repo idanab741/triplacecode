@@ -73,7 +73,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
           scale={1}
         />
       ),
-      href: "/trip-builder/tripmatch",
+    href: "/tripmatch",
     },
     {
       id: "profile",

@@ -9,6 +9,7 @@ import { ChipGroup } from "@/components/ui";
 import { TRIPMATCH_INTEREST_OPTIONS } from "@/locales/he/tripBuilder";
 import { TripMatchCardContent } from "@/screens/tripmatch/TripMatchCardContent";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
 type Stage = "city" | "interests" | "swiping";
@@ -107,21 +108,8 @@ export default function TripMatchPage() {
   const currentCandidate = candidates[candidateIndex];
 
 return (
-    <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
-<div className="flex items-center justify-end gap-2 px-4 pt-4">
-          <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
-        <Link
-          href="/home"
-          className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-          aria-label="חזרה לדף הבית"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </Link>
-      </div>
-
-      <div className="mt-3 w-full">
+<Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+<div className="relative w-full">
         <Image
           src="/images/hero-tripmatch.png"
           alt=""
@@ -130,12 +118,24 @@ return (
           priority
           className="h-56 w-full object-cover"
         />
+        <div className="absolute left-2 top-4 flex items-center gap-2">
+          <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+          <Link
+            href="/home"
+            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
+            aria-label="חזרה לדף הבית"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       <div className="mx-auto flex max-w-sm flex-col gap-4 px-5 pb-10 pt-5">
         {stage === "city" && (
           <div className="flex flex-col gap-3">
-            <ChatBubble>{"\n"}החליקו ימינה למקומות שאהבתם ושמאלה לאלה
+     <ChatBubble>החליקו ימינה למקומות שאהבתם ושמאלה לאלה
               שפחות. ככל שתמשיכו להחליק, נכיר טוב יותר את הטעם שלכם ונמצא עבורכם את ההתאמה
               המושלמת.{"\n\n"}
               אז בואו נתחיל - איפה תרצו לטייל?
@@ -206,8 +206,10 @@ return (
               </SwipeCard>
             )}
           </>
-        )}
+)}
       </div>
+
+      <MainBottomNav active="favorites" />
     </Screen>
   );
 }
