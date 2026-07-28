@@ -21,7 +21,7 @@ interface Collectible {
   collected: boolean;
 }
 
-const GROUND_Y = 80;
+const GROUND_Y = 62;
 const JUMP_VELOCITY = -13;
 const GRAVITY = 0.6;
 const MAX_JUMPS = 2;
@@ -247,11 +247,11 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center overflow-hidden px-0">
+      <div className="flex flex-1 overflow-hidden px-0">
         <div
           ref={containerRef}
-          className="relative h-full overflow-hidden bg-gray-300"
-          style={{ aspectRatio: "9 / 16", touchAction: "manipulation", maxWidth: "100%" }}
+          className="relative h-full w-full overflow-hidden bg-gray-300"
+          style={{ touchAction: "manipulation" }}
         >
           <div ref={bgLayerRef} className="absolute inset-0" />
 
