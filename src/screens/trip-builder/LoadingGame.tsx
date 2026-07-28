@@ -50,16 +50,16 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
     if (!player || !container || !obstaclesLayer || !collectiblesLayer || !bgLayer) return;
 
     // מנקים שאריות מסבב קודם
-    obstaclesLayer.innerHTML = "";
-    collectiblesLayer.innerHTML = "";
-    bgLayer.innerHTML = "";
+    obstaclesLayer!.innerHTML = "";
+    collectiblesLayer!.innerHTML = "";
+    bgLayer!.innerHTML = "";
 
     // רקע רגיל - חוזר על עצמו אוטומטית (repeat-x), בהנחה שהתמונה עצמה
     // כבר "תפורה" נכון (קצה שמאל = קצה ימין), בלי צורך במירור/אריחים ידניים
-    bgLayer.style.backgroundImage = "url(/images/game/runway-bg-wide.png)";
-    bgLayer.style.backgroundSize = "auto 100%";
-    bgLayer.style.backgroundRepeat = "repeat-x";
-    bgLayer.style.backgroundPositionY = "top";
+    bgLayer!.style.backgroundImage = "url(/images/game/runway-bg-wide.png)";
+    bgLayer!.style.backgroundSize = "auto 100%";
+    bgLayer!.style.backgroundRepeat = "repeat-x";
+    bgLayer!.style.backgroundPositionY = "top";
 
     let posY = 0;
     let velocityY = 0;
@@ -94,7 +94,7 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
         img.style.height = "100%";
         img.style.objectFit = "contain";
         el.appendChild(img);
-        obstaclesLayer.appendChild(el);
+        obstaclesLayer!.appendChild(el);
         obstacleElements.push(el);
       }
       for (let i = 0; i < obstacleElements.length; i++) {
@@ -127,7 +127,7 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
     function handlePointer() {
       jump();
     }
-    container.addEventListener("pointerdown", handlePointer);
+    container!.addEventListener("pointerdown", handlePointer);
 
     function spawnWave() {
       const waveCount = wavesForScore(score);
@@ -148,7 +148,7 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
       if (!running) return;
 
       bgOffsetPx -= speed * 4;
-      bgLayer.style.backgroundPositionX = `${bgOffsetPx}px`;
+      bgLayer!.style.backgroundPositionX = `${bgOffsetPx}px`;
 
       velocityY += GRAVITY;
       posY += velocityY;
@@ -157,7 +157,7 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
         velocityY = 0;
         jumpsUsed = 0;
       }
-      player.style.transform = `translateY(${posY}%)`;
+      player!.style.transform = `translateY(${posY}%)`;
 
       obstacles = obstacles.map((o) => ({ ...o, x: o.x - speed })).filter((o) => o.x > -20);
       collectibles = collectibles.map((c) => ({ ...c, x: c.x - speed })).filter((c) => c.x > -20 && !c.collected);
@@ -206,7 +206,7 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
     return () => {
       running = false;
       cancelAnimationFrame(rafId);
-      container.removeEventListener("pointerdown", handlePointer);
+      container!.removeEventListener("pointerdown", handlePointer);
     };
   }, [roundKey]);
 
