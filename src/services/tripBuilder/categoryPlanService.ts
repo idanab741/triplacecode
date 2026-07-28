@@ -70,7 +70,7 @@ if (tripType === "nightlife") {
     };
   }
   if (tripType === "abroad_vacation") {
-    const vacationAnswers = answers as import("./types").AbroadVacationAnswers;
+   const vacationAnswers = answers as unknown as import("./types").AbroadVacationAnswers;
     const { VACATION_TYPE_TO_CATEGORY } = require("@/locales/he/abroadVacation");
     const mappedCategories = Array.from(
       new Set(
