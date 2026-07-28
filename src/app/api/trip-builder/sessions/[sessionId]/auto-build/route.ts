@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getAttributeScoreMap, summarizeTopAttributes } from "@/services/travelDna/attributeLearningService";
@@ -13,7 +13,7 @@ import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
 import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggestionService";
-import { generateVacationAttractionList } from "@/services/tripBuilder/vacationAttractionListService";
+import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
 import type { DayTripAnswers, TripBuilderStop } from "@/services/tripBuilder/types";
@@ -127,27 +127,34 @@ export async function POST(
       }
     }
 
-    // חופשה בחו"ל: מקבצים תחנות לפי יום, ומריצים קריאת AI אחת לכל יום
-    // **במקביל** (לא ברצף) - כך שגם טיולים ארוכים (הרבה ימים) נשארים
-    // מהירים, כי כל קריאה בודדת קטנה (רק תחנות היום הזה) ולא נחתכת ב-timeout
-    // כמו קריאה אחת ענקית לכל הטיול.
+    // חופשה בחו"ל: קריאת AI **אחת בלבד** לכל הטיול (כל הימים יחד), לא
+    // קריאה נפרדת לכל יום. זה קריטי למניעת כפילויות אמיתית - קריאות
+    // מקבילות נפרדות (הגישה הקודמת) לא יכולות לדעת אחת על השנייה ולכן לא
+    // יכולות למנוע חפיפה בין הימים. בנוסף, קריאה אחת חוסכת טוקנים (בלי
+    // חזרה על אותו boilerplate לכל יום) ומפחיתה round-trips.
     if (session.trip_type === "abroad_vacation") {
       const vacationAnswers = answers as unknown as { vacationTypes?: string[] };
       const destinationName = vacationDestinationName ?? "היעד המבוקש";
 
-      const dnaSummary =
-        dna && ((dna.interests && dna.interests.length) || (dna.preferred_categories && dna.preferred_categories.length))
-          ? [
-              dna.interests && dna.interests.length
-                ? `תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`
-                : null,
-              dna.preferred_categories && dna.preferred_categories.length
-                ? `קטגוריות מועדפות: ${dna.preferred_categories.map(getCategoryLabel).join(", ")}`
-                : null,
-            ]
-              .filter(Boolean)
-              .join(". ")
-          : null;
+      // פרופיל טעם מלא: גם העדפות אונבורדינג (עמוד הפרופיל - מטבח, כשרות,
+      // נגישות, סגנון חופשה), וגם למידה מהתנהגות בפועל (מה שהמשתמש אהב/דחה
+      // בעבר) - קודם הקוד הקודם השתמש רק ב-interests/preferred_categories
+      // וזרק את שאר הפרופיל, למרות שהוא כבר מחושב למעלה (dna, learnedAttributes).
+      const dnaSummaryParts: string[] = [];
+      if (dna) {
+        if (dna.interests?.length) dnaSummaryParts.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
+        if (dna.preferred_categories?.length)
+          dnaSummaryParts.push(`קטגוריות מועדפות (מהתנהגות): ${dna.preferred_categories.map(getCategoryLabel).join(", ")}`);
+        if (dna.culinary_styles?.length) dnaSummaryParts.push(`סגנונות אוכל מועדפים: ${dna.culinary_styles.join(", ")}`);
+        if (dna.dietary_restrictions?.length)
+          dnaSummaryParts.push(`הגבלות תזונתיות (חובה לכבד): ${dna.dietary_restrictions.join(", ")}`);
+        if (dna.kosher) dnaSummaryParts.push("חובה: כשרות");
+        if (dna.accessibility) dnaSummaryParts.push("חובה: נגישות");
+        if (dna.vacation_preferences?.length) dnaSummaryParts.push(`העדפות חופשה: ${dna.vacation_preferences.join(", ")}`);
+      }
+      if (learnedAttributes.liked.length) dnaSummaryParts.push(`נלמד מהתנהגות שאהב: ${learnedAttributes.liked.join(", ")}`);
+      if (learnedAttributes.disliked.length) dnaSummaryParts.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
+      const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
 
       const stopsByDay = new Map<number, TripBuilderStop[]>();
       for (const stop of pendingStops) {
@@ -156,28 +163,31 @@ export async function POST(
         stopsByDay.get(day)!.push(stop);
       }
 
-      const dayResults = await Promise.all(
-        Array.from(stopsByDay.entries()).map(async ([day, dayStops]) => {
-          const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
-          const totalAttractions = dayStops.length - totalFood;
+      const daySpecs: VacationDaySpec[] = Array.from(stopsByDay.entries()).map(([day, dayStops]) => {
+        const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
+        return { day, totalFood, totalAttractions: dayStops.length - totalFood };
+      });
 
-          const suggestions = await generateVacationAttractionList({
-            destination: destinationName,
-            totalFood,
-            totalAttractions,
-            vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
-            freeText: answers.freeText,
-            budgetLabel: remainingBudgetLabel,
-            travelDnaSummary: dnaSummary,
-          });
+      // רדיוס תקין סביב מרכז היעד: אם המשתמש/AI כבר קבע רדיוס אזור מפורש
+      // (requestedAreaRadiusKm) - נותנים מרווח פי 2 ממנו (יעד יכול להתפרס
+      // מעבר למרכז המדויק); אחרת ברירת מחדל של עיר גדולה + פרברים.
+      const destinationMaxDistanceKm = requestedAreaRadiusKm ? requestedAreaRadiusKm * 2 : 60;
 
-          return { day, dayStops, suggestions };
-        })
-      );
+      const allSuggestions = await generateVacationItinerary({
+        destination: destinationName,
+        destinationOrigin: searchOrigin,
+        maxDistanceKm: destinationMaxDistanceKm,
+        days: daySpecs,
+        vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
+        freeText: answers.freeText,
+        budgetLabel: remainingBudgetLabel,
+        travelDnaSummary: dnaSummary,
+      });
 
-      for (const { dayStops, suggestions } of dayResults) {
-        const foodSuggestions = suggestions.filter((s) => s.role === "food" || s.role === "coffee_dessert");
-        const attractionSuggestions = suggestions.filter((s) => s.role === "attraction");
+      for (const [day, dayStops] of stopsByDay.entries()) {
+        const daySuggestions = allSuggestions.filter((s) => s.day === day);
+        const foodSuggestions = daySuggestions.filter((s) => s.role === "food" || s.role === "coffee_dessert");
+        const attractionSuggestions = daySuggestions.filter((s) => s.role === "attraction");
         let foodCursor = 0;
         let attractionCursor = 0;
 

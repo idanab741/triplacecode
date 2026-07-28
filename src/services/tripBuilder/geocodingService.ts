@@ -1,4 +1,5 @@
 import { logAiError } from "@/services/ai/claudeService";
+import { haversineDistanceKm } from "./geo";
 import type { LatLng } from "./types";
 
 /**
@@ -33,4 +34,33 @@ export async function geocodePlaceName(placeName: string): Promise<LatLng | null
     });
     return null;
   }
+}
+
+/**
+ * כמו geocodePlaceName, אבל פוסל תוצאה שנופלת רחוק מהיעד המבוקש.
+ * קריטי עבור הצעות AI (Claude יכול "להמציא" שם, או לתת שם שקיים גם בעיר/מדינה
+ * אחרת) - בלי הבדיקה הזו, גיאוקודינג רופף עלול להחזיר קואורדינטות בצד השני
+ * של העולם, וזה "נדבק" למסלול כתחנה שלא שייכת ליעד בכלל.
+ * maxDistanceKm ברירת מחדל 60 ק"מ - מכסה עיר גדולה + פרברים קרובים, בלי
+ * לאפשר "קפיצה" לעיר/מדינה אחרת.
+ */
+export async function geocodePlaceNameNear(
+  placeName: string,
+  near: LatLng,
+  maxDistanceKm = 60
+): Promise<LatLng | null> {
+  const coords = await geocodePlaceName(placeName);
+  if (!coords) return null;
+
+  const distanceKm = haversineDistanceKm(near, coords);
+  if (distanceKm > maxDistanceKm) {
+    logAiError("גיאוקודינג הוחזר רחוק מדי מהיעד - נפסל", {
+      placeName,
+      distanceKm: Math.round(distanceKm),
+      maxDistanceKm,
+    });
+    return null;
+  }
+
+  return coords;
 }
