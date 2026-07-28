@@ -69,23 +69,30 @@ const { data: stops } = await supabase
   const hasDays = likedStops.some((s) => s.day_index != null);
   const ordered = hasDays ? orderByDayThenNearestNeighbor(likedStops, origin) : orderByNearestNeighbor(likedStops, origin);
 
- let cursor = origin;
+let cursor = origin;
   let cumulativeMinutes = 0;
   let cumulativeCost = 0;
   let previousDay: number | null = null;
   const finalStops: FinalItineraryStop[] = [];
 
   for (const stop of ordered) {
-    // מאפסים את המונה בתחילת כל יום חדש - כדי שהשעה בכל יום תחושב יחסית
-    // לתחילת אותו יום, לא מצטברת לאורך כל הטיול
+    // מאפסים את המונה **וגם** את ה-cursor בתחילת כל יום חדש - חוזרים
+    // למיקום המוצא (מלון/יעד), לא ממשיכים מהתחנה האחרונה של היום הקודם.
+    // בלי זה, מרחק גדול (או שגיאת geocoding נקודתית) בסוף יום אחד "מדביק"
+    // את כל התחנות של היום הבא בזמן שגוי שמצטבר קדימה.
     const currentDay = stop.day_index ?? null;
     if (currentDay !== null && currentDay !== previousDay) {
       cumulativeMinutes = 0;
+      cursor = origin;
       previousDay = currentDay;
     }
 
-    const placeLatLng: LatLng = { lat: stop.place!.latitude!, lng: stop.place!.longitude! };
-    const distanceKm = haversineDistanceKm(cursor, placeLatLng);
+  const placeLatLng: LatLng = { lat: stop.place!.latitude!, lng: stop.place!.longitude! };
+    const rawDistanceKm = haversineDistanceKm(cursor, placeLatLng);
+    // תקרת שפיות: מרחק בין תחנות בתוך אותו יעד לא אמור לחרוג מ-100 ק"מ.
+    // אם זה קורה - כנראה geocoding שגוי למקום ספציפי (נקודת "אפס" או עיר
+    // אחרת) - מתעלמים מהמרחק החריג במקום לתת לו "להדביק" זמן ענק לכל השאר.
+    const distanceKm = rawDistanceKm > 100 ? 5 : rawDistanceKm;
     const etaMinutes = estimateTravelMinutes(distanceKm, "drive");
     cumulativeMinutes += etaMinutes;
 

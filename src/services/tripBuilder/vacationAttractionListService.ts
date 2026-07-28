@@ -28,7 +28,7 @@ interface RawSuggestion {
  */
 export async function generateVacationAttractionList(
   params: GenerateListParams
-): Promise<CandidatePlace[]> {
+): Promise<(CandidatePlace & { role: StopRole })[]> {
 const total = params.totalFood + params.totalAttractions;
   const prompt = `אתה מומחה תיירות עולמי עם ידע עמוק על ${params.destination}. תן לי רשימה של ${total} מקומות **אמיתיים, קיימים בפועל, ומהמפורסמים/הפופולריים ביותר** ב${params.destination} - אלה שכל תייר/מקומי ימליץ עליהם, לא מקומות נידחים או מומצאים. וללא כפילויות.
 
