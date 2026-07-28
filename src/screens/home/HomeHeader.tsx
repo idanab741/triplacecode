@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Skeleton } from "@/components/ui";
 
 interface HomeHeaderProps {
@@ -49,21 +50,18 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
         onClick={() => setMessage("בקרוב אפשר יהיה לבחור מיקום")}
         className="flex items-center justify-center gap-1 text-sm font-medium text-ink"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M12 22s7-6.5 7-12A7 7 0 0 0 5 10c0 5.5 7 12 7 12Z" />
-          <circle cx="12" cy="10" r="2.5" />
-        </svg>
+        <Image src="/icons/location.png" alt="" width={22} height={22} />
         המיקום שלי
       </button>
 
-      <div aria-hidden="true" />
+      <button
+        type="button"
+        onClick={() => setMessage("בקרוב - התראות")}
+        aria-label="התראות"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+      >
+        <Image src="/icons/bell.png" alt="" width={22} height={22} />
+      </button>
 
       {message && (
         <div className="absolute inset-x-5 top-16 rounded-card bg-ink px-4 py-2 text-center text-xs text-white shadow-soft">
