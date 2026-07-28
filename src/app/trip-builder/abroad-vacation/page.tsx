@@ -54,7 +54,7 @@ const STAGE_TITLES: Record<Stage, string> = {
   childAges: "גילאי הילדים",
   dates: "מתי יוצאים?",
 bookedQuestion: "האם כבר הזמנתם טיסה ומלון?",
-  flightPreference: "באיזה סוג טיסה אתם מעוניינים?",
+  flightPreference: "עד כמה תתפשרו על הטיסה שלכם?",
   flightsHotels: "נהדר! ספרו לי על הטיסה והמלון",
   lodgingType: "איזה סוג לינה אתם מחפשים?",
   budget: "תקציב ליחיד",

@@ -189,7 +189,12 @@ ${JSON.stringify(dnaSummary)}
 יעדים:
 ${JSON.stringify(destinationsPayload)}`;
 
-  const { text, error } = await callClaude(prompt);
+  // ה-timeout הרגיל (12 שניות) קצר מדי לדירוג כמה יעדים ביחד - הקריאה כמעט
+  // תמיד "כמעט מסיימת" וננטשת ברגע האחרון. כישלון = בלי caching (רק תוצאות
+  // AI נשמרות ב-cache) - כך שכל טעינה הבאה חוזרת ומנסה שוב את אותה קריאה
+  // האיטית שנועדה להיכשל, לנצח. מרחיבים ל-25 שניות כדי שהיא באמת תצליח
+  // ותיכנס ל-cache פעם אחת, ומכאן תהיה מהירה לכל הטעינות הבאות.
+  const { text, error } = await callClaude(prompt, 3000, 25000);
   if (error || !text) return null;
 
   try {

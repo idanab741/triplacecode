@@ -145,7 +145,14 @@ const warnings: string[] = [];
     const descriptions = await generatePersonalizedDescriptions(finalStops, freeText ?? "", tripIntent);
     for (const stop of finalStops) {
       const generated = descriptions.get(stop.stopId);
-      if (generated) stop.shortDescription = generated;
+      if (generated) {
+        stop.shortDescription = generated;
+      } else if (!stop.shortDescription && stop.reason) {
+        // גיבוי: אם יצירת התיאור נכשלה/נקטעה לתחנה הזו ספציפית - עדיף
+        // להציג את ה-reason (כבר קיים, נוצר בשלב הבחירה) מאשר תחנה בלי
+        // שום תיאור בכלל.
+        stop.shortDescription = stop.reason;
+      }
     }
   }
 

@@ -17,6 +17,7 @@ import { generateVacationItinerary, type VacationDaySpec } from "@/services/trip
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
 import type { DayTripAnswers, TripBuilderStop } from "@/services/tripBuilder/types";
+import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 
 /**
@@ -99,7 +100,7 @@ export async function POST(
         }
       } else if (vacationAnswers.surpriseMe) {
         const chosen = await pickSurpriseDestination({
-          vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
+          vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
           freeText: answers.freeText,
           budgetLabel: remainingBudgetLabel,
           travelStyle: vacationAnswers.travelStyle ?? "single_destination",
@@ -133,13 +134,19 @@ export async function POST(
     // יכולות למנוע חפיפה בין הימים. בנוסף, קריאה אחת חוסכת טוקנים (בלי
     // חזרה על אותו boilerplate לכל יום) ומפחיתה round-trips.
     if (session.trip_type === "abroad_vacation") {
-      const vacationAnswers = answers as unknown as { vacationTypes?: string[] };
+      const vacationAnswers = answers as unknown as {
+        vacationTypes?: string[];
+        companions?: string;
+        childAgeBands?: string[];
+      };
       const destinationName = vacationDestinationName ?? "היעד המבוקש";
 
       // פרופיל טעם מלא: גם העדפות אונבורדינג (עמוד הפרופיל - מטבח, כשרות,
       // נגישות, סגנון חופשה), וגם למידה מהתנהגות בפועל (מה שהמשתמש אהב/דחה
       // בעבר) - קודם הקוד הקודם השתמש רק ב-interests/preferred_categories
       // וזרק את שאר הפרופיל, למרות שהוא כבר מחושב למעלה (dna, learnedAttributes).
+      // וגם גילאי הילדים מהשאלון - קודם לא הועברו ל-AI בכלל, כך שהמלצות
+      // לא היו מותאמות-גיל אף פעם, גם למשפחות עם ילדים קטנים.
       const dnaSummaryParts: string[] = [];
       if (dna) {
         if (dna.interests?.length) dnaSummaryParts.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
@@ -154,6 +161,14 @@ export async function POST(
       }
       if (learnedAttributes.liked.length) dnaSummaryParts.push(`נלמד מהתנהגות שאהב: ${learnedAttributes.liked.join(", ")}`);
       if (learnedAttributes.disliked.length) dnaSummaryParts.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
+      if (vacationAnswers.companions === "family" && vacationAnswers.childAgeBands?.length) {
+        const ageLabels = vacationAnswers.childAgeBands.map(
+          (band) => VACATION_CHILD_AGE_OPTIONS.find((o) => o.value === band)?.label ?? band
+        );
+        dnaSummaryParts.push(
+          `חובה: נוסעים עם ילדים בגילאי ${ageLabels.join(", ")} - כל מקום מוצע חייב להתאים לגילאים האלה (בטיחות, שעות, עניין), לא רק מקומות למבוגרים`
+        );
+      }
       const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
 
       const stopsByDay = new Map<number, TripBuilderStop[]>();
@@ -178,11 +193,28 @@ export async function POST(
         destinationOrigin: searchOrigin,
         maxDistanceKm: destinationMaxDistanceKm,
         days: daySpecs,
-        vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
+        vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
         freeText: answers.freeText,
         budgetLabel: remainingBudgetLabel,
         travelDnaSummary: dnaSummary,
       });
+
+      // הקצאה לפי יום, עם "רשת ביטחון": אם Claude תייג יום לא נכון או החזיר
+      // פחות פריטים מהמבוקש ליום מסוים, לא משאירים את התחנה ריקה בשקט (זו
+      // בדיוק הסיבה שקטגוריות שלמות - כמו "חיי לילה" - או ארוחות שלמות
+      // נעלמו בעבר) - שואבים תחנה פנויה מה"עודף" הכללי (מיום אחר, אותו role)
+      // לפני שמוותרים על המקום.
+      const usedSuggestionIds = new Set<string>();
+      const leftoverByRole = (role: "food" | "attraction") =>
+        allSuggestions.filter(
+          (s) =>
+            !usedSuggestionIds.has(s.id) &&
+            (role === "food" ? s.role === "food" || s.role === "coffee_dessert" : s.role === "attraction")
+        );
+
+      // שלב 1: התאמה (stop -> suggestion) - בזיכרון בלבד, בלי await, כי זה
+      // תלוי בסדר (usedSuggestionIds/leftover pool) ולא ניתן להריץ במקביל.
+      const assignments: { stopId: string; suggestion: (typeof allSuggestions)[number] }[] = [];
 
       for (const [day, dayStops] of stopsByDay.entries()) {
         const daySuggestions = allSuggestions.filter((s) => s.day === day);
@@ -193,13 +225,25 @@ export async function POST(
 
         for (const stop of dayStops) {
           const isFoodRole = stop.role === "food" || stop.role === "coffee_dessert";
-          const suggestion = isFoodRole ? foodSuggestions[foodCursor++] : attractionSuggestions[attractionCursor++];
+          let suggestion = isFoodRole ? foodSuggestions[foodCursor++] : attractionSuggestions[attractionCursor++];
+          if (!suggestion) {
+            suggestion = leftoverByRole(isFoodRole ? "food" : "attraction")[0];
+          }
           if (!suggestion) continue;
-
-          const realPlace = await ensurePlaceExists(suggestion, destinationName);
-          await likeStop(supabase, user.id, stop.id, realPlace);
+          usedSuggestionIds.add(suggestion.id);
+          assignments.push({ stopId: stop.id, suggestion });
         }
       }
+
+      // שלב 2: כל השמירות בפועל (DB insert/update) **במקביל**, לא אחת-אחת.
+      // בטיול רב-ימים זה בקלות 30-50+ תחנות - בלי המקבול הזה, כל תחנה
+      // מחכה בתור ל-round-trip נפרד ל-DB, ומצטבר לעשרות שניות מיותרות.
+      await Promise.all(
+        assignments.map(async ({ stopId, suggestion }) => {
+          const realPlace = await ensurePlaceExists(suggestion, destinationName);
+          await likeStop(supabase, user.id, stopId, realPlace);
+        })
+      );
 
       const itinerary = await finalizeItinerary(
         supabase,

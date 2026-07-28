@@ -64,7 +64,23 @@ export const TRAVEL_STYLE_OPTIONS: StepOption[] = [
   { value: "multi_destination", label: "מספר יעדים" },
 ];
 
-/** לכל קצב טיול - כמה אטרקציות ומקומות אוכל ליום, לפי המסמך. */
+export const VACATION_TYPE_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  VACATION_TYPE_OPTIONS.map((option) => [option.value, option.label])
+);
+
+/**
+ * ממיר ערך vacationType (למשל "nightlife") לתווית עברית. בשונה מ-getCategoryLabel
+ * (שמיועד לקטגוריות DB כמו "attractions_activities") - ערכי vacationTypes הם
+ * enum נפרד לגמרי, ורוב הערכים שלו (nightlife, urban, relax, sports_extreme...)
+ * לא קיימים ב-getCategoryLabel כלל ומוחזרים ממנו כמו שהם (באנגלית) - מה שיוצר
+ * סיגנל חלש/מבלבל בפרומפט ל-Claude, שיכול לגרום לו להתעלם מהעדפה שלמה
+ * (למשל "חיי לילה") כי היא מגיעה כמילה בודדת באנגלית בתוך פרומפט בעברית.
+ */
+export function getVacationTypeLabel(value: string): string {
+  return VACATION_TYPE_LABEL_MAP[value] ?? value;
+}
+
+
 export const VACATION_PACE_DAILY_COUNTS: Record<
   "relaxed" | "balanced" | "packed",
   { attractions: number; food: number }

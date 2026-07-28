@@ -38,15 +38,11 @@ export async function POST(request: Request) {
 const dna = await getTravelDna(supabase, user.id);
     const weatherSummary = await getWeatherSummary(origin.lat, origin.lng);
 
-    // Trip Intent: קריאת Claude אחת שמסכמת את הבנת המשתמש - נוצרת פעם אחת כאן,
-    // ומשמשת את כל שאר תהליך התכנון (בחירת קטגוריות, ובהמשך גם דירוג מועמדים).
-const tripIntent = await generateTripIntent({ dna, answers: normalizeAnswers(tripType, answers), weatherSummary });
+    const tripIntent = await generateTripIntent({ dna, answers: normalizeAnswers(tripType, answers), weatherSummary });
     if (tripIntent) {
       await saveTripIntent(supabase, session.id, tripIntent);
     }
 
-    // חופשה בחו"ל: תוכנית מרובת-ימים דטרמיניסטית (לפי קצב הטיול ותאריכים),
-    // לא דרך ה-AI-planner הרגיל שבנוי לטיול חד-יומי בלבד
     const plan =
       tripType === "abroad_vacation"
         ? buildMultiDayVacationPlan(answers as unknown as { startDate: string; endDate: string; pace: string; vacationTypes: string[] })

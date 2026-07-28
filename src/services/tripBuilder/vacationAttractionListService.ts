@@ -29,11 +29,22 @@ interface RawSuggestion {
   name: string;
   role: "food" | "attraction" | "coffee_dessert";
   category: string;
-  description: string;
+  mealType?: "breakfast" | "lunch" | "dinner" | null;
   reason: string;
 }
 
 export type ResolvedVacationPlace = CandidatePlace & { role: StopRole; day: number };
+
+/**
+ * מחפש תמונה עם השם המלא + היעד; אם לא נמצא (למשל כי הניסוח לא תואם בדיוק
+ * את מה שגוגל מזהה) - מנסה שוב עם השם בלבד, בלי היעד. בלי הגיבוי הזה,
+ * מקומות אמיתיים לגמרי היו נשארים בלי תמונה רק כי הניסוח המדויק לא התאים.
+ */
+async function findPlacePhotoReferenceWithFallback(name: string, destination: string): Promise<string | null> {
+  const primary = await findPlacePhotoReference(`${name} ${destination}`);
+  if (primary) return primary;
+  return findPlacePhotoReference(name);
+}
 
 /**
  * מייצר את כל רשימת המקומות לכל הטיול (כל הימים יחד) בקריאת Claude **אחת
@@ -59,9 +70,12 @@ export async function generateVacationItinerary(
 
   const prompt = `אתה מומחה תיירות עולמי עם ידע עמוק על ${params.destination}. בנה רשימת מקומות ל-${params.days.length} ימי חופשה שלמים ב${params.destination}.
 
-*** חובה: כל מקום ברשימה **אמיתי, קיים בפועל, ומהמפורסמים/הפופולריים ביותר**
-ביעד - כזה שכל תייר/מקומי ימליץ עליו. אסור מקומות נידחים, לא ידועים, או
-מומצאים - איכות ופופולריות לפני הכל. ***
+*** חובה: כל מקום ברשימה **אמיתי, קיים בפועל, ופופולרי/מבוקש ממש עכשיו** ביעד -
+לא רק "מפורסם היסטורית". תעדיף מקומות: (א) עם דירוגים גבוהים ותור/ביקוש בפועל,
+(ב) שמככבים הרבה באינסטגרם/רשתות חברתיות ומצולמים הרבה (אווירה/עיצוב/נוף
+מיוחד) - הקהל שלנו אוהב מקומות "אינסטגרמיים", (ג) שהם כרגע "החם" בעיר, לא רק
+קלאסיקה ישנה. במסעדות/בתי קפה - רק מהשווים והכי מדוברים, לא ממוצע גנרי. אסור
+מקומות נידחים, לא ידועים, או מומצאים - איכות, פופולריות ונוכחות ברשת לפני הכל. ***
 
 *** חובה: בלי שום כפילות **לאורך כל הטיול, בכל הימים יחד** - כל מקום מופיע
 פעם אחת בלבד בכל הרשימה, גם אם הוא מתאים למספר ימים. ***
@@ -86,19 +100,19 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
 - name: השם **בעברית** אם יש לו שם עברי מוכר/מקובל (למשל "האקרופוליס", "מגדל אייפל") - אחרת השם המקורי בלעז
 - role: "attraction" | "food" | "coffee_dessert"
 - category: קטגוריה קצרה (לועזית, snake_case)
-- description: משפט אחד בעברית
+- mealType: אם role="food" - חובה לציין "breakfast" | "lunch" | "dinner" לפי שעת הארוחה המתאימה (למשל מקום מתאים לארוחת בוקר -> "breakfast"). אם ליום יש כמה מקומות אוכל - חובה לפזר אותם על פני שעות שונות של היום (לא כולם דינר), לא להציע כמה מסעדות לאותה שעה. אם role="attraction"/"coffee_dessert" - השאר null.
 - reason: משפט אחד למה זה מתאים לבקשה הספציפית של המשתמש
 
 חשוב מאוד: החזר JSON תקין בלבד. אל תשתמש בגרשיים בודדים (') בתוך הטקסט (למשל
 בשמות מקומות או בתיאורים) - אם יש צורך, השמט אותם או נסח מחדש בלי גרש.
 
-השב אך ורק במבנה JSON: [{"day": 1, "name": "...", "role": "...", "category": "...", "description": "...", "reason": "..."}, ...]`;
+השב אך ורק במבנה JSON: [{"day": 1, "name": "...", "role": "...", "category": "...", "mealType": "...", "reason": "..."}, ...]`;
 
   // קריאה אחת לכל הטיול (לא לכל יום) - יותר טוקנים לקריאה בודדת, אבל הרבה
   // פחות round-trips וחזרות על boilerplate בסה"כ. max_tokens גדל עם גודל
   // הטיול; ה-timeout נשאר שמרני (45 שניות) כי זו קריאה בודדת שרצה מיד
   // בתחילת הבנייה, במקביל לשום דבר אחר.
-  const maxTokens = Math.min(8000, 900 + totalPlaces * 130);
+  const maxTokens = Math.min(6000, 500 + totalPlaces * 80);
   const { text, error } = await callClaude(prompt, maxTokens, 45000);
   if (error || !text) return [];
 
@@ -144,7 +158,7 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
 
       const [coords, photoRef] = await Promise.all([
         geocodePlaceNameNear(`${item.name}, ${params.destination}`, params.destinationOrigin, params.maxDistanceKm),
-        findPlacePhotoReference(`${item.name} ${params.destination}`),
+        findPlacePhotoReferenceWithFallback(item.name, params.destination),
       ]);
       // גיאוקודינג נכשל או החזיר מקום רחוק מדי מהיעד - פוסלים את התחנה
       // הזו לגמרי, במקום לתת לה "להידבק" למסלול כיעד לא רלוונטי.
@@ -156,7 +170,10 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
         name: item.name,
         category: item.category,
         subcategory: null,
-        shortDescription: item.description,
+        // תיאור לא מגיע מ-Claude כאן בכוונה - הוא נדרס בכל מקרה בהמשך על-ידי
+        // generatePersonalizedDescriptions בסוף finalizeItinerary, אז אין טעם
+        // לבקש מ-Claude לכתוב אותו פעמיים (חוסך טוקנים וזמן תגובה).
+        shortDescription: null,
         imageUrls,
         rating: null,
         ratingCount: null,
