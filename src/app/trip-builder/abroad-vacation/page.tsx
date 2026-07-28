@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Screen, ChipGroup, Field, Slider } from "@/components/ui";
 import { DateRangePicker } from "@/screens/trip-builder/chat/DateRangePicker";
 import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import {
   VACATION_COMPANION_OPTIONS,
   VACATION_CHILD_AGE_OPTIONS,
@@ -731,7 +732,7 @@ function confirmBooked() {
         {awaitingTripChoice && (
           <>
             <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
-            {submitting && <ChatBubble>רגע, בונים לכם את החופשה...</ChatBubble>}
+            {submitting && <LoadingGame statusText="רגע, בונים לכם את החופשה..." />}
           </>
         )}
 
@@ -795,3 +796,5 @@ function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
     );
   });
 }
+
+
