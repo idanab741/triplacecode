@@ -247,11 +247,11 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col justify-start px-0">
+      <div className="flex flex-1 items-center justify-center overflow-hidden px-0">
         <div
           ref={containerRef}
-          className="relative w-full overflow-hidden bg-gray-300"
-          style={{ aspectRatio: "9 / 16", touchAction: "manipulation", maxHeight: "100%" }}
+          className="relative h-full overflow-hidden bg-gray-300"
+          style={{ aspectRatio: "9 / 16", touchAction: "manipulation", maxWidth: "100%" }}
         >
           <div ref={bgLayerRef} className="absolute inset-0" />
 
