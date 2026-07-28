@@ -4,7 +4,7 @@ import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { describeWeatherCode } from "@/utils/weatherCodes";
 import { createSession, getSessionWithStops, saveCategoryPlan, saveTripIntent } from "@/services/tripBuilder/sessionService";
-import { decideCategoryPlan } from "@/services/tripBuilder/categoryPlanService";
+import { decideCategoryPlan, buildMultiDayVacationPlan } from "@/services/tripBuilder/categoryPlanService";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import { normalizeAnswers } from "@/services/tripBuilder/categoryPlanService";
 import type { DayTripAnswers, TripType } from "@/services/tripBuilder/types";
@@ -45,14 +45,20 @@ const tripIntent = await generateTripIntent({ dna, answers: normalizeAnswers(tri
       await saveTripIntent(supabase, session.id, tripIntent);
     }
 
-    const plan = await decideCategoryPlan({ tripType, dna, answers, weatherSummary, tripIntent });
+    // חופשה בחו"ל: תוכנית מרובת-ימים דטרמיניסטית (לפי קצב הטיול ותאריכים),
+    // לא דרך ה-AI-planner הרגיל שבנוי לטיול חד-יומי בלבד
+    const plan =
+      tripType === "abroad_vacation"
+        ? buildMultiDayVacationPlan(answers as unknown as { startDate: string; endDate: string; pace: string; vacationTypes: string[] })
+        : await decideCategoryPlan({ tripType, dna, answers, weatherSummary, tripIntent });
     const stops = await saveCategoryPlan(supabase, session.id, plan);
 
     return NextResponse.json({
       session: { ...session, category_plan: plan, status: "building", trip_intent: tripIntent },
       stops,
     });
-  } catch (error) {
+} catch (error) {
+    console.error("[Sessions POST Error]", error);
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
     return NextResponse.json({ error: message }, { status: 500 });
   }

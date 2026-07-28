@@ -14,6 +14,7 @@ function buildSearchHref(id: QuickCategoryId): string {
   if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes";
   if (id === "romantic_date") return "/trip-builder/romantic-date";
   if (id === "nightlife") return "/trip-builder/nightlife";
+  if (id === "abroad") return "/trip-builder/abroad-vacation";
 
   const link = QUICK_CATEGORY_SEARCH_LINKS[id];
   if (link.categories) return `/search?category=${link.categories.join(",")}`;

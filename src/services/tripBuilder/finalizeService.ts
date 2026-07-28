@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary } from "./sessionService";
@@ -64,35 +64,48 @@ const { data: stops } = await supabase
     (stop) => stop.place && stop.place.latitude != null && stop.place.longitude != null
   );
 
-  const ordered = orderByNearestNeighbor(likedStops, origin);
+  // עבור חופשה בחו"ל (יש day_index) - ממיינים לפי יום קודם, ורק בתוך כל
+  // יום עושים nearest-neighbor. אחרת (יום בודד) - nearest-neighbor רגיל.
+  const hasDays = likedStops.some((s) => s.day_index != null);
+  const ordered = hasDays ? orderByDayThenNearestNeighbor(likedStops, origin) : orderByNearestNeighbor(likedStops, origin);
 
-  let cursor = origin;
+ let cursor = origin;
   let cumulativeMinutes = 0;
   let cumulativeCost = 0;
+  let previousDay: number | null = null;
   const finalStops: FinalItineraryStop[] = [];
 
   for (const stop of ordered) {
+    // מאפסים את המונה בתחילת כל יום חדש - כדי שהשעה בכל יום תחושב יחסית
+    // לתחילת אותו יום, לא מצטברת לאורך כל הטיול
+    const currentDay = stop.day_index ?? null;
+    if (currentDay !== null && currentDay !== previousDay) {
+      cumulativeMinutes = 0;
+      previousDay = currentDay;
+    }
+
     const placeLatLng: LatLng = { lat: stop.place!.latitude!, lng: stop.place!.longitude! };
     const distanceKm = haversineDistanceKm(cursor, placeLatLng);
     const etaMinutes = estimateTravelMinutes(distanceKm, "drive");
     cumulativeMinutes += etaMinutes;
 
 finalStops.push({
-      stopId: stop.id,
-      placeId: stop.place!.id,
-      name: stop.place!.name,
-      category: stop.category,
-      imageUrls: stop.place!.image_urls ?? [],
-      etaMinutes,
-      arrivalOffsetMinutes: cumulativeMinutes,
-      estimatedVisitMinutes: stop.place!.estimated_visit_minutes,
-      priceLevel: stop.place!.price_level,
-      rating: stop.place!.rating,
-      reason: stop.reason,
-      shortDescription: stop.place!.short_description,
-      latitude: placeLatLng.lat,
-      longitude: placeLatLng.lng,
-      openingHours: stop.place!.opening_hours,
+        stopId: stop.id,
+        placeId: stop.place!.id,
+        name: stop.place!.name,
+        category: stop.category,
+        imageUrls: stop.place!.image_urls ?? [],
+        etaMinutes,
+        arrivalOffsetMinutes: cumulativeMinutes,
+        estimatedVisitMinutes: stop.place!.estimated_visit_minutes,
+        priceLevel: stop.place!.price_level,
+        rating: stop.place!.rating,
+        reason: stop.reason,
+        shortDescription: stop.place!.short_description,
+        latitude: placeLatLng.lat,
+        longitude: placeLatLng.lng,
+        openingHours: stop.place!.opening_hours,
+        dayIndex: stop.day_index,
     });
 
     cumulativeMinutes += stop.place!.estimated_visit_minutes ?? 60;
@@ -168,6 +181,25 @@ function orderByNearestNeighbor(stops: LikedStopWithPlace[], origin: LatLng): Li
   return ordered;
 }
 
+/** כמו orderByNearestNeighbor, אבל שומר על קיבוץ לפי יום - לא מערבב תחנות מימים שונים. */
+function orderByDayThenNearestNeighbor(stops: LikedStopWithPlace[], origin: LatLng): LikedStopWithPlace[] {
+  const days = Array.from(new Set(stops.map((s) => s.day_index ?? 0))).sort((a, b) => a - b);
+  const ordered: LikedStopWithPlace[] = [];
+  let cursor = origin;
+
+  for (const day of days) {
+    const dayStops = stops.filter((s) => (s.day_index ?? 0) === day);
+    const orderedDay = orderByNearestNeighbor(dayStops, cursor);
+    ordered.push(...orderedDay);
+    if (orderedDay.length > 0) {
+      const last = orderedDay[orderedDay.length - 1];
+      cursor = { lat: last.place!.latitude!, lng: last.place!.longitude! };
+    }
+  }
+
+  return ordered;
+}
+
 /**
  * אירועים ופסטיבלים אמיתיים בסביבה (Ticketmaster) - מוצגים כהמלצה משלימה
  * בסוף המסלול, לא כתחנה מוחלקת, כי הם תלויי-תאריך ולא מקום קבוע.
@@ -192,3 +224,4 @@ function estimateCostFromPriceLevel(priceLevel: number | null): number {
   if (priceLevel == null) return 80;
   return [40, 80, 150, 250, 400][Math.min(priceLevel, 4)] ?? 80;
 }
+

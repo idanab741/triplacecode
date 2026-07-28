@@ -13,7 +13,10 @@ import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
 import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggestionService";
-import type { DayTripAnswers } from "@/services/tripBuilder/types";
+import { generateVacationAttractionList } from "@/services/tripBuilder/vacationAttractionListService";
+import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
+import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
+import type { DayTripAnswers, TripBuilderStop } from "@/services/tripBuilder/types";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 
 /**
@@ -41,7 +44,7 @@ export async function POST(
     return NextResponse.json({ error: "חסר מיקום מוצא ל-session" }, { status: 400 });
   }
 
-const answers = session.answers as unknown as DayTripAnswers;
+  const answers = session.answers as unknown as DayTripAnswers;
   const tripIntent = session.trip_intent;
 
   try {
@@ -51,20 +54,72 @@ const answers = session.answers as unknown as DayTripAnswers;
     const rules = getTripTypeRules(session.trip_type);
     const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
 
-const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
+    const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
     const pendingStops = stops
       .filter((s) => s.status === "pending")
-      .sort((a, b) => a.slot_index - b.slot_index);
+      .sort((a, b) => (a.day_index ?? 0) - (b.day_index ?? 0) || a.slot_index - b.slot_index);
     const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
 
-// אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
+    // עבור חופשה בחו"ל: מיקום ה"בית" לכל יום הוא מיקום המלון של אותו יום
+    // (אם המשתמש הזין כמה מלונות), לא מיקום ה-GPS המקורי של המשתמש
+    let dayOriginOverride: { lat: number; lng: number } | null = null;
+    if (session.trip_type === "abroad_vacation") {
+      const hotels = (session as unknown as { hotels?: { name: string; address: string }[] }).hotels ?? [];
+      if (hotels.length > 0 && hotels[0].address) {
+        dayOriginOverride = await geocodePlaceName(hotels[0].address);
+      }
+    }
+
+    // אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
     // סביב האזור הזה, לא סביב הבית של המשתמש. משתמשים בבית רק לחישוב
     // זמני נסיעה אמיתיים בהמשך (ב-finalizeItinerary), לא לחיפוש המקומות עצמם.
     // כשיש אזור מבוקש מפורש - משתמשים ברדיוס קטן וקבוע סביבו (לא ב-distanceBand,
     // שהוא "מרחק מקסימלי מהבית" ולא רלוונטי כשהמשתמש כבר ציין איפה הוא רוצה להיות).
     let searchOrigin = origin;
     let requestedAreaRadiusKm: number | undefined;
-    if (tripIntent?.requestedArea) {
+
+    // חופשה בחו"ל: קובעים יעד קבוע לכל הטיול, לפני כל בחירת תחנה. אם המשתמש
+    // בחר יעד מפורש - משתמשים בו. אם בחר "תפתיעו אותי" - Claude בוחר יעד
+    // אחד עכשיו (לא לפי מלל חופשי שעלול "לתפוס" אזור לא רלוונטי כמו דיסנילנד).
+    let vacationDestinationName: string | null = null;
+    if (session.trip_type === "abroad_vacation") {
+      const vacationAnswers = answers as unknown as {
+        destination?: string | null;
+        surpriseMe?: boolean;
+        vacationTypes?: string[];
+        travelStyle?: string;
+      };
+
+      if (vacationAnswers.destination) {
+        vacationDestinationName = vacationAnswers.destination;
+        const geocoded = await geocodePlaceName(vacationAnswers.destination);
+        if (geocoded) {
+          searchOrigin = geocoded;
+          requestedAreaRadiusKm = 20;
+        }
+      } else if (vacationAnswers.surpriseMe) {
+        const chosen = await pickSurpriseDestination({
+          vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
+          freeText: answers.freeText,
+          budgetLabel: remainingBudgetLabel,
+          travelStyle: vacationAnswers.travelStyle ?? "single_destination",
+        });
+        if (chosen) {
+          vacationDestinationName = `${chosen.city}, ${chosen.country}`;
+          searchOrigin = chosen.coords;
+          requestedAreaRadiusKm = 20;
+
+          // שומרים את היעד שנבחר בפועל ל-session, כדי שהתצוגה בהמשך
+          // (עמוד תוצאות) תדע להציג אותו למשתמש
+          await supabase
+            .from("trip_builder_sessions")
+            .update({ answers: { ...answers, destination: vacationDestinationName } })
+            .eq("id", sessionId);
+        }
+      }
+    }
+
+    if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation") {
       const geocoded = await geocodePlaceName(tripIntent.requestedArea);
       if (geocoded) {
         searchOrigin = geocoded;
@@ -72,11 +127,87 @@ const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
       }
     }
 
-// Area Detection: לפני שבוחרים תחנה אחת, אוספים מועמדים מכל הקטגוריות
+    // חופשה בחו"ל: מקבצים תחנות לפי יום, ומריצים קריאת AI אחת לכל יום
+    // **במקביל** (לא ברצף) - כך שגם טיולים ארוכים (הרבה ימים) נשארים
+    // מהירים, כי כל קריאה בודדת קטנה (רק תחנות היום הזה) ולא נחתכת ב-timeout
+    // כמו קריאה אחת ענקית לכל הטיול.
+    if (session.trip_type === "abroad_vacation") {
+      const vacationAnswers = answers as unknown as { vacationTypes?: string[] };
+      const destinationName = vacationDestinationName ?? "היעד המבוקש";
+
+      const dnaSummary =
+        dna && ((dna.interests && dna.interests.length) || (dna.preferred_categories && dna.preferred_categories.length))
+          ? [
+              dna.interests && dna.interests.length
+                ? `תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`
+                : null,
+              dna.preferred_categories && dna.preferred_categories.length
+                ? `קטגוריות מועדפות: ${dna.preferred_categories.map(getCategoryLabel).join(", ")}`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(". ")
+          : null;
+
+      const stopsByDay = new Map<number, TripBuilderStop[]>();
+      for (const stop of pendingStops) {
+        const day = stop.day_index ?? 1;
+        if (!stopsByDay.has(day)) stopsByDay.set(day, []);
+        stopsByDay.get(day)!.push(stop);
+      }
+
+      const dayResults = await Promise.all(
+        Array.from(stopsByDay.entries()).map(async ([day, dayStops]) => {
+          const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
+          const totalAttractions = dayStops.length - totalFood;
+
+          const suggestions = await generateVacationAttractionList({
+            destination: destinationName,
+            totalFood,
+            totalAttractions,
+            vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getCategoryLabel),
+            freeText: answers.freeText,
+            budgetLabel: remainingBudgetLabel,
+            travelDnaSummary: dnaSummary,
+          });
+
+          return { day, dayStops, suggestions };
+        })
+      );
+
+      for (const { dayStops, suggestions } of dayResults) {
+        const foodSuggestions = suggestions.filter((s) => s.role === "food" || s.role === "coffee_dessert");
+        const attractionSuggestions = suggestions.filter((s) => s.role === "attraction");
+        let foodCursor = 0;
+        let attractionCursor = 0;
+
+        for (const stop of dayStops) {
+          const isFoodRole = stop.role === "food" || stop.role === "coffee_dessert";
+          const suggestion = isFoodRole ? foodSuggestions[foodCursor++] : attractionSuggestions[attractionCursor++];
+          if (!suggestion) continue;
+
+          const realPlace = await ensurePlaceExists(suggestion, destinationName);
+          await likeStop(supabase, user.id, stop.id, realPlace);
+        }
+      }
+
+      const itinerary = await finalizeItinerary(
+        supabase,
+        sessionId,
+        searchOrigin,
+        answers.budgetBand,
+        answers.durationBand,
+        tripIntent,
+        answers.freeText
+      );
+      return NextResponse.json({ itinerary });
+    }
+
+    // Area Detection: לפני שבוחרים תחנה אחת, אוספים מועמדים מכל הקטגוריות
     // בתוכנית ומזהים את האזור הגיאוגרפי הצפוף ביותר במקומות איכותיים.
     // כל המסלול נבנה סביב האזור הזה, במקום לזחול תחנה-אחר-תחנה בלי לראות
     // את התמונה הכוללת - מונע קפיצות גיאוגרפיות ומסלולים לא רציפים.
-const clusteringPools = await Promise.all(
+    const clusteringPools = await Promise.all(
       pendingStops.map(async (stop) => ({
         category: stop.category,
         candidates: await fetchCandidatePool(supabase, {
@@ -99,7 +230,7 @@ const clusteringPools = await Promise.all(
       const stop = pendingStops[i];
       const isFirstStop = i === 0;
 
-// עבור מסעדות ובתי קפה - Claude מוביל עם המלצה אמיתית מהידע הכללי שלו,
+      // עבור מסעדות ובתי קפה - Claude מוביל עם המלצה אמיתית מהידע הכללי שלו,
       // לא רק בוחר מתוך המאגר הקיים. המאגר הוא רק גיבוי אם Claude לא בטוח.
       if (session.trip_type === "restaurants_cafes") {
         const restaurantAnswers = answers as unknown as { cuisine?: string[] };
@@ -111,9 +242,10 @@ const clusteringPools = await Promise.all(
         });
 
         if (aiSuggestion) {
-          await likeStop(supabase, user.id, stop.id, aiSuggestion);
-          excludePlaceIds.push(aiSuggestion.id);
-          cursor = { lat: aiSuggestion.latitude, lng: aiSuggestion.longitude };
+          const realPlace = await ensurePlaceExists(aiSuggestion, tripIntent?.requestedArea ?? "");
+          await likeStop(supabase, user.id, stop.id, realPlace);
+          excludePlaceIds.push(realPlace.id);
+          cursor = { lat: realPlace.latitude, lng: realPlace.longitude };
           continue;
         }
       }
@@ -122,11 +254,12 @@ const clusteringPools = await Promise.all(
       // וקבוע ממרכז האזור עצמו, לא מהתחנה הקודמת. אחרת כל תחנה "מרשה לעצמה"
       // לנוע עוד קצת רחוק יותר, ולאורך כמה תחנות זה מצטבר לדליפה גדולה
       // הרחק מהאזור שהמשתמש ביקש בפועל.
+      const effectiveOrigin = dayOriginOverride ?? (requestedAreaRadiusKm ? searchOrigin : cursor);
       const pool = await fetchCandidatePool(supabase, {
         category: stop.category,
-        origin: requestedAreaRadiusKm ? searchOrigin : cursor,
+        origin: effectiveOrigin,
         distanceBand: answers.distanceBand,
-        maxDistanceKm: requestedAreaRadiusKm ?? (isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand]),
+        maxDistanceKm: dayOriginOverride ? 15 : requestedAreaRadiusKm ?? (isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand]),
         maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
       });
@@ -152,7 +285,7 @@ const clusteringPools = await Promise.all(
 
       if (pool.length === 0) continue;
 
-// עבור מסעדות (ורק שם) - בחירת סוג המטבח לא מגיעה דרך "interests" הרגיל,
+      // עבור מסעדות (ורק שם) - בחירת סוג המטבח לא מגיעה דרך "interests" הרגיל,
       // אלא דרך שדה "cuisine" נפרד. מוסיפים אותה למלל שנשלח לדירוג, אחרת
       // הבחירה הספציפית של המשתמש (למשל "המבורגר") אף פעם לא מגיעה ל-Claude.
       const cuisineSelection = (answers as unknown as { cuisine?: string[] }).cuisine;
@@ -171,7 +304,7 @@ const clusteringPools = await Promise.all(
         tripIntent,
       });
 
-const top = ranked[0];
+      const top = ranked[0];
       if (!top) continue;
 
       await likeStop(supabase, user.id, stop.id, top);
@@ -190,7 +323,7 @@ const top = ranked[0];
       }
     }
 
-const itinerary = await finalizeItinerary(
+    const itinerary = await finalizeItinerary(
       supabase,
       sessionId,
       { lat: session.origin_latitude, lng: session.origin_longitude },
@@ -206,6 +339,7 @@ const itinerary = await finalizeItinerary(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
 /**
  * מוצא מזהי מקומות שנמצאים ברדיוס נתון מנקודה - משמש למניעת בחירת עוד תחנות
  * בתוך אזור חוויה שכבר נבחר (Area Experience), כי הן כבר חלק מאותה חוויה.

@@ -12,7 +12,7 @@ export interface ClaudeCallResult {
  * קריאה גולמית ל-Claude. מטפלת ב-timeout ורושמת כל שגיאה ללוג השרת
  * (console.error - נלכד אוטומטית בלוגים של Vercel).
  */
-export async function callClaude(prompt: string, maxTokens = 2048): Promise<ClaudeCallResult> {
+export async function callClaude(prompt: string, maxTokens = 2048, timeoutMs = TIMEOUT_MS): Promise<ClaudeCallResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     logAiError("ANTHROPIC_API_KEY אינו מוגדר", { prompt: prompt.slice(0, 200) });
@@ -20,7 +20,7 @@ export async function callClaude(prompt: string, maxTokens = 2048): Promise<Clau
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
 try {
     const fetchStart = Date.now();

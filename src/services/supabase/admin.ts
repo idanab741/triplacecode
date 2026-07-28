@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * לקוח Supabase עם ה-service_role key — עוקף RLS לגמרי.
- * לשימוש אך ורק בקוד צד-שרת (API Routes), אף פעם לא בצד הלקוח.
+ * לקוח Supabase עם הרשאות מלאות (service_role, עוקף RLS) - לשימוש אך ורק
+ * בפעולות שרת מבוקרות (כמו הכנסת מקומות שנוצרו ע"י AI לטבלת places),
+ * לעולם לא ייחשף לצד הלקוח.
  */
 export function createAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }

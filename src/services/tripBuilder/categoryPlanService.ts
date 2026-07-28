@@ -69,6 +69,32 @@ if (tripType === "nightlife") {
       freeText: nightlifeAnswers.freeText,
     };
   }
+  if (tripType === "abroad_vacation") {
+    const vacationAnswers = answers as import("./types").AbroadVacationAnswers;
+    const { VACATION_TYPE_TO_CATEGORY } = require("@/locales/he/abroadVacation");
+    const mappedCategories = Array.from(
+      new Set(
+        vacationAnswers.vacationTypes.map(
+          (v: string) => VACATION_TYPE_TO_CATEGORY[v] ?? "attractions_activities"
+        )
+      )
+    ) as string[];
+    return {
+      companions:
+        vacationAnswers.companions === "with_pet"
+          ? "solo"
+          : (vacationAnswers.companions as DayTripAnswers["companions"]),
+      hasPet: vacationAnswers.companions === "with_pet",
+      childAgeBands: vacationAnswers.childAgeBands,
+      timing: "other_date" as DayTripAnswers["timing"],
+      otherDate: vacationAnswers.startDate || null,
+      distanceBand: "5h" as DayTripAnswers["distanceBand"],
+      budgetBand: "unlimited" as DayTripAnswers["budgetBand"],
+      interests: mappedCategories.length > 0 ? mappedCategories : ["attractions_activities"],
+      durationBand: "default" as DayTripAnswers["durationBand"],
+      freeText: vacationAnswers.freeText,
+    };
+  }
   return answers as DayTripAnswers;
 }
 
@@ -270,4 +296,62 @@ export async function decideNextStop(params: DecideNextStopParams): Promise<{ ca
   const pool = interests.length > 0 ? interests : ["attractions_activities"];
   const notUsed = pool.find((c) => !params.usedCategories.includes(c));
   return { category: notUsed ?? pool[0], role: "attraction" };
+}
+import { VACATION_TYPE_TO_CATEGORY, VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
+
+/** מחשב כמה ימים יש בין שני תאריכים (כולל שני הקצוות). */
+function countDays(startDate: string, endDate: string): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diffMs = end.getTime() - start.getTime();
+  const days = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  return Math.max(1, days);
+}
+
+/**
+ * בונה תוכנית קטגוריות מרובת-ימים לחופשה בחו"ל - דטרמיניסטי (בלי AI), לפי
+ * קצב הטיול (VACATION_PACE_DAILY_COUNTS) וסוגי החופשה שנבחרו. יום ראשון
+ * ואחרון (הגעה/עזיבה) מקבלים כמות מופחתת, בהתאם למסמך האפיון.
+ */
+export function buildMultiDayVacationPlan(answers: {
+  startDate: string;
+  endDate: string;
+  pace: string;
+  vacationTypes: string[];
+}): CategoryPlanItem[] {
+  const numDays = countDays(answers.startDate, answers.endDate);
+  const counts =
+    VACATION_PACE_DAILY_COUNTS[answers.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ??
+    VACATION_PACE_DAILY_COUNTS.balanced;
+
+  const categoryPool =
+    answers.vacationTypes.length > 0
+      ? answers.vacationTypes.map((t) => VACATION_TYPE_TO_CATEGORY[t] ?? "attractions_activities")
+      : ["attractions_activities"];
+
+  const plan: CategoryPlanItem[] = [];
+  let order = 0;
+  let categoryCursor = 0;
+
+  function nextCategory(): string {
+    const category = categoryPool[categoryCursor % categoryPool.length];
+    categoryCursor += 1;
+    return category;
+  }
+
+  for (let day = 1; day <= numDays; day++) {
+    const isEdgeDay = day === 1 || day === numDays;
+    // יום הגעה/עזיבה - מחצית מהכמות הרגילה, לפחות תחנה אחת מכל סוג
+    const attractionsCount = isEdgeDay ? Math.max(1, Math.floor(counts.attractions / 2)) : counts.attractions;
+    const foodCount = isEdgeDay ? Math.max(1, Math.floor(counts.food / 2)) : counts.food;
+
+    for (let i = 0; i < attractionsCount; i++) {
+      plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
+    }
+    for (let i = 0; i < foodCount; i++) {
+      plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+    }
+  }
+
+  return plan;
 }

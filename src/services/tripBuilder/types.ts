@@ -44,6 +44,7 @@ export interface TripBuilderStop {
   score: number | null;
   reason: string | null;
   rejected_place_ids: string[];
+  day_index: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +53,8 @@ export interface CategoryPlanItem {
   category: string;
   role: StopRole;
   order: number;
+  /** יום בתוך מסלול מרובה-ימים (1, 2, 3...) - null לטיולים חד-יומיים. */
+  day?: number | null;
 }
 
 export interface CandidatePlace {
@@ -97,6 +100,10 @@ export interface FinalItineraryStop {
   latitude: number;
   longitude: number;
   openingHours: string[] | null;
+  dayIndex: number | null;
+  /** סוג תחנה מיוחדת (נחיתה/צ'ק-אין/צ'ק-אאוט) - null לתחנה רגילה. משמש
+   *  לתצוגה בלבד, לא נשלף מ-DB/AI. */
+  specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | null;
 }
 
 export interface FinalItineraryEvent {
@@ -227,7 +234,7 @@ export interface RomanticDateAnswers {
   dateType: string[];
   freeText: string;
  }
-  
+
 export type NightlifeCompanionType = "couple" | "friends" | "group" | "solo";
 export type GroupSizeBand = "5-10" | "10-20" | "20+";
 
@@ -239,5 +246,42 @@ export interface NightlifeAnswers {
   distanceBand: DistanceBand;
   budgetBand: BudgetBand;
   venueTypes: string[];
+  freeText: string;
+}
+export type VacationCompanionType = "couple" | "family" | "friends" | "solo" | "with_pet";
+export type VacationPace = "relaxed" | "balanced" | "packed";
+export type LodgingType = "hotel" | "resort" | "apartment" | "cabin" | "hostel" | "camping" | "glamping" | "villa";
+export type TravelStyle = "single_destination" | "multi_destination";
+
+export interface FlightInfo {
+  flightNumber: string | null;
+  departureTime: string;
+  arrivalTime: string;
+}
+
+export interface HotelInfo {
+  name: string;
+  address: string;
+}
+
+export type FlightPreference = "direct" | "one_stop" | "two_plus_stops";
+
+export interface AbroadVacationAnswers {
+  companions: VacationCompanionType;
+  childAgeBands: ChildAgeBand[];
+  startDate: string;
+  endDate: string;
+  departureAirport: string;
+  hasBookedFlightAndHotel: boolean;
+  flightPreference: FlightPreference | null;
+  flights: FlightInfo[];
+  hotels: HotelInfo[];
+  lodgingType: LodgingType | null;
+  budgetPerPerson: string;
+  vacationTypes: string[];
+  destination: string | null;
+  surpriseMe: boolean;
+  pace: VacationPace;
+  travelStyle: TravelStyle;
   freeText: string;
 }

@@ -23,6 +23,12 @@ import {
   NIGHTLIFE_PLAN_PROMPT_RULES,
   NIGHTLIFE_RANKING_PROMPT_RULES,
 } from "./nightlife";
+import {
+  ABROAD_VACATION_QUESTIONS,
+  ABROAD_VACATION_DURATION_RULES,
+  ABROAD_VACATION_PLAN_PROMPT_RULES,
+  ABROAD_VACATION_RANKING_PROMPT_RULES,
+} from "./abroadVacation";
 
 export interface TripTypeRulesConfig {
   questions: TripBuilderStep[];
@@ -55,11 +61,17 @@ romantic_date: {
     planPromptRules: ROMANTIC_DATE_PLAN_PROMPT_RULES,
     rankingPromptRules: ROMANTIC_DATE_RANKING_PROMPT_RULES,
   },
-  nightlife: {
+nightlife: {
     questions: NIGHTLIFE_QUESTIONS,
     durationRules: NIGHTLIFE_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
     planPromptRules: NIGHTLIFE_PLAN_PROMPT_RULES,
     rankingPromptRules: NIGHTLIFE_RANKING_PROMPT_RULES,
+  },
+  abroad_vacation: {
+    questions: ABROAD_VACATION_QUESTIONS,
+    durationRules: ABROAD_VACATION_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
+    planPromptRules: ABROAD_VACATION_PLAN_PROMPT_RULES,
+    rankingPromptRules: ABROAD_VACATION_RANKING_PROMPT_RULES,
   },
 };
 

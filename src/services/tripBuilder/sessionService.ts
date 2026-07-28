@@ -15,6 +15,26 @@ export async function createSession(
   answers: Record<string, unknown>,
   origin: { lat: number; lng: number }
 ): Promise<TripBuilderSession> {
+  // עבור חופשה בחו"ל (ובעתיד סופ"ש) - שדות מרובי-ימים נשמרים בעמודות ייעודיות,
+  // בנוסף ל-answers הגולמי, כדי שהשרת יוכל לשלוף אותם בלי לפרסר JSON בכל שאילתה
+  const multiDayFields: Record<string, unknown> = {};
+  if (tripType === "abroad_vacation") {
+    const a = answers as {
+      flights?: unknown;
+      hotels?: unknown;
+      lodgingType?: string | null;
+      startDate?: string;
+      endDate?: string;
+      pace?: string;
+    };
+    multiDayFields.flights = a.flights ?? [];
+    multiDayFields.hotels = a.hotels ?? [];
+    multiDayFields.lodging_type = a.lodgingType ?? null;
+    multiDayFields.start_date = a.startDate || null;
+    multiDayFields.end_date = a.endDate || null;
+    multiDayFields.pace = a.pace ?? "balanced";
+  }
+
   const { data, error } = await supabase
     .from("trip_builder_sessions")
     .insert({
@@ -23,6 +43,7 @@ export async function createSession(
       answers,
       origin_latitude: origin.lat,
       origin_longitude: origin.lng,
+      ...multiDayFields,
     })
     .select("*")
     .single();
@@ -70,6 +91,7 @@ export async function saveCategoryPlan(
     category: item.category,
     role: item.role,
     slot_index: item.order,
+    day_index: item.day ?? null,
   }));
 
   const { data, error } = await supabase.from("trip_builder_stops").insert(rows).select("*");
