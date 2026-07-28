@@ -247,7 +247,10 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden px-0">
+      {/* pb-20 (כ-80px) שומר מקום פנוי לבר הניווט התחתון, שכנראה ממוקם
+          fixed ולא תופס שטח אמיתי בפועל ב-flex - בלי זה, המשחק "חושב"
+          שיש לו יותר גובה פנוי ממה שבאמת נראה, והחלק התחתון נחבא מאחורי הבר */}
+      <div className="flex flex-1 overflow-hidden px-0 pb-20">
         <div
           ref={containerRef}
           className="relative h-full w-full overflow-hidden bg-gray-300"
