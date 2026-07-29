@@ -20,11 +20,24 @@ export async function geocodePlaceName(placeName: string): Promise<LatLng | null
     )}&key=${apiKey}&language=he`;
 
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      logAiError("קריאת גיאוקודינג נכשלה (HTTP)", { placeName, httpStatus: response.status });
+      return null;
+    }
 
     const data = await response.json();
     const location = data?.results?.[0]?.geometry?.location;
-    if (!location) return null;
+    if (!location) {
+      // סטטוס גוגל (למשל REQUEST_DENIED / OVER_QUERY_LIMIT / ZERO_RESULTS) הוא
+      // בדיוק המידע שהיה חסר קודם - בלי זה, מפתח API פגום/חסום נכשל בשקט
+      // גמור לכל מקום, בלי שום עקבה בלוג.
+      logAiError("גיאוקודינג לא החזיר מיקום", {
+        placeName,
+        googleStatus: data?.status,
+        googleErrorMessage: data?.error_message,
+      });
+      return null;
+    }
 
     return { lat: location.lat, lng: location.lng };
   } catch (error) {

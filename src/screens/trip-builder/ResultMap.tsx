@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, AttributionControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -17,16 +17,18 @@ interface ResultMapProps {
   stops: MapStop[];
 }
 
-/** פלטת צבעים קבועה לימים - עד 8 ימים מובחנים, אחר כך חוזר על עצמו. */
+/** פלטת צבעים קבועה לימים - עד 8 ימים מובחנים, אחר כך חוזר על עצמה.
+ *  גוונים שנבחרו במכוון להשתלב עם הזהות הכחולה-סגולה של המותג, לא צבעי
+ *  ברירת מחדל בהירים/מתנגשים. */
 const DAY_COLORS = [
-  "#2563eb", // כחול
-  "#e11d48", // אדום-ורוד
-  "#16a34a", // ירוק
-  "#f59e0b", // כתום
-  "#9333ea", // סגול
-  "#0891b2", // תכלת
-  "#db2777", // ורוד
-  "#65a30d", // ירוק-זית
+  "#4F7DF3", // כחול-מותג
+  "#8B5CF6", // סגול
+  "#0EA5A4", // טורקיז
+  "#EC4899", // ורוד
+  "#6366F1", // אינדיגו
+  "#F59E0B", // ענבר
+  "#059669", // ירוק-אמרלד
+  "#DB2777", // מג'נטה
 ];
 
 function colorForDay(dayIndex: number | null | undefined): string {
@@ -81,11 +83,23 @@ export function ResultMap({ stops }: ResultMapProps) {
   }
 
   return (
-    <div className="h-64 w-full overflow-hidden rounded-card shadow-soft">
-      <MapContainer center={positions[0]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+    <div className="relative h-64 w-full overflow-hidden rounded-card shadow-soft">
+      <MapContainer
+        center={positions[0]}
+        zoom={13}
+        scrollWheelZoom={false}
+        className="h-full w-full"
+        attributionControl={false}
+      >
+        {/* prefix={false} מסיר את התוספת של Leaflet עצמו לשליטה (כולל דגל
+            שהם הוסיפו ל"קרדיט" שלהם) - נשאר רק הקרדיט המשפטי הנדרש בפועל
+            (OpenStreetMap/CARTO), לא המותג של Leaflet. */}
+        <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={20}
         />
         {Array.from(dayGroups.entries()).map(([day, dayStops]) => (
           <Polyline
@@ -105,6 +119,19 @@ export function ResultMap({ stops }: ResultMapProps) {
         ))}
         <FitBounds stops={validStops} />
       </MapContainer>
+
+      {/* שכבת "מיתוג" עדינה מעל המפה - הבסיס (CARTO) הוא ניטרלי/אפור בכוונה,
+          והשכבה הזו נותנת לו גוון כחול-סגול שמתאים לזהות של המותג, בלי
+          להסתמך על שירות מפה בתשלום עם עיצוב מותאם אישית. pointer-events:none
+          כדי לא לחסום גרירה/זום של המפה מתחתיה. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #1E3A8A, #4C1D95)",
+          opacity: 0.12,
+          mixBlendMode: "color",
+        }}
+      />
     </div>
   );
 }

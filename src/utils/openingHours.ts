@@ -34,7 +34,11 @@ export function getTripDayOfWeek(timing: string, otherDate: string | null): numb
 }
 
 export function minutesToTimeLabel(totalMinutes: number): string {
-  const h = Math.floor(totalMinutes / 60) % 24;
-  const m = totalMinutes % 60;
+  // עוטפים למעגל של 24 שעות (1440 דקות) לפני שמחשבים שעה/דקה - בלי זה,
+  // מספר שלילי (שיכול להיווצר מעריכת שעה שמזיזה תחנה מוקדם יותר) מציג
+  // מחרוזת שבורה כמו "-1:-19" במקום שעה תקינה על השעון.
+  const wrapped = ((totalMinutes % 1440) + 1440) % 1440;
+  const h = Math.floor(wrapped / 60);
+  const m = wrapped % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

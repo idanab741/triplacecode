@@ -138,10 +138,10 @@ export default function ProfilePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/favorites?tab=saved")}
+            onClick={() => router.push("/trips")}
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
-            <span className="font-bold text-ink">הטיולים המועדפים שלי</span>
+            <span className="font-bold text-ink">הטיולים השמורים שלי</span>
             <ChevronLeft />
           </button>
 

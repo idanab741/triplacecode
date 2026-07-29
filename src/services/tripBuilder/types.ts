@@ -101,9 +101,12 @@ export interface FinalItineraryStop {
   longitude: number;
   openingHours: string[] | null;
   dayIndex: number | null;
-  /** סוג תחנה מיוחדת (נחיתה/צ'ק-אין/צ'ק-אאוט) - null לתחנה רגילה. משמש
+  /** סוג תחנה מיוחדת (נחיתה/צ'ק-אין/צ'ק-אאוט/טיסת חזרה) - null לתחנה רגילה. משמש
    *  לתצוגה בלבד, לא נשלף מ-DB/AI. */
-  specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | null;
+  specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | null;
+  /** קישור להזמנת נסיעה (Google Maps directions - המשתמש בוחר שם אובר/מונית/
+   *  תחבורה ציבורית) - רק לתחנות לוגיסטיקה (נחיתה/טיסת חזרה). null/undefined לתחנה רגילה. */
+  directionsUrl?: string | null;
 }
 
 export interface FinalItineraryEvent {

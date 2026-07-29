@@ -31,7 +31,8 @@ export async function POST(
 
   const body = await request.json().catch(() => null);
   const instruction: string | undefined = body?.instruction;
-  if (!instruction || !instruction.trim()) {
+  const explicitAction: "remove" | "swap" | undefined = body?.action;
+  if (!explicitAction && (!instruction || !instruction.trim())) {
     return NextResponse.json({ error: "יש לכתוב בקשה" }, { status: 400 });
   }
 
@@ -48,7 +49,10 @@ export async function POST(
   const answers = session.answers as unknown as DayTripAnswers;
 
   try {
-    const action = await interpretAction(instruction);
+    // כפתור המחיקה בסוויפ שולח action="remove" ישירות - אין צורך לבזבז קריאת
+    // Claude כדי "לפרש" משהו שכבר ידוע בוודאות (וגם מונע סיכון שה-AI יפרש
+    // לא נכון בקשת מחיקה מפורשת). תיבת TRIPPY החופשית ממשיכה להשתמש בפירוש AI.
+    const action = explicitAction ?? (await interpretAction(instruction!));
 
     if (action === "remove") {
       await supabase.from("trip_builder_stops").delete().eq("id", targetStop.stopId);
@@ -74,7 +78,7 @@ export async function POST(
         return NextResponse.json({ error: "לא נמצא מקום חלופי מתאים" }, { status: 404 });
       }
 
-      const combinedFreeText = `${answers.freeText}. בקשה ספציפית לתחנה הזו: ${instruction}`;
+      const combinedFreeText = `${answers.freeText}. בקשה ספציפית לתחנה הזו: ${instruction ?? ""}`;
 
       const ranked = await rankCandidates({
         dna,

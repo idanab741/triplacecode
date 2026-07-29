@@ -1,6 +1,6 @@
 import { callClaude, logAiError } from "@/services/ai/claudeService";
 import { geocodePlaceNameNear } from "./geocodingService";
-import { findPlacePhotoReference } from "./placePhotoService";
+import { findPlaceStatusAndPhoto } from "./placePhotoService";
 import { findExistingPlace } from "./aiPlaceInsertionService";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { CandidatePlace, LatLng, StopRole } from "./types";
@@ -40,10 +40,13 @@ export type ResolvedVacationPlace = CandidatePlace & { role: StopRole; day: numb
  * את מה שגוגל מזהה) - מנסה שוב עם השם בלבד, בלי היעד. בלי הגיבוי הזה,
  * מקומות אמיתיים לגמרי היו נשארים בלי תמונה רק כי הניסוח המדויק לא התאים.
  */
-async function findPlacePhotoReferenceWithFallback(name: string, destination: string): Promise<string | null> {
-  const primary = await findPlacePhotoReference(`${name} ${destination}`);
-  if (primary) return primary;
-  return findPlacePhotoReference(name);
+async function findPlacePhotoReferenceWithFallback(
+  name: string,
+  destination: string
+): Promise<{ photoRef: string | null; isClosed: boolean }> {
+  const primary = await findPlaceStatusAndPhoto(`${name} ${destination}`);
+  if (primary.photoRef || primary.isClosed) return primary;
+  return findPlaceStatusAndPhoto(name);
 }
 
 /**
@@ -112,30 +115,59 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
   // פחות round-trips וחזרות על boilerplate בסה"כ. max_tokens גדל עם גודל
   // הטיול; ה-timeout נשאר שמרני (45 שניות) כי זו קריאה בודדת שרצה מיד
   // בתחילת הבנייה, במקביל לשום דבר אחר.
-  const maxTokens = Math.min(6000, 500 + totalPlaces * 80);
-  const { text, error } = await callClaude(prompt, maxTokens, 45000);
-  if (error || !text) return [];
+  // maxTokens הקודם (500 + 80/מקום) לא הספיק בפועל - עברית צורכת יותר
+  // טוקנים למילה מאנגלית, ותשובת Claude נחתכת באמצע (בלי "]" סוגר בכלל).
+  // מעלים משמעותית את התקציב לביטחון.
+  const maxTokens = Math.min(8000, 800 + totalPlaces * 200);
+  // ה-timeout חייב לגדול עם כמות המקומות המבוקשת - טיול של 6 ימים (~38
+  // מקומות) פשוט לוקח יותר זמן לייצר מטיול יום אחד, וזמן קבוע (45 שניות)
+  // ניתק את הקריאה **בדיוק לפני** שהיא הספיקה לסיים, והחזיר מסלול ריק
+  // לגמרי - למרות שהיא כמעט הצליחה.
+  const timeoutMs = Math.min(90000, 20000 + totalPlaces * 1200);
+  const { text, error } = await callClaude(prompt, maxTokens, timeoutMs);
+  if (error || !text) {
+    logAiError("קריאת ה-AI ליצירת רשימת המקומות נכשלה - חוזר עם מסלול ריק", {
+      destination: params.destination,
+      error,
+      hasText: Boolean(text),
+    });
+    return [];
+  }
 
-  let raw: RawSuggestion[];
+  // מנסים קודם פענוח מלא ותקין; אם זה נכשל (בכל דרך - אין "]" סוגר בכלל
+  // כי התשובה נחתכה, או שיש "]" אבל ה-JSON בכל זאת שבור) - **תמיד** מנסים
+  // גם שחזור חלקי לפני שמוותרים. קודם זה היה מגיע לשחזור החלקי רק אם
+  // JSON.parse זרק שגיאה בפועל - אבל תשובה שנחתכת לפני "]" בכלל לא מגיעה
+  // לשם, כי ההתאמה הראשונית (regex) נכשלת קודם ומחזירה [] ישר, בלי לנסות
+  // לשחזר את מה שכן הצליח להיווצר.
+  let raw: RawSuggestion[] | null = null;
   try {
     const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
-    raw = JSON.parse(jsonMatch[0]);
-  } catch (parseError) {
-    const recovered = tryRecoverPartialJson(text);
-    if (recovered && recovered.length > 0) {
-      raw = recovered;
-    } else {
-      logAiError("כשל בפענוח רשימת אטרקציות חופשה", {
-        message: parseError instanceof Error ? parseError.message : String(parseError),
-      });
-      return [];
-    }
+    if (jsonMatch) raw = JSON.parse(jsonMatch[0]);
+  } catch {
+    raw = null;
+  }
+
+  if (!raw) {
+    raw = tryRecoverPartialJson(text);
+  }
+
+  if (!raw || raw.length === 0) {
+    logAiError("כשל בפענוח רשימת אטרקציות חופשה (גם אחרי ניסיון שחזור חלקי)", {
+      destination: params.destination,
+      rawText: text.slice(0, 800),
+    });
+    return [];
   }
 
   // הגנה נוספת מכפילויות: גם אם Claude בכל זאת חזר על שם (נדיר, אחרי
   // ההנחיה המפורשת) - מסננים שמות זהים (מנורמלים) לפני שממשיכים הלאה,
   // כדי לא לבזבז קריאות גיאוקודינג/תמונה על אותו מקום פעמיים.
+  if (raw.length === 0) {
+    logAiError("ה-AI החזיר JSON תקין אבל מערך ריק (0 מקומות)", { destination: params.destination });
+    return [];
+  }
+
   const seenNames = new Set<string>();
   const deduped = raw.filter((item) => {
     const key = item.name.trim().toLowerCase();
@@ -153,16 +185,31 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
       // + תמונה), מה שגם מהיר יותר וגם חוסך קרדיטים.
       const existing = await findExistingPlace(supabase, item.name, params.destination);
       if (existing) {
+        // אם למקום הקיים ב-DB אין תמונה בכלל (למשל נוצר לפני שהיה לנו
+        // fallback טוב יותר) - קודם זה היה נשאר ככה **לצמיתות**, כי כל
+        // שימוש חוזר במקום הזה פשוט מעתיק את מה שיש (או אין) ב-DB בלי
+        // לנסות שוב. במקום זאת, מנסים למלא את הפער עכשיו, ושומרים בחזרה
+        // ל-DB כדי שהשימושים הבאים גם ייהנו מהתיקון.
+        if (existing.imageUrls.length === 0) {
+          const backfill = await findPlacePhotoReferenceWithFallback(existing.name, params.destination);
+          if (backfill.photoRef) {
+            const imageUrl = `/api/places/photo?ref=${encodeURIComponent(backfill.photoRef)}`;
+            await supabase.from("places").update({ image_urls: [imageUrl] }).eq("id", existing.id);
+            existing.imageUrls = [imageUrl];
+          }
+        }
         return { ...existing, role: item.role as StopRole, day: item.day, reason: item.reason };
       }
 
-      const [coords, photoRef] = await Promise.all([
+      const [coords, photoResult] = await Promise.all([
         geocodePlaceNameNear(`${item.name}, ${params.destination}`, params.destinationOrigin, params.maxDistanceKm),
         findPlacePhotoReferenceWithFallback(item.name, params.destination),
       ]);
-      // גיאוקודינג נכשל או החזיר מקום רחוק מדי מהיעד - פוסלים את התחנה
-      // הזו לגמרי, במקום לתת לה "להידבק" למסלול כיעד לא רלוונטי.
-      if (!coords) return null;
+      // גיאוקודינג נכשל, המקום רחוק מדי מהיעד, או שהוא סגור בפועל (זמנית/
+      // לצמיתות) - פוסלים את התחנה לגמרי, במקום להציע למשתמש מקום שהוא לא
+      // יוכל בכלל להיכנס אליו.
+      if (!coords || photoResult.isClosed) return null;
+      const photoRef = photoResult.photoRef;
 
       const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
       return {
@@ -197,7 +244,17 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
     })
   );
 
-  return results.filter((r): r is ResolvedVacationPlace => r !== null);
+  const resolved = results.filter((r): r is ResolvedVacationPlace => r !== null);
+
+  if (resolved.length < deduped.length) {
+    logAiError("חלק מהמקומות נפלו בשלב הפענוח/גיאוקודינג", {
+      destination: params.destination,
+      claudeSuggested: deduped.length,
+      resolvedSuccessfully: resolved.length,
+    });
+  }
+
+  return resolved;
 }
 
 /**

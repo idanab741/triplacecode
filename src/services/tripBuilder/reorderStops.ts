@@ -18,6 +18,10 @@ function estimateTravelMinutes(distanceKm: number): number {
 /**
  * מחשב מחדש את זמני ההגעה לכל תחנה, לפי סדר חדש שהמשתמש קבע בגרירה -
  * בלי לפנות לשרת, כדי שהתצוגה תתעדכן מיד בלי המתנה.
+ * מאפס את המונה **וגם** את המיקום הנוכחי בתחילת כל יום חדש - בדיוק כמו
+ * בחישוב המקביל בשרת (finalizeService.ts). בלעדיו, אחרי כל גרירה בטיול
+ * רב-ימים, השעות של יום 2 ואילך ממשיכות "להצטבר" מהתחנה האחרונה של היום
+ * הקודם במקום לחזור לשעת התחלה סבירה - זה בדיוק מה שגרם לגרירה "להתקלקל".
  */
 export function recalculateStopTimes(
   stops: FinalItineraryStop[],
@@ -25,8 +29,16 @@ export function recalculateStopTimes(
 ): FinalItineraryStop[] {
   let cursor = origin;
   let cumulativeMinutes = 0;
+  let previousDay: number | null = null;
 
   return stops.map((stop) => {
+    const currentDay = stop.dayIndex ?? null;
+    if (currentDay !== null && currentDay !== previousDay) {
+      cumulativeMinutes = 0;
+      cursor = origin;
+      previousDay = currentDay;
+    }
+
     const distanceKm = haversineDistanceKm(cursor, { lat: stop.latitude, lng: stop.longitude });
     const etaMinutes = estimateTravelMinutes(distanceKm);
     cumulativeMinutes += etaMinutes;

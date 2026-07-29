@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getAttributeScoreMap, summarizeTopAttributes } from "@/services/travelDna/attributeLearningService";
@@ -198,6 +198,18 @@ export async function POST(
         budgetLabel: remainingBudgetLabel,
         travelDnaSummary: dnaSummary,
       });
+
+      if (allSuggestions.length === 0) {
+        // נקודת בקרה קריטית: אם הגענו לפה עם רשימה ריקה, המסלול יגיע לעמוד
+        // התוצאות בלי אף תחנה ("לא נבחרו מספיק תחנות"), בלי שום שגיאת HTTP
+        // בדרך - כי שום דבר לא "נכשל" ברמת ה-response, פשוט לא נבחרו מקומות.
+        // בלי הלוג הזה, זה בדיוק התרחיש שהיה בלתי אפשרי לאבחן.
+        console.error("[auto-build] generateVacationItinerary החזיר 0 מקומות", {
+          sessionId,
+          destinationName,
+          daySpecs,
+        });
+      }
 
       // הקצאה לפי יום, עם "רשת ביטחון": אם Claude תייג יום לא נכון או החזיר
       // פחות פריטים מהמבוקש ליום מסוים, לא משאירים את התחנה ריקה בשקט (זו
