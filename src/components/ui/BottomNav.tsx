@@ -44,7 +44,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             ) : null;
 
             return item.href ? (
-          <Link key={item.id} href={item.href} className="relative z-10 flex flex-col items-center gap-px px-2 py-1">
+          <Link key={item.id} href={item.href} className="relative z-10 flex flex-1 flex-col items-center gap-px px-2 py-1">
                 {content}
                 {elevatedLabel}
               </Link>
@@ -53,7 +53,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
                 key={item.id}
                 type="button"
                 onClick={() => onChange?.(item.id)}
-                className="relative z-10 flex flex-col items-center gap-px px-2 py-1"
+                className="relative z-10 flex flex-1 flex-col items-center gap-px px-2 py-1"
               >
                 {content}
                 {elevatedLabel}
@@ -61,7 +61,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             );
           }
 
-          const itemClasses = "flex flex-col items-center gap-px px-3 py-1 text-xs font-medium transition-colors";
+          const itemClasses = "flex flex-1 flex-col items-center gap-px px-3 py-1 text-xs font-medium transition-colors";
 
           return item.href ? (
             <Link key={item.id} href={item.href} className={itemClasses}>
