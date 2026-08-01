@@ -7,6 +7,8 @@ import { Button, Field, Icon, Input, PasswordInput, Screen } from "@/components/
 import {
   signUpWithEmail,
   signInWithEmail,
+  signInAsGuest,
+  signInWithOAuth,
   resetPasswordForEmail,
   translateAuthError,
 } from "@/services/auth/authService";
@@ -87,6 +89,39 @@ function AuthPageContent() {
   const [fpMessage, setFpMessage] = useState<string | null>(null);
 
   const [socialMessage, setSocialMessage] = useState<string | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+
+  async function handleGuestLogin() {
+    if (guestLoading) return;
+    setSocialMessage(null);
+    setGuestLoading(true);
+    const { data, error } = await signInAsGuest();
+    setGuestLoading(false);
+
+    if (error) {
+      setSocialMessage(translateAuthError(error.message));
+      return;
+    }
+    if (data.user) {
+      // אין profile/preferences למשתמש אנונימי חדש - ישר לעמוד הבית,
+      // לא דרך redirectAfterAuth (שמצפה לפרופיל קיים).
+      router.push("/home");
+    }
+  }
+
+  async function handleOAuthLogin(provider: "google" | "apple") {
+    if (oauthLoading) return;
+    setSocialMessage(null);
+    setOauthLoading(provider);
+    const { error } = await signInWithOAuth(provider);
+    // בהצלחה, Supabase מפנה אוטומטית ל-provider - הדף הזה "עוזב" ואין צורך
+    // בניתוב ידני. מטפלים כאן רק בכישלון (למשל הספק לא מוגדר ב-Supabase).
+    if (error) {
+      setOauthLoading(null);
+      setSocialMessage(translateAuthError(error.message));
+    }
+  }
 
   function selectTab(next: Tab) {
     setTab(next);
@@ -175,7 +210,7 @@ function AuthPageContent() {
         </button>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-6 px-6 pt-6 pb-10">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pt-6 pb-10">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-ink">ברוכים הבאים!</h1>
           <p className="mt-1 text-ink-secondary">ההרפתקה שלכם מתחילה כאן!</p>
@@ -301,10 +336,11 @@ function AuthPageContent() {
 
         <button
           type="button"
-          onClick={() => setSocialMessage("כניסת אורח תהיה זמינה בקרוב")}
-          className="text-center text-sm font-semibold text-accent"
+          onClick={handleGuestLogin}
+          disabled={guestLoading}
+          className="text-center text-sm font-semibold text-accent disabled:opacity-50"
         >
-          המשך כאורח
+          {guestLoading ? "נכנס..." : "המשך כאורח"}
         </button>
 
         <div className="flex items-center gap-3 text-xs text-ink-secondary">
@@ -316,17 +352,19 @@ function AuthPageContent() {
         <div className="flex justify-center gap-4">
           <button
             type="button"
-            onClick={() => setSocialMessage("ההתחברות עם Google תהיה זמינה בקרוב")}
+            onClick={() => handleOAuthLogin("google")}
+            disabled={oauthLoading !== null}
             aria-label="המשך עם Google"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-ink-secondary/20 bg-bg shadow-soft"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-ink-secondary/20 bg-bg shadow-soft disabled:opacity-50"
           >
             <GoogleIcon />
           </button>
           <button
             type="button"
-            onClick={() => setSocialMessage("ההתחברות עם Apple תהיה זמינה בקרוב")}
+            onClick={() => handleOAuthLogin("apple")}
+            disabled={oauthLoading !== null}
             aria-label="המשך עם Apple"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-ink-secondary/20 bg-bg text-ink shadow-soft"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-ink-secondary/20 bg-bg text-ink shadow-soft disabled:opacity-50"
           >
             <AppleIcon />
           </button>

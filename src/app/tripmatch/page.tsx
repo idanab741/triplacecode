@@ -132,7 +132,7 @@ return (
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-4 px-5 pb-10 pt-5">
+      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-10 pt-5">
         {stage === "city" && (
           <div className="flex flex-col gap-3">
      <ChatBubble>החליקו ימינה למקומות שאהבתם ושמאלה לאלה

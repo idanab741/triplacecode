@@ -1,18 +1,34 @@
 "use client";
 
 /**
- * מצב "אורח" (ללא חשבון) מושבת זמנית: /home דורש כעת התחברות,
- * ואין עדיין מסלול אמיתי לכניסת אורחים. יוחלט בהמשך אם להוסיף
- * כניסת אורח אמיתית (למשל anonymous auth של Supabase) או להסיר את הכפתור.
+ * מסך פתיחה - כניסת אורח אמיתית (anonymous auth של Supabase).
  */
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { signInAsGuest, translateAuthError } from "@/services/auth/authService";
 
 export default function SplashPage() {
+  const router = useRouter();
   const [guestMessage, setGuestMessage] = useState<string | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  async function handleGuestLogin() {
+    if (guestLoading) return;
+    setGuestMessage(null);
+    setGuestLoading(true);
+    const { data, error } = await signInAsGuest();
+    setGuestLoading(false);
+
+    if (error) {
+      setGuestMessage(translateAuthError(error.message));
+      return;
+    }
+    if (data.user) router.push("/home");
+  }
 
   return (
     <main className="flex min-h-screen flex-1 flex-col bg-bg">
@@ -26,16 +42,12 @@ export default function SplashPage() {
       />
 
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-10 text-center">
-        <div className="flex w-full max-w-xs flex-col gap-3">
+        <div className="flex w-full max-w-xl flex-col gap-3">
           <Button href="/auth" fullWidth>
             בואו נתחיל!
           </Button>
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={() => setGuestMessage("כניסת אורח תהיה זמינה בקרוב")}
-          >
-            היכנס כאורח
+          <Button variant="secondary" fullWidth onClick={handleGuestLogin} disabled={guestLoading}>
+            {guestLoading ? "נכנס..." : "היכנס כאורח"}
           </Button>
           {guestMessage && <p className="text-sm text-ink-secondary">{guestMessage}</p>}
         </div>

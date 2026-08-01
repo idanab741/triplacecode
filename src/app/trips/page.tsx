@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Screen, Skeleton, Button } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -33,21 +33,34 @@ function formatDate(iso: string): string {
 }
 
 export default function SavedTripsPage() {
+  return (
+    <Suspense>
+      <SavedTripsPageContent />
+    </Suspense>
+  );
+}
+
+function SavedTripsPageContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const showAll = searchParams.get("filter") === "all";
   const [trips, setTrips] = useState<SavedTrip[] | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    fetch("/api/trip-builder/sessions/saved")
+    setTrips(null);
+    const params = new URLSearchParams();
+    if (showAll) params.set("all", "true");
+    fetch(`/api/trip-builder/sessions/saved?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => setTrips(data.trips ?? []))
       .catch(() => setTrips([]));
-  }, [user]);
+  }, [user, showAll]);
 
   return (
     <Screen>
-      <div className="mx-auto flex max-w-sm flex-col gap-4 px-5 pt-4">
+      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -59,7 +72,7 @@ export default function SavedTripsPage() {
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </button>
-          <h1 className="text-lg font-bold text-ink">הטיולים השמורים שלי</h1>
+          <h1 className="text-lg font-bold text-ink">{showAll ? "כל הטיולים שלי" : "הטיולים השמורים שלי"}</h1>
         </div>
 
         {loading || trips === null ? (
@@ -70,7 +83,11 @@ export default function SavedTripsPage() {
           </div>
         ) : trips.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <p className="text-sm text-ink-secondary">עוד לא שמרת אף טיול - כשתבנו מסלול ותשמרו אותו, הוא יופיע כאן.</p>
+            <p className="text-sm text-ink-secondary">
+              {showAll
+                ? "עוד לא בנית אף מסלול - כשתבנו טיול, הוא יופיע כאן."
+                : 'עוד לא שמרת אף טיול - כשתבנו מסלול ותשמרו אותו (בעזרת כפתור ה"שמור"), הוא יופיע כאן.'}
+            </p>
             <Button href="/home">לדף הבית</Button>
           </div>
         ) : (

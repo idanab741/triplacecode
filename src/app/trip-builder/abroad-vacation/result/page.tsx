@@ -345,7 +345,7 @@ function AbroadVacationResultContent() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-4">
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-4">
         <div>
           <h1 className="text-xl font-bold text-ink">
             החופשה שלכם ל{answersTyped.destination ?? "היעד שבחרתם"} מוכנה!

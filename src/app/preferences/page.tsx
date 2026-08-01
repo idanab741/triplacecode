@@ -123,7 +123,7 @@ function PreferencesPageContent() {
 
   return (
     <Screen withBottomNavSpacing={false}>
-      <div className="mx-auto flex max-w-sm flex-col gap-6 pt-6">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 pt-6">
         <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary">
           <div
             className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all"

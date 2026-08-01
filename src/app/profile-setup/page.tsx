@@ -114,7 +114,7 @@ export default function ProfileSetupPage() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-6 px-6 pb-10 pt-6">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pb-10 pt-6">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-ink">בניית פרופיל</h1>
           <p className="mt-1 text-ink-secondary">עוד רגע מתחילים לטייל!</p>

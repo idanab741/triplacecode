@@ -15,6 +15,7 @@ import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
+import { MyTripsSection } from "@/screens/home/MyTripsSection";
 
 export default function HomePage() {
   const {
@@ -124,6 +125,7 @@ export default function HomePage() {
             title={personalized ? "מותאם בשבילך" : "יעדים חמים"}
             destinations={destinations}
           />
+          <MyTripsSection />
         </div>
       </div>
 

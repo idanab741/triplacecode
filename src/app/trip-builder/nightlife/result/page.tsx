@@ -147,7 +147,7 @@ src="/images/hero-nightlife.png"
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-sm flex-col gap-5 px-5 pb-10 pt-0">
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-xl font-bold text-ink">הערב שלכם מוכן!</h1>

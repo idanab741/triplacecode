@@ -52,7 +52,7 @@ export default function ProfilePage() {
   if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-bg pb-28">
-        <div className="mx-auto flex max-w-sm flex-col items-center gap-4 pt-10">
+        <div className="mx-auto flex max-w-xl flex-col items-center gap-4 pt-10">
           <Skeleton className="h-28 w-28 rounded-full" />
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-4 w-56" />

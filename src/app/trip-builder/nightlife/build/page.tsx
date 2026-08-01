@@ -191,7 +191,7 @@ function NightlifeBuildContent() {
 
   return (
     <Screen withBottomNavSpacing={false}>
-      <div className="mx-auto flex max-w-sm flex-col gap-4 pt-6">
+      <div className="mx-auto flex max-w-xl flex-col gap-4 pt-6">
         <Stepper
           current={doneStops + 1}
           total={totalStops}
@@ -202,7 +202,7 @@ function NightlifeBuildContent() {
           <div className="flex flex-col items-center gap-4 pt-16 text-center">
             <p className="text-lg font-bold text-ink">רוצים להוסיף עוד תחנה לערב?</p>
             <p className="text-sm text-ink-secondary">אפשר לסיים כאן, או להוסיף עוד תחנה אחת</p>
-            <div className="flex w-full max-w-xs flex-col gap-3">
+            <div className="flex w-full max-w-xl flex-col gap-3">
               <Button variant="primary" fullWidth onClick={handleContinueYes} disabled={busy}>
                 כן, עוד תחנה
               </Button>
