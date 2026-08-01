@@ -21,7 +21,7 @@ interface Collectible {
   collected: boolean;
 }
 
-const GROUND_Y = 80;
+const GROUND_Y = 79;
 const JUMP_VELOCITY = -13;
 const GRAVITY = 0.6;
 const MAX_JUMPS = 2;
