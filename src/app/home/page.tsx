@@ -32,14 +32,18 @@ export default function HomePage() {
   const [personalized, setPersonalized] = useState(false);
 
   useEffect(() => {
-    if (loading || profileLoading || preferencesLoading || !user) return;
+    if (loading || profileLoading || !user) return;
+
+    // אורחים (anonymous auth) לא אמורים להיזרק אוטומטית להשלמת פרופיל -
+    // המטרה של מצב אורח היא שיוכלו לגלוש חופשי בעמוד הבית, ורק אם ילחצו
+    // על פעולה שדורשת חשבון אמיתי - שם תופיע הזמנה להירשם (לא אוטומטית).
+    const isGuest = Boolean(user.is_anonymous);
+    if (isGuest) return;
 
     if (!isProfileComplete(profile)) {
       router.replace("/profile-setup");
-    } else if (!isPreferencesComplete(preferences)) {
-      router.replace("/preferences");
     }
-  }, [loading, profileLoading, preferencesLoading, user, profile, preferences, router]);
+  }, [loading, profileLoading, user, profile, router]);
 
   useEffect(() => {
     getFeaturedDestinations().then((rows) => {
