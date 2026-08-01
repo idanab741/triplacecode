@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 
 /**
- * עמוד בדיקה בלבד למשחק ההמתנה - מציג אותו ישירות, בלי לעבור שאלון שלם.
- * לא חלק מהזרימה האמיתית של האפליקציה, רק כלי פיתוח נוח.
+ * עמוד המשחק שלנו - נגיש ישירות מעמוד הבית (כרטיסיית "גלה עוד"), לא רק
+ * בזמן בניית מסלול אמיתי.
  */
-export default function TestGamePage() {
-  return <LoadingGame statusText="בונים לכם את החופשה... (מסך בדיקה)" />;
+export default function GamePage() {
+  return <LoadingGame statusText="RUNtrippy" />;
 }

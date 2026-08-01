@@ -1,5 +1,4 @@
-import type { NextConfig } from "next";
-import path from "path";
+﻿import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
@@ -10,9 +9,6 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
-  },
-  turbopack: {
-    root: path.join(__dirname),
   },
 };
 

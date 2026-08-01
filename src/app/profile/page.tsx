@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,10 +17,29 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
   const [savingName, setSavingName] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleSignOut() {
     await signOut();
     router.push("/");
+  }
+
+  async function handleDeleteAccount() {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch("/api/profile/delete-account", { method: "POST" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error ?? "מחיקת החשבון נכשלה");
+
+      await signOut();
+      router.push("/");
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "מחיקת החשבון נכשלה");
+      setDeleting(false);
+    }
   }
 
   async function handleSaveName() {
@@ -195,12 +214,19 @@ export default function ProfilePage() {
           ) : (
             <div className="rounded-card bg-danger/10 p-4 text-center">
               <p className="mb-3 text-sm text-danger">פעולה בלתי הפיכה — כל הנתונים יימחקו לצמיתות.</p>
+              {deleteError && <p className="mb-3 text-xs text-danger">{deleteError}</p>}
               <div className="flex gap-2">
-                <Button variant="secondary" fullWidth onClick={() => setShowDeleteConfirm(false)}>
+                <Button variant="secondary" fullWidth onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
                   ביטול
                 </Button>
-                <Button variant="secondary" fullWidth className="!bg-danger !text-white">
-                  כן, מחק את החשבון
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  className="!bg-danger !text-white disabled:!opacity-60"
+                  onClick={handleDeleteAccount}
+                  disabled={deleting}
+                >
+                  {deleting ? "מוחק..." : "כן, מחק את החשבון"}
                 </Button>
               </div>
             </div>

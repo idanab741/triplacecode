@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -14,6 +14,11 @@ const SLIDES = [
     href: "/tripmatch",
     image: "/images/discover/tripmatch.png",
     alt: "TripMatch",
+  },
+  {
+    href: "/test-game",
+    image: "/images/discover/game.png",
+    alt: "המשחק שלנו",
   },
   {
     href: "/ai",
@@ -57,7 +62,7 @@ export function DiscoverCard() {
                 width={1200}
                 height={675}
                 priority
-                className="block w-full h-auto"
+                className="block h-auto w-full"
               />
             </Link>
           </SwiperSlide>
