@@ -3,9 +3,10 @@ import {
   TRANSPORTATION,
   INTERESTS,
   ACCOMMODATION_TYPES,
+  VACATION_PREFERENCES,
   type PreferenceOption,
 } from "@/locales/he/preferences";
-import { VACATION_TYPE_OPTIONS } from "@/locales/he/abroadVacation";
+
 
 export type MultiFieldKey =
   | "culinary_styles"
@@ -52,7 +53,7 @@ export const STEPS: PreferenceStep[] = [
     type: "multi",
     key: "vacation_preferences",
     title: "העדפות חופשות בחו\"ל",
-    options: VACATION_TYPE_OPTIONS,
+    options: VACATION_PREFERENCES,
   },
 ];
 

@@ -8,6 +8,8 @@ export interface PreferenceOption {
   label: string;
   /** תמונת רקע לכרטיס הבחירה (public/images/preferences/...) - אופציונלי, לא לכל האופציות יש תמונה עדיין. */
   imageSrc?: string;
+  /** אימוג'י קטן ליד התווית (בעיקר לתחומי עניין) - אופציונלי. */
+  emoji?: string;
 }
 
 export const CULINARY_STYLES: PreferenceOption[] = [
@@ -47,22 +49,26 @@ export const TRANSPORTATION: PreferenceOption[] = [
 ];
 
 export const INTERESTS: PreferenceOption[] = [
-  { value: "nature_landscapes", label: "טבע ונופים" },
-  { value: "springs_streams", label: "מעיינות ונחלים" },
-  { value: "beaches_pools", label: "חופי ים ובריכות" },
-  { value: "museums_history", label: "מוזיאונים והיסטוריה" },
-  { value: "culture_art", label: "תרבות ואמנות" },
-  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה" },
-  { value: "restaurants_culinary", label: "מסעדות וקולינריה" },
-  { value: "wineries_breweries", label: "יקבים ומבשלות" },
-  { value: "shopping", label: "שופינג וקניות" },
-  { value: "amusement_water_parks", label: "פארקי שעשועים ומים" },
-  { value: "water_attractions", label: "אטרקציות מים" },
-  { value: "sports_extreme", label: "ספורט ואקסטרים" },
-  { value: "relaxation_spa", label: "רוגע וספא" },
-  { value: "nightlife", label: "חיי לילה ובילויים" },
-  { value: "live_shows", label: "הופעות חיות" },
-  { value: "events_festivals", label: "אירועים ופסטיבלים" },
+  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
+  { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },
+  { value: "beaches_pools", label: "חופי ים, אגמים ובריכות", emoji: "🏖️" },
+  { value: "viewpoints", label: "תצפיות, זריחות ושקיעות", emoji: "🌅" },
+  { value: "parks_gardens", label: "פארקים, גנים ופינות פיקניק", emoji: "🌳" },
+  { value: "water_amusement_parks", label: "פארקי מים, פארקי שעשועים ומתקנים", emoji: "🎡" },
+  { value: "attractions_activities", label: "אטרקציות ופעילויות", emoji: "🎯" },
+  { value: "sports_extreme", label: "ספורט ואקסטרים", emoji: "🚴" },
+{ value: "restaurants_culinary", label: "מסעדות וקולינריה", emoji: "🍽️" },
+  { value: "wineries_breweries", label: "יקבים ומבשלות", emoji: "🍷" },
+  { value: "culture_history", label: "תרבות, מוזיאונים והיסטוריה", emoji: "🏛️" },
+  { value: "shopping", label: "שופינג, קניות ושווקים", emoji: "🛍️" },
+  { value: "events_festivals", label: "אירועים, הופעות ופסטיבלים", emoji: "🎪" },
+  { value: "nightlife_entertainment", label: "חיי לילה ובילויים", emoji: "🎭" },
+  { value: "spa_relaxation", label: "ספא, מרחצאות ורוגע", emoji: "🧖" },
+  { value: "boating_water_attractions", label: "שיט ואטרקציות מים", emoji: "🛶" },
+  { value: "heritage_holy_sites", label: "אתרי מורשת ומקומות קדושים", emoji: "🛕" },
+  { value: "kids_family_activities", label: "פעילויות לילדים ומשפחות", emoji: "👨‍👩‍👧‍👦" },
+  { value: "art_galleries", label: "אמנות וגלריות", emoji: "🎨" },
+  { value: "photo_spots", label: "נקודות צילום ונופי אינסטגרם", emoji: "📸" },
 ];
 
 export const ACCOMMODATION_TYPES: PreferenceOption[] = [
@@ -77,16 +83,20 @@ export const ACCOMMODATION_TYPES: PreferenceOption[] = [
 ];
 
 export const VACATION_PREFERENCES: PreferenceOption[] = [
-  { value: "chill_relax", label: "בטן־גב ורוגע" },
-  { value: "nature_adventure", label: "טבע והרפתקאות" },
-  { value: "urban_city_trip", label: "טיול אורבני בעיר הגדולה" },
-  { value: "shopping", label: "שופינג וקניות" },
-  { value: "culinary_restaurants", label: "קולינריה ומסעדות" },
-  { value: "museums_history", label: "מוזיאונים והיסטוריה" },
-  { value: "culture_art", label: "תרבות ואמנות" },
-  { value: "family", label: "משפחתי" },
-  { value: "nightlife", label: "חיי לילה ובילויים" },
-  { value: "sports_extreme", label: "ספורט ואקסטרים" },
-  { value: "spa_wellness", label: "ספא ווולנס" },
-  { value: "ski", label: "סקי" },
+  { value: "beach_relax", label: "בטן גב וחופים", imageSrc: "/images/preferences/activities/beach.png" },
+  { value: "casino_gambling", label: "קזינו והימורים", imageSrc: "/images/preferences/activities/casino.png" },
+  { value: "cruise", label: "קרוזים ושייט", imageSrc: "/images/preferences/activities/cruise.png" },
+  { value: "family", label: "חופשה משפחתית", imageSrc: "/images/preferences/activities/family.png" },
+  { value: "seasonal_holidays", label: "חופשות עונתיות", imageSrc: "/images/preferences/activities/holiday.png" },
+  { value: "honeymoon_romantic", label: "חופשה רומנטית וירח דבש", imageSrc: "/images/preferences/activities/honeymoon.png" },
+  { value: "live_shows_festivals", label: "הופעות חיות ופסטיבלים", imageSrc: "/images/preferences/activities/liveshow.png" },
+  { value: "digital_nomad", label: "נוודות דיגיטלית", imageSrc: "/images/preferences/activities/digitalnomad.png" },
+  { value: "luxury_indulgence", label: "יוקרה ופינוקים", imageSrc: "/images/preferences/activities/luxury.png" },
+  { value: "spa_wellness_retreats", label: "ספא, וולנס וריטריטים", imageSrc: "/images/preferences/activities/wellness.png" },
+  { value: "ski_winter_sports", label: "סקי וספורט חורף", imageSrc: "/images/preferences/activities/ski.png" },
+  { value: "sports_events", label: "אירועי ספורט", imageSrc: "/images/preferences/activities/sportsevents.png" },
+  { value: "backpacking_trekking", label: "טיולי תרמילאים", imageSrc: "/images/preferences/activities/treknature.png" },
+  { value: "tropical_vacation", label: "חופשות טרופיות", imageSrc: "/images/preferences/activities/tropical.png" },
+  { value: "urban_city_trip", label: "חופשה עירונית", imageSrc: "/images/preferences/activities/urban.png" },
+  { value: "parties_nightlife", label: "מסיבות וחיי לילה", imageSrc: "/images/preferences/activities/parties.png" },
 ];

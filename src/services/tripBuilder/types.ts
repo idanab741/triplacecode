@@ -182,6 +182,7 @@ export interface StepOption {
   value: string;
   label: string;
   emoji?: string;
+  imageSrc?: string;
 }
 
 export interface SingleStep {

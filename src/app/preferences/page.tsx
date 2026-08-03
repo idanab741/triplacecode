@@ -171,20 +171,21 @@ function PreferencesPageContent() {
         {/* בלי כרטיסייה לבנה עוטפת בשום שלב - האריחים/הצ'יפים עומדים ישירות
             על רקע העמוד, עקבי בין כל השלבים (לא רק שלבים עם תמונות). */}
         {step.type === "multi" && step.options.some((o) => o.imageSrc) && (
-          <div className="grid grid-cols-3 content-start gap-1.5">
+          <div className={`grid content-start gap-1.5 ${step.key === "vacation_preferences" ? "grid-cols-2" : "grid-cols-3"}`}>
             {step.options.map((option) => (
-              <ImageOptionCard
+         <ImageOptionCard
                 key={option.value}
                 selected={form[step.key].includes(option.value)}
                 onClick={() => toggleChip(step.key, option.value)}
                 label={option.label}
                 imageSrc={option.imageSrc}
+                aspectRatio={step.key === "vacation_preferences" ? "555 / 369" : "1 / 1"}
               />
             ))}
           </div>
         )}
 
-        {step.type === "multi" && !step.options.some((o) => o.imageSrc) && (
+{step.type === "multi" && !step.options.some((o) => o.imageSrc) && (
           <div className="flex flex-wrap justify-center gap-2">
             {step.options.map((option) => (
               <Chip
@@ -192,7 +193,7 @@ function PreferencesPageContent() {
                 selected={form[step.key].includes(option.value)}
                 onClick={() => toggleChip(step.key, option.value)}
               >
-                {option.label}
+                {option.emoji ? `${option.emoji} ${option.label}` : option.label}
               </Chip>
             ))}
           </div>

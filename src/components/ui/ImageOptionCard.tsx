@@ -5,6 +5,9 @@ interface ImageOptionCardProps {
   onClick: () => void;
   label: string;
   imageSrc?: string;
+  /** יחס רוחב-גובה - ברירת מחדל ריבוע (1/1). לתמונות אחרות (כמו 555x369)
+   *  אפשר להעביר "555/369" כדי לשמור על הפרופורציה המקורית בלי חיתוך/עיוות. */
+  aspectRatio?: string;
 }
 
 /**
@@ -14,13 +17,14 @@ interface ImageOptionCardProps {
  * אם עדיין אין תמונה לאופציה הזו (imageSrc לא סופק) - מוצג placeholder
  * עדין באותו יחס-גובה, כדי שהרשת תישאר אחידה עד שתתווסף תמונה אמיתית.
  */
-export function ImageOptionCard({ selected, onClick, label, imageSrc }: ImageOptionCardProps) {
-  return (
+export function ImageOptionCard({ selected, onClick, label, imageSrc, aspectRatio = "1 / 1" }: ImageOptionCardProps) {
+    return (
     <button
       type="button"
       onClick={onClick}
-      className="group relative aspect-square w-full overflow-hidden rounded-card transition active:scale-95"
+  className="group relative w-full overflow-hidden rounded-card transition active:scale-95"
       style={{
+        aspectRatio,
         boxShadow: selected ? "0 8px 20px -4px rgba(24,119,242,0.35)" : "0 2px 8px rgba(16,24,40,0.1)",
       }}
     >
