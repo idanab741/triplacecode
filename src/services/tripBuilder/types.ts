@@ -309,3 +309,26 @@ export interface AbroadVacationAnswers {
   travelStyle: TravelStyle;
   freeText: string;
 }
+export interface WeekendAnswers {
+  companions: VacationCompanionType;
+  childAgeBands: ChildAgeBand[];
+
+  startDate: string;
+  endDate: string;
+
+  distanceBand: DistanceBand;
+
+  hasBookedLodging: boolean;
+  lodgingName: string | null;
+  lodgingAddress: string | null;
+
+  lodgingType: LodgingType | null;
+
+  weekendStyles: string[];
+
+  pace: VacationPace;
+
+  budgetPerPerson: string;
+
+  freeText: string;
+}
