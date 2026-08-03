@@ -60,6 +60,22 @@ function PreferencesPageContent() {
     }
   }, [loading, profileLoading, user, profile, router]);
 
+  // בדיקה כפולה/עמידה: לא משנה איך המשתמש הגיע לכאן (מ-profile-setup או
+  // בכל דרך אחרת) - אם הוא עדיין לא ראה את ה-Onboarding, מיירטים אותו
+  // לכאן *לפני* שממשיכים בזרימת ההעדפות. זה נקודת עצירה אמינה יותר
+  // מלהסתמך רק על הניווט בתוך profile-setup.
+  useEffect(() => {
+    if (loading || profileLoading || !user || !isProfileComplete(profile)) return;
+    try {
+      const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
+      if (!seenOnboarding) {
+        router.replace("/onboarding");
+      }
+    } catch {
+      // localStorage לא זמין - לא חוסמים את הזרימה
+    }
+  }, [loading, profileLoading, user, profile, router]);
+
   useEffect(() => {
     if (!preferencesLoading && isPreferencesComplete(preferences) && !returnTo) {
       router.replace("/home");
