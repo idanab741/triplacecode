@@ -33,7 +33,7 @@ export const ADMIN_NAV: NavGroup[] = [
     title: "תוכן",
     items: [
       { href: "/admin/places", label: "מקומות ואטרקציות", icon: "◆", status: "ready" },
-      { href: "/admin/destinations", label: "יעדים ומדינות", icon: "◇", status: "soon" },
+      { href: "/admin/destinations", label: "יעדים ומדינות", icon: "◇", status: "ready" },
       { href: "/admin/tags", label: "מערכת תגיות", icon: "◉", status: "soon" },
       { href: "/admin/media", label: "ספריית מדיה", icon: "▣", status: "soon" },
       { href: "/admin/workflow", label: "Workflow ואישורים", icon: "◧", status: "soon" },
