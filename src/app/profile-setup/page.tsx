@@ -71,14 +71,12 @@ export default function ProfileSetupPage() {
     // ישירות - הזרימה הרגילה היא profile-setup -> preferences -> home).
     try {
       const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
-      console.log("🔍 ONBOARDING CHECK — seenOnboarding:", seenOnboarding);
       if (!seenOnboarding) {
-        console.log("🔍 ONBOARDING CHECK — redirecting to /onboarding now");
         router.push("/onboarding");
         return;
       }
-    } catch (e) {
-      console.log("🔍 ONBOARDING CHECK — threw an error:", e);
+    } catch {
+      // localStorage לא זמין - פשוט ממשיכים לזרימה הרגילה
     }
 
     router.push("/preferences");
