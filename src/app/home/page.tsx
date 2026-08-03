@@ -16,6 +16,7 @@ import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
+import { ONBOARDING_STORAGE_KEY } from "@/app/onboarding/page";
 
 export default function HomePage() {
   const {
@@ -33,6 +34,18 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading || profileLoading || !user) return;
+
+    // בפעם הראשונה שמשתמש מגיע לעמוד הבית אחרי התחברות/הרשמה - מציגים
+    // קודם את ה-Onboarding (חד-פעמי, לפי דגל ב-localStorage).
+    try {
+      const seenOnboarding = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (!seenOnboarding) {
+        router.replace("/onboarding");
+        return;
+      }
+    } catch {
+      // localStorage לא זמין - פשוט לא מציגים Onboarding, לא חוסמים את הכניסה
+    }
 
     // אורחים (anonymous auth) לא אמורים להיזרק אוטומטית להשלמת פרופיל -
     // המטרה של מצב אורח היא שיוכלו לגלוש חופשי בעמוד הבית, ורק אם ילחצו

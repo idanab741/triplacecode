@@ -65,6 +65,20 @@ export default function ProfileSetupPage() {
     }
 
     await refreshProfile();
+
+    // בפעם הראשונה שמשתמש משלים את בניית הפרופיל - מציגים את ה-Onboarding
+    // *לפני* מסך ההעדפות (לא רק ב-/home, כי המשתמש לא בהכרח מגיע לשם
+    // ישירות - הזרימה הרגילה היא profile-setup -> preferences -> home).
+    try {
+      const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
+      if (!seenOnboarding) {
+        router.push("/onboarding");
+        return;
+      }
+    } catch {
+      // localStorage לא זמין - פשוט ממשיכים לזרימה הרגילה
+    }
+
     router.push("/preferences");
   }
 
