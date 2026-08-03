@@ -78,6 +78,13 @@ function PreferencesPageContent() {
 
   useEffect(() => {
     if (!preferencesLoading && isPreferencesComplete(preferences) && !returnTo) {
+      // אותה הגנה מפני מרוץ כמו ב-profile-setup - לא לדרוס ניווט ל-Onboarding
+      try {
+        const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
+        if (!seenOnboarding) return;
+      } catch {
+        // ממשיכים כרגיל אם localStorage לא זמין
+      }
       router.replace("/home");
     }
   }, [preferencesLoading, preferences, returnTo, router]);

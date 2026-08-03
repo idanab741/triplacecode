@@ -25,6 +25,18 @@ export default function ProfileSetupPage() {
 
   useEffect(() => {
     if (!profileLoading && isProfileComplete(profile)) {
+      // אותה בדיקה בדיוק כמו ב-handleSubmit - אחרת ה-useEffect הזה "מנצח
+      // במרוץ" נגד הניווט ל-Onboarding מיד אחרי refreshProfile(), כי הוא
+      // גם מאזין לשינוי ב-profile ומפנה ישר ל-/home בלי לבדוק כלום.
+      try {
+        const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
+        if (!seenOnboarding) {
+          router.replace("/onboarding");
+          return;
+        }
+      } catch {
+        // localStorage לא זמין - ממשיכים לזרימה הרגילה
+      }
       router.replace("/home");
     }
   }, [profileLoading, profile, router]);
