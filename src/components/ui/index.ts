@@ -9,6 +9,7 @@ export { Checkbox } from "./Checkbox";
 export { Select } from "./Select";
 export { Field } from "./Field";
 export { Chip } from "./Chip";
+export { ImageOptionCard } from "./ImageOptionCard";
 export { Switch } from "./Switch";
 export { Skeleton } from "./Skeleton";
 export { Icon } from "./Icon";

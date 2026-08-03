@@ -19,6 +19,33 @@ import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionServic
 import type { DayTripAnswers, TripBuilderStop } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
 import { getCategoryLabel } from "@/utils/categoryLabels";
+import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
+import { saveTripIntent } from "@/services/tripBuilder/sessionService";
+import { normalizeAnswers } from "@/services/tripBuilder/categoryPlanService";
+import { getWeeklyForecast } from "@/services/weather/weatherService";
+import { describeWeatherCode } from "@/utils/weatherCodes";
+import { generateDayTripPlaces } from "@/services/tripBuilder/dayTripAttractionListService";
+import { reverseGeocodeToLocality } from "@/services/tripBuilder/geocodingService";
+import { distanceBandToRadiusKm } from "@/services/tripBuilder/geo";
+
+/**
+ * זהה ל-getWeatherSummary ב-sessions/route.ts - כפילות מכוונת קטנה, כדי לא
+ * ליצור תלות חדשה בין שני ה-route-ים על פונקציה משותפת לא-exported.
+ */
+async function getWeatherSummary(lat: number, lng: number): Promise<string | null> {
+  try {
+    const forecast = await Promise.race([
+      getWeeklyForecast(lat, lng),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("weather timeout")), 4000)),
+    ]);
+    const today = forecast[0];
+    if (!today) return null;
+    const { label } = describeWeatherCode(today.weatherCode);
+    return `${label}, ${today.maxTemp}°/${today.minTemp}°`;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * "TripLace" - בונה מסלול מלא אוטומטית, בלי לשאול את המשתמש בכלל.
@@ -46,7 +73,7 @@ export async function POST(
   }
 
   const answers = session.answers as unknown as DayTripAnswers;
-  const tripIntent = session.trip_intent;
+  let tripIntent = session.trip_intent;
 
   try {
     const dna = await getTravelDna(supabase, user.id);
@@ -188,16 +215,42 @@ export async function POST(
       // מעבר למרכז המדויק); אחרת ברירת מחדל של עיר גדולה + פרברים.
       const destinationMaxDistanceKm = requestedAreaRadiusKm ? requestedAreaRadiusKm * 2 : 60;
 
-      const allSuggestions = await generateVacationItinerary({
-        destination: destinationName,
-        destinationOrigin: searchOrigin,
-        maxDistanceKm: destinationMaxDistanceKm,
-        days: daySpecs,
-        vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
-        freeText: answers.freeText,
-        budgetLabel: remainingBudgetLabel,
-        travelDnaSummary: dnaSummary,
-      });
+      // "כוונת הטיול" (tripIntent) - אם עדיין לא חושבה ב-session creation (הנתיב
+      // המהיר של "חופשה בחו\"ל" מדלג עליה שם בכוונה) - מחשבים אותה *במקביל*
+      // לקריאת ה-AI הכבדה שבונה את המסלול, לא ברצף לפניה. כך זמן ההמתנה
+      // הכולל הוא רק זמן הקריאה הכבדה מביניהן (הארוכה יותר), לא סכום שתיהן.
+      const tripIntentPromise: Promise<typeof tripIntent> = tripIntent
+        ? Promise.resolve(tripIntent)
+        : (async () => {
+            try {
+              const weatherSummary = await getWeatherSummary(origin.lat, origin.lng);
+              const generated = await generateTripIntent({
+                dna,
+                answers: normalizeAnswers(session.trip_type, answers),
+                weatherSummary,
+              });
+              if (generated) await saveTripIntent(supabase, sessionId, generated);
+              return generated;
+            } catch (err) {
+              console.error("[auto-build] חישוב trip intent במקביל נכשל", err);
+              return null;
+            }
+          })();
+
+      const [allSuggestions, computedTripIntent] = await Promise.all([
+        generateVacationItinerary({
+          destination: destinationName,
+          destinationOrigin: searchOrigin,
+          maxDistanceKm: destinationMaxDistanceKm,
+          days: daySpecs,
+          vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
+          freeText: answers.freeText,
+          budgetLabel: remainingBudgetLabel,
+          travelDnaSummary: dnaSummary,
+        }),
+        tripIntentPromise,
+      ]);
+      tripIntent = computedTripIntent;
 
       if (allSuggestions.length === 0) {
         // נקודת בקרה קריטית: אם הגענו לפה עם רשימה ריקה, המסלול יגיע לעמוד
@@ -254,6 +307,79 @@ export async function POST(
         assignments.map(async ({ stopId, suggestion }) => {
           const realPlace = await ensurePlaceExists(suggestion, destinationName);
           await likeStop(supabase, user.id, stopId, realPlace);
+        })
+      );
+
+      const itinerary = await finalizeItinerary(
+        supabase,
+        sessionId,
+        searchOrigin,
+        answers.budgetBand,
+        answers.durationBand,
+        tripIntent,
+        answers.freeText
+      );
+      return NextResponse.json({ itinerary });
+    }
+
+    // טיול יומי: כמו בחופשה בחו"ל - Claude מציע ישירות מקומות אמיתיים
+    // וספציפיים מתוך הידע הכללי שלו, במקום להיות מוגבל למאגר הפנימי שלנו
+    // (fetchCandidatePool + rankCandidates) - זו הייתה בדיוק הסיבה שאותם
+    // מקומות חוזרים על עצמם שוב ושוב: מאגר קטן ומקומי, לא כל העולם.
+    if (session.trip_type === "day_trip" || session.trip_type === "nature_trip") {
+      // שם אזור קריא ל-Claude ולחיפוש Google: אם המשתמש ציין אזור ספציפי
+      // במלל החופשי - זה כבר בתוך searchOrigin (geocoded למעלה); אחרת
+      // הופכים את מיקום ה-GPS הגולמי לשם עיר/אזור בעזרת reverse geocoding.
+      const areaLabel =
+        (tripIntent?.requestedArea as string | undefined) ?? (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
+
+      const maxDistanceKm = requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
+
+      const dnaSummaryParts: string[] = [];
+      if (dna) {
+        if (dna.interests?.length) dnaSummaryParts.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
+        if (dna.preferred_categories?.length)
+          dnaSummaryParts.push(`קטגוריות מועדפות (מהתנהגות): ${dna.preferred_categories.map(getCategoryLabel).join(", ")}`);
+        if (dna.culinary_styles?.length) dnaSummaryParts.push(`סגנונות אוכל מועדפים: ${dna.culinary_styles.join(", ")}`);
+        if (dna.dietary_restrictions?.length)
+          dnaSummaryParts.push(`הגבלות תזונתיות (חובה לכבד): ${dna.dietary_restrictions.join(", ")}`);
+        if (dna.kosher) dnaSummaryParts.push("חובה: כשרות");
+        if (dna.accessibility) dnaSummaryParts.push("חובה: נגישות");
+      }
+      if (learnedAttributes.liked.length) dnaSummaryParts.push(`נלמד מהתנהגות שאהב: ${learnedAttributes.liked.join(", ")}`);
+      if (learnedAttributes.disliked.length) dnaSummaryParts.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
+
+      let interestLabels: string[];
+      if (session.trip_type === "nature_trip") {
+        const natureAnswers = session.answers as unknown as import("@/services/tripBuilder/types").NatureTripAnswers;
+        const { getNatureTypeLabel, getDifficultyLabel } = await import("@/locales/he/natureTrip");
+        interestLabels = (natureAnswers.natureTypes ?? []).map(getNatureTypeLabel);
+        dnaSummaryParts.push(`רמת קושי מבוקשת: ${getDifficultyLabel(natureAnswers.difficulty)} - חובה לכבד, אל תציע מסלול קשה יותר`);
+      } else {
+        interestLabels = (answers.interests ?? []).map(getCategoryLabel);
+      }
+      const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
+
+      const resolvedPlaces = await generateDayTripPlaces({
+        areaLabel,
+        areaOrigin: searchOrigin,
+        maxDistanceKm,
+        slots: pendingStops.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role })),
+        interestLabels,
+        freeText: answers.freeText,
+        budgetLabel: remainingBudgetLabel,
+        travelDnaSummary: dnaSummary,
+      });
+
+      if (resolvedPlaces.length === 0) {
+        console.error("[auto-build] generateDayTripPlaces החזיר 0 מקומות", { sessionId, areaLabel, tripType: session.trip_type });
+      }
+
+      // שמירות בפועל במקביל - לא אחת-אחת.
+      await Promise.all(
+        resolvedPlaces.map(async (place) => {
+          const realPlace = await ensurePlaceExists(place, areaLabel);
+          await likeStop(supabase, user.id, place.slotId, realPlace);
         })
       );
 

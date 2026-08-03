@@ -7,7 +7,11 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 
 interface LoadingGameProps {
   statusText: string;
+  /** שלבי הבנייה בפועל, מוצגים אחד-אחד עם שעון מתקתק. אם לא סופק - מוצג רק statusText (ללא רשימה מתחלפת), לתאימות לאחור. */
+  steps?: string[];
 }
+
+const CLOCK_FRAMES = ["🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚", "🕛"];
 
 interface Obstacle {
   x: number;
@@ -27,7 +31,7 @@ const GRAVITY = 0.6;
 const MAX_JUMPS = 2;
 const BG_TILE_COUNT = 10; // מספיק אריחים כדי לכסות בנוחות זמן המתנה טיפוסי
 
-export function LoadingGame({ statusText }: LoadingGameProps) {
+export function LoadingGame({ statusText, steps }: LoadingGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const scoreRef = useRef<HTMLParagraphElement>(null);
@@ -39,6 +43,26 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
   const [finalScore, setFinalScore] = useState(0);
   const [roundKey, setRoundKey] = useState(0);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
+  const [clockFrame, setClockFrame] = useState(0);
+
+  // מתקדם לשלב הבא ברשימת הפעולות כל 3.2 שניות (בלולאה) - רק אם סופקה רשימת steps.
+  useEffect(() => {
+    if (!steps || steps.length <= 1) return;
+    const interval = setInterval(() => {
+      setStepIndex((i) => (i + 1) % steps.length);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, [steps]);
+
+  // "מתקתק" - מחליף בין אייקוני השעון כל חצי שנייה, כל עוד יש רשימת שלבים.
+  useEffect(() => {
+    if (!steps || steps.length === 0) return;
+    const interval = setInterval(() => {
+      setClockFrame((f) => (f + 1) % CLOCK_FRAMES.length);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [steps]);
   const highScoreStore = useRef(0);
 
   useEffect(() => {
@@ -235,7 +259,22 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
       </div>
 
       <div className="px-6 pb-2">
-        <p className="mb-2 text-center text-sm font-medium text-ink-secondary">{statusText}</p>
+        {steps && steps.length > 0 ? (
+          <div className="mb-2 flex items-center justify-center gap-2">
+            <span className="text-xl leading-none" aria-hidden="true">
+              {CLOCK_FRAMES[clockFrame]}
+            </span>
+            <p
+              className="text-center text-base font-semibold text-ink"
+              key={stepIndex}
+              style={{ animation: "stepFadeIn 0.35s ease-out" }}
+            >
+              {steps[stepIndex]}
+            </p>
+          </div>
+        ) : (
+          <p className="mb-2 text-center text-sm font-medium text-ink-secondary">{statusText}</p>
+        )}
         <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary">
           <div
             className="h-full w-1/3 rounded-pill"
@@ -308,6 +347,16 @@ export function LoadingGame({ statusText }: LoadingGameProps) {
           }
           100% {
             transform: translateX(300%);
+          }
+        }
+        @keyframes stepFadeIn {
+          0% {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
           }
         }
       `}</style>

@@ -86,7 +86,11 @@ ${JSON.stringify(
 
 מזג אוויר: ${JSON.stringify(params.weatherSummary)}`;
 
-  const { text, error } = await callClaude(prompt, 512);
+  // 512 טוקנים היה קטן מדי בפועל: עם summary+priorities+avoid+accessibilityNotes
+  // מפורטים (כמו בבקשות עם הרבה פרטים - למשל תינוק קטן, כמה העדפות יחד),
+  // התשובה נקטעת באמצע ה-JSON ונכשלת בפענוח - "כוונת הטיול" חוזרת null,
+  // ואז כל שאר התהליך מאבד את ההבנה הזו ונאלץ לנתח את המלל החופשי מחדש.
+  const { text, error } = await callClaude(prompt, 1200);
   if (error || !text) return null;
 
   try {

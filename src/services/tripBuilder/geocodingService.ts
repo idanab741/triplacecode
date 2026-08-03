@@ -50,6 +50,45 @@ export async function geocodePlaceName(placeName: string): Promise<LatLng | null
 }
 
 /**
+ * הופך קואורדינטות (GPS) לשם עיר/אזור קריא - reverse geocoding. נדרש
+ * לטיול יומי: בשונה מחופשה בחו"ל (שיש לה שם יעד מפורש), טיול יומי מתחיל
+ * מנקודת GPS גולמית של המשתמש, ו-Claude צריך שם מקום אמיתי (לא קואורדינטות)
+ * כדי להציע מקומות אמיתיים בסביבה.
+ */
+export async function reverseGeocodeToLocality(coords: LatLng): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) {
+    logAiError("GOOGLE_MAPS_API_KEY אינו מוגדר - לא ניתן לבצע reverse geocoding", {});
+    return null;
+  }
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coords.lat},${coords.lng}&key=${apiKey}&language=he`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      logAiError("reverse geocoding נכשל (HTTP)", { coords, httpStatus: response.status });
+      return null;
+    }
+
+    const data = await response.json();
+    const components: { long_name: string; types: string[] }[] = data?.results?.[0]?.address_components ?? [];
+    // מעדיפים "locality" (עיר) - אם אין, "administrative_area_level_2" (נפה/מחוז) כגיבוי.
+    const locality = components.find((c) => c.types.includes("locality"));
+    const fallback = components.find((c) => c.types.includes("administrative_area_level_2"));
+    const name = locality?.long_name ?? fallback?.long_name ?? null;
+    if (!name) {
+      logAiError("reverse geocoding לא החזיר שם עיר/אזור", { coords, googleStatus: data?.status });
+    }
+    return name;
+  } catch (error) {
+    logAiError("שגיאה ב-reverse geocoding", {
+      message: error instanceof Error ? error.message : String(error),
+      coords,
+    });
+    return null;
+  }
+}
+/**
  * כמו geocodePlaceName, אבל פוסל תוצאה שנופלת רחוק מהיעד המבוקש.
  * קריטי עבור הצעות AI (Claude יכול "להמציא" שם, או לתת שם שקיים גם בעיר/מדינה
  * אחרת) - בלי הבדיקה הזו, גיאוקודינג רופף עלול להחזיר קואורדינטות בצד השני

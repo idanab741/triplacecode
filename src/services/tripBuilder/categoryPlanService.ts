@@ -6,6 +6,8 @@ import type { CategoryPlanItem, DayTripAnswers, RestaurantAnswers, StopRole, Tri
 import { getTripTypeRules } from "./rules";
 import type { TripIntent } from "./tripIntentService";
 import { NIGHTLIFE_VENUE_TYPE_TO_CATEGORY } from "@/locales/he/nightlife";
+import { getDifficultyLabel } from "@/locales/he/natureTrip";
+import { VACATION_TYPE_TO_CATEGORY } from "@/locales/he/abroadVacation";
 
 const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 
@@ -70,8 +72,7 @@ if (tripType === "nightlife") {
     };
   }
   if (tripType === "abroad_vacation") {
-   const vacationAnswers = answers as unknown as import("./types").AbroadVacationAnswers;
-    const { VACATION_TYPE_TO_CATEGORY } = require("@/locales/he/abroadVacation");
+    const vacationAnswers = answers as unknown as import("./types").AbroadVacationAnswers;
     const mappedCategories = Array.from(
       new Set(
         vacationAnswers.vacationTypes.map(
@@ -93,6 +94,55 @@ if (tripType === "nightlife") {
       interests: mappedCategories.length > 0 ? mappedCategories : ["attractions_activities"],
       durationBand: "default" as DayTripAnswers["durationBand"],
       freeText: vacationAnswers.freeText,
+    };
+  }
+  if (tripType === "weekend") {
+    const weekendAnswers = answers as unknown as import("./types").WeekendAnswers;
+    const mappedCategories = Array.from(
+      new Set(
+        weekendAnswers.weekendStyles.map(
+          (v: string) => VACATION_TYPE_TO_CATEGORY[v] ?? "attractions_activities"
+        )
+      )
+    ) as string[];
+    return {
+      companions:
+        weekendAnswers.companions === "with_pet"
+          ? "solo"
+          : (weekendAnswers.companions as DayTripAnswers["companions"]),
+      hasPet: weekendAnswers.companions === "with_pet",
+      childAgeBands: weekendAnswers.childAgeBands,
+      timing: "other_date" as DayTripAnswers["timing"],
+      otherDate: weekendAnswers.startDate || null,
+      distanceBand: weekendAnswers.distanceBand,
+      budgetBand: "unlimited" as DayTripAnswers["budgetBand"],
+      interests: mappedCategories.length > 0 ? mappedCategories : ["attractions_activities"],
+      durationBand: "default" as DayTripAnswers["durationBand"],
+      freeText: weekendAnswers.freeText,
+    };
+  }
+  if (tripType === "nature_trip") {
+    const natureAnswers = answers as unknown as import("./types").NatureTripAnswers;
+    // רמת הקושי לא קיימת ב-DayTripAnswers - משלבים אותה לתוך freeText כדי
+    // ש-tryClaudePlan (שקורא רק את שדה freeText הכללי) עדיין "יראה" אותה.
+    const difficultyNote = `רמת קושי מבוקשת: ${getDifficultyLabel(natureAnswers.difficulty)}.`;
+    const combinedFreeText = natureAnswers.freeText
+      ? `${difficultyNote} ${natureAnswers.freeText}`
+      : difficultyNote;
+    return {
+      companions: natureAnswers.companions,
+      hasPet: natureAnswers.hasPet,
+      childAgeBands: natureAnswers.childAgeBands,
+      timing: natureAnswers.timing,
+      otherDate: natureAnswers.otherDate,
+      distanceBand: natureAnswers.distanceBand,
+      budgetBand: natureAnswers.budgetBand,
+      interests: natureAnswers.natureTypes,
+      durationBand:
+        natureAnswers.durationBand === "custom"
+          ? ("half_day" as DayTripAnswers["durationBand"])
+          : (natureAnswers.durationBand as DayTripAnswers["durationBand"]),
+      freeText: combinedFreeText,
     };
   }
   return answers as DayTripAnswers;
@@ -161,7 +211,20 @@ ${JSON.stringify({
 "category" חייב להיות אחד מתוך הרשימה המלאה: ${ALL_CATEGORY_IDS}.
 תחומי העניין שסומנו בתיבות הסימון: ${
     params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן כלום"
-  } - אלה עדיפות ראשונית, אך אם המלל החופשי מצביע על קטגוריה אחרת (למשל מזכיר "תצפית" והיא לא סומנה) - תשתמש בקטגוריה שהמלל מבקש, גם אם היא לא ברשימת הסימון.`;
+  } - אלה עדיפות ראשונית, אך אם המלל החופשי מצביע על קטגוריה אחרת (למשל מזכיר "תצפית" והיא לא סומנה) - תשתמש בקטגוריה שהמלל מבקש, גם אם היא לא ברשימת הסימון.
+
+*** חובה - סדר התחנות: אם המלל החופשי מתאר רצף כרונולוגי מפורש (למשל "קודם
+קפה, אחר כך טיול קצר, ואז אטרקציה, ולבסוף קניון") - סדר ה-JSON חייב לשקף
+בדיוק את אותו רצף (שדה order תואם לסדר שהמשתמש ביקש), לא סדר שרירותי. כל
+תחנה בתפקיד (role) שמתאים באמת למה שהמשתמש ביקש באותו שלב - למשל "קפה בבוקר
+בטבע" צריך role="coffee_dessert" עם category שמתאימה לסביבה טבעית/פארק, לא
+בית קפה עירוני רגיל. "קניון/רחוב מרכזי בסוף" - role="attraction" עם
+category="shopping", ממוקם אחרון ברשימה.
+
+חובה - גיוון: אם המלל החופשי מתאר שני שלבים שונים במפורש (למשל "מסלול הליכה"
+ובנפרד "אטרקציה") - הקטגוריות שתבחר להם חייבות להיות שונות באופיין, לא שתי
+קטגוריות מאותו סוג ברצף (למשל nature_trails פעמיים) - זה יגרום לשתי תחנות
+שמרגישות זהות במקום שני חלקים שונים ומשלימים של היום. ***`;
 
   const { text, error } = await callClaude(prompt);
   if (error || !text) return null;
@@ -297,7 +360,7 @@ export async function decideNextStop(params: DecideNextStopParams): Promise<{ ca
   const notUsed = pool.find((c) => !params.usedCategories.includes(c));
   return { category: notUsed ?? pool[0], role: "attraction" };
 }
-import { VACATION_TYPE_TO_CATEGORY, VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
+import { VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
 
 /** מחשב כמה ימים יש בין שני תאריכים (כולל שני הקצוות). */
 function countDays(startDate: string, endDate: string): number {

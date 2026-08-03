@@ -13,6 +13,7 @@ import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { LogisticsStopCard } from "@/screens/trip-builder/LogisticsStopCard";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
 import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
@@ -211,16 +212,39 @@ function AbroadVacationResultContent() {
 
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.session) {
-          setError("לא הצלחנו לטעון את החופשה");
-          return;
-        }
-        setSession(data.session);
-      })
-      .catch(() => setError("לא הצלחנו לטעון את החופשה"));
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    function fetchOnce() {
+      fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.session) {
+            setError("לא הצלחנו לטעון את החופשה");
+            return;
+          }
+          setSession(data.session);
+          // ברגע שהבנייה הסתיימה (status "completed") - מפסיקים לתשאל את השרת שוב ושוב.
+          if (data.session.status === "completed" && intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError("לא הצלחנו לטעון את החופשה");
+        });
+    }
+
+    fetchOnce();
+    // הבנייה בפועל (auto-build) רצה ברקע בשרת - לא ממתינים לה לפני הניווט
+    // לעמוד הזה, אלא מתשאלים אותה כל 2.5 שניות עד שהיא מסתיימת.
+    intervalId = setInterval(fetchOnce, 2500);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [sessionId]);
 
   const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
@@ -260,8 +284,23 @@ function AbroadVacationResultContent() {
   if (!session) {
     return (
       <Screen>
-        <p className="pt-10 text-center text-ink-secondary">בונים את החופשה שלכם...</p>
+        <p className="pt-10 text-center text-ink-secondary">טוען...</p>
       </Screen>
+    );
+  }
+
+  if (session.status !== "completed") {
+    return (
+      <LoadingGame
+        statusText="רגע, בונים לכם את החופשה..."
+        steps={[
+          "🌍 מוצאים את היעד המושלם בשבילכם",
+          "🏛️ בוחרים אטרקציות ופינות מיוחדות",
+          "🍽️ מתאימים מסעדות וברים לכל יום",
+          "🗺️ בונים מסלול לפי אזורים וזמני נסיעה",
+          "⏱️ מסדרים הכל לפי שעות פתיחה וקצב הטיול",
+        ]}
+      />
     );
   }
 

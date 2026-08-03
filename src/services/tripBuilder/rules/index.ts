@@ -29,6 +29,12 @@ import {
   ABROAD_VACATION_PLAN_PROMPT_RULES,
   ABROAD_VACATION_RANKING_PROMPT_RULES,
 } from "./abroadVacation";
+import {
+  NATURE_TRIP_QUESTIONS,
+  NATURE_TRIP_DURATION_RULES,
+  NATURE_TRIP_PLAN_PROMPT_RULES,
+  NATURE_TRIP_RANKING_PROMPT_RULES,
+} from "./natureTrip";
 
 export interface TripTypeRulesConfig {
   questions: TripBuilderStep[];
@@ -72,6 +78,12 @@ nightlife: {
     durationRules: ABROAD_VACATION_DURATION_RULES as Record<DurationBand, { roles: StopRole[] }>,
     planPromptRules: ABROAD_VACATION_PLAN_PROMPT_RULES,
     rankingPromptRules: ABROAD_VACATION_RANKING_PROMPT_RULES,
+  },
+  nature_trip: {
+    questions: NATURE_TRIP_QUESTIONS,
+    durationRules: NATURE_TRIP_DURATION_RULES,
+    planPromptRules: NATURE_TRIP_PLAN_PROMPT_RULES,
+    rankingPromptRules: NATURE_TRIP_RANKING_PROMPT_RULES,
   },
 };
 

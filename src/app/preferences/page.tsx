@@ -2,7 +2,9 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, Chip, Screen, Switch } from "@/components/ui";
+import Image from "next/image";
+import { Chip, ImageOptionCard, Screen, Switch } from "@/components/ui";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import { isProfileComplete } from "@/services/profile/profileService";
 import {
@@ -16,6 +18,7 @@ import {
   type PreferencesFormState,
   type MultiFieldKey,
 } from "./steps";
+import { DIETARY_RESTRICTIONS } from "@/locales/he/preferences";
 
 function PreferencesPageContent() {
   const router = useRouter();
@@ -84,7 +87,17 @@ function PreferencesPageContent() {
     if (markComplete) {
       await completePreferences(user.id, updatedForm);
     } else {
-      await savePreferences(user.id, { [step.key]: updatedForm[step.key] });
+      // שלב הקולינריה ממוזג עם מגבלות התזונה/כשרות, ושלב ההתניידות ממוזג
+      // עם הנגישות - שומרים את שניהם יחד כשעוזבים את השלב המתאים.
+      let fieldsToSave: Partial<PreferencesFormState>;
+      if (step.key === "culinary_styles") {
+        fieldsToSave = { culinary_styles: updatedForm.culinary_styles, dietary_restrictions: updatedForm.dietary_restrictions, kosher: updatedForm.kosher };
+      } else if (step.key === "transportation") {
+        fieldsToSave = { transportation: updatedForm.transportation, accessibility: updatedForm.accessibility };
+      } else {
+        fieldsToSave = { [step.key]: updatedForm[step.key] };
+      }
+      await savePreferences(user.id, fieldsToSave);
     }
 
     setSaving(false);
@@ -105,6 +118,8 @@ function PreferencesPageContent() {
     const cleared: PreferencesFormState = {
       ...form,
       [step.key]: step.type === "multi" ? [] : false,
+      ...(step.key === "culinary_styles" ? { dietary_restrictions: [], kosher: false } : {}),
+      ...(step.key === "transportation" ? { accessibility: false } : {}),
     };
     advance(cleared, isLastStep);
   }
@@ -122,8 +137,23 @@ function PreferencesPageContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing={false}>
-      <div className="mx-auto flex max-w-xl flex-col gap-6 pt-6">
+    <Screen withBottomNavSpacing>
+      <div className="-mx-5 -mt-8 flex items-center justify-end gap-2 px-5 py-4">
+        <Image src="/images/trip-triplace-logo.png" alt="" width={110} height={34} className="object-contain" />
+        <button
+          type="button"
+          onClick={() => (stepIndex > 0 ? handleBack() : router.push(returnTo || "/home"))}
+          disabled={saving}
+          aria-label="חזרה"
+          className="flex h-9 w-9 shrink-0 items-center justify-center text-ink disabled:opacity-40"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="mx-auto flex max-w-xl flex-col gap-6 pb-4 pt-2">
         <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary">
           <div
             className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all"
@@ -132,46 +162,100 @@ function PreferencesPageContent() {
         </div>
 
         <header className="text-center">
-          <h1 className="text-xl font-bold text-ink">{step.title}</h1>
-          <p className="mt-1 text-xs text-ink-secondary">
+          <h1 className="text-2xl font-bold text-ink">{step.title}</h1>
+          <p className="mt-1.5 text-xs font-medium text-ink-secondary">
             שלב {stepIndex + 1} מתוך {STEPS.length}
           </p>
         </header>
 
-        <Card>
-          {step.type === "multi" && (
-            <div className="flex flex-wrap gap-2">
-              {step.options.map((option) => (
-                <Chip
-                  key={option.value}
-                  selected={form[step.key].includes(option.value)}
-                  onClick={() => toggleChip(step.key, option.value)}
-                >
-                  {option.label}
-                </Chip>
-              ))}
+        {/* בלי כרטיסייה לבנה עוטפת בשום שלב - האריחים/הצ'יפים עומדים ישירות
+            על רקע העמוד, עקבי בין כל השלבים (לא רק שלבים עם תמונות). */}
+        {step.type === "multi" && step.options.some((o) => o.imageSrc) && (
+          <div className="grid grid-cols-3 content-start gap-1.5">
+            {step.options.map((option) => (
+              <ImageOptionCard
+                key={option.value}
+                selected={form[step.key].includes(option.value)}
+                onClick={() => toggleChip(step.key, option.value)}
+                label={option.label}
+                imageSrc={option.imageSrc}
+              />
+            ))}
+          </div>
+        )}
+
+        {step.type === "multi" && !step.options.some((o) => o.imageSrc) && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {step.options.map((option) => (
+              <Chip
+                key={option.value}
+                selected={form[step.key].includes(option.value)}
+                onClick={() => toggleChip(step.key, option.value)}
+              >
+                {option.label}
+              </Chip>
+            ))}
+          </div>
+        )}
+
+        {step.type === "toggle" && (
+          <Switch
+            checked={form[step.key]}
+            onChange={(checked) => setForm((f) => ({ ...f, [step.key]: checked }))}
+            label={step.title}
+          />
+        )}
+
+        {/* מגבלות תזונה (כולל כשרות) ממוזגות באותו עמוד של סגנון קולינרי */}
+        {step.key === "culinary_styles" && (
+          <div className="border-t border-ink-secondary/10 pt-3">
+            <p className="mb-2.5 text-center text-sm font-semibold text-ink">העדפות מיוחדות</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {DIETARY_RESTRICTIONS.map((option) => {
+                const isKosher = option.value === "kosher";
+                const selected = isKosher ? form.kosher : form.dietary_restrictions.includes(option.value);
+                return (
+                  <Chip
+                    key={option.value}
+                    selected={selected}
+                    onClick={() =>
+                      isKosher
+                        ? setForm((f) => ({ ...f, kosher: !f.kosher }))
+                        : toggleChip("dietary_restrictions", option.value)
+                    }
+                  >
+                    {option.label}
+                  </Chip>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
 
-          {step.type === "toggle" && (
-            <Switch
-              checked={form[step.key]}
-              onChange={(checked) => setForm((f) => ({ ...f, [step.key]: checked }))}
-              label={step.title}
-            />
-          )}
-        </Card>
+        {/* נגישות ממוזגת באותו עמוד של התניידות, באותו פורמט של העדפות מיוחדות */}
+        {step.key === "transportation" && (
+          <div className="border-t border-ink-secondary/10 pt-3">
+            <p className="mb-2.5 text-center text-sm font-semibold text-ink">העדפות נוספות</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Chip
+                selected={form.accessibility}
+                onClick={() => setForm((f) => ({ ...f, accessibility: !f.accessibility }))}
+              >
+                נגישות
+              </Chip>
+            </div>
+          </div>
+        )}
 
-        <div className="flex items-center gap-3">
-          {stepIndex > 0 && (
-            <Button variant="secondary" onClick={handleBack} disabled={saving}>
-              חזרה
-            </Button>
-          )}
-          <Button variant="primary" fullWidth onClick={handleNext} disabled={saving}>
-            {isLastStep ? "סיום" : "הבא"}
-          </Button>
-        </div>
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={saving}
+          className="rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+        >
+          {isLastStep ? "סיום" : "הבא"}
+        </button>
 
         <button
           type="button"
@@ -182,6 +266,8 @@ function PreferencesPageContent() {
           דלג
         </button>
       </div>
+
+      <MainBottomNav active="profile" />
     </Screen>
   );
 }

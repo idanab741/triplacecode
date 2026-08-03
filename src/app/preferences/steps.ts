@@ -1,12 +1,11 @@
 import {
   CULINARY_STYLES,
-  DIETARY_RESTRICTIONS,
   TRANSPORTATION,
   INTERESTS,
   ACCOMMODATION_TYPES,
-  VACATION_PREFERENCES,
   type PreferenceOption,
 } from "@/locales/he/preferences";
+import { VACATION_TYPE_OPTIONS } from "@/locales/he/abroadVacation";
 
 export type MultiFieldKey =
   | "culinary_styles"
@@ -35,9 +34,6 @@ export type PreferenceStep = MultiStep | ToggleStep;
 
 export const STEPS: PreferenceStep[] = [
   { type: "multi", key: "culinary_styles", title: "סגנון קולינרי", options: CULINARY_STYLES },
-  { type: "multi", key: "dietary_restrictions", title: "מגבלות תזונה", options: DIETARY_RESTRICTIONS },
-  { type: "toggle", key: "kosher", title: "כשרות" },
-  { type: "toggle", key: "accessibility", title: "נגישות" },
   {
     type: "multi",
     key: "transportation",
@@ -51,11 +47,12 @@ export const STEPS: PreferenceStep[] = [
     title: "סוגי לינה מועדפים",
     options: ACCOMMODATION_TYPES,
   },
+  // העדפות חופשה בחו"ל - זהות לאלה שבשאלון בניית חופשה בחו"ל, לא רשימה נפרדת.
   {
     type: "multi",
     key: "vacation_preferences",
     title: "העדפות חופשות בחו\"ל",
-    options: VACATION_PREFERENCES,
+    options: VACATION_TYPE_OPTIONS,
   },
 ];
 

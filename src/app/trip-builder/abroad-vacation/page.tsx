@@ -31,39 +31,35 @@ import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 
-type TripChoice = "triplace" | "tripmatch";
-
 type Stage =
+  | "dates"
+  | "travelStyle"
+  | "destination"
   | "companions"
   | "childAges"
-  | "travelStyle"
-  | "dates"
   | "bookedQuestion"
   | "flightPreference"
   | "flightsHotels"
   | "lodgingType"
   | "budget"
   | "vacationTypes"
-  | "destination"
   | "pace"
-  | "freeText"
-  | "tripChoice";
+  | "freeText";
 
 const STAGE_TITLES: Record<Stage, string> = {
+  dates: "מתי יוצאים?",
+  travelStyle: "איך תרצו לטייל?",
+  destination: "איפה החופשה הבאה שלכם?",
   companions: "עם מי אתם נוסעים?",
   childAges: "גילאי הילדים",
-  dates: "מתי יוצאים?",
-bookedQuestion: "האם כבר הזמנתם טיסה ומלון?",
+  bookedQuestion: "האם כבר הזמנתם טיסה ומלון?",
   flightPreference: "עד כמה תתפשרו על הטיסה שלכם?",
   flightsHotels: "נהדר! ספרו לי על הטיסה והמלון",
   lodgingType: "איזה סוג לינה אתם מחפשים?",
   budget: "תקציב ליחיד",
   vacationTypes: "איזה סוג חופשה אתם מחפשים?",
-  destination: "איפה החופשה הבאה שלכם?",
   pace: "מה קצב הטיול שלכם?",
-  travelStyle: "איך תרצו לטייל?",
   freeText: "משהו נוסף שתרצו להוסיף?",
-  tripChoice: "",
 };
 
 const DEFAULT_ANSWERS: AbroadVacationAnswers = {
@@ -71,7 +67,6 @@ const DEFAULT_ANSWERS: AbroadVacationAnswers = {
   childAgeBands: [],
   startDate: "",
   endDate: "",
-  departureAirport: "ben_gurion",
   hasBookedFlightAndHotel: false,
   flightPreference: null,
   flights: [],
@@ -80,6 +75,7 @@ const DEFAULT_ANSWERS: AbroadVacationAnswers = {
   budgetPerPerson: "2500-7500",
   vacationTypes: [],
   destination: null,
+  destinations: [],
   surpriseMe: false,
   pace: "balanced",
   travelStyle: "single_destination",
@@ -107,40 +103,11 @@ function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: strin
   );
 }
 
-function TripChoiceCards({ onChoose, disabled }: { onChoose: (choice: TripChoice) => void; disabled: boolean }) {
-  return (
-    <div className="flex gap-3">
-      <button
-        type="button"
-        onClick={() => onChoose("triplace")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-triplace-logo.png" alt="TripPlace" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">ה-AI בונה הכל אוטומטית</p>
-      </button>
-      <button
-        type="button"
-        onClick={() => onChoose("tripmatch")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">בוחרים לבד עם החלקות</p>
-      </button>
-    </div>
-  );
-}
-
 export default function AbroadVacationQuestionnairePage() {
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const [stage, setStage] = useState<Stage>("companions");
+  const [stage, setStage] = useState<Stage>("dates");
   const [form, setForm] = useState<AbroadVacationAnswers>(DEFAULT_ANSWERS);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -165,17 +132,26 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   const [tempTypes, setTempTypes] = useState<string[]>([]);
   const [destinationInput, setDestinationInput] = useState("");
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
+  const [tempDestinations, setTempDestinations] = useState<string[]>([""]);
+  const [destinationOptionsMulti, setDestinationOptionsMulti] = useState<Record<number, string[]>>({});
   const [tempPace, setTempPace] = useState<string | null>(null);
   const [tempTravelStyle, setTempTravelStyle] = useState<string | null>(null);
   const [tempFreeText, setTempFreeText] = useState("");
 
-  const [awaitingTripChoice, setAwaitingTripChoice] = useState(false);
-  const [busyChoice, setBusyChoice] = useState(false);
+
 
   // עריכת תשובות קודמות - לוחצים על בועת המשתמש כדי לפתוח מחדש את אותה שאלה
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
   const [editTempValue, setEditTempValue] = useState<string | null>(null);
+  const [editTempMultiValue, setEditTempMultiValue] = useState<string[]>([]);
+  const [editTempStartDate, setEditTempStartDate] = useState("");
+  const [editTempEndDate, setEditTempEndDate] = useState("");
+  const [editTempFreeText, setEditTempFreeText] = useState("");
+  const [editTempDestinationInput, setEditTempDestinationInput] = useState("");
+  const [editTempDestinationOptions, setEditTempDestinationOptions] = useState<string[]>([]);
+  const [editTempDestinations, setEditTempDestinations] = useState<string[]>([""]);
+  const [editTempDestOptionsMulti, setEditTempDestOptionsMulti] = useState<Record<number, string[]>>({});
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -204,7 +180,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      addBot(STAGE_TITLES.companions);
+      addBot(STAGE_TITLES.dates);
     }, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -227,6 +203,65 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
         .catch(() => setDestinationOptions([]));
     }, 300);
   }, [destinationInput]);
+
+  // autocomplete יעד - debounce, בזמן עריכת יעד יחיד (destination, כש-travelStyle יחיד)
+  useEffect(() => {
+    const value = editTempDestinationInput.trim();
+    if (value.length < 2) {
+      const clearTimer = setTimeout(() => setEditTempDestinationOptions([]), 0);
+      return () => clearTimeout(clearTimer);
+    }
+    const timeout = setTimeout(() => {
+      fetch(`/api/places/cities?q=${encodeURIComponent(value)}`)
+        .then((res) => res.json())
+        .then((data) => setEditTempDestinationOptions(data.cities ?? []))
+        .catch(() => setEditTempDestinationOptions([]));
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [editTempDestinationInput]);
+
+  const multiDestDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+
+  function updateDestinationAt(index: number, value: string) {
+    setTempDestinations((list) => {
+      const copy = [...list];
+      copy[index] = value;
+      return copy;
+    });
+    if (multiDestDebounceRef.current[index]) clearTimeout(multiDestDebounceRef.current[index]);
+    if (value.trim().length < 2) {
+      setDestinationOptionsMulti((m) => ({ ...m, [index]: [] }));
+      return;
+    }
+    multiDestDebounceRef.current[index] = setTimeout(() => {
+      fetch(`/api/places/cities?q=${encodeURIComponent(value.trim())}`)
+        .then((res) => res.json())
+        .then((data) => setDestinationOptionsMulti((m) => ({ ...m, [index]: data.cities ?? [] })))
+        .catch(() => setDestinationOptionsMulti((m) => ({ ...m, [index]: [] })));
+    }, 300);
+  }
+
+  function selectDestinationAt(index: number, city: string) {
+    setTempDestinations((list) => {
+      const copy = [...list];
+      copy[index] = city;
+      return copy;
+    });
+    setDestinationOptionsMulti((m) => ({ ...m, [index]: [] }));
+  }
+
+  function addDestinationRow() {
+    setTempDestinations((list) => [...list, ""]);
+  }
+
+  function removeDestinationRow(index: number) {
+    setTempDestinations((list) => (list.length > 1 ? list.filter((_, i) => i !== index) : list));
+    setDestinationOptionsMulti((m) => {
+      const copy = { ...m };
+      delete copy[index];
+      return copy;
+    });
+  }
 
   function labelFor(options: { value: string; label: string }[], value: string) {
     return options.find((o) => o.value === value)?.label ?? value;
@@ -252,28 +287,28 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     if (tempCompanion === "family") {
       goTo("childAges");
     } else {
-      goTo("travelStyle");
+      goTo("bookedQuestion");
     }
   }
 
   function confirmChildAges() {
     setForm((f) => ({ ...f, childAgeBands: tempChildAges as AbroadVacationAnswers["childAgeBands"] }));
-    addUser(tempChildAges.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, tempChildAges).join("، ") : "לא רלוונטי");
-    goTo("travelStyle");
+    addUser(tempChildAges.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, tempChildAges).join("، ") : "לא רלוונטי", "childAges");
+    goTo("bookedQuestion");
   }
 
   function confirmDates() {
     if (!tempStartDate || !tempEndDate) return;
     setForm((f) => ({ ...f, startDate: tempStartDate, endDate: tempEndDate }));
-    addUser(`${tempStartDate} עד ${tempEndDate}`);
-    goTo("bookedQuestion");
+    addUser(`${tempStartDate} עד ${tempEndDate}`, "dates");
+    goTo("travelStyle");
   }
 
 function confirmBooked() {
     if (!tempBooked) return;
     const booked = tempBooked === "yes";
     setForm((f) => ({ ...f, hasBookedFlightAndHotel: booked }));
-    addUser(booked ? "כן" : "לא");
+    addUser(booked ? "כן" : "לא", "bookedQuestion");
     if (booked) {
       goTo("flightsHotels");
     } else {
@@ -284,7 +319,7 @@ function confirmBooked() {
   function confirmFlightPreference() {
     if (!tempFlightPreference) return;
     setForm((f) => ({ ...f, flightPreference: tempFlightPreference as AbroadVacationAnswers["flightPreference"] }));
-    addUser(labelFor(FLIGHT_PREFERENCE_OPTIONS, tempFlightPreference));
+    addUser(labelFor(FLIGHT_PREFERENCE_OPTIONS, tempFlightPreference), "flightPreference");
     goTo("lodgingType");
   }
   function addFlightHotelRow() {
@@ -308,34 +343,42 @@ function confirmBooked() {
   function confirmLodgingType() {
     if (!tempLodging) return;
     setForm((f) => ({ ...f, lodgingType: tempLodging as AbroadVacationAnswers["lodgingType"] }));
-    addUser(labelFor(LODGING_TYPE_OPTIONS, tempLodging));
+    addUser(labelFor(LODGING_TYPE_OPTIONS, tempLodging), "lodgingType");
     goTo("budget");
   }
 
   function confirmBudget() {
     if (!tempBudget) return;
     setForm((f) => ({ ...f, budgetPerPerson: tempBudget }));
-    addUser(labelFor(VACATION_BUDGET_STEPS, tempBudget));
+    addUser(labelFor(VACATION_BUDGET_STEPS, tempBudget), "budget");
     goTo("vacationTypes");
   }
 
   function confirmVacationTypes() {
     setForm((f) => ({ ...f, vacationTypes: tempTypes }));
-    addUser(tempTypes.length > 0 ? labelsFor(VACATION_TYPE_OPTIONS, tempTypes).join("، ") : "תפתיעו אותנו");
-    goTo("destination");
+    addUser(tempTypes.length > 0 ? labelsFor(VACATION_TYPE_OPTIONS, tempTypes).join("، ") : "תפתיעו אותנו", "vacationTypes");
+    goTo("pace");
   }
 
   function selectDestination(city: string) {
-    setForm((f) => ({ ...f, destination: city, surpriseMe: false }));
-    addUser(city);
+    setForm((f) => ({ ...f, destination: city, destinations: [], surpriseMe: false }));
+    addUser(city, "destination");
     setDestinationOptions([]);
-    goTo("pace");
+    goTo("companions");
   }
 
   function chooseSurpriseMe() {
-    setForm((f) => ({ ...f, destination: null, surpriseMe: true }));
-    addUser("תפתיעו אותי 🎁");
-    goTo("pace");
+    setForm((f) => ({ ...f, destination: null, destinations: [], surpriseMe: true }));
+    addUser("תפתיעו אותי 🎁", "destination");
+    goTo("companions");
+  }
+
+  function confirmDestinationsMulti() {
+    const cities = tempDestinations.map((c) => c.trim()).filter(Boolean);
+    if (cities.length === 0) return;
+    setForm((f) => ({ ...f, destination: null, destinations: cities, surpriseMe: false }));
+    addUser(cities.join("، "), "destination");
+    goTo("companions");
   }
 
   function confirmPace() {
@@ -349,14 +392,14 @@ function confirmBooked() {
     if (!tempTravelStyle) return;
     setForm((f) => ({ ...f, travelStyle: tempTravelStyle as AbroadVacationAnswers["travelStyle"] }));
     addUser(labelFor(TRAVEL_STYLE_OPTIONS, tempTravelStyle), "travelStyle");
-    goTo("dates");
+    goTo("destination");
   }
 
   function confirmFreeText() {
     const finalForm = { ...form, freeText: tempFreeText };
     setForm(finalForm);
-    addUser(tempFreeText || "—");
-    promptTripChoice();
+    addUser(tempFreeText || "—", "freeText");
+    buildTripDirectly(finalForm);
   }
 
   function openEdit(message: ChatMessage) {
@@ -365,75 +408,177 @@ function confirmBooked() {
     setEditingStage(message.editStage);
 
     if (message.editStage === "companions") setEditTempValue(form.companions);
+    else if (message.editStage === "childAges") setEditTempMultiValue(form.childAgeBands);
+    else if (message.editStage === "dates") {
+      setEditTempStartDate(form.startDate);
+      setEditTempEndDate(form.endDate);
+    } else if (message.editStage === "bookedQuestion") setEditTempValue(form.hasBookedFlightAndHotel ? "yes" : "no");
+    else if (message.editStage === "flightPreference") setEditTempValue(form.flightPreference ?? "");
+    else if (message.editStage === "lodgingType") setEditTempValue(form.lodgingType ?? "");
+    else if (message.editStage === "budget") setEditTempValue(form.budgetPerPerson);
+    else if (message.editStage === "vacationTypes") setEditTempMultiValue(form.vacationTypes);
+    else if (message.editStage === "destination") {
+      if (form.travelStyle === "single_destination") {
+        setEditTempDestinationInput(form.destination ?? "");
+      } else {
+        setEditTempDestinations(form.destinations.length > 0 ? form.destinations : [""]);
+      }
+    } else if (message.editStage === "pace") setEditTempValue(form.pace);
     else if (message.editStage === "travelStyle") setEditTempValue(form.travelStyle);
-    else if (message.editStage === "pace") setEditTempValue(form.pace);
+    else if (message.editStage === "freeText") setEditTempFreeText(form.freeText);
   }
 
   function closeEdit() {
     setEditingMessageId(null);
     setEditingStage(null);
     setEditTempValue(null);
+    setEditTempMultiValue([]);
+    setEditTempStartDate("");
+    setEditTempEndDate("");
+    setEditTempFreeText("");
+    setEditTempDestinationInput("");
+    setEditTempDestinationOptions([]);
+    setEditTempDestinations([""]);
+    setEditTempDestOptionsMulti({});
   }
 
-  function confirmEdit() {
-    if (!editingStage || !editTempValue || editingMessageId == null) return;
-    let newLabel = "";
-
-    if (editingStage === "companions") {
-      setForm((f) => ({ ...f, companions: editTempValue as AbroadVacationAnswers["companions"] }));
-      newLabel = labelFor(VACATION_COMPANION_OPTIONS, editTempValue);
-    } else if (editingStage === "travelStyle") {
-      setForm((f) => ({ ...f, travelStyle: editTempValue as AbroadVacationAnswers["travelStyle"] }));
-      newLabel = labelFor(TRAVEL_STYLE_OPTIONS, editTempValue);
-    } else if (editingStage === "pace") {
-      setForm((f) => ({ ...f, pace: editTempValue as AbroadVacationAnswers["pace"] }));
-      newLabel = labelFor(VACATION_PACE_OPTIONS, editTempValue);
-    }
-
+  function updateMessageLabel(newLabel: string) {
     setMessages((msgs) => msgs.map((msg) => (msg.id === editingMessageId ? { ...msg, text: newLabel } : msg)));
+  }
+
+  /** עריכת יעד יחיד - כמו בזרימה הרגילה, בחירה מהרשימה מאשרת מיד בלי כפתור "עדכן" נפרד. */
+  function selectEditDestination(city: string) {
+    setForm((f) => ({ ...f, destination: city, destinations: [], surpriseMe: false }));
+    updateMessageLabel(city);
     closeEdit();
   }
 
-  function promptTripChoice() {
+  function chooseEditSurpriseMe() {
+    setForm((f) => ({ ...f, destination: null, destinations: [], surpriseMe: true }));
+    updateMessageLabel("תפתיעו אותי 🎁");
+    closeEdit();
+  }
+
+  function updateEditDestinationAt(index: number, value: string) {
+    setEditTempDestinations((list) => {
+      const copy = [...list];
+      copy[index] = value;
+      return copy;
+    });
+    if (value.trim().length < 2) {
+      setEditTempDestOptionsMulti((m) => ({ ...m, [index]: [] }));
+      return;
+    }
+    fetch(`/api/places/cities?q=${encodeURIComponent(value.trim())}`)
+      .then((res) => res.json())
+      .then((data) => setEditTempDestOptionsMulti((m) => ({ ...m, [index]: data.cities ?? [] })))
+      .catch(() => setEditTempDestOptionsMulti((m) => ({ ...m, [index]: [] })));
+  }
+
+  function selectEditDestinationAt(index: number, city: string) {
+    setEditTempDestinations((list) => {
+      const copy = [...list];
+      copy[index] = city;
+      return copy;
+    });
+    setEditTempDestOptionsMulti((m) => ({ ...m, [index]: [] }));
+  }
+
+  function addEditDestinationRow() {
+    setEditTempDestinations((list) => [...list, ""]);
+  }
+
+  function removeEditDestinationRow(index: number) {
+    setEditTempDestinations((list) => (list.length > 1 ? list.filter((_, i) => i !== index) : list));
+  }
+
+  function confirmEdit() {
+    if (!editingStage || editingMessageId == null) return;
+
+    if (editingStage === "companions") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, companions: editTempValue as AbroadVacationAnswers["companions"] }));
+      updateMessageLabel(labelFor(VACATION_COMPANION_OPTIONS, editTempValue));
+    } else if (editingStage === "childAges") {
+      setForm((f) => ({ ...f, childAgeBands: editTempMultiValue as AbroadVacationAnswers["childAgeBands"] }));
+      updateMessageLabel(editTempMultiValue.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, editTempMultiValue).join("، ") : "לא רלוונטי");
+    } else if (editingStage === "dates") {
+      if (!editTempStartDate || !editTempEndDate) return;
+      setForm((f) => ({ ...f, startDate: editTempStartDate, endDate: editTempEndDate }));
+      updateMessageLabel(`${editTempStartDate} עד ${editTempEndDate}`);
+    } else if (editingStage === "bookedQuestion") {
+      if (!editTempValue) return;
+      const booked = editTempValue === "yes";
+      setForm((f) => ({ ...f, hasBookedFlightAndHotel: booked }));
+      updateMessageLabel(booked ? "כן" : "לא");
+    } else if (editingStage === "flightPreference") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, flightPreference: editTempValue as AbroadVacationAnswers["flightPreference"] }));
+      updateMessageLabel(labelFor(FLIGHT_PREFERENCE_OPTIONS, editTempValue));
+    } else if (editingStage === "lodgingType") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, lodgingType: editTempValue as AbroadVacationAnswers["lodgingType"] }));
+      updateMessageLabel(labelFor(LODGING_TYPE_OPTIONS, editTempValue));
+    } else if (editingStage === "budget") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, budgetPerPerson: editTempValue as string }));
+      updateMessageLabel(labelFor(VACATION_BUDGET_STEPS, editTempValue));
+    } else if (editingStage === "vacationTypes") {
+      setForm((f) => ({ ...f, vacationTypes: editTempMultiValue }));
+      updateMessageLabel(editTempMultiValue.length > 0 ? labelsFor(VACATION_TYPE_OPTIONS, editTempMultiValue).join("، ") : "תפתיעו אותנו");
+    } else if (editingStage === "destination") {
+      // רלוונטי רק למצב multi - מצב single מטופל מיידית ב-selectEditDestination/chooseEditSurpriseMe.
+      const cities = editTempDestinations.map((c) => c.trim()).filter(Boolean);
+      if (cities.length === 0) return;
+      setForm((f) => ({ ...f, destination: null, destinations: cities, surpriseMe: false }));
+      updateMessageLabel(cities.join("، "));
+    } else if (editingStage === "pace") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, pace: editTempValue as AbroadVacationAnswers["pace"] }));
+      updateMessageLabel(labelFor(VACATION_PACE_OPTIONS, editTempValue));
+    } else if (editingStage === "travelStyle") {
+      if (!editTempValue) return;
+      setForm((f) => ({ ...f, travelStyle: editTempValue as AbroadVacationAnswers["travelStyle"] }));
+      updateMessageLabel(labelFor(TRAVEL_STYLE_OPTIONS, editTempValue));
+    } else if (editingStage === "freeText") {
+      setForm((f) => ({ ...f, freeText: editTempFreeText }));
+      updateMessageLabel(editTempFreeText || "—");
+    } else {
+      return;
+    }
+
+    closeEdit();
+  }
+
+  /** אחרי "משהו נוסף שתרצו להוסיף" עוברים ישירות לבניית המסלול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
+  async function buildTripDirectly(answers: AbroadVacationAnswers) {
     if (!user) {
       router.push("/auth");
       return;
     }
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      addBot("מעולה! עכשיו תבחרו איך תרצו לבנות את החופשה:");
-      setAwaitingTripChoice(true);
-    }, 700);
-  }
-
-  async function handleTripChoice(choice: TripChoice) {
-    if (busyChoice) return;
-    setBusyChoice(true);
+    // מציגים את מסך ההמתנה (עם המשחק) מיד בלחיצה - לא ממתינים לשום קריאת
+    // רשת קודם (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה".
+    setSubmitting(true);
     setLocationError(null);
     try {
       const origin = await getCurrentPosition();
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "abroad_vacation", answers: form, origin }),
+        body: JSON.stringify({ tripType: "abroad_vacation", answers, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת החופשה נכשלה");
 
       const sessionId = data.session.id;
-      if (choice === "tripmatch") {
-        router.push(`/trip-builder/abroad-vacation/build?sessionId=${sessionId}`);
-        return;
-      }
-      setSubmitting(true);
-      const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" });
-      const buildData = await buildResponse.json();
-      if (!buildResponse.ok) throw new Error(buildData.error ?? "הבנייה נכשלה");
+      // הבנייה בפועל (auto-build - הקריאה הכבדה שבוחרת את כל התחנות) *לא*
+      // ממתינים לה כאן: מפעילים אותה ברקע וממשיכים ישר לעמוד התוצאה, שהוא
+      // זה שמתשאל את ה-session שוב ושוב עד שהיא מסתיימת. כך המשתמש עובר
+      // מיד למסך ההמתנה במקום להיתקע כאן, וה"תנועה" מרגישה מיידית.
+      fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
       router.push(`/trip-builder/abroad-vacation/result?sessionId=${sessionId}`);
     } catch (error) {
       setLocationError(error instanceof Error ? error.message : "לא הצלחנו לבנות את החופשה. נסו שוב.");
-      setBusyChoice(false);
       setSubmitting(false);
     }
   }
@@ -444,7 +589,7 @@ function confirmBooked() {
         <ChatHeader current={1} total={1} onBack={() => router.push("/home")} />
       </div>
 
-      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-64">
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
         {messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
@@ -470,6 +615,142 @@ function confirmBooked() {
                   onSelect={setEditTempValue}
                 />
               )}
+
+              {editingStage === "childAges" && (
+                <ChipGroup options={VACATION_CHILD_AGE_OPTIONS} selected={editTempMultiValue} onChange={setEditTempMultiValue} />
+              )}
+
+              {editingStage === "dates" && (
+                <DateRangePicker
+                  startDate={editTempStartDate}
+                  endDate={editTempEndDate}
+                  onChange={(start, end) => {
+                    setEditTempStartDate(start);
+                    setEditTempEndDate(end);
+                  }}
+                />
+              )}
+
+              {editingStage === "bookedQuestion" && (
+                <AnswerOptions
+                  options={[
+                    { value: "yes", label: "כן" },
+                    { value: "no", label: "לא" },
+                  ]}
+                  selected={editTempValue}
+                  onSelect={setEditTempValue}
+                />
+              )}
+
+              {editingStage === "flightPreference" && (
+                <AnswerOptions options={FLIGHT_PREFERENCE_OPTIONS} selected={editTempValue} onSelect={setEditTempValue} />
+              )}
+
+              {editingStage === "lodgingType" && (
+                <AnswerOptions options={LODGING_TYPE_OPTIONS} selected={editTempValue} onSelect={setEditTempValue} />
+              )}
+
+              {editingStage === "budget" && (
+                <div className="rounded-card bg-white p-4 shadow-md">
+                  <Slider steps={VACATION_BUDGET_STEPS} value={editTempValue ?? VACATION_BUDGET_STEPS[1].value} onChange={setEditTempValue} />
+                </div>
+              )}
+
+              {editingStage === "vacationTypes" && (
+                <ChipGroup options={VACATION_TYPE_OPTIONS} selected={editTempMultiValue} onChange={setEditTempMultiValue} />
+              )}
+
+              {editingStage === "destination" && form.travelStyle === "single_destination" && (
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={editTempDestinationInput}
+                      onChange={(e) => setEditTempDestinationInput(e.target.value)}
+                      placeholder="לדוגמה: ברצלונה, איטליה..."
+                      className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    />
+                    {editTempDestinationOptions.length > 0 && (
+                      <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
+                        {editTempDestinationOptions.map((city) => (
+                          <button
+                            key={city}
+                            type="button"
+                            onClick={() => selectEditDestination(city)}
+                            className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
+                          >
+                            {city}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={chooseEditSurpriseMe}
+                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                  >
+                    🎁 תפתיעו אותי
+                  </button>
+                </div>
+              )}
+
+              {editingStage === "destination" && form.travelStyle !== "single_destination" && (
+                <div className="flex flex-col gap-3">
+                  {editTempDestinations.map((value, i) => (
+                    <div key={i} className="relative flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => updateEditDestinationAt(i, e.target.value)}
+                          placeholder={`יעד ${i + 1} - לדוגמה: ברצלונה, איטליה...`}
+                          className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        />
+                        {(editTempDestOptionsMulti[i]?.length ?? 0) > 0 && (
+                          <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
+                            {editTempDestOptionsMulti[i].map((city) => (
+                              <button
+                                key={city}
+                                type="button"
+                                onClick={() => selectEditDestinationAt(i, city)}
+                                className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
+                              >
+                                {city}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {editTempDestinations.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeEditDestinationRow(i)}
+                          className="shrink-0 rounded-full border border-ink-secondary/25 bg-white px-2.5 py-2 text-xs text-ink-secondary"
+                          aria-label="הסרת יעד"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addEditDestinationRow}
+                    className="w-fit rounded-pill border border-accent/30 bg-accent/5 px-4 py-2 text-xs font-semibold text-accent"
+                  >
+                    + הוסיפו יעד
+                  </button>
+                </div>
+              )}
+
+              {editingStage === "pace" && (
+                <AnswerOptions
+                  options={VACATION_PACE_OPTIONS}
+                  selected={editTempValue}
+                  onSelect={setEditTempValue}
+                />
+              )}
               {editingStage === "travelStyle" && (
                 <AnswerOptions
                   options={TRAVEL_STYLE_OPTIONS}
@@ -477,11 +758,14 @@ function confirmBooked() {
                   onSelect={setEditTempValue}
                 />
               )}
-              {editingStage === "pace" && (
-                <AnswerOptions
-                  options={VACATION_PACE_OPTIONS}
-                  selected={editTempValue}
-                  onSelect={setEditTempValue}
+
+              {editingStage === "freeText" && (
+                <textarea
+                  value={editTempFreeText}
+                  onChange={(e) => setEditTempFreeText(e.target.value)}
+                  placeholder="לדוגמה: ירח דבש, חשוב לנו ים, יעד פחות תיירותי..."
+                  rows={3}
+                  className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
               )}
 
@@ -493,15 +777,28 @@ function confirmBooked() {
                 >
                   ביטול
                 </button>
-                <button
-                  type="button"
-                  onClick={confirmEdit}
-                  disabled={!editTempValue}
-                  className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-                >
-                  עדכן
-                </button>
+                {/* עריכת יעד יחיד מאשרת מיד בלחיצה (כמו בזרימה הרגילה) - אין כפתור "עדכן" נפרד עבורה */}
+                {!(editingStage === "destination" && form.travelStyle === "single_destination") && (
+                  <button
+                    type="button"
+                    onClick={confirmEdit}
+                    disabled={
+                      (editingStage === "companions" && !editTempValue) ||
+                      (editingStage === "dates" && (!editTempStartDate || !editTempEndDate)) ||
+                      (editingStage === "bookedQuestion" && !editTempValue) ||
+                      (editingStage === "flightPreference" && !editTempValue) ||
+                      (editingStage === "lodgingType" && !editTempValue) ||
+                      (editingStage === "budget" && !editTempValue) ||
+                      (editingStage === "pace" && !editTempValue) ||
+                      (editingStage === "travelStyle" && !editTempValue) ||
+                      (editingStage === "destination" && editTempDestinations.every((c) => !c.trim()))
+                    }
+                    className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                    style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                  >
+                    עדכן
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -514,7 +811,7 @@ function confirmBooked() {
 
         {typing && <TypingIndicator />}
 
-        {!typing && !submitting && !awaitingTripChoice && (
+        {!typing && !submitting && (
           <div className="mt-1">
             {stage === "companions" && (
               <AnswerOptions options={VACATION_COMPANION_OPTIONS} selected={tempCompanion} onSelect={setTempCompanion} />
@@ -648,7 +945,7 @@ function confirmBooked() {
                     </div>
                   );
                 })}
-                {tempTravelStyle === "multi_destination" && (
+                {tempTravelStyle !== "single_destination" && (
                   <button
                     type="button"
                     onClick={addFlightHotelRow}
@@ -674,14 +971,14 @@ function confirmBooked() {
               <ChipGroup options={VACATION_TYPE_OPTIONS} selected={tempTypes} onChange={setTempTypes} />
             )}
 
-            {stage === "destination" && (
+            {stage === "destination" && form.travelStyle === "single_destination" && (
               <div className="flex flex-col gap-3">
                 <div className="relative">
                   <input
                     type="text"
                     value={destinationInput}
                     onChange={(e) => setDestinationInput(e.target.value)}
-                    placeholder="לדוגמה: ברצלונה, איטליה..."
+                    placeholder="לדוגמה: ברצלונה, איטליה, יפן.."
                     className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                   {destinationOptions.length > 0 && (
@@ -709,6 +1006,55 @@ function confirmBooked() {
               </div>
             )}
 
+            {stage === "destination" && form.travelStyle !== "single_destination" && (
+              <div className="flex flex-col gap-3">
+                {tempDestinations.map((value, i) => (
+                  <div key={i} className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={(e) => updateDestinationAt(i, e.target.value)}
+                        placeholder={`יעד ${i + 1} - לדוגמה: ברצלונה, איטליה...`}
+                        className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                      />
+                      {(destinationOptionsMulti[i]?.length ?? 0) > 0 && (
+                        <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
+                          {destinationOptionsMulti[i].map((city) => (
+                            <button
+                              key={city}
+                              type="button"
+                              onClick={() => selectDestinationAt(i, city)}
+                              className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
+                            >
+                              {city}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {tempDestinations.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeDestinationRow(i)}
+                        className="shrink-0 rounded-full border border-ink-secondary/25 bg-white px-2.5 py-2 text-xs text-ink-secondary"
+                        aria-label="הסרת יעד"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addDestinationRow}
+                  className="w-fit rounded-pill border border-accent/30 bg-accent/5 px-4 py-2 text-xs font-semibold text-accent"
+                >
+                  + הוסיפו יעד
+                </button>
+              </div>
+            )}
+
             {stage === "pace" && (
               <AnswerOptions options={VACATION_PACE_OPTIONS} selected={tempPace} onSelect={setTempPace} />
             )}
@@ -729,16 +1075,22 @@ function confirmBooked() {
           </div>
         )}
 
-        {awaitingTripChoice && (
-          <>
-            <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
-            {submitting && <LoadingGame statusText="רגע, בונים לכם את החופשה..." />}
-          </>
+        {submitting && (
+          <LoadingGame
+            statusText="רגע, בונים לכם את החופשה..."
+            steps={[
+              "🌍 מוצאים את היעד המושלם בשבילכם",
+              "🏛️ בוחרים אטרקציות ופינות מיוחדות",
+              "🍽️ מתאימים מסעדות וברים לכל יום",
+              "🗺️ בונים מסלול לפי אזורים וזמני נסיעה",
+              "⏱️ מסדרים הכל לפי שעות פתיחה וקצב הטיול",
+            ]}
+          />
         )}
 
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
-        {!awaitingTripChoice && !typing && (
+        {!submitting && !typing && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
@@ -755,6 +1107,7 @@ function confirmBooked() {
                 else if (stage === "pace") confirmPace();
                 else if (stage === "travelStyle") confirmTravelStyle();
                 else if (stage === "freeText") confirmFreeText();
+                else if (stage === "destination" && form.travelStyle !== "single_destination") confirmDestinationsMulti();
               }}
               disabled={
                 (stage === "companions" && !tempCompanion) ||
@@ -765,7 +1118,10 @@ function confirmBooked() {
                 (stage === "budget" && !tempBudget) ||
                 (stage === "pace" && !tempPace) ||
                 (stage === "travelStyle" && !tempTravelStyle) ||
-                stage === "destination"
+                (stage === "destination" && form.travelStyle === "single_destination") ||
+                (stage === "destination" &&
+                  form.travelStyle !== "single_destination" &&
+                  tempDestinations.every((c) => !c.trim()))
               }
               className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}

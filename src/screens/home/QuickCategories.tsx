@@ -15,8 +15,10 @@ function buildSearchHref(id: QuickCategoryId): string {
   if (id === "romantic_date") return "/trip-builder/romantic-date";
   if (id === "nightlife") return "/trip-builder/nightlife";
   if (id === "abroad") return "/trip-builder/abroad-vacation";
+  if (id === "nature_trip") return "/trip-builder/nature-trip";
+  if (id === "weekend") return "/trip-builder/weekend";
 
-  const link = QUICK_CATEGORY_SEARCH_LINKS[id];
+  const link = QUICK_CATEGORY_SEARCH_LINKS[id as QuickCategoryId];
   if (link.categories) return `/search?category=${link.categories.join(",")}`;
   if (link.query) return `/search?q=${encodeURIComponent(link.query)}`;
   return "/search";

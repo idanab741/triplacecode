@@ -43,9 +43,16 @@ export type ResolvedVacationPlace = CandidatePlace & { role: StopRole; day: numb
 async function findPlacePhotoReferenceWithFallback(
   name: string,
   destination: string
-): Promise<{ photoRef: string | null; isClosed: boolean }> {
+): Promise<{
+  photoRef: string | null;
+  isClosed: boolean;
+  exists: boolean;
+  googleName: string | null;
+  rating: number | null;
+  ratingCount: number | null;
+}> {
   const primary = await findPlaceStatusAndPhoto(`${name} ${destination}`);
-  if (primary.photoRef || primary.isClosed) return primary;
+  if (primary.exists) return primary;
   return findPlaceStatusAndPhoto(name);
 }
 
@@ -74,11 +81,27 @@ export async function generateVacationItinerary(
   const prompt = `אתה מומחה תיירות עולמי עם ידע עמוק על ${params.destination}. בנה רשימת מקומות ל-${params.days.length} ימי חופשה שלמים ב${params.destination}.
 
 *** חובה: כל מקום ברשימה **אמיתי, קיים בפועל, ופופולרי/מבוקש ממש עכשיו** ביעד -
-לא רק "מפורסם היסטורית". תעדיף מקומות: (א) עם דירוגים גבוהים ותור/ביקוש בפועל,
-(ב) שמככבים הרבה באינסטגרם/רשתות חברתיות ומצולמים הרבה (אווירה/עיצוב/נוף
-מיוחד) - הקהל שלנו אוהב מקומות "אינסטגרמיים", (ג) שהם כרגע "החם" בעיר, לא רק
-קלאסיקה ישנה. במסעדות/בתי קפה - רק מהשווים והכי מדוברים, לא ממוצע גנרי. אסור
-מקומות נידחים, לא ידועים, או מומצאים - איכות, פופולריות ונוכחות ברשת לפני הכל. ***
+לא רק "מפורסם היסטורית". תעדיף מקומות: (א) עם דירוגים גבוהים **ומספר גדול של
+ביקורות בפועל** ב-Google (לא רק ציון גבוה עם מעט ביקורות - עדיפות ברורה למקום
+עם הרבה ביקורות על פני מקום "עלום" עם מעט מאוד), (ב) שמככבים הרבה
+באינסטגרם/רשתות חברתיות ומצולמים הרבה (אווירה/עיצוב/נוף מיוחד) - הקהל שלנו
+אוהב מקומות "אינסטגרמיים", (ג) שהם כרגע "החם" בעיר, לא רק קלאסיקה ישנה.
+במסעדות/בתי קפה - רק מהשווים והכי מדוברים, לא ממוצע גנרי. ***
+
+*** קריטי - אסור בהחלט להמציא מקומות: כל שם שאתה כותב חייב להיות מקום אמיתי
+שאתה בטוח לגמרי שקיים במציאות, עם השם המדויק והנכון שלו (לא תעתיק משוער, לא
+ניחוש, לא שילוב של כמה מקומות). אם אתה לא בטוח ב-100% שמקום מסוים קיים בשם
+הזה בדיוק - **אל תכלול אותו כלל**, עדיף רשימה עם פחות מקומות מרשימה עם מקום
+מומצא. כל מקום עובר בהמשך אימות מול Google Places - מקום שלא נמצא שם יידחה
+לגמרי, אז עדיף להציע רק מקומות שאתה בטוח שקיימים ומוכרים. ***
+
+*** חובה - התאמת עצימות הפעילויות לסוג החופשה שנבחר: אם סוג החופשה כולל
+"בטן־גב ורוגע" - **אסור** להציע מסלולי הליכה מאומצים, טרקים, קניונים/ערוצים
+תובעניים גיאוגרפית (כמו טיפוס הרים) או אתרים שדורשים מאמץ פיזי משמעותי; העדף
+חופים, ספא, טיילות קלות ונעימות, בתי קפה/מסעדות איכותיים, ואתרים שניתן ליהנות
+מהם בלי מאמץ. אם סוג החופשה כולל "טבע והרפתקאות" - טרקים ומסלולי הליכה כן
+מתאימים ורצויים. תמיד תתאים את רמת המאמץ הפיזי לאופי החופשה שהמשתמש ביקש, לא
+רק לסוג האתר. ***
 
 *** חובה: בלי שום כפילות **לאורך כל הטיול, בכל הימים יחד** - כל מקום מופיע
 פעם אחת בלבד בכל הרשימה, גם אם הוא מתאים למספר ימים. ***
@@ -205,16 +228,47 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
         geocodePlaceNameNear(`${item.name}, ${params.destination}`, params.destinationOrigin, params.maxDistanceKm),
         findPlacePhotoReferenceWithFallback(item.name, params.destination),
       ]);
-      // גיאוקודינג נכשל, המקום רחוק מדי מהיעד, או שהוא סגור בפועל (זמנית/
-      // לצמיתות) - פוסלים את התחנה לגמרי, במקום להציע למשתמש מקום שהוא לא
-      // יוכל בכלל להיכנס אליו.
-      if (!coords || photoResult.isClosed) return null;
+      // גיאוקודינג נכשל, המקום רחוק מדי מהיעד, הוא סגור בפועל (זמנית/
+      // לצמיתות), או ש-Google Places בכלל לא מצא מקום כזה (חשד חזק
+      // ל"המצאה" של Claude - שם שנשמע אמין אבל לא קיים במציאות) - פוסלים
+      // את התחנה לגמרי. גם geocoding לבד לא מספיק כאישור קיום: הוא יכול
+      // "לנחש" קואורדינטות קרובות ליעד גם לשם שלא קיים בכלל, כי הוא בנוי
+      // לפענח כתובות, לא לאמת עסקים/אתרים אמיתיים.
+      if (!coords || photoResult.isClosed || !photoResult.exists) return null;
+
+      // בלי תמונה בכלל מ-Google - פוסלים גם את זה (לא רק מציגים בלי תמונה).
+      // רשת הביטחון הקיימת בשלב ה-auto-build (leftover pool מיום אחר, אותו
+      // role) תמצא תחליף, במקום שהמשתמש יראה כרטיס ריק בלי תמונה במסלול.
+      if (!photoResult.photoRef) {
+        logAiError("מקום קיים ב-Google אבל בלי תמונה - נפסל, יוחלף מה-leftover pool", {
+          name: item.name,
+        });
+        return null;
+      }
+
+      // סף מינימלי של ביקורות אמיתיות - מסנן מקומות עלומים/לא מוכרים גם
+      // כשהם קיימים טכנית ב-Google, בהתאם לבקשה להתבסס רק על מקומות עם
+      // דירוגים משמעותיים, לא נקודות ציון אקראיות.
+      const MIN_RATING_COUNT = 5;
+      if (photoResult.ratingCount !== null && photoResult.ratingCount < MIN_RATING_COUNT) {
+        logAiError("מקום מוצע עם מעט מדי ביקורות ב-Google - נפסל", {
+          name: item.name,
+          ratingCount: photoResult.ratingCount,
+        });
+        return null;
+      }
+
       const photoRef = photoResult.photoRef;
+      // שם המקום: מעדיפים את השם הרשמי שגוגל מחזיר (מאומת, בשפה העקבית
+      // שביקשנו - language=he) על פני הניחוש של Claude - מונע בדיוק את
+      // התקלות של שם באנגלית שהיה אמור להיות בעברית (או להפך) וטעויות
+      // תעתיק/תרגום.
+      const resolvedName = photoResult.googleName ?? item.name;
 
       const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
       return {
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: item.name,
+        name: resolvedName,
         category: item.category,
         subcategory: null,
         // תיאור לא מגיע מ-Claude כאן בכוונה - הוא נדרס בכל מקרה בהמשך על-ידי
@@ -222,8 +276,8 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
         // לבקש מ-Claude לכתוב אותו פעמיים (חוסך טוקנים וזמן תגובה).
         shortDescription: null,
         imageUrls,
-        rating: null,
-        ratingCount: null,
+        rating: photoResult.rating,
+        ratingCount: photoResult.ratingCount,
         priceLevel: null,
         estimatedVisitMinutes: item.role === "food" ? 75 : 90,
         latitude: coords.lat,

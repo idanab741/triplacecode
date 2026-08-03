@@ -35,6 +35,34 @@ export async function POST(request: Request) {
       origin
     );
 
+    // "חופשה בחו\"ל": תוכנית התחנות (buildMultiDayVacationPlan) דטרמיניסטית
+    // לגמרי - בלי קריאת AI - ולכן אין שום סיבה להמתין כאן ל-DNA/מזג
+    // אוויר/"כוונת הטיול" (generateTripIntent, קריאת Claude שלוקחת כ-8
+    // שניות) לפני שמחזירים תשובה ללקוח. אלה יחושבו בהמשך, במקביל לבניית
+    // המסלול עצמה (auto-build) - לא ברצף לפניה - כדי שהניווט למסך
+    // הבא יקרה כמה שיותר מהר.
+    if (tripType === "abroad_vacation" || tripType === "weekend") {
+      const vacationLikeAnswers = answers as unknown as {
+        startDate: string;
+        endDate: string;
+        pace: string;
+        vacationTypes?: string[];
+        weekendStyles?: string[];
+      };
+      const plan = buildMultiDayVacationPlan({
+        startDate: vacationLikeAnswers.startDate,
+        endDate: vacationLikeAnswers.endDate,
+        pace: vacationLikeAnswers.pace,
+        vacationTypes: vacationLikeAnswers.vacationTypes ?? vacationLikeAnswers.weekendStyles ?? [],
+      });
+      const stops = await saveCategoryPlan(supabase, session.id, plan);
+
+      return NextResponse.json({
+        session: { ...session, category_plan: plan, status: "building", trip_intent: null },
+        stops,
+      });
+    }
+
 const dna = await getTravelDna(supabase, user.id);
     const weatherSummary = await getWeatherSummary(origin.lat, origin.lng);
 
@@ -43,10 +71,7 @@ const dna = await getTravelDna(supabase, user.id);
       await saveTripIntent(supabase, session.id, tripIntent);
     }
 
-    const plan =
-      tripType === "abroad_vacation"
-        ? buildMultiDayVacationPlan(answers as unknown as { startDate: string; endDate: string; pace: string; vacationTypes: string[] })
-        : await decideCategoryPlan({ tripType, dna, answers, weatherSummary, tripIntent });
+    const plan = await decideCategoryPlan({ tripType, dna, answers, weatherSummary, tripIntent });
     const stops = await saveCategoryPlan(supabase, session.id, plan);
 
     return NextResponse.json({

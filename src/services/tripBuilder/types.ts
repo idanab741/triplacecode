@@ -146,6 +146,26 @@ export interface DayTripAnswers {
   freeText: string;
 }
 
+export type DifficultyLevel = "easy" | "moderate" | "challenging";
+/** כמו DurationBand, + "custom" (זמן מותאם אישית) - רלוונטי רק לטיול בטבע. */
+export type NatureDurationBand = DurationBand | "custom";
+
+export interface NatureTripAnswers {
+  companions: CompanionType;
+  hasPet: boolean;
+  childAgeBands: ChildAgeBand[];
+  timing: TimingChoice;
+  otherDate: string | null;
+  distanceBand: DistanceBand;
+  budgetBand: BudgetBand;
+  natureTypes: string[];
+  difficulty: DifficultyLevel;
+  durationBand: NatureDurationBand;
+  /** רלוונטי רק אם durationBand === "custom" - תיאור חופשי של הזמן הרצוי. */
+  customDuration: string | null;
+  freeText: string;
+}
+
 export interface RestaurantAnswers {
   companions: CompanionType;
   hasPet: boolean;
@@ -274,7 +294,6 @@ export interface AbroadVacationAnswers {
   childAgeBands: ChildAgeBand[];
   startDate: string;
   endDate: string;
-  departureAirport: string;
   hasBookedFlightAndHotel: boolean;
   flightPreference: FlightPreference | null;
   flights: FlightInfo[];
@@ -283,6 +302,8 @@ export interface AbroadVacationAnswers {
   budgetPerPerson: string;
   vacationTypes: string[];
   destination: string | null;
+  /** יעדים נוספים - רלוונטי כש-travelStyle הוא multi_destination. */
+  destinations: string[];
   surpriseMe: boolean;
   pace: VacationPace;
   travelStyle: TravelStyle;

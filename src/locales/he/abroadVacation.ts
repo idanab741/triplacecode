@@ -14,11 +14,6 @@ export const VACATION_CHILD_AGE_OPTIONS: StepOption[] = [
   { value: "12-18", label: "12‑18" },
 ];
 
-export const DEPARTURE_AIRPORT_OPTIONS: StepOption[] = [
-  { value: "ben_gurion", label: "נתב\"ג" },
-  { value: "other", label: "שדה תעופה אחר" },
-];
-
 export const LODGING_TYPE_OPTIONS: StepOption[] = [
   { value: "hotel", label: "מלון", emoji: "🏨" },
   { value: "resort", label: "ריזורט", emoji: "🏝️" },

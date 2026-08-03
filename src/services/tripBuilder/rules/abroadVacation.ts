@@ -2,7 +2,6 @@ import type { StopRole, TripBuilderStep } from "../types";
 import {
   VACATION_COMPANION_OPTIONS,
   VACATION_CHILD_AGE_OPTIONS,
-  DEPARTURE_AIRPORT_OPTIONS,
   LODGING_TYPE_OPTIONS,
   VACATION_BUDGET_STEPS,
   VACATION_TYPE_OPTIONS,
@@ -18,16 +17,6 @@ import {
  * ה-TripBuilderStep הכללית ולסכן שבירה של שאר השאלונים.
  */
 export const ABROAD_VACATION_QUESTIONS: TripBuilderStep[] = [
-  {
-    type: "companions",
-    key: "companions",
-    title: "עם מי אתם נוסעים?",
-    options: VACATION_COMPANION_OPTIONS,
-    childAgeKey: "childAgeBands",
-    childAgeTitle: "גילאי הילדים",
-    childAgeOptions: VACATION_CHILD_AGE_OPTIONS,
-    childAgeTriggerValue: "family",
-  },
   {
     type: "date",
     key: "startDate",
@@ -46,13 +35,34 @@ export const ABROAD_VACATION_QUESTIONS: TripBuilderStep[] = [
   },
   {
     type: "single",
-    key: "departureAirport",
-    title: "מאיפה אתם טסים?",
-    options: DEPARTURE_AIRPORT_OPTIONS,
+    key: "travelStyle",
+    title: "איך תרצו לטייל?",
+    options: TRAVEL_STYLE_OPTIONS,
+  },
+  {
+    // מטופל כ-custom בעמוד השאלון: אם travelStyle הוא single_destination -
+    // autocomplete יעד יחיד מתוך טבלת destinations + כפתור "תפתיעו אותי"
+    // (surpriseMe: true, destination: null). אחרת - רשימת יעדים דינמית
+    // (destinations: string[]) עם כפתור "הוסיפו יעד" בלי הגבלה.
+    type: "text",
+    key: "destination",
+    title: "איפה החופשה הבאה שלכם?",
+    placeholder: "לדוגמה: ברצלונה, איטליה, יעד לא מוכר...",
+  },
+  {
+    type: "companions",
+    key: "companions",
+    title: "עם מי אתם נוסעים?",
+    options: VACATION_COMPANION_OPTIONS,
+    childAgeKey: "childAgeBands",
+    childAgeTitle: "גילאי הילדים",
+    childAgeOptions: VACATION_CHILD_AGE_OPTIONS,
+    childAgeTriggerValue: "family",
   },
   {
     // מטופל כ"custom" בעמוד השאלון: yes/no, ואם "כן" - טופס טיסה+מלון
-    // חוזר (אפשר להוסיף עוד טיסה/מלון); אם "לא" - עובר לשאלת סוג הלינה.
+    // חוזר (אפשר להוסיף עוד טיסה/מלון); אם "לא" - עובר לשאלת "עד כמה
+    // תתפשרו על הטיסה" (תוספת מכוונת, לא קיימת במסמך המקורי) ואז לינה.
     type: "single",
     key: "hasBookedFlightAndHotel",
     title: "האם כבר הזמנתם טיסה ומלון?",
@@ -80,24 +90,10 @@ export const ABROAD_VACATION_QUESTIONS: TripBuilderStep[] = [
     options: VACATION_TYPE_OPTIONS,
   },
   {
-    // מטופל כ-custom בעמוד השאלון: autocomplete מתוך טבלת destinations
-    // + כפתור "תפתיעו אותי" (surpriseMe: true, destination: null).
-    type: "text",
-    key: "destination",
-    title: "איפה החופשה הבאה שלכם?",
-    placeholder: "לדוגמה: ברצלונה, איטליה, יעד לא מוכר...",
-  },
-  {
     type: "single",
     key: "pace",
     title: "מה קצב הטיול שלכם?",
     options: VACATION_PACE_OPTIONS,
-  },
-  {
-    type: "single",
-    key: "travelStyle",
-    title: "איך תרצו לטייל?",
-    options: TRAVEL_STYLE_OPTIONS,
   },
   {
     type: "text",

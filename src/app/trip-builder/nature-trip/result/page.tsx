@@ -7,27 +7,25 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Button, Screen } from "@/components/ui";
-import { getCategoryLabel } from "@/utils/categoryLabels";
+import { Screen } from "@/components/ui";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
-import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
+import type { NatureTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
   ssr: false,
 });
 
-function DayTripResultContent() {
+function NatureTripResultContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const [session, setSession] = useState<TripBuilderSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
   const [editingTime, setEditingTime] = useState(false);
-  const [swappingStopId, setSwappingStopId] = useState<string | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -47,26 +45,7 @@ function DayTripResultContent() {
     }
   }
 
-  
-async function handleSwapStop(stopId: string) {
-    if (!sessionId || swappingStopId) return;
-    setSwappingStopId(stopId);
-    setSwapError(null);
-    try {
-      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/stops/${stopId}/swap`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "ההחלפה נכשלה");
-      setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
-    } catch (error) {
-      setSwapError(error instanceof Error ? error.message : "ההחלפה נכשלה, נסו שוב");
-    } finally {
-      setSwappingStopId(null);
-    }
-  }
-
-const sensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
@@ -130,8 +109,9 @@ const sensors = useSensors(
       if (intervalId) clearInterval(intervalId);
     };
   }, [sessionId]);
-const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
-  const answers = session?.answers as unknown as DayTripAnswers | undefined;
+
+  const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
+  const answers = session?.answers as unknown as NatureTripAnswers | undefined;
 
   const defaultStartMinutes = useMemo(() => {
     if (!itinerary || !answers || itinerary.stops.length === 0) return 9 * 60; // ברירת מחדל 09:00
@@ -162,13 +142,13 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
   if (session.status !== "completed") {
     return (
       <LoadingGame
-        statusText="רגע, בונים לכם את הטיול..."
+        statusText="רגע, בונים לכם את יום הטבע..."
         steps={[
-          "🔍 מחפשים את המקומות הכי מתאימים לכם",
-          "🎯 בוחרים אטרקציות לפי התחומים שבחרתם",
-          "🍽️ מוצאים מקום אוכל בשעה הנכונה",
+          "🌿 מחפשים את פינות הטבע הכי מיוחדות",
+          "🥾 מתאימים את המסלול לרמת הקושי שבחרתם",
+          "💧 בודקים מעיינות, תצפיות ונקודות עניין",
+          "☕ מוסיפים עצירת קפה או אוכל בשעה הנכונה",
           "🗺️ בונים מסלול רציף וקרוב לבית",
-          "⏱️ מתאימים הכל לזמן ולתקציב שבחרתם",
         ]}
       />
     );
@@ -190,18 +170,18 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
   return (
     <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
       {/* Hero עליון עם הלוגו בפינה */}
-<div className="relative w-full">
+      <div className="relative w-full">
         <Image
-          src="/images/hero-day-trip-result.png"
+          src="/images/hero-nature-trip.png"
           alt="הטיול שלכם מוכן"
           width={800}
           height={450}
           priority
           className="h-56 w-full object-cover"
         />
-<div className="absolute left-2 top-4 flex items-center gap-2">
-            <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
-<Link
+        <div className="absolute left-2 top-4 flex items-center gap-2">
+          <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
+          <Link
             href="/home"
             className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
             aria-label="חזרה לדף הבית"
@@ -211,12 +191,12 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
             </svg>
           </Link>
         </div>
-</div>
+      </div>
 
-<div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-xl font-bold text-ink">הטיול שלכם מוכן!</h1>
+            <h1 className="text-xl font-bold text-ink">יום הטבע שלכם מוכן!</h1>
             <p className="mt-1 text-sm text-ink-secondary">
               {itinerary.stops.length} תחנות{session?.trip_intent?.requestedArea ? ` · ${session.trip_intent.requestedArea}` : ""}
             </p>
@@ -235,7 +215,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
                 className="w-20 rounded-pill border border-accent/30 px-2 py-1.5 text-sm font-semibold"
               />
             ) : (
-<button
+              <button
                 type="button"
                 onClick={() => setEditingTime(true)}
                 className="rounded-pill border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm font-semibold text-accent"
@@ -246,7 +226,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
         </div>
 
-{/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
+        {/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
         <ResultMap
           stops={itinerary.stops.map((s) => ({
             stopId: s.stopId,
@@ -262,7 +242,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-3">
-{itinerary.stops.map((stop) => (
+              {itinerary.stops.map((stop) => (
                 <div key={stop.stopId} className="flex flex-col gap-1">
                   <p className="pr-1 text-sm font-bold text-accent">
                     🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
@@ -286,7 +266,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-ink">אירועים בסביבה השבוע</h2>
             <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-   {itinerary.events.map((event) => (
+              {itinerary.events.map((event) => (
                 <a
                   key={event.id}
                   href={event.url}
@@ -309,7 +289,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
         )}
 
-<button
+        <button
           type="button"
           onClick={handleSaveTrip}
           disabled={saving}
@@ -318,13 +298,12 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
         >
           {saving ? "שומר..." : saved ? "✓ המסלול נשמר" : "שמור מסלול"}
         </button>
-      
       </div>
     </Screen>
   );
 }
 
-export default function DayTripResultPage() {
+export default function NatureTripResultPage() {
   return (
     <Suspense
       fallback={
@@ -333,7 +312,7 @@ export default function DayTripResultPage() {
         </Screen>
       }
     >
-      <DayTripResultContent />
+      <NatureTripResultContent />
     </Suspense>
   );
 }

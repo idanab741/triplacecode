@@ -58,7 +58,8 @@ const { data: stops } = await supabase
       "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description)"
     )
     .eq("session_id", sessionId)
-    .eq("status", "liked");
+    .eq("status", "liked")
+    .order("slot_index", { ascending: true });
 
   const likedStops = ((stops ?? []) as LikedStopWithPlace[]).filter(
     (stop) => stop.place && stop.place.latitude != null && stop.place.longitude != null
@@ -141,7 +142,13 @@ const warnings: string[] = [];
 
   // תיאורים אישיים - Claude מייצר תיאור לכל תחנה על סמך ידע כללי + הבקשה של
   // המשתמש, לא רק על סמך short_description שיכול להיות ריק/גנרי ב-DB.
-  if (finalStops.length > 0) {
+  // *** במסלולים גדולים (חופשה רב-ימית, 15+ תחנות) - מדלגים על הקריאה הזו
+  // לגמרי. היא קריאת AI *שלישית* ברצף (אחרי "כוונת הטיול" ובניית המסלול
+  // עצמה), ויכולה לקחת עד 20-40 שניות בטיול ארוך - וזו בדיוק הסיבה
+  // שהמסלול מסומן "מוכן" כל כך מאוחר. ה-reason שכבר נוצר בשלב הדירוג/בחירת
+  // התחנות (משפט שמסביר למה המקום מתאים) הוא כבר תיאור סביר - לא "ריק". ***
+  const MAX_STOPS_FOR_AI_DESCRIPTIONS = 15;
+  if (finalStops.length > 0 && finalStops.length <= MAX_STOPS_FOR_AI_DESCRIPTIONS) {
     const descriptions = await generatePersonalizedDescriptions(finalStops, freeText ?? "", tripIntent);
     for (const stop of finalStops) {
       const generated = descriptions.get(stop.stopId);
@@ -151,6 +158,12 @@ const warnings: string[] = [];
         // גיבוי: אם יצירת התיאור נכשלה/נקטעה לתחנה הזו ספציפית - עדיף
         // להציג את ה-reason (כבר קיים, נוצר בשלב הבחירה) מאשר תחנה בלי
         // שום תיאור בכלל.
+        stop.shortDescription = stop.reason;
+      }
+    }
+  } else if (finalStops.length > MAX_STOPS_FOR_AI_DESCRIPTIONS) {
+    for (const stop of finalStops) {
+      if (!stop.shortDescription && stop.reason) {
         stop.shortDescription = stop.reason;
       }
     }
@@ -167,10 +180,21 @@ const itinerary: FinalItinerary = {
   return itinerary;
 }
 
-function orderByNearestNeighbor(stops: LikedStopWithPlace[], origin: LatLng): LikedStopWithPlace[] {
+/**
+ * מתחילה מהתחנה **הראשונה בתוכנית המקורית** (כפי ש-Claude קבע לפי סדר
+ * slot_index) - לא מהתחנה הכי קרובה גיאוגרפית לבית. זה קריטי כשהמשתמש
+ * מבקש רצף מפורש במלל החופשי (למשל "קודם קפה, אחר כך טיול, ואז קניון") -
+ * בלי זה, המיון הגיאוגרפי הטהור היה יכול לבחור כל תחנה כפתיחה, ומתעלם
+ * לגמרי מהכוונה שהמשתמש ביקש. משם והלאה - nearest-neighbor רגיל, כדי
+ * לבנות מסלול יעיל בין שאר התחנות.
+ */
+function orderByNearestNeighbor(stops: LikedStopWithPlace[], _origin: LatLng): LikedStopWithPlace[] {
+  if (stops.length === 0) return [];
+
   const remaining = [...stops];
-  const ordered: LikedStopWithPlace[] = [];
-  let cursor = origin;
+  const [first] = remaining.splice(0, 1);
+  const ordered: LikedStopWithPlace[] = [first];
+  let cursor = { lat: first.place!.latitude!, lng: first.place!.longitude! };
 
   while (remaining.length > 0) {
     let nearestIndex = 0;

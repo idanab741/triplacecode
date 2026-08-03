@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
-import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
-import type { DayTripAnswers } from "@/services/tripBuilder/types";
+import { NATURE_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/natureTrip";
+import type { NatureTripAnswers } from "@/services/tripBuilder/types";
 import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
@@ -15,7 +15,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import Image from "next/image";
 
-const DEFAULT_ANSWERS: DayTripAnswers = {
+const DEFAULT_ANSWERS: NatureTripAnswers = {
   companions: "solo",
   hasPet: false,
   childAgeBands: [],
@@ -23,8 +23,10 @@ const DEFAULT_ANSWERS: DayTripAnswers = {
   otherDate: null,
   distanceBand: "1h",
   budgetBand: "300-600",
-  interests: [],
+  natureTypes: [],
+  difficulty: "easy",
   durationBand: "half_day",
+  customDuration: null,
   freeText: "",
 };
 
@@ -34,7 +36,8 @@ type EditableFieldKey =
   | "timing"
   | "distanceBand"
   | "budgetBand"
-  | "interests"
+  | "natureTypes"
+  | "difficulty"
   | "durationBand"
   | "freeText";
 
@@ -79,7 +82,7 @@ function TripTypeBadge({ label }: { label: string }) {
         }}
       >
         <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/40">
-          <Image src="/images/day-trip-icon.png" alt="" fill className="object-cover" />
+          <Image src="/images/categories/cat-nature.png" alt="" fill className="object-cover" />
         </div>
         <span className="text-[13.5px] font-medium text-white">{label}</span>
       </div>
@@ -87,23 +90,24 @@ function TripTypeBadge({ label }: { label: string }) {
   );
 }
 
-export default function DayTripQuestionnairePage() {
-const router = useRouter();
+export default function NatureTripQuestionnairePage() {
+  const router = useRouter();
   const { user, profile } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [form, setForm] = useState<DayTripAnswers>(DEFAULT_ANSWERS);
-const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState<NatureTripAnswers>(DEFAULT_ANSWERS);
+  const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [awaitingChildAges, setAwaitingChildAges] = useState(false);
   const [awaitingOtherDate, setAwaitingOtherDate] = useState(false);
-const [tempMulti, setTempMulti] = useState<string[]>([]);
+  const [awaitingCustomDuration, setAwaitingCustomDuration] = useState(false);
+  const [tempMulti, setTempMulti] = useState<string[]>([]);
   const [tempSlider, setTempSlider] = useState<string | null>(null);
   const [tempText, setTempText] = useState("");
-const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [tempHasPet, setTempHasPet] = useState(false);
 
   const [editingFieldKey, setEditingFieldKey] = useState<EditableFieldKey | null>(null);
@@ -114,22 +118,21 @@ const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [editTempText, setEditTempText] = useState("");
   const [editTempCompanion, setEditTempCompanion] = useState<string | null>(null);
   const [editTempHasPet, setEditTempHasPet] = useState(false);
-const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
   const startedRef = useRef(false);
 
-
-  const step = DAY_TRIP_QUESTIONS[stepIndex];
-  const isLastStep = stepIndex === DAY_TRIP_QUESTIONS.length - 1;
+  const step = NATURE_TRIP_QUESTIONS[stepIndex];
+  const isLastStep = stepIndex === NATURE_TRIP_QUESTIONS.length - 1;
 
   function nextId() {
     idRef.current += 1;
     return idRef.current;
   }
- function addBot(text: string, fieldKey?: EditableFieldKey) {
+  function addBot(text: string, fieldKey?: EditableFieldKey) {
     setMessages((m) => [...m, { id: nextId(), role: "assistant", text, fieldKey }]);
   }
-function addUser(text: string, fieldKey?: EditableFieldKey) {
+  function addUser(text: string, fieldKey?: EditableFieldKey) {
     setMessages((m) => [...m, { id: nextId(), role: "user", text, fieldKey }]);
   }
   function addIconBadge(label: string) {
@@ -141,23 +144,22 @@ function addUser(text: string, fieldKey?: EditableFieldKey) {
     if (startedRef.current) return;
     startedRef.current = true;
     addBot(
-      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\nאז בואו נתחיל!"
+      "שלום! אני טריפי AI 👋\nסוכן ה-AI האישי של TRIPLACE.\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם יום טבע שתוכנן במיוחד בשבילכם.\nאז בואו נתחיל!"
     );
-    addIconBadge("טיול יומי");
+    addIconBadge("טיול בטבע");
     setTyping(true);
     setTimeout(() => {
       setTyping(false);
-      addBot(DAY_TRIP_QUESTIONS[0].title);
+      addBot(NATURE_TRIP_QUESTIONS[0].title);
     }, 900);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
-
-  function updateField<K extends keyof DayTripAnswers>(key: K, value: DayTripAnswers[K]) {
+  function updateField<K extends keyof NatureTripAnswers>(key: K, value: NatureTripAnswers[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -169,7 +171,7 @@ useEffect(() => {
     return values.map((v) => labelFor(options, v));
   }
 
-function resetTempAnswerState() {
+  function resetTempAnswerState() {
     setTempMulti([]);
     setTempSlider(null);
     setTempText("");
@@ -177,9 +179,10 @@ function resetTempAnswerState() {
     setTempHasPet(false);
     setAwaitingChildAges(false);
     setAwaitingOtherDate(false);
+    setAwaitingCustomDuration(false);
   }
 
-function goToNextStep() {
+  function goToNextStep() {
     resetTempAnswerState();
     if (isLastStep) {
       buildTripDirectly(form);
@@ -196,13 +199,13 @@ function goToNextStep() {
   // ואמין לתופעת הלוואי הזו, כדי שלא "תרוץ פעמיים" בטעות
   useEffect(() => {
     if (stepIndex === 0) return; // השאלה הראשונה כבר נוספה ב-mount
-    addBot(DAY_TRIP_QUESTIONS[stepIndex].title);
+    addBot(NATURE_TRIP_QUESTIONS[stepIndex].title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
 
   // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
-function handleCompanionsSelect(value: string) {
+  function handleCompanionsSelect(value: string) {
     setTempCompanion(value);
   }
 
@@ -212,10 +215,10 @@ function handleCompanionsSelect(value: string) {
 
   function confirmCompanions() {
     if (step.type !== "companions" || !tempCompanion) return;
-    updateField("companions", tempCompanion as DayTripAnswers["companions"]);
+    updateField("companions", tempCompanion as NatureTripAnswers["companions"]);
     updateField("hasPet", tempHasPet);
 
-const label = labelFor(step.options, tempCompanion);
+    const label = labelFor(step.options, tempCompanion);
     addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
 
     if (tempCompanion === step.childAgeTriggerValue) {
@@ -230,9 +233,9 @@ const label = labelFor(step.options, tempCompanion);
     goToNextStep();
   }
 
-function confirmChildAges() {
+  function confirmChildAges() {
     if (step.type !== "companions") return;
-    updateField("childAgeBands", tempMulti as DayTripAnswers["childAgeBands"]);
+    updateField("childAgeBands", tempMulti as NatureTripAnswers["childAgeBands"]);
     addUser(
       tempMulti.length > 0 ? labelsFor(step.childAgeOptions, tempMulti).join("، ") : "לא רלוונטי",
       "childAgeBands"
@@ -241,8 +244,8 @@ function confirmChildAges() {
   }
 
   function handleDateSelect(value: string) {
-if (step.type !== "date") return;
-    updateField("timing", value as DayTripAnswers["timing"]);
+    if (step.type !== "date") return;
+    updateField("timing", value as NatureTripAnswers["timing"]);
     const label = labelFor(step.options, value);
     addUser(label, "timing");
 
@@ -262,34 +265,52 @@ if (step.type !== "date") return;
 
   function confirmSlider() {
     if (step.type !== "slider") return;
-const value = tempSlider ?? (form[step.key as keyof DayTripAnswers] as string) ?? step.steps[0];
-    updateField(step.key as keyof DayTripAnswers, value as never);
+    const value = tempSlider ?? (form[step.key as keyof NatureTripAnswers] as string) ?? step.steps[0];
+    updateField(step.key as keyof NatureTripAnswers, value as never);
     const label = labelFor(step.steps as unknown as { value: string; label: string }[], value);
     addUser(label, step.key as EditableFieldKey);
     goToNextStep();
   }
 
-  function confirmInterests() {
-if (step.type !== "multi-emoji") return;
-    updateField("interests", tempMulti);
-    addUser(tempMulti.length > 0 ? labelsFor(step.options, tempMulti).join("، ") : "לא משנה לי", "interests");
+  function confirmNatureTypes() {
+    if (step.type !== "multi-emoji") return;
+    updateField("natureTypes", tempMulti);
+    addUser(tempMulti.length > 0 ? labelsFor(step.options, tempMulti).join("، ") : "לא משנה לי", "natureTypes");
     goToNextStep();
   }
 
+  /** מטפל בבחירת "single": difficulty רגיל, אבל durationBand="custom" פותח שדה טקסט חופשי לפני שממשיכים. */
   function handleSingleSelect(value: string) {
-if (step.type !== "single") return;
-    updateField(step.key as keyof DayTripAnswers, value as never);
+    if (step.type !== "single") return;
+    updateField(step.key as keyof NatureTripAnswers, value as never);
     const label = labelFor(step.options, value);
     addUser(label, step.key as EditableFieldKey);
+
+    if (step.key === "durationBand" && value === "custom") {
+      setAwaitingCustomDuration(true);
+      setTyping(true);
+      setTimeout(() => {
+        setTyping(false);
+        addBot("איזה משך זמן בדיוק בא לכם?", "durationBand");
+      }, 500);
+      return;
+    }
+    goToNextStep();
+  }
+
+  function confirmCustomDuration() {
+    if (!tempText) return;
+    updateField("customDuration", tempText);
+    addUser(tempText, "durationBand");
     goToNextStep();
   }
 
   function getEditQuestionTitle(key: EditableFieldKey): string {
     if (key === "childAgeBands") {
-      const companionsStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+      const companionsStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "companions");
       return companionsStep && companionsStep.type === "companions" ? companionsStep.childAgeTitle : "";
     }
-    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === key);
+    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === key);
     return editStep?.title ?? "";
   }
 
@@ -299,11 +320,11 @@ if (step.type !== "single") return;
     setEditingFieldKey(key);
     setEditingMessageId(message.id);
 
-if (key === "companions") {
+    if (key === "companions") {
       setEditTempCompanion(form.companions);
       setEditTempHasPet(form.hasPet);
-    } else if (key === "childAgeBands" || key === "interests") {
-      setEditTempMulti(key === "childAgeBands" ? form.childAgeBands : form.interests);
+    } else if (key === "childAgeBands" || key === "natureTypes") {
+      setEditTempMulti(key === "childAgeBands" ? form.childAgeBands : form.natureTypes);
     } else if (key === "distanceBand" || key === "budgetBand") {
       setEditTempSlider(form[key] as string);
     } else if (key === "freeText") {
@@ -311,6 +332,9 @@ if (key === "companions") {
     } else if (key === "timing") {
       setEditTempValue(form.timing);
       setEditTempText(form.otherDate ?? "");
+    } else if (key === "durationBand") {
+      setEditTempValue(form.durationBand);
+      setEditTempText(form.customDuration ?? "");
     } else {
       setEditTempValue(form[key] as string);
     }
@@ -329,49 +353,59 @@ if (key === "companions") {
 
   function confirmEdit() {
     if (!editingFieldKey || editingMessageId == null) return;
-const key = editingFieldKey;
-    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === (key === "childAgeBands" ? "companions" : key));
+    const key = editingFieldKey;
+    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === (key === "childAgeBands" ? "companions" : key));
     if (!editStep) return;
 
     let newLabel = "";
 
-if (key === "companions" && editStep.type === "companions") {
+    if (key === "companions" && editStep.type === "companions") {
       if (!editTempCompanion) return;
-      updateField("companions", editTempCompanion as DayTripAnswers["companions"]);
+      updateField("companions", editTempCompanion as NatureTripAnswers["companions"]);
       updateField("hasPet", editTempHasPet);
       const label = labelFor(editStep.options, editTempCompanion);
       newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
 
-      // אם עברו מ"משפחה עם ילדים" לאופציה אחרת - שאלת/תשובת הגילאים כבר לא רלוונטית, מוחקים אותה
       if (editTempCompanion !== editStep.childAgeTriggerValue) {
-        updateField("childAgeBands", [] as DayTripAnswers["childAgeBands"]);
+        updateField("childAgeBands", [] as NatureTripAnswers["childAgeBands"]);
         setMessages((msgs) => msgs.filter((m) => m.fieldKey !== "childAgeBands"));
       }
-} else if (key === "timing" && editStep.type === "date") {
+    } else if (key === "timing" && editStep.type === "date") {
       if (!editTempValue) return;
       if (editTempValue === editStep.otherDateTriggerValue) {
         if (!editTempText) return;
-        updateField("timing", editTempValue as DayTripAnswers["timing"]);
+        updateField("timing", editTempValue as NatureTripAnswers["timing"]);
         updateField("otherDate", editTempText);
         newLabel = editTempText;
       } else {
-        updateField("timing", editTempValue as DayTripAnswers["timing"]);
+        updateField("timing", editTempValue as NatureTripAnswers["timing"]);
         newLabel = labelFor(editStep.options, editTempValue);
       }
     } else if ((key === "distanceBand" || key === "budgetBand") && editStep.type === "slider") {
       const value = editTempSlider ?? (form[key] as string);
       updateField(key, value as never);
       newLabel = labelFor(editStep.steps as unknown as { value: string; label: string }[], value);
-} else if (key === "interests" && editStep.type === "multi-emoji") {
-      updateField("interests", editTempMulti);
+    } else if (key === "natureTypes" && editStep.type === "multi-emoji") {
+      updateField("natureTypes", editTempMulti);
       newLabel = editTempMulti.length > 0 ? labelsFor(editStep.options, editTempMulti).join("، ") : "לא משנה לי";
     } else if (key === "childAgeBands" && editStep.type === "companions") {
-      updateField("childAgeBands", editTempMulti as DayTripAnswers["childAgeBands"]);
+      updateField("childAgeBands", editTempMulti as NatureTripAnswers["childAgeBands"]);
       newLabel = editTempMulti.length > 0 ? labelsFor(editStep.childAgeOptions, editTempMulti).join("، ") : "לא רלוונטי";
+    } else if (key === "difficulty" && editStep.type === "single") {
+      if (!editTempValue) return;
+      updateField("difficulty", editTempValue as NatureTripAnswers["difficulty"]);
+      newLabel = labelFor(editStep.options, editTempValue);
     } else if (key === "durationBand" && editStep.type === "single") {
       if (!editTempValue) return;
-      updateField("durationBand", editTempValue as DayTripAnswers["durationBand"]);
-      newLabel = labelFor(editStep.options, editTempValue);
+      updateField("durationBand", editTempValue as NatureTripAnswers["durationBand"]);
+      if (editTempValue === "custom") {
+        if (!editTempText) return;
+        updateField("customDuration", editTempText);
+        newLabel = editTempText;
+      } else {
+        updateField("customDuration", null);
+        newLabel = labelFor(editStep.options, editTempValue);
+      }
     } else if (key === "freeText") {
       updateField("freeText", editTempText);
       newLabel = editTempText || "—";
@@ -381,21 +415,21 @@ if (key === "companions" && editStep.type === "companions") {
     closeEdit();
   }
 
-function confirmFreeText() {
+  function confirmFreeText() {
     const finalForm = { ...form, freeText: tempText };
     setForm(finalForm);
     addUser(tempText || "—", "freeText");
     resetTempAnswerState();
-    // freeText הוא תמיד השאלה האחרונה ב-DAY_TRIP_QUESTIONS - עוברים ישירות
-    // לבנייה עם הטופס המעודכן, בלי לעבור דרך goToNextStep (שסומך על ה-state
-    // הכללי `form`, שעדיין לא מעודכן באותו tick בגלל batching של React).
+    // freeText הוא תמיד השאלה האחרונה - עוברים ישירות לבנייה עם הטופס
+    // המעודכן, בלי לעבור דרך goToNextStep (שסומך על ה-state הכללי `form`,
+    // שעדיין לא מעודכן באותו tick בגלל batching של React).
     buildTripDirectly(finalForm);
   }
 
   // ---------- שליחה סופית ----------
 
   /** אחרי השאלה האחרונה עוברים ישירות לבניית הטיול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
-  async function buildTripDirectly(answers: DayTripAnswers) {
+  async function buildTripDirectly(answers: NatureTripAnswers) {
     if (!user) {
       router.push("/auth");
       return;
@@ -408,7 +442,7 @@ function confirmFreeText() {
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "day_trip", answers, origin }),
+        body: JSON.stringify({ tripType: "nature_trip", answers, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
@@ -416,9 +450,9 @@ function confirmFreeText() {
       const sessionId = data.session.id;
       // בניית המסלול בפועל (auto-build) רצה ברקע - לא ממתינים לה כאן, כדי
       // שהניווט לעמוד התוצאה יקרה מיד. עמוד התוצאה מתשאל את ה-session שוב
-      // ושוב עד שהיא מסתיימת (בדיוק כמו בחופשה בחו"ל).
+      // ושוב עד שהיא מסתיימת.
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
-      router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
+      router.push(`/trip-builder/nature-trip/result?sessionId=${sessionId}`);
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו לבנות את הטיול. יש לאשר גישה למיקום ולנסות שוב."
@@ -442,7 +476,10 @@ function confirmFreeText() {
       return { label: "בחרתי", onClick: confirmSlider };
     }
     if (step.type === "multi-emoji") {
-      return { label: "המשך", onClick: confirmInterests };
+      return { label: "המשך", onClick: confirmNatureTypes };
+    }
+    if (step.type === "single" && awaitingCustomDuration) {
+      return { label: "המשך", onClick: confirmCustomDuration, disabled: !tempText };
     }
     if (step.type === "text") {
       return { label: "המשך", onClick: confirmFreeText };
@@ -450,7 +487,7 @@ function confirmFreeText() {
     return null;
   }
 
-const footerAction = getFooterAction();
+  const footerAction = getFooterAction();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -458,18 +495,18 @@ const footerAction = getFooterAction();
 
   return (
     <Screen withBottomNavSpacing>
-            <div className="-mx-5 -mt-8">
-<ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
-        </div>
+      <div className="-mx-5 -mt-8">
+        <ChatHeader current={stepIndex + 1} total={NATURE_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
+      </div>
 
-<div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
         {messages.map((m) => {
           if (editingFieldKey && m.id === editingMessageId) {
             return (
               <div key={m.id} className="mt-1">
                 {editingFieldKey === "companions" &&
                   (() => {
-                    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "companions");
                     if (!editStep || editStep.type !== "companions") return null;
                     return (
                       <div className="flex flex-col gap-3">
@@ -492,16 +529,16 @@ const footerAction = getFooterAction();
 
                 {editingFieldKey === "childAgeBands" &&
                   (() => {
-                    const companionsStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "companions");
+                    const companionsStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "companions");
                     if (!companionsStep || companionsStep.type !== "companions") return null;
                     return (
                       <ChipGroup options={companionsStep.childAgeOptions} selected={editTempMulti} onChange={setEditTempMulti} />
                     );
                   })()}
 
-           {editingFieldKey === "timing" &&
+                {editingFieldKey === "timing" &&
                   (() => {
-                    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "timing");
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "timing");
                     if (!editStep || editStep.type !== "date") return null;
                     return (
                       <div className="flex flex-col gap-3">
@@ -522,7 +559,7 @@ const footerAction = getFooterAction();
 
                 {(editingFieldKey === "distanceBand" || editingFieldKey === "budgetBand") &&
                   (() => {
-                    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey);
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === editingFieldKey);
                     if (!editStep || editStep.type !== "slider") return null;
                     return (
                       <Slider
@@ -533,21 +570,41 @@ const footerAction = getFooterAction();
                     );
                   })()}
 
-                {editingFieldKey === "interests" &&
+                {editingFieldKey === "natureTypes" &&
                   (() => {
-                    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "interests");
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "natureTypes");
                     if (!editStep || editStep.type !== "multi-emoji") return null;
                     return <ChipGroup options={editStep.options} selected={editTempMulti} onChange={setEditTempMulti} />;
                   })()}
 
-                {editingFieldKey === "durationBand" &&
+                {editingFieldKey === "difficulty" &&
                   (() => {
-                    const editStep = DAY_TRIP_QUESTIONS.find((q) => q.key === "durationBand");
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "difficulty");
                     if (!editStep || editStep.type !== "single") return null;
                     return <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />;
                   })()}
 
-        {editingFieldKey === "freeText" && (
+                {editingFieldKey === "durationBand" &&
+                  (() => {
+                    const editStep = NATURE_TRIP_QUESTIONS.find((q) => q.key === "durationBand");
+                    if (!editStep || editStep.type !== "single") return null;
+                    return (
+                      <div className="flex flex-col gap-3">
+                        <AnswerOptions options={editStep.options} selected={editTempValue} onSelect={setEditTempValue} />
+                        {editTempValue === "custom" && (
+                          <input
+                            type="text"
+                            value={editTempText}
+                            onChange={(e) => setEditTempText(e.target.value)}
+                            placeholder="לדוגמה: 3 שעות בערך"
+                            className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                {editingFieldKey === "freeText" && (
                   <textarea
                     value={editTempText}
                     onChange={(e) => setEditTempText(e.target.value)}
@@ -577,7 +634,7 @@ const footerAction = getFooterAction();
             );
           }
 
-return m.role === "assistant" ? (
+          return m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
           ) : m.role === "icon" ? (
             <div key={m.id} className="flex items-end justify-end gap-2">
@@ -594,8 +651,8 @@ return m.role === "assistant" ? (
 
         {!editingFieldKey && typing && <TypingIndicator />}
 
- {!editingFieldKey && !typing && !submitting && (
-       <div className="mt-1">
+        {!editingFieldKey && !typing && !submitting && (
+          <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
                 <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
@@ -635,7 +692,7 @@ return m.role === "assistant" ? (
               <div className="rounded-card bg-white p-4 shadow-md">
                 <Slider
                   steps={step.steps}
-                  value={tempSlider ?? (form[step.key as keyof DayTripAnswers] as string)}
+                  value={tempSlider ?? (form[step.key as keyof NatureTripAnswers] as string)}
                   onChange={(value) => setTempSlider(value)}
                 />
               </div>
@@ -645,8 +702,17 @@ return m.role === "assistant" ? (
               <ChipGroup options={step.options} selected={tempMulti} onChange={setTempMulti} />
             )}
 
-            {step.type === "single" && (
+            {step.type === "single" && !awaitingCustomDuration && (
               <AnswerOptions options={step.options} onSelect={handleSingleSelect} />
+            )}
+            {step.type === "single" && awaitingCustomDuration && (
+              <input
+                type="text"
+                value={tempText}
+                onChange={(e) => setTempText(e.target.value)}
+                placeholder="לדוגמה: 3 שעות בערך"
+                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
             )}
 
             {step.type === "text" && (
@@ -661,22 +727,22 @@ return m.role === "assistant" ? (
           </div>
         )}
 
-{submitting && (
+        {submitting && (
           <LoadingGame
-            statusText="רגע, בונים לכם את הטיול..."
+            statusText="רגע, בונים לכם את יום הטבע..."
             steps={[
-              "🔍 מחפשים את המקומות הכי מתאימים לכם",
-              "🎯 בוחרים אטרקציות לפי התחומים שבחרתם",
-              "🍽️ מוצאים מקום אוכל בשעה הנכונה",
+              "🌿 מחפשים את פינות הטבע הכי מיוחדות",
+              "🥾 מתאימים את המסלול לרמת הקושי שבחרתם",
+              "💧 בודקים מעיינות, תצפיות ונקודות עניין",
+              "☕ מוסיפים עצירת קפה או אוכל בשעה הנכונה",
               "🗺️ בונים מסלול רציף וקרוב לבית",
-              "⏱️ מתאימים הכל לזמן ולתקציב שבחרתם",
             ]}
           />
         )}
 
-{locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
+        {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
- {!editingFieldKey && !submitting && footerAction && (
+        {!editingFieldKey && !submitting && footerAction && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
@@ -699,7 +765,7 @@ return m.role === "assistant" ? (
 }
 
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-    return new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("הדפדפן שלך לא תומך באיתור מיקום"));
       return;
