@@ -1,5 +1,4 @@
 import { OnboardingVisual, RealPhoto } from "./OnboardingVisual";
-import { OnboardingRealScreenLink } from "../OnboardingRealScreenLink";
 
 const DAY_COLORS = ["#4F7DF3", "#8B5CF6", "#0EA5A4"];
 
@@ -8,7 +7,6 @@ const DAY_COLORS = ["#4F7DF3", "#8B5CF6", "#0EA5A4"];
 export function Slide5Route() {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
-      <OnboardingRealScreenLink href="/trip-builder/day-trip/result">
       <OnboardingVisual>
         <div className="p-4">
           <div className="relative h-28 w-full overflow-hidden rounded-card">
@@ -67,7 +65,6 @@ export function Slide5Route() {
           </div>
         </div>
       </OnboardingVisual>
-      </OnboardingRealScreenLink>
 
       <div className="relative z-10 flex flex-col gap-2 text-center">
         <h1 className="text-[26px] font-bold leading-tight text-ink">בונים, שומרים ומנהלים את הטיולים שלכם</h1>

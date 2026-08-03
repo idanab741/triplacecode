@@ -1,7 +1,6 @@
 "use client";
 
 import { OnboardingVisual, RealPhoto } from "./OnboardingVisual";
-import { OnboardingRealScreenLink } from "../OnboardingRealScreenLink";
 
 /** מסך 3: TripMatch - איך מגלים מקומות מדויקים בהחלקה. כפתורי הפעולה
  *  מתחת לכרטיס (לא מעליו) בדיוק כמו ב-SwipeCard.tsx האמיתי: לייק (❤️)
@@ -10,7 +9,6 @@ import { OnboardingRealScreenLink } from "../OnboardingRealScreenLink";
 export function Slide3TripMatch() {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
-      <OnboardingRealScreenLink href="/tripmatch">
       <OnboardingVisual>
         <div className="p-4">
           <div className="relative overflow-hidden rounded-3xl bg-white shadow-lg">
@@ -67,7 +65,6 @@ export function Slide3TripMatch() {
           </div>
         </div>
       </OnboardingVisual>
-      </OnboardingRealScreenLink>
 
       <div className="relative z-10 flex flex-col gap-2 text-center">
         <h1 className="text-[26px] font-bold leading-tight text-ink">מגלים מקומות שמתאימים בדיוק לכם</h1>

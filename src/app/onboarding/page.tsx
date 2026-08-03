@@ -130,7 +130,10 @@ export default function OnboardingPage() {
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const drag = dragState.current;
     if (!drag.active) return;
-    const dx = e.clientX - drag.startX;
+    // dx הפוך בכוונה: המשתמשים דיווחו שההחלקה עבדה הפוך (שמאלה הזיז ימינה
+    // ולהפך) - כך שההגדרה הנכונה בפועל היא ההפך ממה שהאינטואיציה הגיאומטרית
+    // הראשונית הייתה מציעה.
+    const dx = -(e.clientX - drag.startX);
     const dy = e.clientY - drag.startY;
 
     if (drag.direction === null) {

@@ -1,5 +1,4 @@
 import { OnboardingVisual, RealPhoto } from "./OnboardingVisual";
-import { OnboardingRealScreenLink } from "../OnboardingRealScreenLink";
 
 const OPTIONS = ["טיול בארץ", "חופשה בחו\"ל", "סופ\"ש זוגי"];
 
@@ -8,7 +7,6 @@ const OPTIONS = ["טיול בארץ", "חופשה בחו\"ל", "סופ\"ש זו�
 export function Slide4Ai() {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
-      <OnboardingRealScreenLink href="/trip-builder/day-trip">
       <OnboardingVisual>
         <div className="flex items-center gap-2.5 border-b border-ink-secondary/10 px-4 pt-3 pb-2.5">
           <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-sm">
@@ -68,7 +66,6 @@ export function Slide4Ai() {
           </div>
         </div>
       </OnboardingVisual>
-      </OnboardingRealScreenLink>
 
       <div className="relative z-10 flex flex-col gap-2 text-center">
         <h1 className="text-[26px] font-bold leading-tight text-ink">טריפי ה-AI בונה לכם מסלול אישי</h1>

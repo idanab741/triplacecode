@@ -1,5 +1,4 @@
 import { OnboardingVisual, CategoryDot, RealPhoto } from "./OnboardingVisual";
-import { OnboardingRealScreenLink } from "../OnboardingRealScreenLink";
 
 const CATEGORIES = [
   { src: "/images/categories/cat-abroad.png", label: "חו\"ל" },
@@ -14,7 +13,6 @@ const CATEGORIES = [
 export function Slide1Welcome() {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
-      <OnboardingRealScreenLink href="/home">
       <OnboardingVisual tint="#e5e6f4">
         <div className="px-7 pt-5">
           <RealPhoto src="/images/home-hero.png" alt="TRIPLACE - AI Powered by" />
@@ -48,7 +46,6 @@ export function Slide1Welcome() {
           </div>
         </div>
       </OnboardingVisual>
-      </OnboardingRealScreenLink>
 
       <div className="relative z-10 flex flex-col gap-2 text-center">
         <h1 className="text-[26px] font-bold leading-tight text-ink">ברוכים הבאים ל-TRIPLACE</h1>
