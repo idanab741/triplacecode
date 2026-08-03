@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button, Checkbox, Field, Icon, Input, Screen, Select } from "@/components/ui";
@@ -23,7 +23,13 @@ export default function ProfileSetupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // דגל שמונע במפורש מה-useEffect למטה "לנצח במרוץ" נגד הניווט הידני
+  // שקורה בתוך handleSubmit. ברגע שהמשתמש לוחץ "שמור", אנחנו לוקחים
+  // בעלות מלאה על הניווט - שום אפקט פסיבי לא אמור להתערב יותר.
+  const manualNavigationRef = useRef(false);
+
   useEffect(() => {
+    if (manualNavigationRef.current) return;
     if (!profileLoading && isProfileComplete(profile)) {
       // אותה בדיקה בדיוק כמו ב-handleSubmit - אחרת ה-useEffect הזה "מנצח
       // במרוץ" נגד הניווט ל-Onboarding מיד אחרי refreshProfile(), כי הוא
@@ -76,6 +82,9 @@ export default function ProfileSetupPage() {
       return;
     }
 
+    // מסמנים *לפני* refreshProfile() - כך שברגע שהוא מעדכן את ה-state
+    // ומפעיל מחדש את ה-useEffect למעלה, הוא כבר יידע לוותר ולא להתערב.
+    manualNavigationRef.current = true;
     await refreshProfile();
 
     // בפעם הראשונה שמשתמש משלים את בניית הפרופיל - מציגים את ה-Onboarding
