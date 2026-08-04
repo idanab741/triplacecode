@@ -8,6 +8,9 @@ export interface Profile {
   country: string | null;
   avatar_url: string | null;
   intro_completed_at: string | null;
+  tripmatch_onboarding_completed_at: string | null;
+  chat_onboarding_completed_at: string | null;
+  planner_onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

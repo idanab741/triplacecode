@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
+import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
@@ -90,6 +91,7 @@ function TripTypeBadge({ label }: { label: string }) {
 export default function DayTripQuestionnairePage() {
 const router = useRouter();
   const { user, profile } = useAuth();
+  const { ready } = useFeatureOnboardingGuard("chat", "/onboarding/chat");
 
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<DayTripAnswers>(DEFAULT_ANSWERS);
@@ -455,6 +457,8 @@ const footerAction = getFooterAction();
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [footerAction, editingFieldKey]);
+
+  if (!ready) return null;
 
   return (
     <Screen withBottomNavSpacing>

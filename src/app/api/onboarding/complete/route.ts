@@ -2,18 +2,26 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 
-/** מסמנת שהמשתמש המחובר סיים/דילג על סיור ה-Onboarding. נכתבת ל-DB
- *  (לא רק ל-localStorage) כדי ש-/auth/callback/route.ts - שרץ בשרת - יוכל
- *  לדעת את זה גם הוא, ולא רק קוד שרץ בדפדפן.
+type Feature = "main" | "tripmatch" | "chat" | "planner";
+
+const COLUMN_BY_FEATURE: Record<Feature, string> = {
+  main: "intro_completed_at",
+  tripmatch: "tripmatch_onboarding_completed_at",
+  chat: "chat_onboarding_completed_at",
+  planner: "planner_onboarding_completed_at",
+};
+
+/** מסמנת שהמשתמש המחובר סיים/דילג על אחד מסוגי ה-Onboarding (הראשי, או
+ *  אחד ממסכי ההסבר לפיצ'ר) - לפי `feature` בגוף הבקשה. נכתבת ל-DB (לא
+ *  ל-localStorage) כדי שגם קוד שרץ בשרת (auth/callback) וגם מכשירים
+ *  אחרים אחרי התחברות יידעו את זה.
  *
- *  משתמשים ב-admin client (service_role) לכתיבה עצמה - לא ב-client
- *  הרגיל של המשתמש - כי אם אין RLS policy שמתירה למשתמש לעדכן את
- *  עמודת intro_completed_at בשורת ה-profiles שלו, העדכון עם ה-client
- *  הרגיל "נכשל בשקט": מחזיר error:null אבל בפועל לא נוגע באף שורה
- *  (RLS פשוט מסנן את השורה בלי לזרוק שגיאה) - וזה בדיוק גורם ללולאה
- *  האינסופית חזרה ל-/onboarding. זיהוי המשתמש עדיין קורה מול ה-session
+ *  משתמשים ב-admin client (service_role) לכתיבה עצמה, לא ב-client
+ *  הרגיל - אחרת אם אין RLS policy מתאימה, העדכון "נכשל בשקט" (מחזיר
+ *  success בלי לגעת בפועל בשום שורה) - זה בדיוק מה שגרם ללולאה
+ *  האינסופית שכבר תיקנו פעם אחת. זיהוי המשתמש עדיין קורה מול ה-session
  *  הרגיל, כדי שרק המשתמש המחובר יוכל לסמן את *עצמו* כמסיים. */
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,22 +29,23 @@ export async function POST() {
 
   if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
 
+  const body = await request.json().catch(() => null);
+  const feature: Feature = body?.feature && body.feature in COLUMN_BY_FEATURE ? body.feature : "main";
+  const column = COLUMN_BY_FEATURE[feature];
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("profiles")
-    .update({ intro_completed_at: new Date().toISOString() })
+    .update({ [column]: new Date().toISOString() })
     .eq("id", user.id)
-    .select("id, intro_completed_at");
+    .select(`id, ${column}`);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   if (!data || data.length === 0) {
-    // אין שגיאה, אבל גם אף שורה לא עודכנה - כנראה שאין שורת profiles
-    // בכלל למשתמש הזה (מקרה קצה נדיר, למשל אם profile-setup לא הושלם
-    // כראוי). מחזירים שגיאה ברורה במקום להעמיד פנים שהצליח.
     return NextResponse.json({ error: "לא נמצאה שורת פרופיל לעדכון" }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, profile: data[0] });
+  return NextResponse.json({ success: true, feature, profile: data[0] });
 }

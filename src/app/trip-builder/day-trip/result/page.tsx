@@ -14,6 +14,7 @@ import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
+import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -23,6 +24,7 @@ const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then(
 function DayTripResultContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
+  const { ready } = useFeatureOnboardingGuard("planner", "/onboarding/planner");
   const [session, setSession] = useState<TripBuilderSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
@@ -186,6 +188,8 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
       </Screen>
     );
   }
+
+  if (!ready) return null;
 
   return (
     <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">

@@ -9,9 +9,6 @@ import { OnboardingProgress } from "@/screens/onboarding/OnboardingProgress";
 import { OnboardingBackdrop } from "@/screens/onboarding/OnboardingBackdrop";
 import { Slide1Welcome } from "@/screens/onboarding/slides/Slide1Welcome";
 import { Slide2Profile } from "@/screens/onboarding/slides/Slide2Profile";
-import { Slide3TripMatch } from "@/screens/onboarding/slides/Slide3TripMatch";
-import { Slide4Ai } from "@/screens/onboarding/slides/Slide4Ai";
-import { Slide5Route } from "@/screens/onboarding/slides/Slide5Route";
 
 /** מפתח localStorage שמסמן שהמשתמש כבר ראה את ה-Onboarding, כדי שלא יוצג שוב.
  *  המסך הזה מופיע פעם אחת, מיד אחרי שמשתמש מתחבר/נרשם ומגיע לעמוד הבית
@@ -19,7 +16,7 @@ import { Slide5Route } from "@/screens/onboarding/slides/Slide5Route";
  *  לוגיקת "המשך כאורח" - המשתמש כבר מחובר בשלב הזה. */
 export const ONBOARDING_STORAGE_KEY = "triplace_onboarding_completed";
 
-const SLIDES = [Slide1Welcome, Slide2Profile, Slide3TripMatch, Slide4Ai, Slide5Route];
+const SLIDES = [Slide1Welcome, Slide2Profile];
 
 /** תמונת הרקע (המטושטשת) של כל מסך - צילום ה-hero האמיתי של אותו פיצ'ר
  *  באפליקציה, כדי שהרקע מאחורי כל מסך Onboarding יהיה תמיד "חלון" לתוכן
@@ -28,9 +25,6 @@ const SLIDES = [Slide1Welcome, Slide2Profile, Slide3TripMatch, Slide4Ai, Slide5R
 const SLIDE_BACKDROPS = [
   "/images/home-hero.png",
   "/images/hero-profile-setup.png",
-  "/images/hero-tripmatch.png",
-  "/images/tripy.png",
-  "/images/hero-day-trip-result.png",
 ];
 
 const SWIPE_THRESHOLD_PX = 55;

@@ -11,11 +11,13 @@ import { TripMatchCardContent } from "@/screens/tripmatch/TripMatchCardContent";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
+import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 
 type Stage = "city" | "interests" | "swiping";
 
 export default function TripMatchPage() {
   const router = useRouter();
+  const { ready } = useFeatureOnboardingGuard("tripmatch", "/onboarding/tripmatch");
   const [stage, setStage] = useState<Stage>("city");
 
   const [cityInput, setCityInput] = useState("");
@@ -106,6 +108,8 @@ export default function TripMatchPage() {
   }
 
   const currentCandidate = candidates[candidateIndex];
+
+  if (!ready) return null;
 
 return (
 <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
