@@ -1,3 +1,5 @@
+"use client";
+
 import { FeatureOnboardingScreen } from "@/screens/onboarding/FeatureOnboardingScreen";
 import { Slide3TripMatch } from "@/screens/onboarding/slides/Slide3TripMatch";
 

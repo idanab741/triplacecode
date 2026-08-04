@@ -1,3 +1,5 @@
+"use client";
+
 import { FeatureOnboardingScreen } from "@/screens/onboarding/FeatureOnboardingScreen";
 import { Slide4Ai } from "@/screens/onboarding/slides/Slide4Ai";
 

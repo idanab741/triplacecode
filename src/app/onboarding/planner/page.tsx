@@ -1,3 +1,5 @@
+"use client";
+
 import { FeatureOnboardingScreen } from "@/screens/onboarding/FeatureOnboardingScreen";
 import { Slide5Route } from "@/screens/onboarding/slides/Slide5Route";
 
