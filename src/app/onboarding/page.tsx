@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui";
 import { OnboardingProgress } from "@/screens/onboarding/OnboardingProgress";
 import { OnboardingBackdrop } from "@/screens/onboarding/OnboardingBackdrop";
@@ -48,6 +49,7 @@ function BackArrow() {
  *  מוצג פעם אחת בלבד למשתמש חדש, אחרי כניסה, לפני עמוד הבית. */
 export default function OnboardingPage() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
 
   const total = SLIDES.length;
@@ -66,23 +68,27 @@ export default function OnboardingPage() {
     pointerId: null as number | null,
   });
 
-  function markSeen() {
+  async function markSeen() {
     try {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
     } catch {
       // localStorage לא זמין (מצב פרטי וכו') - לא קריטי, לא חוסם את הזרימה
     }
-    // כותבים גם ל-DB (לא רק ל-localStorage) - כי /auth/callback/route.ts
-    // שרץ בשרת (התחברות Google/Apple/קישור אישור מייל) קורא רק את זה,
-    // ואין לו שום גישה ל-localStorage של הדפדפן. לא מחכים לתשובה - לא
-    // רוצים לעכב את הניווט בשביל זה.
-    fetch("/api/onboarding/complete", { method: "POST" }).catch(() => {
-      // כשל שקט - localStorage כבר נשמר כרשת ביטחון בצד הלקוח
-    });
+    // כותבים ל-DB וממתינים לזה *לפני* שממשיכים - קריטי: אם לא נחכה,
+    // המשתמש ינווט ל-/home בזמן שה-profile הישן (מלפני העדכון) עדיין
+    // יושב ב-context, ועמוד הבית יראה intro_completed_at ריק ויקפיץ
+    // בחזרה ל-/onboarding מיד. refreshProfile() בסוף מוודא שה-context
+    // מתעדכן עם הנתון החדש לפני שהניווט קורה.
+    try {
+      await fetch("/api/onboarding/complete", { method: "POST" });
+    } catch {
+      // כשל ברשת - localStorage כבר נשמר כרשת ביטחון בצד הלקוח
+    }
+    await refreshProfile();
   }
 
-  function goHome() {
-    markSeen();
+  async function goHome() {
+    await markSeen();
     router.push("/home");
   }
 
