@@ -19,7 +19,7 @@ export async function POST() {
   const userId = user.id;
   const stepErrors: string[] = [];
 
-  async function safeDelete(label: string, run: () => Promise<{ error: { message: string } | null }>) {
+  async function safeDelete(label: string, run: () => PromiseLike<{ error: { message: string } | null }>) {
     try {
       const { error } = await run();
       if (error) stepErrors.push(`${label}: ${error.message}`);
@@ -31,7 +31,7 @@ export async function POST() {
   // stops לפני sessions (תלות ישירה), אחר כך כל השאר - סדר לא קריטי
   // ביניהם כי כולן תלויות ב-userId ישירות, לא זו בזו.
   const { data: sessions } = await admin.from("trip_builder_sessions").select("id").eq("user_id", userId);
-  const sessionIds = (sessions ?? []).map((s) => s.id);
+  const sessionIds = (sessions ?? []).map((s: { id: string }) => s.id);
   if (sessionIds.length > 0) {
     await safeDelete("trip_builder_stops", () => admin.from("trip_builder_stops").delete().in("session_id", sessionIds));
   }
