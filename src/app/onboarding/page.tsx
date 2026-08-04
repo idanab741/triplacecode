@@ -80,9 +80,15 @@ export default function OnboardingPage() {
     // בחזרה ל-/onboarding מיד. refreshProfile() בסוף מוודא שה-context
     // מתעדכן עם הנתון החדש לפני שהניווט קורה.
     try {
-      await fetch("/api/onboarding/complete", { method: "POST" });
-    } catch {
-      // כשל ברשת - localStorage כבר נשמר כרשת ביטחון בצד הלקוח
+      const res = await fetch("/api/onboarding/complete", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // מציגים את זה בגלוי - אחרת המשתמש רק "ייתקע" בלולאה בחזרה
+        // ל-Onboarding בלי שום הסבר למה.
+        alert(`שגיאה בסימון הסיור כהושלם:\n\n${data?.error ?? res.status}\n\nהמשך לאפליקציה ינסה בכל זאת, אבל ייתכן שתחזור לכאן שוב.`);
+      }
+    } catch (e) {
+      alert(`שגיאת רשת בסימון הסיור כהושלם: ${e instanceof Error ? e.message : String(e)}`);
     }
     await refreshProfile();
   }
