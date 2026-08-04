@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Button, Checkbox, Field, Icon, Input, Screen, Select } from "@/components/ui";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useAuth } from "@/hooks/useAuth";
-import { updateProfile, isProfileComplete } from "@/services/profile/profileService";
+import { updateProfile, isProfileComplete, getProfile } from "@/services/profile/profileService";
 import { isReasonableBirthDate, MAX_AGE, MIN_AGE } from "@/utils/validation";
 import { COUNTRIES } from "@/constants/countries";
 
@@ -31,17 +31,14 @@ export default function ProfileSetupPage() {
   useEffect(() => {
     if (manualNavigationRef.current) return;
     if (!profileLoading && isProfileComplete(profile)) {
-      // אותה בדיקה בדיוק כמו ב-handleSubmit - אחרת ה-useEffect הזה "מנצח
-      // במרוץ" נגד הניווט ל-Onboarding מיד אחרי refreshProfile(), כי הוא
-      // גם מאזין לשינוי ב-profile ומפנה ישר ל-/home בלי לבדוק כלום.
-      try {
-        const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
-        if (!seenOnboarding) {
-          router.replace("/onboarding");
-          return;
-        }
-      } catch {
-        // localStorage לא זמין - ממשיכים לזרימה הרגילה
+      // אותה בדיקה בדיוק כמו בכל שאר נקודות הניתוב - שדה ה-DB
+      // (profile.intro_completed_at), לא localStorage. זה קריטי: אם
+      // localStorage כבר מכיל דגל ישן מבדיקות קודמות (בדפדפן הזה), הוא
+      // היה גורם לניתוב הזה "לשקר" ולדלג על ה-Onboarding בזמן שכל שאר
+      // המערכת (auth/callback, getPostAuthPath) עדיין רואה שהוא לא הושלם.
+      if (!profile?.intro_completed_at) {
+        router.replace("/onboarding");
+        return;
       }
       router.replace("/home");
     }
@@ -88,16 +85,17 @@ export default function ProfileSetupPage() {
     await refreshProfile();
 
     // בפעם הראשונה שמשתמש משלים את בניית הפרופיל - מציגים את ה-Onboarding
-    // *לפני* מסך ההעדפות (לא רק ב-/home, כי המשתמש לא בהכרח מגיע לשם
-    // ישירות - הזרימה הרגילה היא profile-setup -> preferences -> home).
-    try {
-      const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
-      if (!seenOnboarding) {
+    // *לפני* מסך ההעדפות. בודקים ישירות מול ה-DB (לא את משתנה ה-profile
+    // המקומי, שעדיין "ישן" ברגע הזה כי refreshProfile() לא מחזיר את הערך
+    // החדש באופן סינכרוני - הוא רק מעדכן state שמתעדכן ברינדור הבא).
+    // חשוב: זו אותה בדיקה בדיוק כמו בכל שאר נקודות הניתוב (auth/callback,
+    // getPostAuthPath) - לא localStorage, כדי שהכל יהיה עקבי.
+    if (user) {
+      const freshProfile = await getProfile(user.id);
+      if (!freshProfile?.intro_completed_at) {
         router.push("/onboarding");
         return;
       }
-    } catch {
-      // localStorage לא זמין - פשוט ממשיכים לזרימה הרגילה
     }
 
     router.push("/preferences");

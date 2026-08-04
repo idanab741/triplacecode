@@ -66,28 +66,18 @@ function PreferencesPageContent() {
   // מלהסתמך רק על הניווט בתוך profile-setup.
   useEffect(() => {
     if (loading || profileLoading || !user || !isProfileComplete(profile)) return;
-    try {
-      const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
-      if (!seenOnboarding) {
-        router.replace("/onboarding");
-      }
-    } catch {
-      // localStorage לא זמין - לא חוסמים את הזרימה
+    if (!profile?.intro_completed_at) {
+      router.replace("/onboarding");
     }
   }, [loading, profileLoading, user, profile, router]);
 
   useEffect(() => {
     if (!preferencesLoading && isPreferencesComplete(preferences) && !returnTo) {
       // אותה הגנה מפני מרוץ כמו ב-profile-setup - לא לדרוס ניווט ל-Onboarding
-      try {
-        const seenOnboarding = window.localStorage.getItem("triplace_onboarding_completed");
-        if (!seenOnboarding) return;
-      } catch {
-        // ממשיכים כרגיל אם localStorage לא זמין
-      }
+      if (!profile?.intro_completed_at) return;
       router.replace("/home");
     }
-  }, [preferencesLoading, preferences, returnTo, router]);
+  }, [preferencesLoading, preferences, returnTo, router, profile]);
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
