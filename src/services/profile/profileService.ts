@@ -7,6 +7,7 @@ export interface Profile {
   birth_date: string | null;
   country: string | null;
   avatar_url: string | null;
+  intro_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }

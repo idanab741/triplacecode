@@ -72,6 +72,13 @@ export default function OnboardingPage() {
     } catch {
       // localStorage לא זמין (מצב פרטי וכו') - לא קריטי, לא חוסם את הזרימה
     }
+    // כותבים גם ל-DB (לא רק ל-localStorage) - כי /auth/callback/route.ts
+    // שרץ בשרת (התחברות Google/Apple/קישור אישור מייל) קורא רק את זה,
+    // ואין לו שום גישה ל-localStorage של הדפדפן. לא מחכים לתשובה - לא
+    // רוצים לעכב את הניווט בשביל זה.
+    fetch("/api/onboarding/complete", { method: "POST" }).catch(() => {
+      // כשל שקט - localStorage כבר נשמר כרשת ביטחון בצד הלקוח
+    });
   }
 
   function goHome() {

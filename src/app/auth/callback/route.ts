@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
       if (user) {
         const [{ data: profile }, { data: preferences }] = await Promise.all([
-          supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+          supabase.from("profiles").select("full_name, intro_completed_at").eq("id", user.id).single(),
           supabase
             .from("user_preferences")
             .select("onboarding_completed_at")
@@ -30,7 +30,15 @@ export async function GET(request: Request) {
 
         let destination = "/profile-setup";
         if (profile?.full_name) {
-          destination = preferences?.onboarding_completed_at ? "/home" : "/preferences";
+          if (!profile?.intro_completed_at) {
+            // עדיין לא ראה את סיור ה-Onboarding (5 מסכי "ברוכים הבאים") -
+            // חובה להראות אותו כאן, כי משתמשי Google/Apple/אישור-מייל
+            // "מדלגים" לגמרי על /profile-setup (הפרופיל כבר מלא מהספק),
+            // אז שם לא הייתה להם אף הזדמנות לראות את זה.
+            destination = "/onboarding";
+          } else {
+            destination = preferences?.onboarding_completed_at ? "/home" : "/preferences";
+          }
         }
         return NextResponse.redirect(`${origin}${destination}`);
       }
