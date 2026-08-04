@@ -7,10 +7,10 @@ export interface Profile {
   birth_date: string | null;
   country: string | null;
   avatar_url: string | null;
-  intro_completed_at: string | null;
+  main_onboarding_completed_at: string | null;
+  intro_completed_at?: string | null;
   tripmatch_onboarding_completed_at: string | null;
-  chat_onboarding_completed_at: string | null;
-  planner_onboarding_completed_at: string | null;
+  tripbuilding_onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +28,11 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 /** פרופיל נחשב "שלם" כשיש בו שם מלא. */
 export function isProfileComplete(profile: Profile | null): boolean {
   return Boolean(profile?.full_name && profile.full_name.trim().length > 0);
+}
+
+/** Existing accounts remain recognised while the status migration is rolled out. */
+export function isMainOnboardingComplete(profile: Profile | null): boolean {
+  return Boolean(profile?.main_onboarding_completed_at ?? profile?.intro_completed_at);
 }
 
 export async function updateProfile(

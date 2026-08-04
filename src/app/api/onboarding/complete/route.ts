@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 
-type Feature = "main" | "tripmatch" | "chat" | "planner";
+type Feature = "main" | "tripmatch" | "tripbuilding";
 
 const COLUMN_BY_FEATURE: Record<Feature, string> = {
-  main: "intro_completed_at",
+  main: "main_onboarding_completed_at",
   tripmatch: "tripmatch_onboarding_completed_at",
-  chat: "chat_onboarding_completed_at",
-  planner: "planner_onboarding_completed_at",
+  tripbuilding: "tripbuilding_onboarding_completed_at",
+};
+
+// Allows the app to keep working during rollout if migration 0014 has not
+// reached a deployed database yet. The new columns remain the primary source.
+const LEGACY_COLUMN_BY_FEATURE: Partial<Record<Feature, string>> = {
+  main: "intro_completed_at",
+  tripbuilding: "chat_onboarding_completed_at",
 };
 
 /** מסמנת שהמשתמש המחובר סיים/דילג על אחד מסוגי ה-Onboarding (הראשי, או
@@ -34,11 +40,22 @@ export async function POST(request: Request) {
   const column = COLUMN_BY_FEATURE[feature];
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("profiles")
     .update({ [column]: new Date().toISOString() })
     .eq("id", user.id)
     .select(`id, ${column}`);
+
+  if (error && LEGACY_COLUMN_BY_FEATURE[feature]) {
+    const legacyColumn = LEGACY_COLUMN_BY_FEATURE[feature];
+    const legacy = await admin
+      .from("profiles")
+      .update({ [legacyColumn]: new Date().toISOString() })
+      .eq("id", user.id)
+      .select(`id, ${legacyColumn}`);
+    data = legacy.data;
+    error = legacy.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
