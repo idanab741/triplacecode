@@ -35,6 +35,12 @@ import {
   NATURE_TRIP_PLAN_PROMPT_RULES,
   NATURE_TRIP_RANKING_PROMPT_RULES,
 } from "./natureTrip";
+import {
+  WEEKEND_QUESTIONS,
+  WEEKEND_DURATION_RULES,
+  WEEKEND_PLAN_PROMPT_RULES,
+  WEEKEND_RANKING_PROMPT_RULES,
+} from "./weekend";
 
 export interface TripTypeRulesConfig {
   questions: TripBuilderStep[];
@@ -84,6 +90,12 @@ nightlife: {
     durationRules: NATURE_TRIP_DURATION_RULES,
     planPromptRules: NATURE_TRIP_PLAN_PROMPT_RULES,
     rankingPromptRules: NATURE_TRIP_RANKING_PROMPT_RULES,
+  },
+  weekend: {
+    questions: WEEKEND_QUESTIONS,
+    durationRules: WEEKEND_DURATION_RULES,
+    planPromptRules: WEEKEND_PLAN_PROMPT_RULES,
+    rankingPromptRules: WEEKEND_RANKING_PROMPT_RULES,
   },
 };
 

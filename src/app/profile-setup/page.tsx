@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Button, Checkbox, Field, Icon, Input, Screen, Select } from "@/components/ui";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useAuth } from "@/hooks/useAuth";
-import { updateProfile, isProfileComplete, getProfile } from "@/services/profile/profileService";
+import { updateProfile, isMainOnboardingComplete, isProfileComplete, getProfile } from "@/services/profile/profileService";
 import { isReasonableBirthDate, MAX_AGE, MIN_AGE } from "@/utils/validation";
 import { COUNTRIES } from "@/constants/countries";
 
@@ -36,7 +36,7 @@ export default function ProfileSetupPage() {
       // localStorage כבר מכיל דגל ישן מבדיקות קודמות (בדפדפן הזה), הוא
       // היה גורם לניתוב הזה "לשקר" ולדלג על ה-Onboarding בזמן שכל שאר
       // המערכת (auth/callback, getPostAuthPath) עדיין רואה שהוא לא הושלם.
-      if (!profile?.intro_completed_at) {
+      if (!isMainOnboardingComplete(profile)) {
         router.replace("/onboarding");
         return;
       }
@@ -92,13 +92,13 @@ export default function ProfileSetupPage() {
     // getPostAuthPath) - לא localStorage, כדי שהכל יהיה עקבי.
     if (user) {
       const freshProfile = await getProfile(user.id);
-      if (!freshProfile?.intro_completed_at) {
+      if (!isMainOnboardingComplete(freshProfile)) {
         router.push("/onboarding");
         return;
       }
     }
 
-    router.push("/preferences");
+    router.push("/home");
   }
 
   if (loading || profileLoading) {

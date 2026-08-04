@@ -52,6 +52,11 @@ export async function resetPasswordForEmail(email: string) {
   });
 }
 
+export async function updatePassword(password: string) {
+  const supabase = createClient();
+  return supabase.auth.updateUser({ password });
+}
+
 export async function getSession() {
   const supabase = createClient();
   const {

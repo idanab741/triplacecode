@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Chip, ImageOptionCard, Screen, Switch } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
-import { isProfileComplete } from "@/services/profile/profileService";
+import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/profileService";
 import {
   isPreferencesComplete,
   savePreferences,
@@ -66,7 +66,7 @@ function PreferencesPageContent() {
   // מלהסתמך רק על הניווט בתוך profile-setup.
   useEffect(() => {
     if (loading || profileLoading || !user || !isProfileComplete(profile)) return;
-    if (!profile?.intro_completed_at) {
+    if (!isMainOnboardingComplete(profile)) {
       router.replace("/onboarding");
     }
   }, [loading, profileLoading, user, profile, router]);
@@ -74,7 +74,7 @@ function PreferencesPageContent() {
   useEffect(() => {
     if (!preferencesLoading && isPreferencesComplete(preferences) && !returnTo) {
       // אותה הגנה מפני מרוץ כמו ב-profile-setup - לא לדרוס ניווט ל-Onboarding
-      if (!profile?.intro_completed_at) return;
+      if (!isMainOnboardingComplete(profile)) return;
       router.replace("/home");
     }
   }, [preferencesLoading, preferences, returnTo, router, profile]);

@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { FeatureOnboardingScreen } from "@/screens/onboarding/FeatureOnboardingScreen";
-import { Slide5Route } from "@/screens/onboarding/slides/Slide5Route";
-
+/** Legacy URL: Trip Building onboarding now always starts from the AI tab. */
 export default function PlannerOnboardingPage() {
-  return <FeatureOnboardingScreen feature="planner" destination="/trip-builder/day-trip/result" Slide={Slide5Route} />;
+  redirect("/ai");
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { isProfileComplete } from "@/services/profile/profileService";
+import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/profileService";
 import { isPreferencesComplete } from "@/services/preferences/preferencesService";
 import { getFeaturedDestinations } from "@/services/destinations/destinationsService";
 import { getFirstName } from "@/utils/greeting";
@@ -44,7 +44,7 @@ export default function HomePage() {
     // קודם את ה-Onboarding (חד-פעמי, לפי profiles.intro_completed_at ב-DB -
     // לא localStorage, כדי שזה יהיה עקבי עם auth/callback/route.ts
     // שרץ בשרת ואין לו גישה ל-localStorage בכלל).
-    if (!isGuest && !profile?.intro_completed_at) {
+    if (!isGuest && !isMainOnboardingComplete(profile)) {
       router.replace("/onboarding");
       return;
     }

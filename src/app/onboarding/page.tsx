@@ -62,7 +62,7 @@ export default function OnboardingPage() {
     pointerId: null as number | null,
   });
 
-  async function markSeen() {
+  async function markSeen(): Promise<boolean> {
     try {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
     } catch {
@@ -74,22 +74,24 @@ export default function OnboardingPage() {
     // בחזרה ל-/onboarding מיד. refreshProfile() בסוף מוודא שה-context
     // מתעדכן עם הנתון החדש לפני שהניווט קורה.
     try {
-      const res = await fetch("/api/onboarding/complete", { method: "POST" });
+      const res = await fetch("/api/onboarding/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feature: "main" }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
         // מציגים את זה בגלוי - אחרת המשתמש רק "ייתקע" בלולאה בחזרה
         // ל-Onboarding בלי שום הסבר למה.
         alert(`שגיאה בסימון הסיור כהושלם:\n\n${data?.error ?? res.status}\n\nהמשך לאפליקציה ינסה בכל זאת, אבל ייתכן שתחזור לכאן שוב.`);
       }
     } catch (e) {
       alert(`שגיאת רשת בסימון הסיור כהושלם: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
     }
     await refreshProfile();
+    return true;
   }
 
   async function goHome() {
-    await markSeen();
-    router.push("/home");
+    if (await markSeen()) router.push("/home");
   }
 
   function setTrackTransform(percent: number, animated: boolean) {

@@ -4,12 +4,11 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
-export type FeatureKey = "tripmatch" | "chat" | "planner";
+export type FeatureKey = "tripmatch" | "tripbuilding";
 
 const FIELD_BY_FEATURE: Record<FeatureKey, string> = {
   tripmatch: "tripmatch_onboarding_completed_at",
-  chat: "chat_onboarding_completed_at",
-  planner: "planner_onboarding_completed_at",
+  tripbuilding: "tripbuilding_onboarding_completed_at",
 };
 
 /** שומר על עמוד פיצ'ר (TripMatch / צ'אט / בונה מסלול): בפעם הראשונה

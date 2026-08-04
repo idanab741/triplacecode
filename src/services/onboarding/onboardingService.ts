@@ -1,5 +1,4 @@
-import { isProfileComplete, type Profile } from "@/services/profile/profileService";
-import { isPreferencesComplete, type UserPreferences } from "@/services/preferences/preferencesService";
+import { isMainOnboardingComplete, isProfileComplete, type Profile } from "@/services/profile/profileService";
 
 /** לאן לנתב משתמש מיד אחרי התחברות/הרשמה, לפי מצב הפרופיל וההעדפות שלו.
  *
@@ -9,11 +8,9 @@ import { isPreferencesComplete, type UserPreferences } from "@/services/preferen
  *  בודקים את אותו שדה DB בדיוק - profiles.intro_completed_at - ולא
  *  localStorage, כי הגרסה בשרת חייבת לקרוא את זה בלי גישה לדפדפן. */
 export function getPostAuthPath(
-  profile: Profile | null,
-  preferences: UserPreferences | null
+  profile: Profile | null
 ): string {
   if (!isProfileComplete(profile)) return "/profile-setup";
-  if (!profile?.intro_completed_at) return "/onboarding";
-  if (!isPreferencesComplete(preferences)) return "/preferences";
+  if (!isMainOnboardingComplete(profile)) return "/onboarding";
   return "/home";
 }

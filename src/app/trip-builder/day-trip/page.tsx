@@ -91,7 +91,7 @@ function TripTypeBadge({ label }: { label: string }) {
 export default function DayTripQuestionnairePage() {
 const router = useRouter();
   const { user, profile } = useAuth();
-  const { ready } = useFeatureOnboardingGuard("chat", "/onboarding/chat");
+  const { ready } = useFeatureOnboardingGuard("tripbuilding", "/onboarding/chat");
 
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<DayTripAnswers>(DEFAULT_ANSWERS);

@@ -13,7 +13,6 @@ import {
   translateAuthError,
 } from "@/services/auth/authService";
 import { getProfile } from "@/services/profile/profileService";
-import { getPreferences } from "@/services/preferences/preferencesService";
 import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
 
@@ -51,11 +50,8 @@ function BackIcon() {
 }
 
 async function redirectAfterAuth(userId: string, router: ReturnType<typeof useRouter>) {
-  const [profile, preferences] = await Promise.all([
-    getProfile(userId),
-    getPreferences(userId),
-  ]);
-  router.push(getPostAuthPath(profile, preferences));
+  const profile = await getProfile(userId);
+  router.push(getPostAuthPath(profile));
 }
 
 function AuthPageContent() {
@@ -184,8 +180,12 @@ function AuthPageContent() {
       return;
     }
     setFpLoading(true);
-    await resetPasswordForEmail(fpEmail);
+    const { error } = await resetPasswordForEmail(fpEmail);
     setFpLoading(false);
+    if (error) {
+      setFpMessage(translateAuthError(error.message));
+      return;
+    }
     setFpMessage("אם הכתובת קיימת במערכת, נשלח אליה קישור לאיפוס סיסמה.");
   }
 
