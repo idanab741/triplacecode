@@ -32,12 +32,16 @@ export default function ProfilePage() {
     try {
       const response = await fetch("/api/profile/delete-account", { method: "POST" });
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error ?? "מחיקת החשבון נכשלה");
+      if (!response.ok) throw new Error(data?.error ?? `מחיקת החשבון נכשלה (סטטוס ${response.status})`);
 
       await signOut();
       router.push("/");
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : "מחיקת החשבון נכשלה");
+      const message = error instanceof Error ? error.message : "מחיקת החשבון נכשלה";
+      setDeleteError(message);
+      // alert() בכוונה - בנוסף לטקסט בעמוד - כדי שהשגיאה בלתי-אפשרית
+      // לפספס, גם בלי DevTools.
+      alert(`שגיאה במחיקת החשבון:\n\n${message}`);
       setDeleting(false);
     }
   }
