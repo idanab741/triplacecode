@@ -77,10 +77,10 @@ export default function OnboardingPage() {
       const res = await fetch("/api/onboarding/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feature: "main" }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data?.error ?? `HTTP ${res.status}`);
         // מציגים את זה בגלוי - אחרת המשתמש רק "ייתקע" בלולאה בחזרה
         // ל-Onboarding בלי שום הסבר למה.
         alert(`שגיאה בסימון הסיור כהושלם:\n\n${data?.error ?? res.status}\n\nהמשך לאפליקציה ינסה בכל זאת, אבל ייתכן שתחזור לכאן שוב.`);
+        return false;
       }
     } catch (e) {
       alert(`שגיאת רשת בסימון הסיור כהושלם: ${e instanceof Error ? e.message : String(e)}`);
