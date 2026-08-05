@@ -39,7 +39,14 @@ export async function POST(request: Request) {
   const feature: Feature = body?.feature && body.feature in COLUMN_BY_FEATURE ? body.feature : "main";
   const column = COLUMN_BY_FEATURE[feature];
 
-  const admin = createAdminClient();
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[onboarding/complete] createAdminClient failed:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
   // upsert (לא update) - מאותה סיבה כמו ב-updateProfile: אם שורת
   // ה-profiles חסרה (הטריגר לא רץ), update() היה "מצליח" ומחזיר 0
   // שורות בלי שגיאה - זה בדיוק מה שגרם למשתמשי Google/Apple להיתקע

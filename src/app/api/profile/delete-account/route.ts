@@ -15,7 +15,14 @@ export async function POST() {
 
   if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
 
-  const admin = createAdminClient();
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[delete-account] createAdminClient failed:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
   const userId = user.id;
   const stepErrors: string[] = [];
 
@@ -35,6 +42,7 @@ export async function POST() {
   if (sessionIds.length > 0) {
     await safeDelete("trip_builder_stops", () => admin.from("trip_builder_stops").delete().in("session_id", sessionIds));
   }
+  await safeDelete("tripmatch_sessions", () => admin.from("tripmatch_sessions").delete().eq("user_id", userId));
   await safeDelete("trip_builder_sessions", () => admin.from("trip_builder_sessions").delete().eq("user_id", userId));
   await safeDelete("favorites", () => admin.from("favorites").delete().eq("user_id", userId));
   await safeDelete("travel_dna", () => admin.from("travel_dna").delete().eq("user_id", userId));
@@ -46,8 +54,16 @@ export async function POST() {
   const { error } = await admin.auth.admin.deleteUser(userId);
 
   if (error) {
+    // מדפיסים את השגיאה המלאה ליומן השרת (טרמינל של npm run dev /
+    // Vercel Function Logs) - כי error.message לפעמים ריק/לא-אינפורמטיבי,
+    // וצריך לראות את כל האובייקט כדי להבין מה קרה בפועל.
+    const fullDetails = JSON.stringify(error, Object.getOwnPropertyNames(error));
+    console.error("[delete-account] admin.auth.admin.deleteUser failed:", fullDetails);
     const detail = stepErrors.length > 0 ? ` (שלבים קודמים שנכשלו: ${stepErrors.join(" | ")})` : "";
-    return NextResponse.json({ error: `${error.message}${detail}` }, { status: 500 });
+    // JSON.stringify(error) רגיל תמיד נותן "{}" כי message/stack הן
+    // non-enumerable על אובייקט Error - לכן משתמשים כאן ב-fullDetails.
+    const message = error.message || fullDetails;
+    return NextResponse.json({ error: `${message}${detail}` }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, warnings: stepErrors.length > 0 ? stepErrors : undefined });
