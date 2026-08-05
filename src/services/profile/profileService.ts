@@ -40,7 +40,11 @@ export async function updateProfile(
   updates: Partial<Pick<Profile, "full_name" | "city" | "birth_date" | "country" | "avatar_url">>
 ) {
   const supabase = createClient();
-  return supabase.from("profiles").update(updates).eq("id", userId);
+  // upsert (לא update) - אם משום מה שורת ה-profiles של המשתמש עדיין
+  // לא נוצרה (למשל הטריגר handle_new_user לא רץ, כמו שקרה עם משתמשי
+  // Google/Apple), update() "מצליח בשקט" בלי לשנות כלום כי אין שורה
+  // תואמת. upsert מבטיח שהשורה תיווצר כאן אם היא חסרה.
+  return supabase.from("profiles").upsert({ id: userId, ...updates });
 }
 
 export async function uploadAvatar(userId: string, file: File): Promise<string> {

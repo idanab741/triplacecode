@@ -40,18 +40,20 @@ export async function POST(request: Request) {
   const column = COLUMN_BY_FEATURE[feature];
 
   const admin = createAdminClient();
+  // upsert (לא update) - מאותה סיבה כמו ב-updateProfile: אם שורת
+  // ה-profiles חסרה (הטריגר לא רץ), update() היה "מצליח" ומחזיר 0
+  // שורות בלי שגיאה - זה בדיוק מה שגרם למשתמשי Google/Apple להיתקע
+  // כאן. upsert יוצר את השורה אם היא חסרה.
   let { data, error } = await admin
     .from("profiles")
-    .update({ [column]: new Date().toISOString() })
-    .eq("id", user.id)
+    .upsert({ id: user.id, [column]: new Date().toISOString() })
     .select(`id, ${column}`);
 
   if (error && LEGACY_COLUMN_BY_FEATURE[feature]) {
     const legacyColumn = LEGACY_COLUMN_BY_FEATURE[feature];
     const legacy = await admin
       .from("profiles")
-      .update({ [legacyColumn]: new Date().toISOString() })
-      .eq("id", user.id)
+      .upsert({ id: user.id, [legacyColumn]: new Date().toISOString() })
       .select(`id, ${legacyColumn}`);
     data = legacy.data;
     error = legacy.error;

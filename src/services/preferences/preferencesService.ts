@@ -39,7 +39,9 @@ export async function savePreferences(
   updates: Partial<PreferencesFields>
 ) {
   const supabase = createClient();
-  return supabase.from("user_preferences").update(updates).eq("id", userId);
+  // upsert, מאותה סיבה כמו ב-profileService.updateProfile: אם שורת
+  // ה-user_preferences חסרה (הטריגר לא רץ), update() נכשל בשקט.
+  return supabase.from("user_preferences").upsert({ id: userId, ...updates });
 }
 
 /** שמירה סופית — מסמנת את האשף כהושלם, ומרעננת את ה-Travel DNA. */
@@ -50,8 +52,7 @@ export async function completePreferences(
   const supabase = createClient();
   const result = await supabase
     .from("user_preferences")
-    .update({ ...updates, onboarding_completed_at: new Date().toISOString() })
-    .eq("id", userId);
+    .upsert({ id: userId, ...updates, onboarding_completed_at: new Date().toISOString() });
 
   if (!result.error) {
     await recomputeTravelDna(supabase, userId);
