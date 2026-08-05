@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { QUICK_CATEGORIES, type QuickCategoryId } from "@/constants/quickCategories";
@@ -8,7 +9,9 @@ import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 import { TRIP_TYPE_RULES } from "@/services/tripBuilder/rules";
 import type { TripType } from "@/services/tripBuilder/types";
 import { AnswerOptions } from "./AnswerOptions";
+import { CategoryOptions } from "./CategoryOptions";
 import { ChatBubble } from "./ChatBubble";
+import { ChatHeader } from "./ChatHeader";
 import { TypingIndicator } from "./TypingIndicator";
 import { UserBubble } from "./UserBubble";
 
@@ -19,6 +22,7 @@ const label = (options: { value: string; label: string }[], value: string) => op
 
 /** Renders the existing rule descriptors in one persistent chat surface. */
 export function TrippyConversation() {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([{ id: 1, role: "assistant", text: INTRO }]);
   const [type, setType] = useState<TripType | null>(null);
   const [index, setIndex] = useState(0);
@@ -31,7 +35,9 @@ export function TrippyConversation() {
   const id = useRef(1); const bottom = useRef<HTMLDivElement>(null);
   const questions = type ? TRIP_TYPE_RULES[type]?.questions ?? [] : [];
   const step = questions[index];
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages, typing, type, index, followUp]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, typing, type, index, followUp]);
   const add = (role: Message["role"], message: string) => { id.current += 1; setMessages((all) => [...all, { id: id.current, role, text: message }]); };
   const save = (key: string, answer: unknown) => ({ ...answers, [key]: answer });
   function next(nextAnswers: Record<string, unknown>) {
@@ -57,9 +63,15 @@ function choose(category: QuickCategoryId) {
     if (step.type === "multi-emoji") { add("user", values.map((item) => label(step.options, item)).join(", ")); next(save(step.key, values)); return; }
     if (step.type === "text") { if (!text) return; add("user", text); next(save(step.key, text)); }
   }
-  return <Screen withBottomNavSpacing><div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-5 pb-6">
+  const availableCategoryIds = QUICK_CATEGORIES.filter((category) => TYPES[category.id] && TRIP_TYPE_RULES[TYPES[category.id]!]).map((category) => category.id);
+
+  return <Screen withBottomNavSpacing>
+    <div className="-mx-5 -mt-8">
+      <ChatHeader current={type ? index + 1 : 0} total={type ? questions.length : 0} onBack={() => router.push("/home")} />
+    </div>
+    <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
     {messages.map((message) => message.role === "assistant" ? <ChatBubble key={message.id}>{message.text}</ChatBubble> : <UserBubble key={message.id}>{message.text}</UserBubble>)}
-    {!type && <AnswerOptions options={QUICK_CATEGORIES.filter((category) => TYPES[category.id] && TRIP_TYPE_RULES[TYPES[category.id]!]).map((category) => ({ value: category.id, label: QUICK_CATEGORY_LABELS[category.id] }))} onSelect={(selected) => choose(selected as QuickCategoryId)} />}
+    {!type && <CategoryOptions categoryIds={availableCategoryIds} onSelect={choose} />}
     {typing && <TypingIndicator />}
     {step && !typing && <div className="flex flex-col gap-3">
       {step.type === "single" && <AnswerOptions options={step.options} onSelect={(selected) => { add("user", label(step.options, selected)); next(save(step.key, selected)); }} />}
