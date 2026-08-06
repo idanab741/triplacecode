@@ -31,18 +31,21 @@ export function SwipeHeader({
 
   return (
     <div className="flex flex-col gap-3 px-5 pt-4">
-      <div className="flex items-center justify-between">
-        <button type="button" onClick={onBack} aria-label="חזרה" className="flex h-9 w-9 items-center justify-center text-ink">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </button>
-        <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" width={110} height={34} className="object-contain" />
+      <div className="relative flex h-9 items-center">
+        <div className="absolute left-0 flex items-center gap-2">
+          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" width={100} height={30} className="object-contain" />
+          <button type="button" onClick={onBack} aria-label="חזרה" className="flex h-9 w-9 items-center justify-center text-ink">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 6l-6 6 6 6" />
+            </svg>
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={onOpenFilters}
           aria-label="פילטרים"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-bg-secondary text-ink"
+          className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-full bg-bg-secondary text-ink"
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 6h16M7 12h10M10 18h4" />
