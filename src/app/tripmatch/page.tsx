@@ -102,21 +102,24 @@ export default function TripMatchPage() {
     }
   }
 
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (stage !== "swiping" || userLocation || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setUserLocation(null)
+    );
+  }, [stage, userLocation]);
+
   const visibleCandidates = useMemo(() => {
     const filtered = applyFilters(candidates, filters);
-    if (filtered.length === 0) return filtered;
-    // אין "בית" רלוונטי ל-TripMatch (יכול לשמש לתכנון עיר רחוקה) - במקום זה,
-    // מרחק/זמן נסיעה מחושבים יחסית למרכז-המסה של כל התוצאות שנטענו, כך
-    // שהם משקפים "כמה מרכזי המקום ביחס לשאר האזור" ולא "0" שלא אומר כלום.
-    const center = {
-      lat: filtered.reduce((sum, c) => sum + c.latitude, 0) / filtered.length,
-      lng: filtered.reduce((sum, c) => sum + c.longitude, 0) / filtered.length,
-    };
+    if (!userLocation) return filtered; // בלי מיקום אמיתי - לא ממציאים מספר
     return filtered.map((c) => {
-      const distanceKm = haversineDistanceKm(center, { lat: c.latitude, lng: c.longitude });
+      const distanceKm = haversineDistanceKm(userLocation, { lat: c.latitude, lng: c.longitude });
       return { ...c, distanceKm, etaMinutes: estimateTravelMinutes(distanceKm, "drive") };
     });
-  }, [candidates, filters]);
+  }, [candidates, filters, userLocation]);
   const currentCandidate = visibleCandidates[candidateIndex];
 
   async function handleDecision(liked: boolean) {

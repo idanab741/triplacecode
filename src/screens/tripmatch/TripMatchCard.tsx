@@ -3,6 +3,8 @@
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
+const MAX_REASONABLE_DRIVING_KM = 400; // מעבר לזה, "X דק' נסיעה" כבר לא כנה - צריך טיסה
+
 interface TripMatchCardProps {
   candidate: CandidatePlace;
 }
@@ -55,8 +57,15 @@ export function TripMatchCard({ candidate }: TripMatchCardProps) {
           </div>
           <h2 className="text-xl font-extrabold leading-tight">{candidate.name}</h2>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-white/90">
-            <span>🚗 {candidate.etaMinutes} דק&apos;</span>
-            <span>📍 {candidate.distanceKm.toFixed(1)} ק&quot;מ</span>
+            {candidate.distanceKm > 0 &&
+              (candidate.distanceKm <= MAX_REASONABLE_DRIVING_KM ? (
+                <>
+                  <span>🚗 {candidate.etaMinutes} דק&apos;</span>
+                  <span>📍 {candidate.distanceKm.toFixed(1)} ק&quot;מ</span>
+                </>
+              ) : (
+                <span>✈️ {Math.round(candidate.distanceKm).toLocaleString()} ק&quot;מ ממך</span>
+              ))}
             {candidate.priceLevel != null && <span>{"₪".repeat(candidate.priceLevel + 1)}</span>}
           </div>
         </div>
