@@ -73,8 +73,8 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="whitespace-nowrap px-4 py-3 text-left text-[11.5px] font-semibold uppercase tracking-wide"
-                  style={{ color: "var(--admin-ink-faint)", width: col.width, textAlign: col.align ?? "left", cursor: col.sortValue ? "pointer" : "default" }}
+                  className="whitespace-nowrap px-4 py-3 text-right text-[11.5px] font-semibold uppercase tracking-wide"
+                  style={{ color: "var(--admin-ink-faint)", width: col.width, textAlign: col.align ?? "right", cursor: col.sortValue ? "pointer" : "default" }}
                   onClick={() => toggleSort(col)}
                 >
                   <span className="inline-flex items-center gap-1">
@@ -133,7 +133,7 @@ export function DataTable<T>({
                       </td>
                     )}
                     {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3" style={{ color: "var(--admin-ink)", textAlign: col.align ?? "left" }}>
+                      <td key={col.key} className="px-4 py-3" style={{ color: "var(--admin-ink)", textAlign: col.align ?? "right" }}>
                         {col.render(row)}
                       </td>
                     ))}

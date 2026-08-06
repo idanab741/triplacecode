@@ -1,30 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Screen, SwipeCard } from "@/components/ui";
-import { ChipGroup } from "@/components/ui";
-import { TRIPMATCH_INTEREST_OPTIONS } from "@/locales/he/tripBuilder";
-import { TripMatchCardContent } from "@/screens/tripmatch/TripMatchCardContent";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
+import { CategoryPicker } from "@/screens/tripmatch/CategoryPicker";
+import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
+import { TripMatchCard } from "@/screens/tripmatch/TripMatchCard";
+import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
+import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 
-type Stage = "city" | "interests" | "swiping";
+type Stage = "city" | "category" | "swiping";
 
 export default function TripMatchPage() {
   const router = useRouter();
   const { ready } = useFeatureOnboardingGuard("tripmatch", "/onboarding/tripmatch");
   const [stage, setStage] = useState<Stage>("city");
+  const [heroVisible, setHeroVisible] = useState(true);
 
   const [cityInput, setCityInput] = useState("");
   const [cityOptions, setCityOptions] = useState<string[]>([]);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
 
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [categoryValue, setCategoryValue] = useState<string | null>(null);
+  const [categoryLabel, setCategoryLabel] = useState<string>("");
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<CandidatePlace[]>([]);
@@ -32,11 +35,14 @@ export default function TripMatchPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // השלמה אוטומטית לערים, עם debounce כדי לא להציף את השרת בכל הקשה
   useEffect(() => {
-    if (selectedCity) return; // כבר נבחרה עיר - לא ממשיכים לחפש
+    if (selectedCity) return;
     if (cityInput.trim().length < 2) {
       setCityOptions([]);
       return;
@@ -54,18 +60,33 @@ export default function TripMatchPage() {
     setSelectedCity(city);
     setCityInput(city);
     setCityOptions([]);
-    setStage("interests");
+    // ה-HERO נעלם ב-Fade+Slide (הטרנזישן מוגדר על ה-wrapper), ורק אז עוברים שלב
+    setHeroVisible(false);
+    window.setTimeout(() => setStage("category"), 280);
   }
 
-  async function handleStartSwiping() {
+  function handleEditDestination() {
+    setStage("city");
+    setHeroVisible(true);
+    setCategoryValue(null);
+  }
+
+  function handleEditCategory() {
+    setStage("category");
+  }
+
+  async function handleSelectCategory(value: string, label: string) {
+    setCategoryValue(value);
+    setCategoryLabel(label);
     if (!selectedCity || busy) return;
     setBusy(true);
     setError(null);
+    setFilters(EMPTY_FILTERS);
     try {
       const response = await fetch("/api/tripmatch/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city: selectedCity, interests: selectedInterests }),
+        body: JSON.stringify({ city: selectedCity, interests: [value] }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "לא הצלחנו להתחיל");
@@ -80,21 +101,22 @@ export default function TripMatchPage() {
     }
   }
 
+  const visibleCandidates = useMemo(() => applyFilters(candidates, filters), [candidates, filters]);
+  const currentCandidate = visibleCandidates[candidateIndex];
+
   async function handleDecision(liked: boolean) {
-    if (!sessionId || busy) return;
-    const candidate = candidates[candidateIndex];
-    if (!candidate) return;
+    if (!sessionId || busy || !currentCandidate) return;
+    const decidedPlace = currentCandidate;
 
     setBusy(true);
     try {
       const response = await fetch(`/api/tripmatch/sessions/${sessionId}/decide`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placeId: candidate.id, liked }),
+        body: JSON.stringify({ placeId: decidedPlace.id, liked }),
       });
       const data = await response.json();
       if (response.ok) {
-        // מזינים מחדש מהשרת - כך שגם מועמדים חדשים (שלא היו ברשימה הראשונית) יכולים להצטרף
         setCandidates(data.candidates ?? []);
         setCandidateIndex(0);
       } else {
@@ -105,43 +127,49 @@ export default function TripMatchPage() {
     } finally {
       setBusy(false);
     }
-  }
 
-  const currentCandidate = candidates[candidateIndex];
+    // אין מעבר אוטומטי אחרי Like - עוצרים על Dialog, בדיוק כמו במפרט
+    if (liked) setLikedPlace(decidedPlace);
+  }
 
   if (!ready) return null;
 
-return (
-<Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-<div className="relative w-full">
-        <Image
-          src="/images/hero-tripmatch.png"
-          alt=""
-          width={800}
-          height={450}
-          priority
-          className="h-56 w-full object-cover"
-        />
-        <div className="absolute left-2 top-4 flex items-center gap-2">
-          <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
-          <Link
-            href="/home"
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-            aria-label="חזרה לדף הבית"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </Link>
+  return (
+    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+      {stage !== "swiping" && (
+        <div
+          className="overflow-hidden transition-all duration-300 ease-out"
+          style={{ maxHeight: heroVisible ? 260 : 0, opacity: heroVisible ? 1 : 0 }}
+        >
+          <div className="relative w-full">
+            <Image src="/images/hero-tripmatch.png" alt="" width={800} height={450} priority className="h-56 w-full object-cover" />
+            <div className="absolute left-2 top-4 flex items-center gap-2">
+              <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {stage === "swiping" && currentCandidate && (
+        <SwipeHeader
+          city={selectedCity ?? ""}
+          categoryLabel={categoryLabel}
+          currentIndex={candidateIndex}
+          total={visibleCandidates.length}
+          onBack={() => router.push("/home")}
+          onEditDestination={handleEditDestination}
+          onEditCategory={handleEditCategory}
+          onOpenFilters={() => setFiltersOpen(true)}
+          activeFilterCount={countActiveFilters(filters)}
+        />
+      )}
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-10 pt-5">
         {stage === "city" && (
           <div className="flex flex-col gap-3">
-     <ChatBubble>החליקו ימינה למקומות שאהבתם ושמאלה לאלה
-              שפחות. ככל שתמשיכו להחליק, נכיר טוב יותר את הטעם שלכם ונמצא עבורכם את ההתאמה
-              המושלמת.{"\n\n"}
+            <ChatBubble>
+              החליקו ימינה למקומות שאהבתם ושמאלה לאלה שפחות. ככל שתמשיכו להחליק, נכיר טוב יותר את הטעם שלכם ונמצא
+              עבורכם את ההתאמה המושלמת.{"\n\n"}
               אז בואו נתחיל - איפה תרצו לטייל?
             </ChatBubble>
 
@@ -174,19 +202,11 @@ return (
           </div>
         )}
 
-{stage === "interests" && (
+        {stage === "category" && (
           <div className="flex flex-col gap-3">
             <ChatBubble>מה בא לכם לעשות ב{selectedCity}?</ChatBubble>
-            <ChipGroup options={TRIPMATCH_INTEREST_OPTIONS} selected={selectedInterests} onChange={setSelectedInterests} />
-            <button
-              type="button"
-              onClick={handleStartSwiping}
-              disabled={busy}
-              className="mt-2 w-full rounded-pill py-3 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-            >
-              {busy ? "טוען..." : "בואו נתחיל להחליק"}
-            </button>
+            <CategoryPicker onSelect={handleSelectCategory} />
+            {busy && <p className="text-center text-sm text-ink-secondary">טוען...</p>}
             {error && <p className="text-center text-sm text-danger">{error}</p>}
           </div>
         )}
@@ -196,22 +216,31 @@ return (
             {!currentCandidate ? (
               <p className="pt-16 text-center text-ink-secondary">
                 {candidates.length === 0
-                  ? `לא מצאנו עדיין מקומות ב${selectedCity} בקטגוריות שבחרתם.`
-                  : "נגמרו המועמדים כרגע."}
+                  ? `לא מצאנו עדיין מקומות ב${selectedCity} בקטגוריה הזו.`
+                  : visibleCandidates.length === 0
+                    ? "אין תוצאות עם הפילטרים שנבחרו. נסו לרוקן חלק מהם."
+                    : "נגמרו המועמדים כרגע."}
               </p>
             ) : (
-              <SwipeCard
-                key={currentCandidate.id}
-                onSwipeLeft={() => handleDecision(false)}
-                onSwipeRight={() => handleDecision(true)}
-                disabled={busy}
-              >
-                <TripMatchCardContent candidate={currentCandidate} />
+              <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
+                <TripMatchCard candidate={currentCandidate} />
               </SwipeCard>
             )}
           </>
-)}
+        )}
       </div>
+
+      {filtersOpen && (
+        <FiltersSheet candidates={candidates} filters={filters} onChange={setFilters} onClose={() => setFiltersOpen(false)} />
+      )}
+
+      {likedPlace && (
+        <LikedDialog
+          placeName={likedPlace.name}
+          onContinue={() => setLikedPlace(null)}
+          onViewPlace={() => router.push(`/place/${likedPlace.id}`)}
+        />
+      )}
 
       <MainBottomNav active="favorites" />
     </Screen>

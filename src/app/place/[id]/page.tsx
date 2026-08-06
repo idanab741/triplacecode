@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getPlaceById } from "@/services/places/placesServerService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { Screen } from "@/components/ui";
+import { PlaceHeroActions } from "@/screens/place/PlaceHeroActions";
+import { PlaceNavigationCard } from "@/screens/place/PlaceNavigationCard";
 
 interface PlacePageProps {
   params: Promise<{ id: string }>;
@@ -44,15 +46,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
           />
         )}
 
-        <Link
-          href="/search"
-          aria-label="חזרה"
-          className="absolute start-4 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-soft"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2">
-            <path d="m14 6-6 6 6 6" />
-          </svg>
-        </Link>
+        <PlaceHeroActions placeId={place.id} placeName={place.name} />
 
         <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.65),transparent)] px-6 pb-5 pt-16">
           <h1 className="text-2xl font-extrabold text-white">{place.name}</h1>
@@ -67,10 +61,14 @@ export default async function PlacePage({ params }: PlacePageProps) {
         </div>
 
         {place.short_description && (
-          <p className="text-sm leading-relaxed text-ink-secondary">{place.short_description}</p>
+          <p className="line-clamp-3 text-sm leading-relaxed text-ink-secondary">{place.short_description}</p>
         )}
 
         {place.address && <p className="text-sm text-ink-secondary">{place.address}</p>}
+
+        <div className="mt-2">
+          <PlaceNavigationCard placeId={place.id} latitude={place.latitude} longitude={place.longitude} />
+        </div>
       </div>
     </div>
   );

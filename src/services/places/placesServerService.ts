@@ -22,6 +22,8 @@ export interface PlaceDetail {
   image_urls: string[];
   opening_hours: string[] | null;
   tags: string[];
+  latitude: number;
+  longitude: number;
 }
 
 /** לשימוש ב-Server Components בלבד. */

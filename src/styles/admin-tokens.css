@@ -79,6 +79,41 @@
   font-feature-settings: "tnum" 1;
 }
 
+/* ==========================================================================
+   ברירת מחדל RTL לתוכן טקסטואלי בתוך שלד LTR
+   השלד (sidebar, מבנה כללי, Drawer שנפתח מהצד) נשאר LTR בכוונה (enterprise
+   SaaS), אבל כל התוכן בפועל הוא עברית - אז טקסט קריא (כותרות, תוויות,
+   כפתורים, טבלאות, שדות קלט) חייב להיות מיושר לימין ובכיוון RTL, אחרת הוא
+   "נדבק" לשמאל וקשה לקרוא. שדות שמכילים בכוונה ערכים טכניים באנגלית
+   (מפתחות שדה, סלאגים) מסומנים עם admin-ltr-value כדי להישאר LTR.
+   ========================================================================== */
+.admin-root h1, .admin-root h2, .admin-root h3, .admin-root h4,
+.admin-root p, .admin-root label, .admin-root span, .admin-root a,
+.admin-root button, .admin-root th, .admin-root td, .admin-root li {
+  text-align: right;
+}
+.admin-root input, .admin-root select, .admin-root textarea {
+  text-align: right;
+  direction: rtl;
+}
+.admin-root input::placeholder, .admin-root textarea::placeholder {
+  text-align: right;
+}
+
+/* שימוש: <div className="admin-ltr-value"> סביב שדה שמכיל ערך טכני
+   באנגלית (מפתח שדה, slug וכו') - נשאר LTR ומיושר לשמאל בכוונה. */
+.admin-ltr-value,
+.admin-ltr-value input,
+.admin-ltr-value textarea {
+  direction: ltr !important;
+  text-align: left !important;
+}
+.admin-ltr-value input::placeholder,
+.admin-ltr-value textarea::placeholder {
+  text-align: left !important;
+}
+
+
 .admin-root ::selection {
   background: var(--admin-accent-soft);
 }

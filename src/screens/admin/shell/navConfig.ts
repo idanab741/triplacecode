@@ -34,6 +34,8 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/places", label: "מקומות ואטרקציות", icon: "◆", status: "ready" },
       { href: "/admin/destinations", label: "יעדים ומדינות", icon: "◇", status: "ready" },
+      { href: "/admin/place-type-fields", label: "שדות לפי סוג יעד", icon: "◈", status: "ready" },
+      { href: "/admin/taxonomy", label: "מערכת טקסונומיה", icon: "◉", status: "ready" },
       { href: "/admin/tags", label: "מערכת תגיות", icon: "◉", status: "soon" },
       { href: "/admin/media", label: "ספריית מדיה", icon: "▣", status: "soon" },
       { href: "/admin/workflow", label: "Workflow ואישורים", icon: "◧", status: "soon" },
