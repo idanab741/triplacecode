@@ -11,6 +11,7 @@ import { TripMatchCard } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 
@@ -101,7 +102,21 @@ export default function TripMatchPage() {
     }
   }
 
-  const visibleCandidates = useMemo(() => applyFilters(candidates, filters), [candidates, filters]);
+  const visibleCandidates = useMemo(() => {
+    const filtered = applyFilters(candidates, filters);
+    if (filtered.length === 0) return filtered;
+    // אין "בית" רלוונטי ל-TripMatch (יכול לשמש לתכנון עיר רחוקה) - במקום זה,
+    // מרחק/זמן נסיעה מחושבים יחסית למרכז-המסה של כל התוצאות שנטענו, כך
+    // שהם משקפים "כמה מרכזי המקום ביחס לשאר האזור" ולא "0" שלא אומר כלום.
+    const center = {
+      lat: filtered.reduce((sum, c) => sum + c.latitude, 0) / filtered.length,
+      lng: filtered.reduce((sum, c) => sum + c.longitude, 0) / filtered.length,
+    };
+    return filtered.map((c) => {
+      const distanceKm = haversineDistanceKm(center, { lat: c.latitude, lng: c.longitude });
+      return { ...c, distanceKm, etaMinutes: estimateTravelMinutes(distanceKm, "drive") };
+    });
+  }, [candidates, filters]);
   const currentCandidate = visibleCandidates[candidateIndex];
 
   async function handleDecision(liked: boolean) {

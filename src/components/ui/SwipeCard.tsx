@@ -76,16 +76,7 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
       style={{ willChange: "transform" }}
     >
       {children}
-      <div className="mt-4 flex items-center justify-center gap-6">
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => flyOut("left")}
-          aria-label="לא מתאים"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-bg-secondary text-2xl shadow-soft disabled:opacity-50"
-        >
-          ❌
-        </button>
+      <div className="mt-4 flex items-center justify-center gap-6 pb-2">
         <button
           type="button"
           disabled={disabled}
@@ -94,6 +85,15 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
           className="flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-2xl shadow-soft disabled:opacity-50"
         >
           ❤️
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => flyOut("left")}
+          aria-label="לא מתאים"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-bg-secondary text-2xl shadow-soft disabled:opacity-50"
+        >
+          ❌
         </button>
       </div>
     </div>

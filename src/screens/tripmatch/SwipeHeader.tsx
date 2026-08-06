@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 interface SwipeHeaderProps {
   city: string;
   categoryLabel: string;
@@ -35,7 +37,7 @@ export function SwipeHeader({
             <path d="M15 6l-6 6 6 6" />
           </svg>
         </button>
-        <h1 className="text-base font-bold text-ink">TripMatch</h1>
+        <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" width={110} height={34} className="object-contain" />
         <button
           type="button"
           onClick={onOpenFilters}

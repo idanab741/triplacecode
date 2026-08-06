@@ -32,7 +32,7 @@ export function TripMatchCard({ candidate }: TripMatchCardProps) {
   const tags = deriveTags(candidate);
 
   return (
-    <div className="relative flex h-[calc(100dvh-260px)] min-h-[420px] w-full flex-col overflow-hidden rounded-card bg-white shadow-soft">
+    <div className="relative flex h-[calc(100dvh-340px)] min-h-[380px] w-full flex-col overflow-hidden rounded-card bg-white shadow-soft">
       <div className="relative flex-1 bg-bg-secondary">
         {candidate.imageUrls[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
