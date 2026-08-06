@@ -29,7 +29,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const mapResponse = await fetch(`https://maps.googleapis.com/maps/api/staticmap?${params_}`);
   if (!mapResponse.ok) {
-    return NextResponse.json({ error: "טעינת מפה נכשלה" }, { status: 502 });
+    const body = await mapResponse.text().catch(() => "");
+    console.error(`[map-preview] Google Static Maps failed: ${mapResponse.status} - ${body}`);
+    return NextResponse.json({ error: `טעינת מפה נכשלה: ${body || mapResponse.status}` }, { status: 502 });
   }
 
   const imageBuffer = await mapResponse.arrayBuffer();

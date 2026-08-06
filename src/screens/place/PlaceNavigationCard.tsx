@@ -27,6 +27,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavigationCardProps) {
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
+  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -60,8 +61,25 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
       )}
 
       <div className="overflow-hidden rounded-card bg-bg-secondary">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/places/${placeId}/map-preview`} alt="מפה" className="h-40 w-full object-cover" loading="lazy" />
+        {mapFailed ? (
+          <button
+            type="button"
+            onClick={handleStartNavigation}
+            className="flex h-40 w-full flex-col items-center justify-center gap-1.5 text-ink-secondary"
+          >
+            <span className="text-2xl">🗺️</span>
+            <span className="text-[13px] font-medium">לא ניתן לטעון תצוגת מפה כרגע - לחצו לפתיחה בגוגל מפות</span>
+          </button>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/places/${placeId}/map-preview`}
+            alt="מפה"
+            className="h-40 w-full object-cover"
+            loading="lazy"
+            onError={() => setMapFailed(true)}
+          />
+        )}
       </div>
 
       <button

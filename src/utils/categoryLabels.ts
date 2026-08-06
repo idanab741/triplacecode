@@ -1,4 +1,5 @@
 import { INTERESTS } from "@/locales/he/preferences";
+import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 
 /** תוויות לקטגוריות שאינן חלק מרשימת INTERESTS של ההעדפות. */
 const EXTRA_CATEGORY_LABELS: Record<string, string> = {
@@ -36,8 +37,13 @@ spa_relaxation: "ספא ורוגע",
   sweets: "מאנצ'ים ומתוקים",
 };
 
+// כל תתי-התגיות (154) מתוך tripTaxonomy.ts - נבנה פעם אחת, לא בכל קריאה.
+const SUBTAG_LABELS: Record<string, string> = Object.fromEntries(
+  TRIP_TYPE_GROUPS.flatMap((group) => group.subTags.map((sub) => [sub.id, sub.label]))
+);
+
 export function getCategoryLabel(categoryId: string): string {
   const found = INTERESTS.find((option) => option.value === categoryId);
   if (found) return found.label;
-  return EXTRA_CATEGORY_LABELS[categoryId] ?? categoryId;
+  return EXTRA_CATEGORY_LABELS[categoryId] ?? SUBTAG_LABELS[categoryId] ?? categoryId;
 }

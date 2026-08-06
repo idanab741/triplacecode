@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
@@ -11,11 +12,9 @@ interface PlaceHeroActionsProps {
   placeName: string;
 }
 
-/** חזרה (שמאל) + שמירה/שיתוף (ימין), מוצגות מעל ה-HERO. חזרה היא תמיד
- *  router.back() - כך שהעמוד עובד נכון גם כשמגיעים אליו מ-TripMatch,
- *  מחיפוש, או מכל מקום אחר, בלי יעד חזרה קשיח. */
+/** לוגו + חזרה (בצד ה-start) ו-שמירה/שיתוף (בצד ה-end) - באותו סגנון בדיוק
+ *  כמו header ה-HERO בעמוד תוצאת "חופשה בחו״ל" (trip-builder/abroad-vacation/result). */
 export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) {
-  const router = useRouter();
   const { user } = useAuth();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,44 +55,35 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => router.back()}
-        aria-label="חזרה"
-        className="absolute start-4 top-6 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-soft"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2">
-          <path d="m14 6-6 6 6 6" />
-        </svg>
-      </button>
-
-      <div className="absolute end-4 top-6 z-10 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleShare}
-          aria-label="שיתוף"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-soft"
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <path d="M8.6 13.5l6.8 3.9M15.4 6.6L8.6 10.5" />
+      <div className="absolute start-2 top-4 flex items-center gap-2">
+        <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+        <button type="button" onClick={() => window.history.back()} className="flex h-9 w-9 shrink-0 items-center justify-center text-ink" aria-label="חזרה">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 6l-6 6 6 6" />
           </svg>
         </button>
+      </div>
+
+      <div className="absolute end-2 top-4 flex items-center gap-2">
         {user && (
           <button
             type="button"
             onClick={handleSave}
             disabled={busy}
             aria-label={saved ? "הסרה משמורים" : "שמירה"}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-soft disabled:opacity-60"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm disabled:opacity-60"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 3h12v18l-6-4-6 4V3z" />
-            </svg>
+            {saved ? "✓" : <Image src="/icons/save.png" alt="" width={20} height={20} />}
           </button>
         )}
+        <button
+          type="button"
+          onClick={handleShare}
+          aria-label="שיתוף"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm"
+        >
+          <Image src="/icons/share.png" alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
+        </button>
       </div>
     </>
   );

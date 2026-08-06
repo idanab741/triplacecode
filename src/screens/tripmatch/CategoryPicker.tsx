@@ -6,20 +6,24 @@ interface CategoryPickerProps {
   onSelect: (categoryValue: string, categoryLabel: string) => void;
 }
 
-/** שלב 2 - בחירת סוג מסלול יחיד (לא בחירה מרובה). ברגע שנבחרת קטגוריה
- *  עוברים ישר להחלקות - אין כפתור "המשך" נפרד. */
+/** שלב 2 - בחירת סוג מסלול יחיד. באותו סגנון בדיוק כמו כפתורי הקטגוריה
+ *  במסך הפתיחה של טריפי AI (CategoryOptions.tsx) - Chip דק עם אייקון
+ *  עגול, לא כרטיס גדול. */
 export function CategoryPicker({ onSelect }: CategoryPickerProps) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="flex flex-wrap gap-2">
       {TRIPMATCH_INTEREST_OPTIONS.map((option) => (
         <button
           key={option.value}
           type="button"
           onClick={() => onSelect(option.value, option.label)}
-          className="flex flex-col items-start gap-2 rounded-card bg-white p-4 text-start shadow-soft transition active:scale-[0.97]"
+          className="flex items-center gap-2 rounded-pill py-1.5 ps-1.5 pe-4 text-[13.5px] font-medium text-ink transition active:scale-95"
+          style={{ background: "#ffffff", boxShadow: "0 2px 8px rgba(16,24,40,0.08)" }}
         >
-          <span className="text-2xl">{option.emoji}</span>
-          <span className="text-[13.5px] font-semibold leading-snug text-ink">{option.label}</span>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary text-base">
+            {option.emoji}
+          </span>
+          {option.label}
         </button>
       ))}
     </div>
