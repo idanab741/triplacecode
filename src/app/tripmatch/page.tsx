@@ -145,6 +145,16 @@ export default function TripMatchPage() {
             <Image src="/images/hero-tripmatch.png" alt="" width={800} height={450} priority className="h-56 w-full object-cover" />
             <div className="absolute left-2 top-4 flex items-center gap-2">
               <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+              <button
+                type="button"
+                onClick={() => router.push("/home")}
+                aria-label="חזרה"
+                className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 6l-6 6 6 6" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

@@ -55,7 +55,7 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
 
   return (
     <>
-      <div className="absolute start-2 top-4 flex items-center gap-2">
+      <div className="absolute left-2 top-4 flex items-center gap-2">
         <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
         <button type="button" onClick={() => window.history.back()} className="flex h-9 w-9 shrink-0 items-center justify-center text-ink" aria-label="חזרה">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -64,7 +64,7 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
         </button>
       </div>
 
-      <div className="absolute end-2 top-4 flex items-center gap-2">
+      <div className="absolute right-2 top-4 flex items-center gap-2">
         {user && (
           <button
             type="button"
