@@ -10,6 +10,7 @@ import {
   deleteAddress,
   type UserAddress,
 } from "@/services/addresses/addressesService";
+import { AddressRow } from "./AddressRow";
 
 interface ChooseLocationSheetProps {
   onClose: () => void;
@@ -82,7 +83,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
           if (user) {
             const supabase = createClient();
             const saved = await addAddress(supabase, user.id, {
-              label: "המיקום הנוכחי שלי",
+              label: data.city ?? data.address_text,
               address_text: data.address_text,
               city: data.city,
               latitude,
@@ -94,7 +95,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             onSelect({
               id: "current",
               user_id: "",
-              label: "המיקום הנוכחי שלי",
+              label: data.city ?? data.address_text,
               address_text: data.address_text,
               city: data.city,
               latitude,
@@ -168,9 +169,9 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg pb-6"
+        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg pb-24"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mt-3 h-1 w-10 rounded-pill bg-ink-secondary/30" />
@@ -236,36 +237,13 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               <div className="admin-skeleton mx-5 h-16 rounded-card" />
             ) : (
               addresses.map((address) => (
-                <div key={address.id} className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5">
-                  <button type="button" onClick={() => onSelect(address)} className="flex flex-1 items-center gap-3 text-start">
-                    <span
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg"
-                      style={{
-                        background: address.is_default ? "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" : "var(--color-bg-secondary)",
-                        color: address.is_default ? "#fff" : "var(--color-ink-secondary)",
-                      }}
-                    >
-                      📍
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 truncate text-[15px] font-semibold text-ink">
-                        {address.label}
-                        {address.is_default && <span className="text-accent">✓</span>}
-                      </span>
-                      {address.city && <span className="block truncate text-[13px] text-ink-secondary">{address.city}</span>}
-                    </span>
-                  </button>
-                  {!address.is_default && (
-                    <button type="button" onClick={() => handleSetDefault(address)} className="shrink-0 text-[12px] font-medium text-accent">
-                      הפוך לראשי
-                    </button>
-                  )}
-                  <button type="button" onClick={() => handleDelete(address)} aria-label="מחיקה" className="shrink-0 text-ink-secondary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
-                    </svg>
-                  </button>
-                </div>
+                <AddressRow
+                  key={address.id}
+                  address={address}
+                  onSelect={() => onSelect(address)}
+                  onSetDefault={() => handleSetDefault(address)}
+                  onDelete={() => handleDelete(address)}
+                />
               ))
             )}
 
