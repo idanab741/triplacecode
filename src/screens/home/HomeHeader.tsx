@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/services/supabase/client";
+import { listAddresses, type UserAddress } from "@/services/addresses/addressesService";
+import { ChooseLocationSheet } from "./ChooseLocationSheet";
 
 interface HomeHeaderProps {
   avatarUrl?: string | null;
@@ -12,7 +16,21 @@ interface HomeHeaderProps {
 
 /** Header שקוף שיושב מעל אזור ה-Hero. */
 export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
+  const { user } = useAuth();
   const [message, setMessage] = useState<string | null>(null);
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    listAddresses(supabase, user.id)
+      .then((addresses) => {
+        const active = addresses.find((a) => a.is_default) ?? addresses[0];
+        if (active) setSelectedAddress(active);
+      })
+      .catch(() => {});
+  }, [user]);
 
   return (
     <header className="relative z-10 grid grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
@@ -47,11 +65,11 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
 
       <button
         type="button"
-        onClick={() => setMessage("בקרוב אפשר יהיה לבחור מיקום")}
-        className="flex items-center justify-center gap-1 text-sm font-medium text-ink"
+        onClick={() => setLocationSheetOpen(true)}
+        className="flex items-center justify-center gap-1 truncate text-sm font-medium text-ink"
       >
         <Image src="/icons/location.png" alt="" width={22} height={22} />
-        המיקום שלי
+        {selectedAddress ? selectedAddress.label : "המיקום שלי"}
       </button>
 
       <button
@@ -67,6 +85,16 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
         <div className="absolute inset-x-5 top-16 rounded-card bg-ink px-4 py-2 text-center text-xs text-white shadow-soft">
           {message}
         </div>
+      )}
+
+      {locationSheetOpen && (
+        <ChooseLocationSheet
+          onClose={() => setLocationSheetOpen(false)}
+          onSelect={(address) => {
+            setSelectedAddress(address);
+            setLocationSheetOpen(false);
+          }}
+        />
       )}
     </header>
   );
