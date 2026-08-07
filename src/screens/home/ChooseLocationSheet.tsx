@@ -83,7 +83,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
           if (user) {
             const supabase = createClient();
             const saved = await addAddress(supabase, user.id, {
-              label: data.city ?? data.address_text,
+              label: data.address_text,
               address_text: data.address_text,
               city: data.city,
               latitude,
@@ -95,7 +95,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             onSelect({
               id: "current",
               user_id: "",
-              label: data.city ?? data.address_text,
+              label: data.address_text,
               address_text: data.address_text,
               city: data.city,
               latitude,

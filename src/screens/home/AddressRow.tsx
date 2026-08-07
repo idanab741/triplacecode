@@ -71,8 +71,9 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
 
   return (
     <div className="relative overflow-hidden border-t border-ink-secondary/10">
-      {/* פאנל החשיפה - יושב מתחת לכרטיס, נחשף כשהכרטיס נגרר ימינה */}
-      <div className="absolute inset-y-0 start-0 flex" style={{ width: SWIPE_REVEAL_PX }}>
+      {/* פאנל החשיפה - יושב מתחת לכרטיס, נחשף כשהכרטיס נגרר ימינה. עוגן
+          פיזי מפורש (right-0, לא start-0) כדי לא להתהפך לפי RTL. */}
+      <div className="absolute inset-y-0 right-0 flex" style={{ width: SWIPE_REVEAL_PX }}>
         {!address.is_default && (
           <button
             type="button"
@@ -82,9 +83,12 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
               setSwipeX(0);
             }}
             aria-label="הפוך לברירת מחדל"
-            className="flex flex-1 items-center justify-center bg-accent text-xl text-white"
+            className="flex flex-1 items-center justify-center bg-accent text-white"
           >
-            🏠
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11l9-8 9 8" />
+              <path d="M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10" />
+            </svg>
           </button>
         )}
         <button
