@@ -99,9 +99,15 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
+                      ref={(el) => {
+                        // תמונה שכבר בקאש של הדפדפן לפעמים לא מפעילה onLoad
+                        // בכלל - בלי הבדיקה הזו היא נשארת בלתי-נראית לצמיתות.
+                        if (el?.complete) markLoaded(key);
+                      }}
                       src={destination.imageUrl}
                       alt={destination.name}
                       onLoad={() => markLoaded(key)}
+                      onError={() => markLoaded(key)} // עדיף לחשוף שגיאה גלויה (אייקון שבור) מאשר תמונה נעלמת לצמיתות
                       className="h-full w-full object-cover transition-opacity duration-500 ease-out"
                       style={{ opacity: isLoaded ? 1 : 0 }}
                     />
