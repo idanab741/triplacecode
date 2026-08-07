@@ -75,8 +75,8 @@ function TripTypeBadge({ label }: { label: string }) {
           boxShadow: "0 4px 12px rgba(24,119,242,0.28)",
         }}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/20 text-base">
-          🍽️
+        <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/40">
+          <Image src="/images/categories/cat-restaurants.png" alt="" fill className="object-cover" />
         </div>
         <span className="text-[13.5px] font-medium text-white">{label}</span>
       </div>
