@@ -266,7 +266,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               <button
                 type="button"
                 onClick={() => setAddingAddress(true)}
-                className="w-full rounded-pill py-3.5 text-[15px] font-bold text-white shadow-soft"
+                className="w-full rounded-pill px-6 py-4 text-base font-bold text-white shadow-soft"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
                 + הוספת כתובת
