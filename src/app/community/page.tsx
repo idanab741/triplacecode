@@ -13,7 +13,7 @@ export default function CommunityPage() {
             className="relative flex h-48 w-48 items-center justify-center rounded-full"
             style={{ background: "radial-gradient(circle, rgba(24,119,242,0.14), transparent 70%)" }}
           >
-            <div className="relative h-40 w-40">
+            <div className="relative h-70 w-70">
               <Image src="/images/community-coming-soon.png" alt="" fill className="object-contain" priority />
             </div>
           </div>
