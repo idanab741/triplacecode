@@ -155,18 +155,20 @@ export default function TripMatchPage() {
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
       {stage !== "swiping" && (
-        <div dir="ltr" className="flex items-center gap-2 px-4 pt-4">
-          <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />
-          <button
-            type="button"
-            onClick={() => router.push("/home")}
-            aria-label="חזרה"
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
+        <div className="relative h-16">
+          <div className="absolute left-2 top-4 flex items-center gap-2">
+            <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+            <button
+              type="button"
+              onClick={() => router.push("/home")}
+              aria-label="חזרה"
+              className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 

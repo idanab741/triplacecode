@@ -30,12 +30,12 @@ export function SwipeHeader({
   const progressPct = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-3 px-5 pt-4">
-      <div className="relative flex h-9 items-center">
-        <div className="absolute left-0 flex items-center gap-2">
-          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" width={100} height={30} className="object-contain" />
-          <button type="button" onClick={onBack} aria-label="חזרה" className="flex h-9 w-9 items-center justify-center text-ink">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex flex-col gap-3 px-5">
+      <div className="relative h-16">
+        <div className="absolute left-2 top-4 flex items-center gap-2">
+          <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
+          <button type="button" onClick={onBack} aria-label="חזרה" className="flex h-9 w-9 shrink-0 items-center justify-center text-ink">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </button>
@@ -45,7 +45,7 @@ export function SwipeHeader({
           type="button"
           onClick={onOpenFilters}
           aria-label="פילטרים"
-          className="absolute right-0 flex h-9 w-9 items-center justify-center rounded-full bg-bg-secondary text-ink"
+          className="absolute right-2 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-bg-secondary text-ink"
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 6h16M7 12h10M10 18h4" />
