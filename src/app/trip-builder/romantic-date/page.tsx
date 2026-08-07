@@ -7,15 +7,13 @@ import { useRouter } from "next/navigation";
 import { Screen, ChipGroup, Field, Slider } from "@/components/ui";
 import { ROMANTIC_DATE_QUESTIONS } from "@/services/tripBuilder/rules/romanticDate";
 import type { RomanticDateAnswers } from "@/services/tripBuilder/types";
-import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
+import { TripBuilderHeader } from "@/screens/trip-builder/chat/TripBuilderHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
-
-type TripChoice = "triplace" | "tripmatch";
 
 const DEFAULT_ANSWERS: RomanticDateAnswers = {
   dateWith: "partner",
@@ -55,36 +53,6 @@ function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: strin
   );
 }
 
-function TripChoiceCards({ onChoose, disabled }: { onChoose: (choice: TripChoice) => void; disabled: boolean }) {
-  return (
-    <div className="flex gap-3">
-      <button
-        type="button"
-        onClick={() => onChoose("triplace")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-triplace-logo.png" alt="TripPlace" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">ה-AI בונה הכל אוטומטית</p>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onChoose("tripmatch")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">בוחרים לבד עם החלקות</p>
-      </button>
-    </div>
-  );
-}
-
 function TripTypeBadge({ label }: { label: string }) {
   return (
     <div className="flex justify-end">
@@ -110,8 +78,6 @@ export default function RomanticDateQuestionnairePage() {
   const [form, setForm] = useState<RomanticDateAnswers>(DEFAULT_ANSWERS);
   const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [awaitingTripChoice, setAwaitingTripChoice] = useState(false);
-  const [busyChoice, setBusyChoice] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -181,7 +147,7 @@ export default function RomanticDateQuestionnairePage() {
   function goToNextStep() {
     resetTempAnswerState();
     if (isLastStep) {
-      promptTripChoice();
+      buildTripDirectly(form);
       return;
     }
     setTyping(true);
@@ -238,56 +204,37 @@ export default function RomanticDateQuestionnairePage() {
   }
 
   function confirmFreeText() {
-    updateField("freeText", tempText);
+    const finalForm = { ...form, freeText: tempText };
+    setForm(finalForm);
     addUser(tempText || "—", "freeText");
-    goToNextStep();
+    buildTripDirectly(finalForm);
   }
 
-  function promptTripChoice() {
+  /** אחרי "משהו נוסף שתרצו להוסיף" עוברים ישירות לבניית הטיול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
+  async function buildTripDirectly(answers: RomanticDateAnswers) {
     if (!user) {
       router.push("/auth");
       return;
     }
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      addBot("מעולה! עכשיו תבחרו איך תרצו למצוא את המקום:");
-      setAwaitingTripChoice(true);
-    }, 700);
-  }
-
-  async function handleTripChoice(choice: TripChoice) {
-    if (busyChoice) return;
-    setBusyChoice(true);
+    setSubmitting(true);
     setLocationError(null);
-
     try {
       const origin = await getCurrentPosition();
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "romantic_date", answers: form, origin }),
+        body: JSON.stringify({ tripType: "romantic_date", answers, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת החיפוש נכשלה");
 
       const sessionId = data.session.id;
-
-      if (choice === "tripmatch") {
-        router.push(`/trip-builder/romantic-date/build?sessionId=${sessionId}`);
-        return;
-      }
-
-      setSubmitting(true);
-      const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" });
-      const buildData = await buildResponse.json();
-      if (!buildResponse.ok) throw new Error(buildData.error ?? "החיפוש נכשל");
+      fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
       router.push(`/trip-builder/romantic-date/result?sessionId=${sessionId}`);
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו למצוא מקום. יש לאשר גישה למיקום ולנסות שוב."
       );
-      setBusyChoice(false);
       setSubmitting(false);
     }
   }
@@ -307,7 +254,7 @@ export default function RomanticDateQuestionnairePage() {
   return (
     <Screen withBottomNavSpacing>
       <div className="-mx-5 -mt-8">
-        <ChatHeader current={stepIndex + 1} total={ROMANTIC_DATE_QUESTIONS.length} onBack={() => router.push("/home")} />
+        <TripBuilderHeader current={stepIndex + 1} total={ROMANTIC_DATE_QUESTIONS.length} onBack={() => router.push("/home")} />
       </div>
 
       <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-64">
@@ -329,7 +276,7 @@ export default function RomanticDateQuestionnairePage() {
 
         {typing && <TypingIndicator />}
 
-        {!typing && !submitting && !awaitingTripChoice && (
+        {!typing && !submitting && (
           <div className="mt-1">
             {step.type === "single" && (
               <AnswerOptions options={step.options} selected={tempSingle} onSelect={setTempSingle} />
@@ -375,16 +322,11 @@ export default function RomanticDateQuestionnairePage() {
           </div>
         )}
 
-        {awaitingTripChoice && (
-          <>
-            <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
-            {submitting && <ChatBubble>רגע, בונים לכם את הדייט...</ChatBubble>}
-          </>
-        )}
+        {submitting && <ChatBubble>רגע, בונים לכם את הדייט...</ChatBubble>}
 
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
-        {!awaitingTripChoice && footerAction && (
+        {footerAction && (
           <div className="flex justify-center pt-2">
             <button
               type="button"

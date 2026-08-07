@@ -16,7 +16,7 @@ import {
 import { WEEKEND_STYLE_OPTIONS, WEEKEND_BUDGET_STEPS } from "@/locales/he/weekend";
 import { DISTANCE_STEPS } from "@/locales/he/tripBuilder";
 import type { WeekendAnswers } from "@/services/tripBuilder/types";
-import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
+import { TripBuilderHeader } from "@/screens/trip-builder/chat/TripBuilderHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
@@ -381,7 +381,7 @@ export default function WeekendQuestionnairePage() {
   return (
     <Screen withBottomNavSpacing>
       <div className="-mx-5 -mt-8">
-        <ChatHeader current={1} total={1} onBack={() => router.push("/home")} />
+        <TripBuilderHeader current={1} total={1} onBack={() => router.push("/home")} />
       </div>
 
       <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">

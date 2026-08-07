@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
-import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
+import { TripBuilderHeader } from "@/screens/trip-builder/chat/TripBuilderHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
@@ -463,7 +463,7 @@ const footerAction = getFooterAction();
   return (
     <Screen withBottomNavSpacing>
             <div className="-mx-5 -mt-8">
-<ChatHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
+<TripBuilderHeader current={stepIndex + 1} total={DAY_TRIP_QUESTIONS.length} onBack={() => router.push("/home")} />
         </div>
 
 <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">

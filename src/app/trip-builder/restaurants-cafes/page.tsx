@@ -6,15 +6,13 @@ import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { RESTAURANTS_CAFES_QUESTIONS } from "@/services/tripBuilder/rules/restaurantsCafes";
 import type { RestaurantAnswers } from "@/services/tripBuilder/types";
-import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
+import { TripBuilderHeader } from "@/screens/trip-builder/chat/TripBuilderHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
-
-type TripChoice = "triplace" | "tripmatch";
 
 const DEFAULT_ANSWERS: RestaurantAnswers = {
   companions: "solo",
@@ -66,43 +64,6 @@ function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: strin
   );
 }
 
-/** שתי כרטיסיות לוגו לבחירה בין TripPlace (אוטומטי) ל-TripMatch (החלקות). */
-function TripChoiceCards({
-  onChoose,
-  disabled,
-}: {
-  onChoose: (choice: TripChoice) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="flex gap-3">
-      <button
-        type="button"
-        onClick={() => onChoose("triplace")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-triplace-logo.png" alt="TripPlace" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">ה-AI בונה הכל אוטומטית</p>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onChoose("tripmatch")}
-        disabled={disabled}
-        className="flex-1 rounded-card bg-white p-4 shadow-soft transition active:scale-95 disabled:opacity-50"
-      >
-        <div className="relative mx-auto h-8 w-full">
-          <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" fill className="object-contain" />
-        </div>
-        <p className="mt-2 text-center text-[11px] text-ink-secondary">בוחרים לבד עם החלקות</p>
-      </button>
-    </div>
-  );
-}
-
 /** תג שמציג את סוג הטיול, בצד שמאל — כמו תשובות המשתמש, עם גרדיאנט המותג. */
 function TripTypeBadge({ label }: { label: string }) {
   return (
@@ -131,8 +92,6 @@ export default function RestaurantsCafesQuestionnairePage() {
   const [form, setForm] = useState<RestaurantAnswers>(DEFAULT_ANSWERS);
   const [submitting, setSubmitting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [awaitingTripChoice, setAwaitingTripChoice] = useState(false);
-  const [busyChoice, setBusyChoice] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -217,7 +176,7 @@ export default function RestaurantsCafesQuestionnairePage() {
   function goToNextStep() {
     resetTempAnswerState();
     if (isLastStep) {
-      promptTripChoice();
+      buildTripDirectly(form);
       return;
     }
     setTyping(true);
@@ -308,9 +267,10 @@ export default function RestaurantsCafesQuestionnairePage() {
   }
 
   function confirmFreeText() {
-    updateField("freeText", tempText);
+    const finalForm = { ...form, freeText: tempText };
+    setForm(finalForm);
     addUser(tempText || "—", "freeText");
-    goToNextStep();
+    buildTripDirectly(finalForm);
   }
 
   function getEditQuestionTitle(key: EditableFieldKey): string {
@@ -405,53 +365,31 @@ export default function RestaurantsCafesQuestionnairePage() {
     closeEdit();
   }
 
-  function promptTripChoice() {
+  /** אחרי "משהו נוסף שתרצו להוסיף" עוברים ישירות לבניית הטיול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
+  async function buildTripDirectly(answers: RestaurantAnswers) {
     if (!user) {
       router.push("/auth");
       return;
     }
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      addBot("מעולה! עכשיו תבחרו איך תרצו למצוא את המקום:");
-      setAwaitingTripChoice(true);
-    }, 700);
-  }
-
-  async function handleTripChoice(choice: TripChoice) {
-    if (busyChoice) return;
-    setBusyChoice(true);
+    setSubmitting(true);
     setLocationError(null);
-
     try {
       const origin = await getCurrentPosition();
       const response = await fetch("/api/trip-builder/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "restaurants_cafes", answers: form, origin }),
+        body: JSON.stringify({ tripType: "restaurants_cafes", answers, origin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "יצירת החיפוש נכשלה");
 
       const sessionId = data.session.id;
-
-      if (choice === "tripmatch") {
-        router.push(`/trip-builder/day-trip/build?sessionId=${sessionId}`);
-        return;
-      }
-
-      setSubmitting(true);
-      const buildResponse = await fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, {
-        method: "POST",
-      });
-      const buildData = await buildResponse.json();
-      if (!buildResponse.ok) throw new Error(buildData.error ?? "החיפוש נכשל");
-router.push(`/trip-builder/restaurants-cafes/result?sessionId=${sessionId}`);
+      fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
+      router.push(`/trip-builder/restaurants-cafes/result?sessionId=${sessionId}`);
     } catch (error) {
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו למצוא מקום. יש לאשר גישה למיקום ולנסות שוב."
       );
-      setBusyChoice(false);
       setSubmitting(false);
     }
   }
@@ -484,7 +422,7 @@ router.push(`/trip-builder/restaurants-cafes/result?sessionId=${sessionId}`);
   return (
 <Screen withBottomNavSpacing>
           <div className="-mx-5 -mt-8">
-        <ChatHeader current={stepIndex + 1} total={RESTAURANTS_CAFES_QUESTIONS.length} onBack={() => router.push("/home")} />
+        <TripBuilderHeader current={stepIndex + 1} total={RESTAURANTS_CAFES_QUESTIONS.length} onBack={() => router.push("/home")} />
       </div>
 
       <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-64">
@@ -612,7 +550,7 @@ router.push(`/trip-builder/restaurants-cafes/result?sessionId=${sessionId}`);
 
         {!editingFieldKey && typing && <TypingIndicator />}
 
-        {!editingFieldKey && !typing && !submitting && !awaitingTripChoice && (
+        {!editingFieldKey && !typing && !submitting && (
           <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
@@ -675,16 +613,11 @@ router.push(`/trip-builder/restaurants-cafes/result?sessionId=${sessionId}`);
           </div>
         )}
 
-        {!editingFieldKey && awaitingTripChoice && (
-          <>
-            <TripChoiceCards onChoose={handleTripChoice} disabled={busyChoice} />
-            {submitting && <ChatBubble>רגע, מוצאים לכם את המקום...</ChatBubble>}
-          </>
-        )}
+        {submitting && <ChatBubble>רגע, מוצאים לכם את המקום...</ChatBubble>}
 
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
-        {!editingFieldKey && !awaitingTripChoice && footerAction && (
+        {!editingFieldKey && footerAction && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
