@@ -330,10 +330,19 @@ export async function POST(
       // שם אזור קריא ל-Claude ולחיפוש Google: אם המשתמש ציין אזור ספציפי
       // במלל החופשי - זה כבר בתוך searchOrigin (geocoded למעלה); אחרת
       // הופכים את מיקום ה-GPS הגולמי לשם עיר/אזור בעזרת reverse geocoding.
-      const areaLabel =
-        (tripIntent?.requestedArea as string | undefined) ?? (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
+      //
+      // חריג חשוב: אם המשתמש ביקש במפורש שה-AI יבחר את האזור בעצמו
+      // (tripIntent.openAreaChoice, למשל "בעיר שתבחר") - אסור לחזור
+      // אוטומטית למיקום הנוכחי/לרדיוס הקטן מהשאלון, כי זה בדיוק מבטל את
+      // הבקשה המפורשת של המשתמש לחופש בחירה. נותנים ל-Claude רדיוס גדול
+      // בהרבה ומודיעים לו בפרומפט שהוא רשאי לבחור עיר/אזור אחר לגמרי.
+      const areaLabel = tripIntent?.openAreaChoice
+        ? "כל אזור בישראל שתבחר בעצמך כמתאים ביותר לבקשה - לא חייב להיות קרוב למיקום הנוכחי של המשתמש"
+        : (tripIntent?.requestedArea as string | undefined) ?? (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
 
-      const maxDistanceKm = requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
+      const maxDistanceKm = tripIntent?.openAreaChoice
+        ? 150 // כמעט כל הארץ - נותן ל-Claude חופש אמיתי לבחור עיר אחרת
+        : requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
 
       const dnaSummaryParts: string[] = [];
       if (dna) {
@@ -371,7 +380,7 @@ export async function POST(
         areaLabel,
         areaOrigin: searchOrigin,
         maxDistanceKm,
-        slots: pendingStops.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role })),
+        slots: pendingStops.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role, note: stop.note })),
         interestLabels,
         freeText: answers.freeText,
         budgetLabel: remainingBudgetLabel,

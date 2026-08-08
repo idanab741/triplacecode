@@ -92,6 +92,7 @@ export async function saveCategoryPlan(
     role: item.role,
     slot_index: item.order,
     day_index: item.day ?? null,
+    note: item.note ?? null,
   }));
 
   const { data, error } = await supabase.from("trip_builder_stops").insert(rows).select("*");

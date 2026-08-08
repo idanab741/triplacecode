@@ -223,8 +223,15 @@ ${JSON.stringify({
 מזג אוויר: ${JSON.stringify(params.weatherSummary)}
 
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
-[{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint|bar|spa", "order": 0}, ...]
+[{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint|bar|spa", "order": 0, "note": "..."}, ...]
 "category" חייב להיות אחד מתוך הרשימה המלאה: ${ALL_CATEGORY_IDS}.
+"note" - חובה למלא בכל תחנה שבה המלל החופשי נותן פרט ספציפי לאותו שלב (לא רק
+קטגוריה כללית): תיאור קצר בעברית של **בדיוק** מה התחנה הזו אמורה להיות, לפי
+המלל החופשי. לדוגמה: אם המלל אומר "עגלת קפה בטבע, ואז רחוב מסחרי" - לתחנת
+הקפה note="עגלת קפה ממש, לא בית קפה יושב, בסביבה טבעית/פארק" ולתחנת
+האטרקציה note="רחוב/אזור מסחרי קרוב לבית, לא קניון". זה השדה שהשלב הבא
+בתהליך (שבוחר את המקום האמיתי הספציפי) ישתמש בו כדי לא "לאבד" את הפרטים
+המדויקים שבמלל החופשי. אם אין פרט ספציפי לתחנה - אפשר להשאיר note ריק.
 תחומי העניין שסומנו בתיבות הסימון: ${
     params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן כלום"
   } - אלה עדיפות ראשונית, אך אם המלל החופשי מצביע על קטגוריה אחרת (למשל מזכיר "תצפית" והיא לא סומנה) - תשתמש בקטגוריה שהמלל מבקש, גם אם היא לא ברשימת הסימון.
@@ -248,12 +255,13 @@ category="shopping", ממוקם אחרון ברשימה.
   try {
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) throw new Error("לא נמצא JSON בתשובת Claude");
-    const parsed = JSON.parse(jsonMatch[0]) as { category: string; role: string; order: number }[];
+    const parsed = JSON.parse(jsonMatch[0]) as { category: string; role: string; order: number; note?: string }[];
 
     return parsed.map((item, index) => ({
       category: item.category,
       role: normalizeRole(item.role),
       order: item.order ?? index,
+      note: typeof item.note === "string" && item.note.trim() ? item.note.trim() : undefined,
     }));
   } catch (parseError) {
     logAiError("כשל בפענוח תשובת JSON מ-Claude בתכנון קטגוריות", {

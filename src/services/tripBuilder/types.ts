@@ -45,6 +45,7 @@ export interface TripBuilderStop {
   reason: string | null;
   rejected_place_ids: string[];
   day_index: number | null;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +56,12 @@ export interface CategoryPlanItem {
   order: number;
   /** יום בתוך מסלול מרובה-ימים (1, 2, 3...) - null לטיולים חד-יומיים. */
   day?: number | null;
+  /** תיאור קצר בעברית של מה בדיוק התחנה הזו אמורה להיות, לפי המלל החופשי
+   *  (למשל "עגלת קפה בסביבה טבעית", לא רק role="coffee_dessert"). בלי זה,
+   *  שלב בחירת המקום הספציפי (generateDayTripPlaces) מקבל רק role/category
+   *  גנריים וצריך "לנחש מחדש" את הכוונה המדויקת מתוך המלל החופשי המלא -
+   *  וזה נכשל בפועל. */
+  note?: string;
 }
 
 export interface CandidatePlace {
