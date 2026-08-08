@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "9A2Z56J83W.com.triplacetravel.app",
+        "paths": ["*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["9A2Z56J83W.com.triplacetravel.app"]
+  }
+}
