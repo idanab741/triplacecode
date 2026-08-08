@@ -58,7 +58,17 @@ export async function resolveAiSuggestedPlace(
   maxDistanceKm: number
 ): Promise<ResolvedAiPlace | null> {
   const existing = await findExistingPlace(supabase, item.name, areaLabel);
-  if (existing) {
+  // חשוב: findExistingPlace לא בודק מרחק בכלל (מחזיר distanceKm:0 קבוע) -
+  // אם שם דומה כבר קיים ב-DB ממקום/משתמש/session אחר לגמרי (גם רחוק
+  // מאוד), הוא היה מוחזר בלי שום בדיקת מרחק. זה בדיוק מה שגרם לתחנות
+  // רחוקות (למשל כנרת) להיכנס למסלול למרות maxDistanceKm קטן.
+  if (existing && haversineDistanceKm(areaOrigin, { lat: existing.latitude, lng: existing.longitude }) > maxDistanceKm) {
+    logAiError("מקום קיים ב-DB נמצא, אבל רחוק מדי מהיעד הנוכחי - מתעלמים ובודקים כמקום חדש", {
+      name: item.name,
+      existingLat: existing.latitude,
+      existingLng: existing.longitude,
+    });
+  } else if (existing) {
     if (existing.imageUrls.length === 0) {
       const backfill = await findPlacePhotoReferenceWithFallback(existing.name, areaLabel);
       if (backfill.photoRef) {
