@@ -10,6 +10,12 @@ export interface TripIntent {
   avoid: string[];
   accessibilityNotes: string[];
   requestedArea: string | null;
+  /** true אם המשתמש ביקש במפורש שה-AI יבחר את האזור/העיר (למשל "בעיר
+   *  שתבחר", "תפתיעו אותי", "איפה שבא לכם") - לא שם מקום ספציפי. במקרה
+   *  כזה אסור לחזור אוטומטית למיקום ה-GPS הנוכחי של המשתמש/לרדיוס הקטן
+   *  שבחר בשאלון - זו בדיוק הסיבה שהמסלול "לא יוצא מתל אביב" גם כשהמשתמש
+   *  ביקש בפירוש שהמערכת תבחר בעצמה. */
+  openAreaChoice: boolean;
 }
 
 const TRIP_INTENT_PROMPT_RULES = `אתה מתכנן טיולים מקצועי ב-TRIPLACE. המשתמש אינו ממלא טופס - הוא
@@ -32,6 +38,11 @@ const TRIP_INTENT_PROMPT_RULES = `אתה מתכנן טיולים מקצועי ב
 (למשל "יום ביפו", "רוצים לבלות בנווה צדק", "טיול בזכרון יעקב") - חלץ את השם המדויק לשדה
 requestedArea. אם לא הוזכר מקום ספציפי, החזר null.
 
+אם המלל החופשי אומר במפורש שהמשתמש משאיר את בחירת האזור/העיר לך (למשל "בעיר שתבחר",
+"תפתיעו אותי", "איפה שבא לכם", "כל מקום מעניין") - סמן openAreaChoice=true. זה **שונה**
+מ"לא הוזכר מקום" (requestedArea=null בלי openAreaChoice) - כאן המשתמש ביקש בפירוש חופש
+בחירה, ולא מצפה שהמערכת תיצמד למיקום הנוכחי שלו/לרדיוס קטן מהבית.
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 {
   "summary": "משפט או שניים בעברית שמתארים את הטיול הרצוי, כאילו מתארים אותו לחבר שיתכנן אותו",
@@ -39,7 +50,8 @@ requestedArea. אם לא הוזכר מקום ספציפי, החזר null.
   "priorities": ["...", "..."],
   "avoid": ["...", "..."],
   "accessibilityNotes": ["...", "..."],
-  "requestedArea": "שם המקום או null"
+  "requestedArea": "שם המקום או null",
+  "openAreaChoice": true | false
 }`;
 
 interface GenerateTripIntentParams {
@@ -105,6 +117,7 @@ return {
       avoid: Array.isArray(parsed.avoid) ? parsed.avoid : [],
       accessibilityNotes: Array.isArray(parsed.accessibilityNotes) ? parsed.accessibilityNotes : [],
       requestedArea: typeof parsed.requestedArea === "string" && parsed.requestedArea.trim() ? parsed.requestedArea : null,
+      openAreaChoice: parsed.openAreaChoice === true,
     };
   } catch (parseError) {
     logAiError("כשל בפענוח Trip Intent", {
