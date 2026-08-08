@@ -20,6 +20,9 @@ interface GenerateDayTripParams {
   freeText: string;
   budgetLabel: string;
   travelDnaSummary?: string | null;
+  /** תשובות השאלון (הרכב מטיילים, גילאים, תזמון, משך) - עד עכשיו לא הופיעו
+   *  בפרומפט הזה בכלל, למרות שה"20%" שאינו מלל חופשי מתייחס אליהן. */
+  questionnaireSummary?: string | null;
 }
 
 interface RawDaySuggestion {
@@ -87,6 +90,7 @@ ${slotsBreakdown}
 תחומי עניין: ${params.interestLabels.join(", ") || "כל תחום"}
 תקציב: ${params.budgetLabel}
 ${params.travelDnaSummary ? `פרופיל המשתמש: ${params.travelDnaSummary}` : ""}
+${params.questionnaireSummary ? `תשובות נוספות בשאלון (הרכב מטיילים/תזמון/מרחק - חלק מה-20%): ${params.questionnaireSummary}` : ""}
 בקשה חופשית מהמשתמש (המשקל הגבוה ביותר): ${JSON.stringify(params.freeText || null)}
 
 לכל מקום תן:

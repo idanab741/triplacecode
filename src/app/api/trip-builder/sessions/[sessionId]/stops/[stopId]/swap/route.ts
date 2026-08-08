@@ -9,6 +9,7 @@ import { likeStop } from "@/services/tripBuilder/swipeService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel } from "@/services/tripBuilder/rules/dayTrip";
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
 /**
@@ -74,6 +75,20 @@ export async function POST(
       attributeScoreMap,
       learnedAttributes,
       tripIntent,
+      // רק לטיול יומי כרגע - ר' הסבר מפורט ב-categoryPlanService.ts /
+      // rankingService.ts. שאר סוגי הטיול יתווספו בהמשך, אחד-אחד.
+      questionnaireAnswers:
+        session.trip_type === "day_trip"
+          ? {
+              companions: answers.companions,
+              childAgeBands: answers.childAgeBands,
+              timing: answers.timing,
+              distanceBand: answers.distanceBand,
+              budgetBand: answers.budgetBand,
+              interests: (answers.interests ?? []).map(getCategoryLabel),
+              durationBand: answers.durationBand,
+            }
+          : undefined,
     });
 
     const top = ranked[0];

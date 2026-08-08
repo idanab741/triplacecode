@@ -360,6 +360,13 @@ export async function POST(
       }
       const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
 
+      const questionnaireSummaryParts: string[] = [];
+      if (answers.companions) questionnaireSummaryParts.push(`הרכב מטיילים: ${answers.companions}`);
+      if (answers.childAgeBands?.length) questionnaireSummaryParts.push(`גילאי ילדים: ${answers.childAgeBands.join(", ")}`);
+      if (answers.timing) questionnaireSummaryParts.push(`תזמון: ${answers.timing}`);
+      if (answers.distanceBand) questionnaireSummaryParts.push(`מרחק מבוקש: ${answers.distanceBand}`);
+      const questionnaireSummary = questionnaireSummaryParts.length ? questionnaireSummaryParts.join(". ") : null;
+
       const resolvedPlaces = await generateDayTripPlaces({
         areaLabel,
         areaOrigin: searchOrigin,
@@ -369,6 +376,7 @@ export async function POST(
         freeText: answers.freeText,
         budgetLabel: remainingBudgetLabel,
         travelDnaSummary: dnaSummary,
+        questionnaireSummary,
       });
 
       if (resolvedPlaces.length === 0) {
@@ -485,6 +493,12 @@ export async function POST(
         ? `${answers.freeText}. סוג מטבח מועדף: ${cuisineSelection.map(getCategoryLabel).join(", ")}`
         : answers.freeText;
 
+      // תשובות השאלון המפורשות לפרומפט הדירוג (rankCandidates) - עדיין לא
+      // מחובר לאף סוג טיול (day_trip לא מגיע לכאן בכלל - יש לו נתיב נפרד,
+      // ר' questionnaireSummary ב-generateDayTripPlaces למעלה). יחובר לכאן
+      // כשנעבור על שאר סוגי הטיול אחד-אחד.
+      const questionnaireAnswers = undefined;
+
       const ranked = await rankCandidates({
         dna,
         candidates: pool,
@@ -494,6 +508,7 @@ export async function POST(
         attributeScoreMap,
         learnedAttributes,
         tripIntent,
+        questionnaireAnswers,
       });
 
       const top = ranked[0];

@@ -7,6 +7,7 @@ import { rankCandidates } from "@/services/tripBuilder/rankingService";
 import { getAttributeScoreMap, summarizeTopAttributes } from "@/services/travelDna/attributeLearningService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel } from "@/services/tripBuilder/rules/dayTrip";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 
 export async function GET(
@@ -89,6 +90,19 @@ const dna = await getTravelDna(supabase, user.id);
       rankingPromptRules: rules.rankingPromptRules,
       attributeScoreMap,
       learnedAttributes,
+      // רק לטיול יומי כרגע - שאר סוגי הטיול יתווספו בהמשך, אחד-אחד.
+      questionnaireAnswers:
+        session.trip_type === "day_trip"
+          ? {
+              companions: answers.companions,
+              childAgeBands: answers.childAgeBands,
+              timing: answers.timing,
+              distanceBand: answers.distanceBand,
+              budgetBand: answers.budgetBand,
+              interests: (answers.interests ?? []).map(getCategoryLabel),
+              durationBand: answers.durationBand,
+            }
+          : undefined,
     });
 
     return NextResponse.json({ stop, candidates: ranked });

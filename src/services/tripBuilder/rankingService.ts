@@ -16,6 +16,11 @@ interface RankCandidatesParams {
     disliked: string[];
   };
   tripIntent?: TripIntent | null;
+  /** תשובות השאלון בפועל (הרכב מטיילים, גילאים, תחומי עניין...) - עד עכשיו
+   *  היו רק בפרומפט של decideCategoryPlan (בחירת סוגי התחנות), לא כאן
+   *  (בחירת המקום הספציפי) - אף שהטקסט בפרומפט טען "15% תשובות שאלון".
+   *  אופציונלי בכוונה: מוזן כרגע רק לטיול יומי, שאר הסוגים יתווספו בהמשך. */
+  questionnaireAnswers?: Record<string, unknown>;
 }
 
 const MAX_CANDIDATES_FOR_AI_RANKING = 6;
@@ -109,7 +114,10 @@ ${JSON.stringify(params.tripIntent ?? { note: "לא זמין - נתח את המ�
 Travel DNA:
 ${JSON.stringify(dnaSummary)}
 
-מלל חופשי מהמשתמש:
+${params.questionnaireAnswers ? `תשובות המשתמש בשאלון (משקל 15% בהחלטה - לא רק המלל החופשי):
+${JSON.stringify(params.questionnaireAnswers)}
+
+` : ""}מלל חופשי מהמשתמש:
 ${JSON.stringify(params.freeText || null)}
 
 תקציב שנותר:
