@@ -48,6 +48,11 @@ export function SearchBarLink() {
     router.push(`/search?q=${encodeURIComponent(q)}`);
   }
 
+  function goToPlaceResult(placeId: string) {
+    setOpen(false);
+    router.push(`/search/result?placeId=${encodeURIComponent(placeId)}`);
+  }
+
   return (
     <div ref={containerRef} className="relative mx-6">
       <div className="flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft">
@@ -73,7 +78,7 @@ export function SearchBarLink() {
             <button
               key={s.placeId}
               type="button"
-              onClick={() => goToSearch(s.mainText)}
+              onClick={() => goToPlaceResult(s.placeId)}
               className="flex w-full flex-col items-start gap-0.5 border-b border-ink-secondary/10 px-4 py-2.5 text-start last:border-none hover:bg-bg-secondary"
             >
               <span className="text-sm font-medium text-ink">{s.mainText}</span>
