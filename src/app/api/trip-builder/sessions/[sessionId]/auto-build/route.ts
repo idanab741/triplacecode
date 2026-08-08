@@ -391,11 +391,14 @@ export async function POST(
       if (learnedAttributes.disliked.length) dnaSummaryParts.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
 
       let interestLabels: string[];
+      let hardDifficultyConstraint: string | null = null;
       if (session.trip_type === "nature_trip") {
         const natureAnswers = session.answers as unknown as import("@/services/tripBuilder/types").NatureTripAnswers;
         const { getNatureTypeLabel, getDifficultyLabel } = await import("@/locales/he/natureTrip");
         interestLabels = (natureAnswers.natureTypes ?? []).map(getNatureTypeLabel);
-        dnaSummaryParts.push(`רמת קושי מבוקשת: ${getDifficultyLabel(natureAnswers.difficulty)} - חובה לכבד, אל תציע מסלול קשה יותר`);
+        // הוצא מ-dnaSummaryParts (שם זה קבור ברשימה כללית) לשדה ייעודי -
+        // ר' הבלוק המודגש בפרומפט של generateDayTripPlaces.
+        hardDifficultyConstraint = getDifficultyLabel(natureAnswers.difficulty);
       } else {
         interestLabels = (answers.interests ?? []).map(getCategoryLabel);
       }
@@ -418,6 +421,7 @@ export async function POST(
         freeText: answers.freeText,
         budgetLabel: remainingBudgetLabel,
         travelDnaSummary: dnaSummary,
+        hardDifficultyConstraint,
         questionnaireSummary,
       });
 

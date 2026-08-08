@@ -158,6 +158,17 @@ const DAY_TRIP_ATTRACTION_MAX: Record<string, number> = {
   full_day: 4,
 };
 
+/** טיול בטבע - פחות אטרקציות מטיול יומי רגיל (מסלולי הליכה לוקחים יותר
+ *  זמן לכל אחד) - אותם מספרים כבר משמשים כברירת המחדל הדטרמיניסטית
+ *  (NATURE_TRIP_DURATION_RULES), עכשיו גם כתקרה קשיחה כשClaude בונה את
+ *  התוכנית. */
+const NATURE_TRIP_ATTRACTION_MAX: Record<string, number> = {
+  "1-2h": 1,
+  half_day: 2,
+  full_day: 3,
+  custom: 2,
+};
+
 /** קובע את רשימת הקטגוריות/תפקידים למסלול - קריאת Claude אחת, עם fallback דטרמיניסטי. */
 export async function decideCategoryPlan(params: DecideCategoryPlanParams): Promise<CategoryPlanItem[]> {
   const rules = getTripTypeRules(params.tripType);
@@ -175,6 +186,11 @@ export async function decideCategoryPlan(params: DecideCategoryPlanParams): Prom
     if (params.tripType === "day_trip") {
       const durationBand = normalizedAnswers.durationBand;
       const max = DAY_TRIP_ATTRACTION_MAX[durationBand] ?? DAY_TRIP_ATTRACTION_MAX.full_day;
+      return capRoleCount(aiPlan, "attraction", max);
+    }
+    if (params.tripType === "nature_trip") {
+      const durationBand = normalizedAnswers.durationBand;
+      const max = NATURE_TRIP_ATTRACTION_MAX[durationBand] ?? NATURE_TRIP_ATTRACTION_MAX.full_day;
       return capRoleCount(aiPlan, "attraction", max);
     }
     return aiPlan;
@@ -225,13 +241,19 @@ ${JSON.stringify({
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 [{"category": "...", "role": "attraction|food|coffee_dessert|viewpoint|bar|spa", "order": 0, "note": "..."}, ...]
 "category" חייב להיות אחד מתוך הרשימה המלאה: ${ALL_CATEGORY_IDS}.
-"note" - חובה למלא בכל תחנה שבה המלל החופשי נותן פרט ספציפי לאותו שלב (לא רק
-קטגוריה כללית): תיאור קצר בעברית של **בדיוק** מה התחנה הזו אמורה להיות, לפי
-המלל החופשי. לדוגמה: אם המלל אומר "עגלת קפה בטבע, ואז רחוב מסחרי" - לתחנת
-הקפה note="עגלת קפה ממש, לא בית קפה יושב, בסביבה טבעית/פארק" ולתחנת
-האטרקציה note="רחוב/אזור מסחרי קרוב לבית, לא קניון". זה השדה שהשלב הבא
-בתהליך (שבוחר את המקום האמיתי הספציפי) ישתמש בו כדי לא "לאבד" את הפרטים
-המדויקים שבמלל החופשי. אם אין פרט ספציפי לתחנה - אפשר להשאיר note ריק.
+"note" - **חובה מוחלטת** למלא בכל תחנה שהמלל החופשי נותן לה אפילו פרט אחד קטן
+מעבר לקטגוריה הכללית (סוג מקום ספציפי, אווירה, למי זה מיועד, מה להימנע ממנו).
+אל תשאיר note ריק "כברירת מחדל" - זו טעות נפוצה שגורמת לשלב הבא לאבד בדיוק את
+הפרטים שהמשתמש טרח לפרט. תיאור קצר בעברית של **בדיוק** מה התחנה הזו אמורה
+להיות, לפי המלל החופשי. דוגמה מלאה: אם המלל אומר "עגלת קפה בטבע, ואז רחוב
+מסחרי ראשי לקניות" - 3 תחנות, כל אחת עם note משלה:
+- תחנה 1 (coffee_dessert): note="עגלת קפה ממש (רוכלות/דוכן נייד), לא בית קפה
+  יושב - חייבת להיות בתוך שטח ירוק/פארק/סביבה טבעית, לא ברחוב עירוני"
+- תחנה 2 (attraction, category=shopping): note="רחוב מסחרי **ראשי** ומוכר
+  בעיר עם הרבה חנויות/תנועה - לא שוק, לא קניון סגור, לא רחוב צדדי שקט"
+- תחנה 3 (attraction, category=shopping): note="קניות בפועל - חנות/מרכז
+  קניות אמיתי שאפשר לקנות בו דברים, לא סתם עוד רחוב לטייל בו"
+רק אם ממש אין שום פרט מעבר לקטגוריה - מותר להשאיר note ריק.
 תחומי העניין שסומנו בתיבות הסימון: ${
     params.answers.interests.filter((i) => i !== "events_festivals").join(", ") || "לא סומן כלום"
   } - אלה עדיפות ראשונית, אך אם המלל החופשי מצביע על קטגוריה אחרת (למשל מזכיר "תצפית" והיא לא סומנה) - תשתמש בקטגוריה שהמלל מבקש, גם אם היא לא ברשימת הסימון.
