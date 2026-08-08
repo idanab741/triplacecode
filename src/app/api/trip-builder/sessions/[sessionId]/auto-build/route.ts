@@ -344,6 +344,12 @@ export async function POST(
         ? 150 // כמעט כל הארץ - נותן ל-Claude חופש אמיתי לבחור עיר אחרת
         : requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
 
+      // מרחק יעד אקראי בטווח 0-maxDistanceKm - בלי זה, Claude נוטה באופן
+      // עקבי למקום הכי קרוב/מוכר בטווח (הטיה טבעית, לא רק ברירת מחדל
+      // אקראית) - "עד X ק"מ" מתפרש בפועל כ"הכי קרוב שעדיין בגבול", לא
+      // כפיזור אמיתי על פני כל הטווח שהמשתמש אישר.
+      const targetDistanceKm = Math.round(Math.random() * maxDistanceKm);
+
       const dnaSummaryParts: string[] = [];
       if (dna) {
         if (dna.interests?.length) dnaSummaryParts.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
@@ -380,6 +386,7 @@ export async function POST(
         areaLabel,
         areaOrigin: searchOrigin,
         maxDistanceKm,
+        targetDistanceKm,
         slots: pendingStops.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role, note: stop.note })),
         interestLabels,
         freeText: answers.freeText,

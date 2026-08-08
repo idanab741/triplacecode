@@ -29,13 +29,19 @@ export async function findPlaceStatusAndPhoto(query: string): Promise<{
   googleName: string | null;
   rating: number | null;
   ratingCount: number | null;
+  /** קואורדינטות מדויקות של העסק/המקום עצמו, מתוך אותה תוצאה בדיוק -
+   *  מדויק משמעותית מ-geocodePlaceNameNear (Geocoding API, שנועד לכתובות
+   *  רחוב, לא לעסקים לא-רשמיים כמו עגלת קפה בתוך פארק - שם הוא לרוב
+   *  מחזיר את מרכז הפארק/הרחוב, לא את המיקום המדויק של העסק). */
+  latitude: number | null;
+  longitude: number | null;
 }> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     logAiError("GOOGLE_MAPS_API_KEY אינו מוגדר - לא ניתן לחפש תמונת מקום", {});
     // כשאין מפתח API בכלל - לא ניתן לאמת קיום, אז לא נכון "לפסול" את כל
     // המקומות (exists: true) - זה מצב תצורה חריג, לא סימן להמצאה.
-    return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null };
+    return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null, latitude: null, longitude: null };
   }
 
   try {
@@ -46,7 +52,7 @@ export async function findPlaceStatusAndPhoto(query: string): Promise<{
     const response = await fetch(url);
     if (!response.ok) {
       logAiError("חיפוש תמונת מקום נכשל (HTTP)", { query, httpStatus: response.status });
-      return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null };
+      return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null, latitude: null, longitude: null };
     }
 
     const data = await response.json();
@@ -58,7 +64,7 @@ export async function findPlaceStatusAndPhoto(query: string): Promise<{
     const exists = data?.status === "OK" && Boolean(topResult);
     if (!exists) {
       logAiError("Google Places לא מצא מקום כזה בכלל - חשד להמצאה", { query, googleStatus: data?.status });
-      return { photoRef: null, isClosed: false, exists: false, googleName: null, rating: null, ratingCount: null };
+      return { photoRef: null, isClosed: false, exists: false, googleName: null, rating: null, ratingCount: null, latitude: null, longitude: null };
     }
 
     const businessStatus = topResult?.business_status;
@@ -71,18 +77,20 @@ export async function findPlaceStatusAndPhoto(query: string): Promise<{
     const rating: number | null = typeof topResult?.rating === "number" ? topResult.rating : null;
     const ratingCount: number | null =
       typeof topResult?.user_ratings_total === "number" ? topResult.user_ratings_total : null;
+    const latitude: number | null = typeof topResult?.geometry?.location?.lat === "number" ? topResult.geometry.location.lat : null;
+    const longitude: number | null = typeof topResult?.geometry?.location?.lng === "number" ? topResult.geometry.location.lng : null;
 
     const photoRef = topResult?.photos?.[0]?.photo_reference;
     if (typeof photoRef !== "string") {
       logAiError("חיפוש תמונת מקום לא החזיר תמונה", { query, googleStatus: data?.status });
-      return { photoRef: null, isClosed, exists, googleName, rating, ratingCount };
+      return { photoRef: null, isClosed, exists, googleName, rating, ratingCount, latitude, longitude };
     }
-    return { photoRef, isClosed, exists, googleName, rating, ratingCount };
+    return { photoRef, isClosed, exists, googleName, rating, ratingCount, latitude, longitude };
   } catch (error) {
     logAiError("שגיאה בחיפוש תמונת מקום", {
       message: error instanceof Error ? error.message : String(error),
       query,
     });
-    return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null };
+    return { photoRef: null, isClosed: false, exists: true, googleName: null, rating: null, ratingCount: null, latitude: null, longitude: null };
   }
 }

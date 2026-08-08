@@ -2,10 +2,15 @@ import { geocodePlaceNameNear } from "./geocodingService";
 import { findPlaceStatusAndPhoto } from "./placePhotoService";
 import { findExistingPlace } from "./aiPlaceInsertionService";
 import { logAiError } from "@/services/ai/claudeService";
+import { haversineDistanceKm } from "./geo";
 import type { createAdminClient } from "@/services/supabase/admin";
 import type { CandidatePlace, LatLng, StopRole } from "./types";
 
-const MIN_RATING_COUNT = 5;
+// ירדתי מ-5 ל-2: 5 ביקורות פסל בפועל בדיוק את סוג המקומות הלא-פורמליים
+// שהמשתמש מבקש לפעמים במפורש (עגלת קפה ברחוב, דוכן, קיוסק) - למקום כזה
+// לרוב אין נוכחות עסקית מסודרת בגוגל. "exists" (למעלה) כבר מוודא שהמקום
+// אמיתי; הסף הזה הוא רק הגנה נוספת, לא ההגנה העיקרית נגד המצאות.
+const MIN_RATING_COUNT = 2;
 const MIN_RATING = 4.0;
 
 /**
@@ -65,10 +70,33 @@ export async function resolveAiSuggestedPlace(
     return { ...existing, role: item.role, reason: item.reason };
   }
 
-  const [coords, photoResult] = await Promise.all([
-    geocodePlaceNameNear(`${item.name}, ${areaLabel}`, areaOrigin, maxDistanceKm),
-    findPlacePhotoReferenceWithFallback(item.name, areaLabel),
-  ]);
+  // תמונה/קיום/מיקום נשלפים באותה קריאה אחת ל-Places Text Search - מדויק
+  // משמעותית מ-geocodePlaceNameNear (Geocoding API, מיועד לכתובות רחוב, לא
+  // לעסקים לא-רשמיים כמו עגלת קפה בתוך פארק - זה בדיוק מה שגרם למיקומים
+  // שגויים בפועל: היו שתי קריאות API נפרדות, לשני עסקים/פרשנויות שונות).
+  // geocodePlaceNameNear נשאר רק כ-fallback אם Places לא סיפק קואורדינטות.
+  const photoResult = await findPlacePhotoReferenceWithFallback(item.name, areaLabel);
+
+  let coords: LatLng | null =
+    photoResult.latitude != null && photoResult.longitude != null
+      ? { lat: photoResult.latitude, lng: photoResult.longitude }
+      : null;
+
+  if (coords) {
+    const distanceKm = haversineDistanceKm(areaOrigin, coords);
+    if (distanceKm > maxDistanceKm) {
+      logAiError("מיקום מ-Places Text Search רחוק מדי מהיעד - נופל ל-Geocoding כגיבוי", {
+        name: item.name,
+        distanceKm: Math.round(distanceKm),
+        maxDistanceKm,
+      });
+      coords = null;
+    }
+  }
+
+  if (!coords) {
+    coords = await geocodePlaceNameNear(`${item.name}, ${areaLabel}`, areaOrigin, maxDistanceKm);
+  }
 
   if (!coords || photoResult.isClosed || !photoResult.exists) return null;
 
