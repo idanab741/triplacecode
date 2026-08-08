@@ -6,6 +6,7 @@ import type { createAdminClient } from "@/services/supabase/admin";
 import type { CandidatePlace, LatLng, StopRole } from "./types";
 
 const MIN_RATING_COUNT = 5;
+const MIN_RATING = 4.0;
 
 /**
  * מחפש תמונה עם השם המלא + האזור; אם לא נמצא (למשל כי הניסוח לא תואם
@@ -80,6 +81,14 @@ export async function resolveAiSuggestedPlace(
     logAiError("מקום מוצע עם מעט מדי ביקורות ב-Google - נפסל", {
       name: item.name,
       ratingCount: photoResult.ratingCount,
+    });
+    return null;
+  }
+
+  if (photoResult.rating !== null && photoResult.rating < MIN_RATING) {
+    logAiError("מקום מוצע עם דירוג נמוך מ-4.0 ב-Google - נפסל", {
+      name: item.name,
+      rating: photoResult.rating,
     });
     return null;
   }
