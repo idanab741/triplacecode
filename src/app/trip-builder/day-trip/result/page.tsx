@@ -33,6 +33,28 @@ function DayTripResultContent() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  async function handleDeleteStop(stopId: string) {
+    if (!sessionId || !session?.final_itinerary) return;
+
+    // עדכון אופטימי - מוחקים מהתצוגה מיד, בלי לחכות לשרת
+    const remainingStops = session.final_itinerary.stops.filter((s) => s.stopId !== stopId);
+    setSession((s) => (s ? { ...s, final_itinerary: { ...s.final_itinerary!, stops: remainingStops } } : s));
+
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/stops/${stopId}/instruct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove" }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.itinerary) {
+        setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
+      }
+    } catch {
+      // עדכון אופטימי כבר קרה - לא הופכים אותו אם השרת נכשל בשקט, רק לא מסנכרנים חזרה
+    }
+  }
+
   async function handleSaveTrip() {
     if (!sessionId || saving) return;
     setSaving(true);
@@ -45,6 +67,21 @@ function DayTripResultContent() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleShareTrip() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `הטיול היומי שלי מוכן! תראו את המסלול: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   
@@ -212,6 +249,27 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
             </svg>
           </Link>
         </div>
+
+        {/* שמור + שתף - אותו מיקום/עיצוב בדיוק כמו בעמוד תוצאת חופשה בחו"ל */}
+        <div className="absolute right-2 top-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSaveTrip}
+            disabled={saving}
+            aria-label="שמור טיול"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm disabled:opacity-60"
+          >
+            {saved ? "✓" : <Image src="/icons/save.png" alt="" width={20} height={20} />}
+          </button>
+          <button
+            type="button"
+            onClick={handleShareTrip}
+            aria-label="שתף טיול"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm"
+          >
+            <Image src="/icons/share.png" alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
+          </button>
+        </div>
 </div>
 
 <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
@@ -274,6 +332,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
                     onItineraryUpdate={(updated) =>
                       setSession((s) => (s ? { ...s, final_itinerary: updated } : s))
                     }
+                    onDelete={() => handleDeleteStop(stop.stopId)}
                   />
                 </div>
               ))}
@@ -317,7 +376,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >
-          {saving ? "שומר..." : saved ? "✓ המסלול נשמר" : "שמור מסלול"}
+          {saving ? "שומר..." : saved ? "✓ נוסף ליומן" : "+ הוספה ליומן"}
         </button>
       
       </div>

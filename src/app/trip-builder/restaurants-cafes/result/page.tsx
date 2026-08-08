@@ -32,6 +32,28 @@ function RestaurantResultContent() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  async function handleDeleteStop(stopId: string) {
+    if (!sessionId || !session?.final_itinerary) return;
+
+    // עדכון אופטימי - מוחקים מהתצוגה מיד, בלי לחכות לשרת
+    const remainingStops = session.final_itinerary.stops.filter((s) => s.stopId !== stopId);
+    setSession((s) => (s ? { ...s, final_itinerary: { ...s.final_itinerary!, stops: remainingStops } } : s));
+
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/stops/${stopId}/instruct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove" }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.itinerary) {
+        setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
+      }
+    } catch {
+      // עדכון אופטימי כבר קרה - לא הופכים אותו אם השרת נכשל בשקט, רק לא מסנכרנים חזרה
+    }
+  }
+
   async function handleSaveTrip() {
     if (!sessionId || saving) return;
     setSaving(true);
@@ -167,6 +189,7 @@ function RestaurantResultContent() {
                 stop={stop}
                 sessionId={sessionId}
                 onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
+                onDelete={() => handleDeleteStop(stop.stopId)}
               />
             </div>
           </SortableContext>
