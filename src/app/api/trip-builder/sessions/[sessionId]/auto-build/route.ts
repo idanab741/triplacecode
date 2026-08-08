@@ -16,7 +16,7 @@ import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggesti
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
-import type { DayTripAnswers, TripBuilderStop } from "@/services/tripBuilder/types";
+import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
@@ -96,6 +96,14 @@ export async function POST(
       if (hotels.length > 0 && hotels[0].address) {
         dayOriginOverride = await geocodePlaceName(hotels[0].address);
       }
+    } else if (session.trip_type === "weekend") {
+      // סופ"ש: אותו רעיון כמו חופשה בחו"ל - כל הימים "מתחילים" ממיקום
+      // הלינה בפועל (אם כבר נסגרה), לא מהבית. שדה יחיד (lodgingAddress),
+      // לא מערך hotels - סופ"ש הוא בדרך כלל לינה אחת לכל הטיול.
+      const weekendAnswers = answers as unknown as { hasBookedLodging?: boolean; lodgingAddress?: string | null };
+      if (weekendAnswers.hasBookedLodging && weekendAnswers.lodgingAddress) {
+        dayOriginOverride = await geocodePlaceName(weekendAnswers.lodgingAddress);
+      }
     }
 
     // אם המלל החופשי ביקש אזור ספציפי (למשל "יום ביפו") - בונים את הטיול
@@ -145,6 +153,15 @@ export async function POST(
             .eq("id", sessionId);
         }
       }
+    } else if (session.trip_type === "weekend") {
+      // סופ"ש: אין שדה "יעד" מפורש כמו בחו"ל (זה תמיד בארץ) - שם אזור
+      // קריא נגזר מ-reverse geocoding, בדיוק כמו areaLabel בטיול יומי.
+      // אם כבר יש לינה - האזור נגזר ממנה (שם העיר/אזור של המלון), לא
+      // מהבית, כי שם בפועל מתרחש הסופ"ש. requestedAreaRadiusKm נשאר
+      // undefined בכוונה - הרדיוס עצמו מחושב למטה (destinationMaxDistanceKm)
+      // ישירות מ-distanceBand, בלי הכפלה פי 2 (זו לא "עיר בחו"ל שמתפרסת").
+      searchOrigin = dayOriginOverride ?? origin;
+      vacationDestinationName = (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
     }
 
     if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation") {
@@ -160,12 +177,15 @@ export async function POST(
     // מקבילות נפרדות (הגישה הקודמת) לא יכולות לדעת אחת על השנייה ולכן לא
     // יכולות למנוע חפיפה בין הימים. בנוסף, קריאה אחת חוסכת טוקנים (בלי
     // חזרה על אותו boilerplate לכל יום) ומפחיתה round-trips.
-    if (session.trip_type === "abroad_vacation") {
+    if (session.trip_type === "abroad_vacation" || session.trip_type === "weekend") {
       const vacationAnswers = answers as unknown as {
         vacationTypes?: string[];
+        weekendStyles?: string[];
         companions?: string;
         childAgeBands?: string[];
       };
+      // סופ"ש משתמש ב-weekendStyles (לא vacationTypes) - אותו רעיון, שם שדה שונה.
+      const vacationTypeValues = vacationAnswers.vacationTypes ?? vacationAnswers.weekendStyles ?? [];
       const destinationName = vacationDestinationName ?? "היעד המבוקש";
 
       // פרופיל טעם מלא: גם העדפות אונבורדינג (עמוד הפרופיל - מטבח, כשרות,
@@ -213,7 +233,13 @@ export async function POST(
       // רדיוס תקין סביב מרכז היעד: אם המשתמש/AI כבר קבע רדיוס אזור מפורש
       // (requestedAreaRadiusKm) - נותנים מרווח פי 2 ממנו (יעד יכול להתפרס
       // מעבר למרכז המדויק); אחרת ברירת מחדל של עיר גדולה + פרברים.
-      const destinationMaxDistanceKm = requestedAreaRadiusKm ? requestedAreaRadiusKm * 2 : 60;
+      // סופ"ש בארץ - קנה מידה קטן בהרבה מ"עיר בחו"ל", אז ברירת המחדל
+      // (בלי רדיוס מפורש) נשענת על distanceBand של המשתמש, לא על 60 ק"מ קבוע.
+      const destinationMaxDistanceKm = requestedAreaRadiusKm
+        ? requestedAreaRadiusKm * 2
+        : session.trip_type === "weekend"
+          ? distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
+          : 60;
 
       // "כוונת הטיול" (tripIntent) - אם עדיין לא חושבה ב-session creation (הנתיב
       // המהיר של "חופשה בחו\"ל" מדלג עליה שם בכוונה) - מחשבים אותה *במקביל*
@@ -243,7 +269,7 @@ export async function POST(
           destinationOrigin: searchOrigin,
           maxDistanceKm: destinationMaxDistanceKm,
           days: daySpecs,
-          vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
+          vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
           freeText: answers.freeText,
           budgetLabel: remainingBudgetLabel,
           travelDnaSummary: dnaSummary,
