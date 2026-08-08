@@ -14,6 +14,7 @@ interface PlaceResult {
   rating: number | null;
   ratingCount: number | null;
   imageUrl: string | null;
+  tags: string[];
 }
 
 function SearchResultContent() {
@@ -24,6 +25,8 @@ function SearchResultContent() {
   const [result, setResult] = useState<PlaceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addedToJournal, setAddedToJournal] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     if (!placeId) {
@@ -75,12 +78,15 @@ function SearchResultContent() {
         {result && (
           <>
             {/* שורת התוצאה - בדיוק המקום שנמצא בחיפוש */}
-            <div className="flex items-center gap-3 rounded-card bg-white p-4 shadow-soft">
-              {result.imageUrl && (
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-card">
-                  <Image src={result.imageUrl} alt="" fill className="object-cover" />
-                </div>
-              )}
+            <div className="flex items-start gap-3 rounded-card bg-white p-4 shadow-soft">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
+                {result.imageUrl && !imageFailed ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={result.imageUrl} alt="" className="h-full w-full object-cover" onError={() => setImageFailed(true)} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-xl">📍</div>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-bold text-ink">{result.name}</p>
                 <p className="truncate text-[13px] text-ink-secondary">{result.address}</p>
@@ -89,17 +95,39 @@ function SearchResultContent() {
                     ⭐ {result.rating.toFixed(1)} {result.ratingCount ? `(${result.ratingCount.toLocaleString()})` : ""}
                   </p>
                 )}
+                {result.tags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {result.tags.map((tag) => (
+                      <span key={tag} className="rounded-pill bg-bg-secondary px-2.5 py-1 text-[11.5px] font-medium text-ink-secondary">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* מפה */}
             <div className="overflow-hidden rounded-card bg-bg-secondary">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/places/static-map?lat=${result.latitude}&lng=${result.longitude}`}
-                alt="מפה"
-                className="h-48 w-full object-cover"
-              />
+              {mapFailed ? (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${result.latitude},${result.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-48 w-full flex-col items-center justify-center gap-1.5 text-ink-secondary"
+                >
+                  <span className="text-2xl">🗺️</span>
+                  <span className="text-[13px] font-medium">לא ניתן לטעון תצוגת מפה כרגע - לחצו לפתיחה בגוגל מפות</span>
+                </a>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/places/static-map?lat=${result.latitude}&lng=${result.longitude}`}
+                  alt="מפה"
+                  className="h-48 w-full object-cover"
+                  onError={() => setMapFailed(true)}
+                />
+              )}
             </div>
 
             <button
