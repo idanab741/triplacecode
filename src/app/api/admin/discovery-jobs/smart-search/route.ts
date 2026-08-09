@@ -41,7 +41,7 @@ ${freeText}
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
 {"places": [{"name": "שם מדויק", "description": "תיאור אם סופק/ידוע, אחרת null"}, ...]}`;
 
-  const { text, error } = await callClaude(prompt, 3000);
+  const { text, error } = await callClaude(prompt, 8000);
   if (error || !text) {
     logAiError("פירוק טקסט חופשי לרשימת מקומות נכשל", { error });
     return { places: [], debugInfo: `שגיאת Claude: ${error ?? "אין תשובה בכלל"}` };
@@ -54,6 +54,17 @@ ${freeText}
     const places = Array.isArray(parsed.places) ? parsed.places : [];
     return { places, debugInfo: places.length === 0 ? `JSON תקין אבל places ריק. תשובה גולמית: ${text.slice(0, 500)}` : null };
   } catch (parseError) {
+    // התשובה נקטעה באמצע (רשימה גדולה מדי) - ה-JSON השלם לא תקין, אבל
+    // אפשר עדיין לחלץ את הפריטים היחידים שכן הושלמו במלואם, במקום לאבד
+    // הכל. עדיף חלק מהרשימה מכלום.
+    const itemMatches = text.matchAll(/\{\s*"name"\s*:\s*"([^"]*)"\s*,\s*"description"\s*:\s*(null|"([^"]*)")\s*\}/g);
+    const salvaged: ExtractedPlace[] = [];
+    for (const m of itemMatches) {
+      salvaged.push({ name: m[1], description: m[2] === "null" ? null : m[3] });
+    }
+    if (salvaged.length > 0) {
+      return { places: salvaged, debugInfo: `התשובה נקטעה (רשימה ארוכה מדי) - שוחזרו ${salvaged.length} פריטים שלמים בלבד מתוך הרשימה.` };
+    }
     const message = parseError instanceof Error ? parseError.message : String(parseError);
     logAiError("כשל בפענוח JSON של רשימת מקומות", { message });
     return { places: [], debugInfo: `שגיאת פענוח JSON: ${message}. תשובה גולמית: ${text.slice(0, 500)}` };
