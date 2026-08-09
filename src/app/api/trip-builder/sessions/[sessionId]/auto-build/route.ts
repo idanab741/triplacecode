@@ -366,9 +366,14 @@ export async function POST(
         ? "כל אזור בישראל שתבחר בעצמך כמתאים ביותר לבקשה - לא חייב להיות קרוב למיקום הנוכחי של המשתמש"
         : (tripIntent?.requestedArea as string | undefined) ?? (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
 
-      const maxDistanceKm = tripIntent?.openAreaChoice
-        ? 150 // כמעט כל הארץ - נותן ל-Claude חופש אמיתי לבחור עיר אחרת
-        : requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
+      const maxDistanceKm = requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand);
+      // הערה חשובה: openAreaChoice ("בעיר שתבחר") משפיע רק על areaLabel
+      // (איזה אזור/עיר Claude בוחר) - **לא** על maxDistanceKm. "תבחר בעצמך
+      // את העיר" ו"תתעלם מהמרחק שביקשתי" הם שני דברים שונים לגמרי; קודם
+      // זה היה מוגדר יחד (150 ק"מ קבוע כש-openAreaChoice=true), מה שגרם
+      // למרחקים אבסורדיים (עד גבול סוריה) גם כשהמשתמש ביקש רדיוס קטן
+      // בפירוש (למשל "40 דקות"). "חופש בחירת עיר" עדיין כפוף לרדיוס
+      // שהמשתמש קבע - הוא רק לא נסגר אוטומטית סביב מיקום הבית.
 
       // מרחק יעד אקראי בטווח 0-maxDistanceKm - בלי זה, Claude נוטה באופן
       // עקבי למקום הכי קרוב/מוכר בטווח (הטיה טבעית, לא רק ברירת מחדל
