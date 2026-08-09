@@ -41,13 +41,31 @@ export default function ContentDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          ניהול יעדים ואטרקציות
-        </h1>
-        <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-          מקור האמת של Trippy AI, TripMatch, בניית המסלולים והחיפוש
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+            יעדים ומקומות
+          </h1>
+          <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
+            ניהול, גילוי, העשרה והתאמה חכמה של מקומות באמצעות AI
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/places"
+            className="rounded-[var(--admin-radius-sm)] border px-3.5 py-2 text-[13.5px] font-medium"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
+          >
+            + הוסף מקום ידנית דרך Google
+          </Link>
+          <Link
+            href="/admin/discovery"
+            className="rounded-[var(--admin-radius-sm)] px-3.5 py-2 text-[13.5px] font-medium text-white"
+            style={{ background: "var(--admin-accent)" }}
+          >
+            🤖 מצא מקומות באמצעות AI
+          </Link>
+        </div>
       </div>
 
       {error && <p className="text-[13.5px] text-red-600">{error}</p>}
