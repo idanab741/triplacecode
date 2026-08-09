@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { collectPlacesForCityAndCategory } from "@/services/places/collectionService";
-import { DISCOVERY_TRIP_TYPES } from "@/services/admin/discoveryConfig";
+import { DISCOVERY_BUCKETS } from "@/services/admin/discoveryConfigV2";
 import { callClaude, logAiError } from "@/services/ai/claudeService";
 
 function checkAuth(request: Request): boolean {
@@ -57,7 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await supabase.from("discovery_jobs").update({ status: "running" }).eq("id", id);
 
-  const tripType = DISCOVERY_TRIP_TYPES.find((t) => t.key === job.trip_type);
+  const tripType = DISCOVERY_BUCKETS.find((t) => t.key === job.trip_type);
   const filters = (job.filters ?? {}) as Record<string, string>;
   // עיר לא חובה - אם לא הוגדרה עיר/אזור ספציפיים, מחפשים ברמת המדינה כולה
   // (Google Places Text Search מתמודד היטב עם "עגלות קפה, ישראל" בלי צורך
@@ -71,9 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const errors: string[] = [];
 
   for (const categoryKey of job.categories as string[]) {
-    const category =
-      tripType?.categories.find((c) => c.key === categoryKey) ??
-      tripType?.secondaryCategories?.find((c) => c.key === categoryKey);
+    const category = tripType?.categories.find((c) => c.key === categoryKey);
     const rawLabel = category ? category.label : categoryKey;
     try {
       // Claude בונה שאילתה מדויקת ומנוטרלת-דו-משמעות לפני שפונים לגוגל

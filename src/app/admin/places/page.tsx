@@ -15,7 +15,7 @@ import { DataTable, SearchInput, FilterSelect, type Column } from "@/screens/adm
 import { Drawer, DrawerSection, AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { Badge } from "@/screens/admin/shared/Primitives";
 import { ChipToggleGroup, TriStateToggle } from "@/screens/admin/shared/ChipToggleGroup";
-import { DISCOVERY_TRIP_TYPES } from "@/services/admin/discoveryConfig";
+import { DISCOVERY_BUCKETS } from "@/services/admin/discoveryConfigV2";
 import Link from "next/link";
 
 interface Place {
@@ -456,17 +456,14 @@ while (true) {
             setFilterTripType(v);
             setFilterCategory(""); // איפוס קטגוריה כשמחליפים סוג טיול - הרשימה תלויה בו
           }}
-          placeholder="כל סוגי הטיול"
-          options={DISCOVERY_TRIP_TYPES.map((t) => ({ value: t.key, label: `${t.emoji} ${t.label}` }))}
+          placeholder="הכל"
+          options={DISCOVERY_BUCKETS.map((t) => ({ value: t.key, label: `${t.emoji} ${t.label}` }))}
         />
         <FilterSelect
           value={filterCategory}
           onChange={setFilterCategory}
           placeholder="כל הקטגוריות"
-          options={[
-            ...(DISCOVERY_TRIP_TYPES.find((t) => t.key === filterTripType)?.categories ?? []),
-            ...(DISCOVERY_TRIP_TYPES.find((t) => t.key === filterTripType)?.secondaryCategories ?? []),
-          ].map((c) => ({ value: c.key, label: `${c.emoji} ${c.label}` }))}
+          options={(DISCOVERY_BUCKETS.find((t) => t.key === filterTripType)?.categories ?? []).map((c) => ({ value: c.key, label: `${c.emoji} ${c.label}` }))}
         />
         <FilterSelect value={filterCountry} onChange={setFilterCountry} placeholder="כל המדינות" options={uniqueCountries.map((c) => ({ value: c, label: c }))} />
         <FilterSelect value={filterCity} onChange={setFilterCity} placeholder="כל הערים" options={uniqueCities.map((c) => ({ value: c, label: c }))} />

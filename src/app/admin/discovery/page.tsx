@@ -1,45 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
-import { DISCOVERY_TRIP_TYPES, type DiscoveryFilterOption } from "@/services/admin/discoveryConfig";
+import { DISCOVERY_BUCKETS } from "@/services/admin/discoveryConfigV2";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 const QUANTITY_OPTIONS = [10, 20, 50, 100, 250, 500, 1000];
 
-/** מסך ה-AI Discovery - השלב הראשון בבנייה מחדש לפי המפרט: בחירת סוג
- *  טיול → קטגוריות רלוונטיות בלבד → פילטרים רלוונטיים בלבד → כמות →
- *  הפעלה. זהו ה-UI; המנוע האמיתי מאחורי "הפעל חיפוש" (Google Discovery
- *  + Duplicate Detection + AI Enrichment + TripMatch Classification) הוא
- *  הפאזה הבאה - כרגע יוצר Discovery Job ברשומה, לא מריץ אותו בפועל. */
+interface Destination {
+  id: string;
+  name: string;
+  country: string | null;
+}
+
+/** מסך AI Discovery, גרסה 2 - נבנה מחדש לפי בקשה מפורשת: מיקום קודם
+ *  (מדינה -> עיר, מתוך רשימת היעדים המתוירת שכבר קיימת + "אחר" חופשי,
+ *  אף אחד לא חובה), ואז 4 אפשרויות פשוטות (מסעדה/אטרקציות/חיי לילה/לינה)
+ *  במקום 7 סוגי טיול - כל אחת פותחת את מה שכבר קיים לה. */
 export default function DiscoveryWizardPage() {
   const { secret: adminSecret } = useAdminSecret();
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
-  const [tripTypeKey, setTripTypeKey] = useState<string | null>(null);
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [useOtherCity, setUseOtherCity] = useState(false);
+  const [otherCity, setOtherCity] = useState("");
+
+  const [bucketKey, setBucketKey] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
-  const [quantity, setQuantity] = useState(20);
   const [minRating, setMinRating] = useState(4.0);
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [minReviews, setMinReviews] = useState(0);
+  const [budget, setBudget] = useState("");
+  const [quantity, setQuantity] = useState(20);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const tripType = DISCOVERY_TRIP_TYPES.find((t) => t.key === tripTypeKey) ?? null;
+  useEffect(() => {
+    if (!adminSecret) return;
+    fetch("/api/admin/destinations", { headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
+      .then((res) => res.json())
+      .then((data) => setDestinations(data.destinations ?? []))
+      .catch(() => {});
+  }, [adminSecret]);
+
+  const countries = Array.from(new Set(destinations.map((d) => d.country).filter(Boolean))) as string[];
+  const citiesForCountry = destinations.filter((d) => !country || d.country === country);
+  const bucket = DISCOVERY_BUCKETS.find((b) => b.key === bucketKey) ?? null;
 
   function toggleCategory(key: string) {
     setSelectedCategories((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
-  function updateFilter(key: string, value: string) {
-    setFilterValues((prev) => ({ ...prev, [key]: value }));
-  }
-
   async function handleLaunch() {
-    if (!tripType) return;
+    if (!bucket) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -47,11 +63,16 @@ export default function DiscoveryWizardPage() {
         method: "POST",
         headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
         body: JSON.stringify({
-          tripType: tripType.key,
+          tripType: bucket.key,
           categories: selectedCategories,
-          filters: filterValues,
+          filters: {
+            country,
+            city: useOtherCity ? otherCity : city,
+            budget,
+          },
           quantity,
           minRating,
+          minReviews,
         }),
       });
       const data = await res.json();
@@ -71,211 +92,162 @@ export default function DiscoveryWizardPage() {
           🤖 מצא מקומות באמצעות AI
         </h1>
         <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-          בחר סוג טיול → בחר מה לחפש → בחר איפה → הגדר איכות → הגדר כמות → לחץ מצא
+          מיקום → מה מחפשים → פילטרים → הפעל
         </p>
       </div>
 
-      {/* שלב 1 - סוג טיול */}
-      <div className="grid grid-cols-4 gap-3 md:grid-cols-7">
-        {DISCOVERY_TRIP_TYPES.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => {
-              setTripTypeKey(t.key);
-              setSelectedCategories([]);
-              setFilterValues({});
-              setShowMoreFilters(false);
-              setStep(2);
-            }}
-            className="flex flex-col items-center gap-2 rounded-[var(--admin-radius-lg)] border p-4 text-center transition"
-            style={{
-              borderColor: tripTypeKey === t.key ? "var(--admin-accent)" : "var(--admin-border)",
-              background: tripTypeKey === t.key ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
-            }}
-          >
-            <span className="text-[26px]">{t.emoji}</span>
-            <span className="text-[12.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
-              {t.label}
-            </span>
-          </button>
-        ))}
+      {/* שלב 1 - מיקום: מדינה + עיר. שום דבר כאן לא חובה. */}
+      <div>
+        <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+          איפה? (לא חובה)
+        </h2>
+        <div className="grid max-w-2xl grid-cols-2 gap-4">
+          <AdminField label="מדינה">
+            <input
+              list="discovery-countries"
+              className={adminInputClass}
+              style={adminInputStyle}
+              value={country}
+              onChange={(e) => {
+                setCountry(e.target.value);
+                setCity("");
+              }}
+              placeholder="לדוגמה: ישראל"
+            />
+            <datalist id="discovery-countries">
+              {countries.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </AdminField>
+
+          {!useOtherCity ? (
+            <AdminField label="עיר / יעד">
+              <select className={adminInputClass} style={adminInputStyle} value={city} onChange={(e) => setCity(e.target.value)}>
+                <option value="">— לא הוגדר —</option>
+                {citiesForCountry.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </AdminField>
+          ) : (
+            <AdminField label="עיר / יעד (הזנה חופשית)">
+              <input className={adminInputClass} style={adminInputStyle} value={otherCity} onChange={(e) => setOtherCity(e.target.value)} placeholder="הקלד שם יעד" />
+            </AdminField>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setUseOtherCity((v) => !v)}
+          className="mt-2 text-[12.5px] font-medium"
+          style={{ color: "var(--admin-accent)" }}
+        >
+          {useOtherCity ? "← בחר מתוך הרשימה" : "אחר (יעד לא ברשימה)"}
+        </button>
       </div>
 
-      {tripType && (
-        <>
-          {/* שלב 2 - קטגוריות (רק של סוג הטיול שנבחר) */}
-          <div>
-            <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-              מה בא לכם לחפש?
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {tripType.categories.map((c) => {
-                const selected = selectedCategories.includes(c.key);
-                return (
-                  <button
-                    key={c.key}
-                    type="button"
-                    onClick={() => toggleCategory(c.key)}
-                    className="rounded-full border px-3.5 py-2 text-[13px] font-medium transition"
-                    style={{
-                      borderColor: selected ? "var(--admin-accent)" : "var(--admin-border)",
-                      background: selected ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
-                      color: selected ? "var(--admin-accent)" : "var(--admin-ink)",
-                    }}
-                  >
-                    {c.emoji} {c.label}
-                  </button>
-                );
-              })}
-            </div>
+      {/* שלב 2 - 4 האפשרויות */}
+      <div>
+        <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+          מה מחפשים?
+        </h2>
+        <div className="grid grid-cols-4 gap-3">
+          {DISCOVERY_BUCKETS.map((b) => (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => {
+                setBucketKey(b.key);
+                setSelectedCategories([]);
+              }}
+              className="flex flex-col items-center gap-2 rounded-[var(--admin-radius-lg)] border p-5 text-center transition"
+              style={{
+                borderColor: bucketKey === b.key ? "var(--admin-accent)" : "var(--admin-border)",
+                background: bucketKey === b.key ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+              }}
+            >
+              <span className="text-[30px]">{b.emoji}</span>
+              <span className="text-[13.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
+                {b.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* שלב 3 - קטגוריות ספציפיות לאפשרות שנבחרה, בתיבה עם מסגרת */}
+      {bucket && (
+        <div
+          className="rounded-[var(--admin-radius-lg)] border p-5"
+          style={{ borderColor: "var(--admin-accent)", background: "var(--admin-bg-surface)" }}
+        >
+          <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+            {bucket.emoji} {bucket.label} - איזה סוג?
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {bucket.categories.map((c) => {
+              const selected = selectedCategories.includes(c.key);
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => toggleCategory(c.key)}
+                  className="rounded-full border px-3.5 py-2 text-[13px] font-medium transition"
+                  style={{
+                    borderColor: selected ? "var(--admin-accent)" : "var(--admin-border)",
+                    background: selected ? "var(--admin-accent-soft)" : "var(--admin-bg)",
+                    color: selected ? "var(--admin-accent)" : "var(--admin-ink)",
+                  }}
+                >
+                  {c.emoji} {c.label}
+                </button>
+              );
+            })}
           </div>
+        </div>
+      )}
 
-          {/* שכבה שנייה - ספציפית יותר (כרגע: חופשה בחו"ל בלבד) - מופיעה
-              רק אחרי שנבחרה לפחות קטגוריה אחת מהשכבה הראשונה. */}
-          {tripType.secondaryCategories && selectedCategories.length > 0 && (
-            <div>
-              <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-                מה ספציפית לחפש ביעד?
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {tripType.secondaryCategories.map((c) => {
-                  const selected = selectedCategories.includes(c.key);
-                  return (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => toggleCategory(c.key)}
-                      className="rounded-full border px-3.5 py-2 text-[13px] font-medium transition"
-                      style={{
-                        borderColor: selected ? "var(--admin-accent)" : "var(--admin-border)",
-                        background: selected ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
-                        color: selected ? "var(--admin-accent)" : "var(--admin-ink)",
-                      }}
-                    >
-                      {c.emoji} {c.label}
-                    </button>
-                  );
-                })}
-              </div>
+      {/* שלב 4 - פילטרים + הפעלה */}
+      {bucket && selectedCategories.length > 0 && (
+        <div className="flex flex-wrap items-end gap-6 rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+          <AdminField label="דירוג Google מינימלי">
+            <input type="number" step="0.1" min={1} max={5} className={adminInputClass} style={{ ...adminInputStyle, width: 90 }} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} />
+          </AdminField>
+          <AdminField label="מספר ביקורות מינימלי">
+            <input type="number" min={0} className={adminInputClass} style={{ ...adminInputStyle, width: 100 }} value={minReviews} onChange={(e) => setMinReviews(Number(e.target.value))} />
+          </AdminField>
+          <AdminField label="תקציב">
+            <input className={adminInputClass} style={{ ...adminInputStyle, width: 110 }} value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="לא חובה" />
+          </AdminField>
+          {minRating < 4 && <p className="text-[12.5px] text-amber-600">⚠️ מתחת ל-4.0</p>}
+          <AdminField label="כמה מקומות למצוא?">
+            <div className="flex flex-wrap gap-1.5">
+              {QUANTITY_OPTIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setQuantity(q)}
+                  className="rounded-[var(--admin-radius-sm)] border px-3 py-1.5 text-[12.5px] font-medium"
+                  style={{
+                    borderColor: quantity === q ? "var(--admin-accent)" : "var(--admin-border)",
+                    background: quantity === q ? "var(--admin-accent-soft)" : "transparent",
+                    color: quantity === q ? "var(--admin-accent)" : "var(--admin-ink)",
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
             </div>
-          )}
-
-          {/* שלב 3 - פילטרים (רק של סוג הטיול שנבחר, דינמי) */}
-          {selectedCategories.length > 0 && (
-            <div>
-              <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-                פילטרים
-              </h2>
-              {/* ברירת מחדל: רק מדינה/עיר/אזור (השורה הראשונה). שאר
-                  הפילטרים (שעה, תקציב, נגישות וכו') מוסתרים עד שלוחצים
-                  "עוד פילטרים" - לא כולם בבת אחת. */}
-              <div className="grid grid-cols-3 gap-4">
-                {tripType.filters.slice(0, 3).map((f) => (
-                  <DiscoveryFilterField key={f.key} filter={f} value={filterValues[f.key] ?? ""} onChange={(v) => updateFilter(f.key, v)} />
-                ))}
-              </div>
-              {tripType.filters.length > 3 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreFilters((v) => !v)}
-                    className="mt-3 text-[12.5px] font-medium"
-                    style={{ color: "var(--admin-accent)" }}
-                  >
-                    {showMoreFilters ? "▲ הסתר פילטרים נוספים" : `▼ עוד פילטרים (${tripType.filters.length - 3})`}
-                  </button>
-                  {showMoreFilters && (
-                    <div className="mt-3 grid grid-cols-3 gap-4">
-                      {tripType.filters.slice(3).map((f) => (
-                        <DiscoveryFilterField key={f.key} filter={f} value={filterValues[f.key] ?? ""} onChange={(v) => updateFilter(f.key, v)} />
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* שלב 4 - איכות + כמות */}
-          {selectedCategories.length > 0 && (
-            <div className="flex flex-wrap items-end gap-6 rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-              <AdminField label="דירוג Google מינימלי">
-                <input
-                  type="number"
-                  step="0.1"
-                  min={1}
-                  max={5}
-                  className={adminInputClass}
-                  style={{ ...adminInputStyle, width: 100 }}
-                  value={minRating}
-                  onChange={(e) => setMinRating(Number(e.target.value))}
-                />
-              </AdminField>
-              {minRating < 4 && (
-                <p className="text-[12.5px] text-amber-600">⚠️ מתחת ל-4.0 - מקומות מתחת ל-3.0 עדיין ידרשו אישור ידני תמיד</p>
-              )}
-              <AdminField label="כמה מקומות למצוא?">
-                <div className="flex flex-wrap gap-1.5">
-                  {QUANTITY_OPTIONS.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => setQuantity(q)}
-                      className="rounded-[var(--admin-radius-sm)] border px-3 py-1.5 text-[12.5px] font-medium"
-                      style={{
-                        borderColor: quantity === q ? "var(--admin-accent)" : "var(--admin-border)",
-                        background: quantity === q ? "var(--admin-accent-soft)" : "transparent",
-                        color: quantity === q ? "var(--admin-accent)" : "var(--admin-ink)",
-                      }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </AdminField>
-              <AdminButton onClick={handleLaunch} disabled={submitting}>
-                {submitting ? "מפעיל..." : "🔍 הפעל חיפוש"}
-              </AdminButton>
-            </div>
-          )}
-        </>
+          </AdminField>
+          <AdminButton onClick={handleLaunch} disabled={submitting}>
+            {submitting ? "מפעיל..." : "🔍 הפעל חיפוש"}
+          </AdminButton>
+        </div>
       )}
 
       {error && <p className="text-[13.5px] text-red-600">{error}</p>}
     </div>
-  );
-}
-
-function DiscoveryFilterField({ filter, value, onChange }: { filter: DiscoveryFilterOption; value: string; onChange: (v: string) => void }) {
-  if (filter.type === "toggle") {
-    return (
-      <AdminField label={filter.label}>
-        <select className={adminInputClass} style={adminInputStyle} value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">לא משנה</option>
-          <option value="true">כן</option>
-          <option value="false">לא</option>
-        </select>
-      </AdminField>
-    );
-  }
-  if ((filter.type === "select" || filter.type === "multiselect") && filter.options) {
-    return (
-      <AdminField label={filter.label}>
-        <select className={adminInputClass} style={adminInputStyle} value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">הכל</option>
-          {filter.options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </AdminField>
-    );
-  }
-  return (
-    <AdminField label={filter.label}>
-      <input className={adminInputClass} style={adminInputStyle} value={value} onChange={(e) => onChange(e.target.value)} />
-    </AdminField>
   );
 }
