@@ -32,6 +32,7 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     title: "תוכן",
     items: [
+      { href: "/admin/content-dashboard", label: "ניהול יעדים ואטרקציות", icon: "◆", status: "ready" },
       { href: "/admin/places", label: "מקומות ואטרקציות", icon: "◆", status: "ready" },
       { href: "/admin/destinations", label: "יעדים ומדינות", icon: "◇", status: "ready" },
       { href: "/admin/place-type-fields", label: "שדות לפי סוג יעד", icon: "◈", status: "ready" },
