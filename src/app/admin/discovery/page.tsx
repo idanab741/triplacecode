@@ -24,6 +24,7 @@ export default function DiscoveryWizardPage() {
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(20);
   const [minRating, setMinRating] = useState(4.0);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +85,7 @@ export default function DiscoveryWizardPage() {
               setTripTypeKey(t.key);
               setSelectedCategories([]);
               setFilterValues({});
+              setShowMoreFilters(false);
               setStep(2);
             }}
             className="flex flex-col items-center gap-2 rounded-[var(--admin-radius-lg)] border p-4 text-center transition"
@@ -135,11 +137,33 @@ export default function DiscoveryWizardPage() {
               <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
                 פילטרים
               </h2>
+              {/* ברירת מחדל: רק מדינה/עיר/אזור (השורה הראשונה). שאר
+                  הפילטרים (שעה, תקציב, נגישות וכו') מוסתרים עד שלוחצים
+                  "עוד פילטרים" - לא כולם בבת אחת. */}
               <div className="grid grid-cols-3 gap-4">
-                {tripType.filters.map((f) => (
+                {tripType.filters.slice(0, 3).map((f) => (
                   <DiscoveryFilterField key={f.key} filter={f} value={filterValues[f.key] ?? ""} onChange={(v) => updateFilter(f.key, v)} />
                 ))}
               </div>
+              {tripType.filters.length > 3 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreFilters((v) => !v)}
+                    className="mt-3 text-[12.5px] font-medium"
+                    style={{ color: "var(--admin-accent)" }}
+                  >
+                    {showMoreFilters ? "▲ הסתר פילטרים נוספים" : `▼ עוד פילטרים (${tripType.filters.length - 3})`}
+                  </button>
+                  {showMoreFilters && (
+                    <div className="mt-3 grid grid-cols-3 gap-4">
+                      {tripType.filters.slice(3).map((f) => (
+                        <DiscoveryFilterField key={f.key} filter={f} value={filterValues[f.key] ?? ""} onChange={(v) => updateFilter(f.key, v)} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

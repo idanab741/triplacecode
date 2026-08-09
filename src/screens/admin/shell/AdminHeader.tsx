@@ -2,10 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { ADMIN_NAV_FLAT } from "./navConfig";
+import { useAdminSecret } from "./AdminAuthContext";
 
 export function AdminHeader({ dark, onToggleDark }: { dark: boolean; onToggleDark: () => void }) {
   const pathname = usePathname();
   const current = ADMIN_NAV_FLAT.find((i) => pathname === i.href || pathname?.startsWith(i.href + "/"));
+  const { clearSecret } = useAdminSecret();
 
   return (
     <header
@@ -41,6 +43,17 @@ export function AdminHeader({ dark, onToggleDark }: { dark: boolean; onToggleDar
           style={{ color: "var(--admin-ink-secondary)", background: "var(--admin-bg-sunken)" }}
         >
           {dark ? "☀" : "☾"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm("להתנתק? תצטרך להזין שוב את סיסמת האדמין.")) clearSecret();
+          }}
+          className="rounded-[var(--admin-radius-sm)] px-2.5 py-1.5 text-[12.5px] font-medium transition"
+          style={{ color: "var(--admin-ink-secondary)", background: "var(--admin-bg-sunken)" }}
+        >
+          התנתק
         </button>
 
         <div
