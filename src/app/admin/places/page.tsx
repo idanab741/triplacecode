@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
+import { useRouter } from "next/navigation";
 import {
   TRIP_TYPE_GROUPS,
   CUISINE_TAGS,
@@ -141,6 +142,7 @@ function toggleInArray(arr: string[], value: string): string[] {
 
 export default function AdminPlacesPage() {
   const { secret: adminSecret } = useAdminSecret();
+  const router = useRouter();
   const [places, setPlaces] = useState<Place[]>([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -298,8 +300,7 @@ while (true) {
   }
 
   function startEdit(place: Place) {
-    setEditingId(place.id);
-    setEditForm(placeToForm(place));
+    router.push(`/admin/places/${place.id}`);
   }
 
   function cancelEdit() {
