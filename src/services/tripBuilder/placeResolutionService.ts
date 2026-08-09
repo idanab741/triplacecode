@@ -154,6 +154,32 @@ export async function resolveAiSuggestedPlace(
     return null;
   }
 
+  // תפקיד "attraction" (אתר/מסלול/נקודת עניין) - הבעיה ההפוכה: לא סוג
+  // "אסור" ספציפי, אלא **שום סימן טוב בכלל**. עסק רגיל (חנות, משרד,
+  // ספק שירותים עסקי) שגוגל לא הצליח לסווג לשום קטגוריה ספציפית מקבל
+  // רק "store"/"point_of_interest"/"establishment" גנריים - בדיוק המקרה
+  // שבו Claude "שאל" שם עסק אמיתי (עובר את בדיקת ה-exists) וכתב לו תיאור
+  // מומצא של אתר טבע/תצפית. תפקידי food/coffee/bar/spa לא עוברים את
+  // הבדיקה הזו - יש להם סוגי Google אמינים משלהם (restaurant/cafe/bar/spa).
+  const ATTRACTION_LIKE_TYPES = new Set([
+    "tourist_attraction", "park", "natural_feature", "museum", "art_gallery",
+    "zoo", "aquarium", "amusement_park", "place_of_worship", "church",
+    "hindu_temple", "mosque", "synagogue", "stadium", "shopping_mall",
+    "campground", "rv_park", "beach", "hiking_area", "national_park",
+    "landmark", "historical_landmark", "viewpoint", "lake", "river",
+  ]);
+  if (item.role === "attraction" && photoResult.types.length > 0) {
+    const hasAttractionSignal = photoResult.types.some((t) => ATTRACTION_LIKE_TYPES.has(t));
+    const onlyGenericTypes = photoResult.types.every((t) => t === "point_of_interest" || t === "establishment" || t === "store");
+    if (!hasAttractionSignal && onlyGenericTypes) {
+      logAiError("מקום מוצע כ'אטרקציה' אבל גוגל לא מסווג אותו כשום דבר תיירותי/טבעי - נפסל", {
+        name: item.name,
+        allTypes: photoResult.types,
+      });
+      return null;
+    }
+  }
+
   const resolvedName = photoResult.googleName ?? item.name;
   const imageUrls = [`/api/places/photo?ref=${encodeURIComponent(photoResult.photoRef)}`];
 
