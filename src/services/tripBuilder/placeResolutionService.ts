@@ -131,6 +131,29 @@ export async function resolveAiSuggestedPlace(
     return null;
   }
 
+  // מקום אמיתי (עובר את כל הבדיקות למעלה) אבל מסוג עסק שלא הגיוני בשום
+  // תפקיד מסלול (Claude "השאיל" שם של עסק אמיתי ותיאר אותו כמשהו שהוא
+  // לא - למשל אכסניה שתוארה כשביל טבע). אלה סוגים שגוגל מחזיר בעצמו,
+  // לא ניחוש - אם מקום מסומן ככה, זה כמעט תמיד סימן לתיאור שגוי, לא
+  // רק "מיון גס מדי".
+  const DISQUALIFYING_TYPES = new Set([
+    "lodging", "hospital", "pharmacy", "bank", "atm", "gas_station",
+    "car_repair", "car_dealer", "real_estate_agency", "insurance_agency",
+    "lawyer", "accounting", "electrician", "plumber", "storage",
+    "moving_company", "funeral_home", "cemetery", "school", "university",
+    "local_government_office", "courthouse", "police", "fire_station", "post_office",
+  ]);
+  const disqualifyingMatch = photoResult.types.find((t) => DISQUALIFYING_TYPES.has(t));
+  if (disqualifyingMatch) {
+    logAiError("מקום מוצע הוא מסוג עסק שלא הגיוני לתפקיד מסלול - נפסל", {
+      name: item.name,
+      matchedType: disqualifyingMatch,
+      allTypes: photoResult.types,
+      requestedRole: item.role,
+    });
+    return null;
+  }
+
   const resolvedName = photoResult.googleName ?? item.name;
   const imageUrls = [`/api/places/photo?ref=${encodeURIComponent(photoResult.photoRef)}`];
 

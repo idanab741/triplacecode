@@ -22,7 +22,7 @@ interface BottomNavProps {
 export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50">
-<div className="relative flex items-end justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">        {items.map((item) => {
+<div className="relative flex items-end justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),10px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">        {items.map((item) => {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
