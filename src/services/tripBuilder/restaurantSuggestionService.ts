@@ -1,7 +1,7 @@
 import { callClaude, logAiError } from "@/services/ai/claudeService";
-import { geocodePlaceName } from "./geocodingService";
-import { findPlacePhotoReference } from "./placePhotoService";
+import { resolveAiSuggestedPlace } from "./placeResolutionService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
+import type { createAdminClient } from "@/services/supabase/admin";
 import type { CandidatePlace, LatLng } from "./types";
 
 interface SuggestRestaurantParams {
@@ -9,6 +9,12 @@ interface SuggestRestaurantParams {
   cuisine: string[];
   freeText: string;
   budgetLabel: string;
+  /** נדרשים כדי לעבור דרך resolveAiSuggestedPlace - אותה הגנה מלאה נגד
+   *  המצאות/מיקום שגוי/דירוג נמוך/סוג עסק לא הגיוני שכבר קיימת לטיול
+   *  יומי, במקום אימות חלש ונפרד שהיה כאן קודם (רק geocoding, בלי
+   *  exists/rating/type check בכלל). */
+  areaOrigin: LatLng;
+  maxDistanceKm: number;
 }
 
 interface ClaudeRestaurantSuggestion {
@@ -20,33 +26,36 @@ interface ClaudeRestaurantSuggestion {
 /**
  * מבקש מ-Claude המלצה אמיתית על מסעדה/בית קפה ספציפיים לפי הידע הכללי שלו
  * (לא רק מתוך מה שכבר קיים ב-DB) - ה-AI מוביל, ה-DB הוא רק גיבוי. מאמת את
- * ההמלצה עם תמונה ומיקום אמיתיים מגוגל.
+ * ההמלצה באותו מנגנון המלא שמשמש טיול יומי (Places API, exists, סגור/פתוח,
+ * דירוג 4.0+, סוג עסק הגיוני) - לא רק "יש תמונה בגוגל".
  */
-export async function suggestRealRestaurant(params: SuggestRestaurantParams): Promise<CandidatePlace | null> {
+export async function suggestRealRestaurant(
+  supabase: ReturnType<typeof createAdminClient>,
+  params: SuggestRestaurantParams
+): Promise<CandidatePlace | null> {
   const suggestion = await askClaudeForRestaurant(params);
   if (!suggestion) return null;
 
-  const coords = await geocodePlaceName(`${suggestion.name}, ${params.city}`);
-  if (!coords) return null; // אם גוגל לא מזהה את המקום - כנראה שם לא מדויק, נופלים חזרה ל-DB
-
-  const photoRef = await findPlacePhotoReference(`${suggestion.name} ${params.city}`);
-  const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
+  const resolved = await resolveAiSuggestedPlace(
+    supabase,
+    {
+      name: suggestion.name,
+      category: "wineries_dining",
+      role: "food",
+      reason: suggestion.reason,
+      estimatedVisitMinutes: 75,
+    },
+    params.city,
+    params.areaOrigin,
+    params.maxDistanceKm
+  );
+  if (!resolved) return null; // נפסל באימות (לא קיים/סגור/דירוג נמוך/רחוק מדי/סוג עסק לא הגיוני) - נופלים חזרה ל-DB
 
   return {
-    id: `ai-${Date.now()}`,
-    name: suggestion.name,
-    category: "wineries_dining",
+    ...resolved,
     subcategory: null,
     shortDescription: suggestion.description,
-    imageUrls,
-    rating: null,
-    ratingCount: null,
     priceLevel: null,
-    estimatedVisitMinutes: 75,
-    latitude: coords.lat,
-    longitude: coords.lng,
-    distanceKm: 0,
-    etaMinutes: 0,
     tripTypeTags: [],
     cuisineTags: params.cuisine,
     kosher: null,
@@ -54,7 +63,6 @@ export async function suggestRealRestaurant(params: SuggestRestaurantParams): Pr
     suitableChildAges: [],
     budgetTier: null,
     isAreaExperience: false,
-    reason: suggestion.reason,
   } as CandidatePlace;
 }
 

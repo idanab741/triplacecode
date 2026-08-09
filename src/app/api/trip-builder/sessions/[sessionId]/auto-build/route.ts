@@ -479,12 +479,15 @@ export async function POST(
       // עבור מסעדות ובתי קפה - Claude מוביל עם המלצה אמיתית מהידע הכללי שלו,
       // לא רק בוחר מתוך המאגר הקיים. המאגר הוא רק גיבוי אם Claude לא בטוח.
       if (session.trip_type === "restaurants_cafes") {
-        const restaurantAnswers = answers as unknown as { cuisine?: string[] };
-        const aiSuggestion = await suggestRealRestaurant({
+        const restaurantAnswers = answers as unknown as { cuisine?: string[]; distanceBand?: string };
+        const restaurantMaxDistanceKm = requestedAreaRadiusKm ?? distanceBandToRadiusKm((restaurantAnswers.distanceBand ?? "30min") as never);
+        const aiSuggestion = await suggestRealRestaurant(supabase, {
           city: tripIntent?.requestedArea ?? "האזור המבוקש",
           cuisine: restaurantAnswers.cuisine ?? [],
           freeText: answers.freeText,
           budgetLabel: remainingBudgetLabel,
+          areaOrigin: cursor,
+          maxDistanceKm: restaurantMaxDistanceKm,
         });
 
         if (aiSuggestion) {
