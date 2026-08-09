@@ -20,7 +20,7 @@ interface ExtractedPlace {
  * מוכנה שהמשתמש הדביק (עם שמות ותיאורים) - Claude מחלץ בדיוק את זה,
  * לא כותב מחדש/מגניב תיאורים משלו.
  */
-async function extractPlacesFromFreeText(freeText: string, location: string): Promise<ExtractedPlace[]> {
+async function extractPlacesFromFreeText(freeText: string, location: string): Promise<{ places: ExtractedPlace[]; debugInfo: string | null }> {
   const prompt = `אתה עוזר לצוות אדמין להזין מקומות למאגר נתונים. הטקסט הבא הוא **קלט מהאדמין**, ויכול
 להיות אחד משני סוגים - עליך לזהות איזה מהם:
 
@@ -44,19 +44,19 @@ ${freeText}
   const { text, error } = await callClaude(prompt, 3000);
   if (error || !text) {
     logAiError("פירוק טקסט חופשי לרשימת מקומות נכשל", { error });
-    return [];
+    return { places: [], debugInfo: `שגיאת Claude: ${error ?? "אין תשובה בכלל"}` };
   }
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return [];
+    if (!jsonMatch) return { places: [], debugInfo: `Claude לא החזיר JSON. תשובה גולמית: ${text.slice(0, 500)}` };
     const parsed = JSON.parse(jsonMatch[0]);
-    return Array.isArray(parsed.places) ? parsed.places : [];
+    const places = Array.isArray(parsed.places) ? parsed.places : [];
+    return { places, debugInfo: places.length === 0 ? `JSON תקין אבל places ריק. תשובה גולמית: ${text.slice(0, 500)}` : null };
   } catch (parseError) {
-    logAiError("כשל בפענוח JSON של רשימת מקומות", {
-      message: parseError instanceof Error ? parseError.message : String(parseError),
-    });
-    return [];
+    const message = parseError instanceof Error ? parseError.message : String(parseError);
+    logAiError("כשל בפענוח JSON של רשימת מקומות", { message });
+    return { places: [], debugInfo: `שגיאת פענוח JSON: ${message}. תשובה גולמית: ${text.slice(0, 500)}` };
   }
 }
 
@@ -74,10 +74,10 @@ export async function POST(request: Request) {
   }
 
   const location = [city, country].filter(Boolean).join(", ");
-  const extracted = await extractPlacesFromFreeText(freeText, location);
+  const { places: extracted, debugInfo } = await extractPlacesFromFreeText(freeText, location);
 
   if (extracted.length === 0) {
-    return NextResponse.json({ places: [], errors: ["לא זוהו מקומות בטקסט - נסה לנסח אחרת"] });
+    return NextResponse.json({ places: [], errors: [debugInfo ?? "לא זוהו מקומות בטקסט - נסה לנסח אחרת"] });
   }
 
   const supabase = createAdminClient();
