@@ -480,15 +480,29 @@ export async function POST(
       // לא רק בוחר מתוך המאגר הקיים. המאגר הוא רק גיבוי אם Claude לא בטוח.
       if (session.trip_type === "restaurants_cafes") {
         const restaurantAnswers = answers as unknown as { cuisine?: string[]; distanceBand?: string };
-        const restaurantMaxDistanceKm = requestedAreaRadiusKm ?? distanceBandToRadiusKm((restaurantAnswers.distanceBand ?? "30min") as never);
-        const aiSuggestion = await suggestRealRestaurant(supabase, {
-          city: tripIntent?.requestedArea ?? "האזור המבוקש",
-          cuisine: restaurantAnswers.cuisine ?? [],
-          freeText: answers.freeText,
-          budgetLabel: remainingBudgetLabel,
-          areaOrigin: cursor,
-          maxDistanceKm: restaurantMaxDistanceKm,
-        });
+        const baseRestaurantMaxDistanceKm =
+          requestedAreaRadiusKm ?? distanceBandToRadiusKm((restaurantAnswers.distanceBand ?? "30min") as never);
+
+        // אם הרדיוס המבוקש (למשל "10 דקות") לא מניב שום תוצאה - לא נותנים
+        // "לא מצאנו כלום" מיד; מרחיבים פעם אחת (עד פי 3, מקסימום 25 ק"מ)
+        // לפני שמוותרים. עדיף מקום קצת רחוק יותר ממסך ריק לגמרי.
+        const distanceAttemptsKm = [
+          baseRestaurantMaxDistanceKm,
+          Math.min(baseRestaurantMaxDistanceKm * 3, 25),
+        ];
+
+        let aiSuggestion = null as Awaited<ReturnType<typeof suggestRealRestaurant>>;
+        for (const attemptMaxDistanceKm of distanceAttemptsKm) {
+          aiSuggestion = await suggestRealRestaurant(supabase, {
+            city: tripIntent?.requestedArea ?? "האזור המבוקש",
+            cuisine: restaurantAnswers.cuisine ?? [],
+            freeText: answers.freeText,
+            budgetLabel: remainingBudgetLabel,
+            areaOrigin: cursor,
+            maxDistanceKm: attemptMaxDistanceKm,
+          });
+          if (aiSuggestion) break;
+        }
 
         if (aiSuggestion) {
           const realPlace = await ensurePlaceExists(aiSuggestion, tripIntent?.requestedArea ?? "");
