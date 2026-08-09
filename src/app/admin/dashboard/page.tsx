@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { StatCard } from "@/screens/admin/shared/Primitives";
 import { LineChart, HorizontalBarChart } from "@/screens/admin/shared/Charts";
 import { adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
@@ -23,7 +24,7 @@ interface DashboardData {
  *  בכוונה בלי "Conversion ל-Premium"/"Retention" - אין עדיין מושג של מנוי
  *  או טבלת אירועי login בסכמה הקיימת שמאפשרת לחשב את אלה באמת. */
 export default function DashboardPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +54,6 @@ export default function DashboardPage() {
             נתונים אמיתיים מ-Supabase (משתמשים + מסלולים)
           </p>
         </div>
-        <input
-          type="password"
-          value={adminSecret}
-          onChange={(e) => setAdminSecret(e.target.value)}
-          placeholder="סיסמת אדמין"
-          className={adminInputClass}
-          style={{ ...adminInputStyle, width: 200 }}
-        />
       </div>
 
       {!adminSecret && (

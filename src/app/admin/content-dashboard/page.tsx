@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { StatCard } from "@/screens/admin/shared/Primitives";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 
 interface ModuleStat {
   module: string;
@@ -13,25 +14,19 @@ interface ModuleStat {
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
-/** יבוא מ-localStorage, אותו דפוס בדיוק כמו שאר עמודי האדמין הקיימים
- *  (place-type-fields, taxonomy) - לא ממציא מנגנון הזדהות חדש. */
-function getAdminSecret(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("admin_secret") ?? "";
-}
-
 /** מסך הכניסה החדש למערכת ניהול היעדים/אטרקציות - "מה חסר? מה צריך
  *  השלמה?" כפי שנדרש. שלב ראשון בבנייה מחדש (Audit כבר בוצע) - מתמקד
  *  בתמונת מצב חיה, לא עוד טבלה. הקישור לכל מודול עדיין מוביל לעמוד
  *  המקומות הקיים (עדיין לא נבנה Workspace ייעודי לכל מודול - זה השלב הבא). */
 export default function ContentDashboardPage() {
+  const { secret: adminSecret } = useAdminSecret();
   const [totalPlaces, setTotalPlaces] = useState<number | null>(null);
   const [modules, setModules] = useState<ModuleStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/content-dashboard", { headers: { [ADMIN_SECRET_HEADER]: getAdminSecret() } })
+    fetch("/api/admin/content-dashboard", { headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
       .then((res) => res.json())
       .then((data) => {
         if (data.error) throw new Error(data.error);

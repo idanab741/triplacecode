@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { DataTable, SearchInput, type Column } from "@/screens/admin/shared/DataTable";
 import { Drawer, DrawerSection, AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { Badge, EmptyState } from "@/screens/admin/shared/Primitives";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
-const SECRET_STORAGE_KEY = "triplace_admin_secret";
 
 interface TaxonomyTerm {
   id: string;
@@ -53,7 +53,7 @@ const EMPTY_FORM = {
  *  טיול (ראו migration 0016). זהו הקטלוג בלבד - חיבור צרכנים קיימים
  *  (Onboarding, tripTaxonomy.ts וכו') לקרוא מכאן הוא שלב נפרד ועתידי. */
 export default function TaxonomyTermsPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [terms, setTerms] = useState<TaxonomyTerm[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,14 +64,8 @@ export default function TaxonomyTermsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
-    if (stored) setAdminSecret(stored);
-  }, []);
-  useEffect(() => {
-    if (adminSecret) sessionStorage.setItem(SECRET_STORAGE_KEY, adminSecret);
-  }, [adminSecret]);
+  // הסיסמה עכשיו מגיעה מ-AdminAuthContext (localStorage משותף) - לא צריך
+  // יותר sessionStorage נפרד לעמוד הזה.
 
   async function loadTerms() {
     if (!adminSecret) return;
@@ -249,14 +243,6 @@ export default function TaxonomyTermsPage() {
             {terms.length.toLocaleString()} מונחים ב-{groupCounts.length} קבוצות — מקור אחד לסוגי טיול, תחומי עניין, קהלי יעד, עונות, ו-Place DNA. ראו migration 0016.
           </p>
         </div>
-        <input
-          type="password"
-          value={adminSecret}
-          onChange={(e) => setAdminSecret(e.target.value)}
-          placeholder="סיסמת אדמין"
-          className={adminInputClass}
-          style={{ ...adminInputStyle, width: 200 }}
-        />
       </div>
 
       {error && (

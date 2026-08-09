@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import {
   TRIP_TYPE_GROUPS,
   CUISINE_TAGS,
@@ -139,7 +140,7 @@ function toggleInArray(arr: string[], value: string): string[] {
 }
 
 export default function AdminPlacesPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [places, setPlaces] = useState<Place[]>([]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -426,14 +427,6 @@ while (true) {
             מציג {filteredPlaces.length.toLocaleString()} מתוך {places.length.toLocaleString()}
           </p>
         </div>
-        <input
-          type="password"
-          value={adminSecret}
-          onChange={(e) => setAdminSecret(e.target.value)}
-          placeholder="סיסמת אדמין"
-          className={adminInputClass}
-          style={{ ...adminInputStyle, width: 200 }}
-        />
       </div>
 
       {error && (

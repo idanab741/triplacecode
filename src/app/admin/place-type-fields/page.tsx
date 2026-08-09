@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { DataTable, SearchInput, type Column } from "@/screens/admin/shared/DataTable";
 import { Drawer, DrawerSection, AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { Badge, EmptyState } from "@/screens/admin/shared/Primitives";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
-const SECRET_STORAGE_KEY = "triplace_admin_secret";
 
 type FieldType = "number" | "text" | "boolean" | "single_select" | "multi_select";
 
@@ -47,7 +47,7 @@ const EMPTY_FORM = {
  *  בקוד, נוצרים "סוגי יעד" ו"שדות" חדשים (מסלול טבע, מלון, בר...), בדיוק
  *  לפי הדרישה "בלי צורך בשינוי קוד". ראו migration 0015. */
 export default function PlaceTypeFieldsPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [fieldDefs, setFieldDefs] = useState<FieldDef[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,15 +58,8 @@ export default function PlaceTypeFieldsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
-  // נוחות: שומרים את סיסמת האדמין ב-session הזה בלבד, כדי לא להקליד
-  // אותה מחדש בכל מעבר בין מסכי אדמין (לא נשמר אחרי סגירת הטאב).
-  useEffect(() => {
-    const stored = sessionStorage.getItem(SECRET_STORAGE_KEY);
-    if (stored) setAdminSecret(stored);
-  }, []);
-  useEffect(() => {
-    if (adminSecret) sessionStorage.setItem(SECRET_STORAGE_KEY, adminSecret);
-  }, [adminSecret]);
+  // הסיסמה עכשיו מגיעה מ-AdminAuthContext (localStorage משותף לכל
+  // עמודי האדמין) - לא צריך יותר sessionStorage נפרד לעמוד הזה.
 
   async function loadFieldDefs() {
     if (!adminSecret) return;
@@ -224,14 +217,6 @@ export default function PlaceTypeFieldsPage() {
             {fieldDefs.length.toLocaleString()} שדות, {placeTypes.length.toLocaleString()} סוגי יעד — מגדיר אילו שדות ייעודיים כל סוג יעד (מסלול טבע, מלון, בר...) מציג בטופס העריכה של "מקומות", בלי צורך בשינוי קוד.
           </p>
         </div>
-        <input
-          type="password"
-          value={adminSecret}
-          onChange={(e) => setAdminSecret(e.target.value)}
-          placeholder="סיסמת אדמין"
-          className={adminInputClass}
-          style={{ ...adminInputStyle, width: 200 }}
-        />
       </div>
 
       {error && (

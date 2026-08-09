@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { DataTable, SearchInput, type Column } from "@/screens/admin/shared/DataTable";
 import { Badge } from "@/screens/admin/shared/Primitives";
 import { adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
@@ -10,7 +11,7 @@ import { UserDetailDrawer } from "@/screens/admin/users/UserDetailDrawer";
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
 export default function UsersPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [users, setUsers] = useState<RealUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,14 +75,6 @@ export default function UsersPage() {
             {adminSecret ? `${filtered.length.toLocaleString()} מתוך ${users.length.toLocaleString()} משתמשים אמיתיים` : "נתונים אמיתיים מ-Supabase Auth"}
           </p>
         </div>
-        <input
-          type="password"
-          value={adminSecret}
-          onChange={(e) => setAdminSecret(e.target.value)}
-          placeholder="סיסמת אדמין"
-          className={adminInputClass}
-          style={{ ...adminInputStyle, width: 200 }}
-        />
       </div>
 
       {!adminSecret && (

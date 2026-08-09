@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { DataTable, SearchInput, FilterSelect, type Column } from "@/screens/admin/shared/DataTable";
 import { Drawer, DrawerSection, AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { Badge } from "@/screens/admin/shared/Primitives";
@@ -33,7 +34,7 @@ function statusTone(status: Destination["status"]): "neutral" | "success" | "war
 }
 
 export default function DestinationsPage() {
-  const [adminSecret, setAdminSecret] = useState("");
+  const { secret: adminSecret } = useAdminSecret();
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +196,6 @@ export default function DestinationsPage() {
             {adminSecret ? `מציג ${filtered.length.toLocaleString()} מתוך ${destinations.length.toLocaleString()}` : "יעדים אמיתיים מ-Supabase"}
           </p>
         </div>
-        <input type="password" value={adminSecret} onChange={(e) => setAdminSecret(e.target.value)} placeholder="סיסמת אדמין" className={adminInputClass} style={{ ...adminInputStyle, width: 200 }} />
       </div>
 
       {!adminSecret && (
