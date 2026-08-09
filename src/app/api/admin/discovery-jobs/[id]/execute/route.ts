@@ -44,7 +44,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const errors: string[] = [];
 
   for (const categoryKey of job.categories as string[]) {
-    const category = tripType?.categories.find((c) => c.key === categoryKey);
+    const category =
+      tripType?.categories.find((c) => c.key === categoryKey) ??
+      tripType?.secondaryCategories?.find((c) => c.key === categoryKey);
     const query = category ? category.label : categoryKey;
     try {
       // הערה: category כאן משתמש במפתח הקטגוריה מה-Discovery Wizard עצמו

@@ -131,6 +131,36 @@ export default function DiscoveryWizardPage() {
             </div>
           </div>
 
+          {/* שכבה שנייה - ספציפית יותר (כרגע: חופשה בחו"ל בלבד) - מופיעה
+              רק אחרי שנבחרה לפחות קטגוריה אחת מהשכבה הראשונה. */}
+          {tripType.secondaryCategories && selectedCategories.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                מה ספציפית לחפש ביעד?
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {tripType.secondaryCategories.map((c) => {
+                  const selected = selectedCategories.includes(c.key);
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => toggleCategory(c.key)}
+                      className="rounded-full border px-3.5 py-2 text-[13px] font-medium transition"
+                      style={{
+                        borderColor: selected ? "var(--admin-accent)" : "var(--admin-border)",
+                        background: selected ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                        color: selected ? "var(--admin-accent)" : "var(--admin-ink)",
+                      }}
+                    >
+                      {c.emoji} {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* שלב 3 - פילטרים (רק של סוג הטיול שנבחר, דינמי) */}
           {selectedCategories.length > 0 && (
             <div>

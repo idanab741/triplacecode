@@ -18,8 +18,38 @@ export interface DiscoveryTripType {
   /** האם עיר היא שדה חובה עבור סוג הטיול הזה (טבע/חו"ל - לא בהכרח). */
   cityRequired: boolean;
   categories: DiscoveryCategory[];
+  /** שכבה שנייה, ספציפית יותר, שמופיעה **אחרי** בחירת הקטגוריה הראשית -
+   *  כרגע רלוונטי לחופשה בחו"ל בלבד (סגנון חופשה כללי -> מה ספציפית
+   *  לחפש ביעד, אותה רשימה כמו טיול יומי + "אתרי חובה ביעד"). */
+  secondaryCategories?: DiscoveryCategory[];
   filters: DiscoveryFilterOption[];
 }
+
+/** בדיוק אותן 20 קטגוריות כמו טיול יומי, פלוס "אתרי חובה ביעד" - נשלף
+ *  לשימוש חוזר עבור חו"ל, כדי לא לשכפל את הרשימה בטעות עם הבדלים קטנים. */
+const DETAILED_ATTRACTION_CATEGORIES: DiscoveryCategory[] = [
+  { key: "coffee_carts", emoji: "☕", label: "עגלות קפה ובתי קפה" },
+  { key: "nature_trails", emoji: "🌿", label: "מסלולי טבע ונופים" },
+  { key: "beaches_pools", emoji: "🏖️", label: "חופי ים, אגמים ובריכות" },
+  { key: "viewpoints", emoji: "🌅", label: "תצפיות, זריחות ושקיעות" },
+  { key: "parks_picnic", emoji: "🌳", label: "פארקים, גנים ופינות פיקניק" },
+  { key: "water_parks", emoji: "🎡", label: "פארקי מים, שעשועים ומתקנים" },
+  { key: "attractions", emoji: "🎯", label: "אטרקציות ופעילויות" },
+  { key: "sports_extreme", emoji: "🚴", label: "ספורט ואקסטרים" },
+  { key: "restaurants", emoji: "🍽️", label: "מסעדות וקולינריה" },
+  { key: "wineries", emoji: "🍷", label: "יקבים ומבשלות" },
+  { key: "culture_museums", emoji: "🏛️", label: "תרבות, מוזיאונים והיסטוריה" },
+  { key: "shopping", emoji: "🛍️", label: "שופינג, קניות ושווקים" },
+  { key: "events", emoji: "🎪", label: "אירועים, הופעות ופסטיבלים" },
+  { key: "nightlife", emoji: "🎭", label: "חיי לילה ובילויים" },
+  { key: "spa", emoji: "🧖", label: "ספא, מרחצאות ורוגע" },
+  { key: "boating", emoji: "🛶", label: "שיט ואטרקציות מים" },
+  { key: "heritage", emoji: "🛕", label: "אתרי מורשת ומקומות קדושים" },
+  { key: "kids_family", emoji: "👨‍👩‍👧‍👦", label: "פעילויות לילדים ומשפחות" },
+  { key: "art_galleries", emoji: "🎨", label: "אמנות וגלריות" },
+  { key: "photo_spots", emoji: "📸", label: "נקודות צילום ואינסטגרם" },
+  { key: "must_see_landmarks", emoji: "🗽", label: "אתרי חובה ביעד" },
+];
 
 /** מקור: המפרט ה-MASTER המלא (102 סעיפים) - סעיפים 10-28. תוכן מדויק,
  *  לא מפושט/מנוחש. כל סוג טיול מציג רק את הקטגוריות/פילטרים שלו -
@@ -287,6 +317,7 @@ export const DISCOVERY_TRIP_TYPES: DiscoveryTripType[] = [
     emoji: "✈️",
     label: "חופשה בחו\"ל",
     cityRequired: true,
+    secondaryCategories: DETAILED_ATTRACTION_CATEGORIES,
     categories: [
       { key: "beach_relax", emoji: "🏖️", label: "בטן גב וחופים" },
       { key: "casino", emoji: "🎰", label: "קזינו והימורים" },
