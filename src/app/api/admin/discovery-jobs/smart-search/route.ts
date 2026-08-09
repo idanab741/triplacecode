@@ -14,6 +14,31 @@ interface ExtractedPlace {
 }
 
 /**
+ * מנסה לפרק רשימה מובנית **בלי Claude בכלל** - הפורמט שהמשתמש בדרך כלל
+ * מדביק (מספר-שם-תיאור, מופרד ב-Tab או כמה רווחים, שורה לכל פריט) הוא
+ * צפוי מספיק כדי לפרק אותו בקוד פשוט. זה מהיר יותר, זול יותר (0 טוקנים),
+ * ואמין יותר מלשלוח ל-Claude ולבקש ממנו "להעתיק" בחזרה טקסט שכבר קיים
+ * בקלט - זה בדיוק מה שגרם לקטיעת התשובה בבקשות גדולות.
+ */
+function tryParseStructuredList(freeText: string): ExtractedPlace[] {
+  const lines = freeText.split("\n").map((l) => l.trim()).filter(Boolean);
+  const results: ExtractedPlace[] = [];
+
+  for (const line of lines) {
+    // מספר בהתחלה (אופציונלי) + Tab או 2+ רווחים בין השדות
+    const cleaned = line.replace(/^\d+[.):\t]?\s*/, "");
+    const parts = cleaned.split(/\t+| {2,}/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && parts[0].length > 1 && parts[0].length < 80) {
+      results.push({ name: parts[0], description: parts.slice(1).join(" ") || null });
+    }
+  }
+
+  // אם רוב השורות אכן נפרקו בהצלחה (לא רק שורה אקראית אחת) - זו כנראה
+  // רשימה מובנית אמיתית, לא טקסט חופשי שרק נראה כך במקרה.
+  return results.length >= Math.max(2, lines.length * 0.6) ? results : [];
+}
+
+/**
  * שלב 1: Claude מפרש את הטקסט החופשי - שני מקרים אפשריים, לא ידוע מראש
  * איזה מהם: (א) בקשה כללית ("100 עגלות קפה בתל אביב") - Claude מייצר
  * כמה שמות אמיתיים שהוא בטוח בהם, לא ממלא כדי להגיע למספר. (ב) רשימה
@@ -21,6 +46,15 @@ interface ExtractedPlace {
  * לא כותב מחדש/מגניב תיאורים משלו.
  */
 async function extractPlacesFromFreeText(freeText: string, location: string): Promise<{ places: ExtractedPlace[]; debugInfo: string | null }> {
+  // שלב 0 - ניסיון פירוק ישיר בקוד, בלי Claude בכלל. אם זה מצליח (רשימה
+  // מובנית שהמשתמש כבר כתב) - זהו, סיימנו, בלי טוקנים, בלי סיכון קטיעה.
+  const structured = tryParseStructuredList(freeText);
+  if (structured.length > 0) {
+    return { places: structured, debugInfo: null };
+  }
+
+  // שלב 1 - רק אם הפירוק הישיר לא הצליח (טקסט חופשי אמיתי, או בקשה
+  // כללית כמו "100 עגלות קפה") - פונים ל-Claude.
   const prompt = `אתה עוזר לצוות אדמין להזין מקומות למאגר נתונים. הטקסט הבא הוא **קלט מהאדמין**, ויכול
 להיות אחד משני סוגים - עליך לזהות איזה מהם:
 
