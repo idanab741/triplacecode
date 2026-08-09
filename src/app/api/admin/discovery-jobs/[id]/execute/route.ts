@@ -32,13 +32,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const tripType = DISCOVERY_TRIP_TYPES.find((t) => t.key === job.trip_type);
   const filters = (job.filters ?? {}) as Record<string, string>;
-  const city = filters.city || filters.area || "";
+  // עיר לא חובה - אם לא הוגדרה עיר/אזור ספציפיים, מחפשים ברמת המדינה כולה
+  // (Google Places Text Search מתמודד היטב עם "עגלות קפה, ישראל" בלי צורך
+  // בעיר מדויקת - הוא עצמו "משלים" את הפיזור הגיאוגרפי).
   const country = filters.country || "ישראל";
-
-  if (!city) {
-    await supabase.from("discovery_jobs").update({ status: "failed" }).eq("id", id);
-    return NextResponse.json({ error: "חסרה עיר/אזור בבקשה - חובה לחיפוש Google בגרסה הנוכחית" }, { status: 400 });
-  }
+  const location = filters.city || filters.area || country;
 
   let totalFetched = 0;
   let totalSaved = 0;
@@ -54,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       // הרשמיים של interest_category ב-tripTaxonomy.ts. יישור מלא בין שתי
       // הטקסונומיות (Discovery config מול interest_category) הוא עבודת
       // המשך נפרדת, לא נפתר כאן.
-      const result = await collectPlacesForCityAndCategory(city, categoryKey, country, query);
+      const result = await collectPlacesForCityAndCategory(location, categoryKey, country, query);
       totalFetched += result.fetched;
       totalSaved += result.saved;
       totalSkipped += result.skipped;
