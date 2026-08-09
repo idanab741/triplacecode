@@ -2,10 +2,37 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { collectPlacesForCityAndCategory } from "@/services/places/collectionService";
 import { DISCOVERY_TRIP_TYPES } from "@/services/admin/discoveryConfig";
+import { callClaude, logAiError } from "@/services/ai/claudeService";
 
 function checkAuth(request: Request): boolean {
   const secret = request.headers.get("x-admin-secret");
   return Boolean(secret) && secret === process.env.ADMIN_API_SECRET;
+}
+
+/** לפני שפונים לגוגל בכלל - Claude בונה שאילתת חיפוש מדויקת ומפורשת,
+ *  שמנטרלת דו-משמעות (הדוגמה שגרמה לבאג: "קניונים" בעברית = גם ניקבת
+ *  סלע טבעית וגם קניון קניות - חיפוש גולמי של תווית הקטגוריה בגוגל
+ *  החזיר קניוני קניות, לא ניקבות טבע). לא ניחוש טקסטואלי בקוד - Claude
+ *  מבין את ההקשר (סוג הטיול + הקטגוריה המדויקת) ובונה שאילתה חד-משמעית. */
+async function buildDisambiguatedQuery(tripTypeLabel: string, categoryLabel: string, location: string): Promise<string> {
+  const prompt = `אתה בונה שאילתת חיפוש ל-Google Places API, בעברית, שתחזיר בדיוק את סוג המקום הנכון -
+לא פרשנות מוטעית של מילה דו-משמעית.
+
+הֶקְשֵׁר: מחפשים מקומות לקטגוריה "${categoryLabel}" בהקשר של "${tripTypeLabel}", ב-${location}.
+
+שים לב במיוחד למילים דו-משמעיות בעברית שעלולות להטעות חיפוש (דוגמה מוכרת: "קניון" יכול להתפרש
+כניקבת סלע טבעית **או** כמרכז קניות - חובה להבהיר איזה מהשניים!). אם יש דו-משמעות כזו בקטגוריה
+הנוכחית, נסח את השאילתה כך שלא תתפרש בטעות, למשל בעזרת מילים נלוות חד-משמעיות (טבע, ניקבת סלע,
+מסלול, שמורה - לא קניות/מרכז מסחרי).
+
+השב אך ורק בשאילתת החיפוש עצמה, בעברית, קצרה (2-5 מילים), בלי שום טקסט נוסף, בלי מרכאות.`;
+
+  const { text, error } = await callClaude(prompt, 100);
+  if (error || !text?.trim()) {
+    logAiError("בניית שאילתת חיפוש חד-משמעית נכשלה - נופל לתווית הקטגוריה הגולמית", { categoryLabel, error });
+    return categoryLabel; // גיבוי - עדיף מלגמרי להיכשל, גם אם פחות מדויק
+  }
+  return text.trim().replace(/^["']|["']$/g, "");
 }
 
 /**
@@ -47,19 +74,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const category =
       tripType?.categories.find((c) => c.key === categoryKey) ??
       tripType?.secondaryCategories?.find((c) => c.key === categoryKey);
-    const query = category ? category.label : categoryKey;
+    const rawLabel = category ? category.label : categoryKey;
     try {
-      // הערה: category כאן משתמש במפתח הקטגוריה מה-Discovery Wizard עצמו
-      // (coffee_carts, nature_trails וכו') - לא בהכרח זהה תמיד ל-20 ה-IDs
-      // הרשמיים של interest_category ב-tripTaxonomy.ts. יישור מלא בין שתי
-      // הטקסונומיות (Discovery config מול interest_category) הוא עבודת
-      // המשך נפרדת, לא נפתר כאן.
+      // Claude בונה שאילתה מדויקת ומנוטרלת-דו-משמעות לפני שפונים לגוגל
+      // בכלל - לא הטקסט הגולמי של הקטגוריה. ר' buildDisambiguatedQuery
+      // והבאג שהוביל לזה (קניון=מרכז קניות לעומת קניון=ניקבת סלע טבעית).
+      //
+      // הערה נוספת: category (הפרמטר השלישי) משתמש במפתח הקטגוריה
+      // מה-Discovery Wizard עצמו - לא בהכרח זהה תמיד ל-20 ה-IDs הרשמיים
+      // של interest_category ב-tripTaxonomy.ts. יישור מלא בין שתי
+      // הטקסונומיות הוא עבודת המשך נפרדת, לא נפתר כאן.
+      const query = await buildDisambiguatedQuery(tripType?.label ?? job.trip_type, rawLabel, location);
       const result = await collectPlacesForCityAndCategory(location, categoryKey, country, query);
       totalFetched += result.fetched;
       totalSaved += result.saved;
       totalSkipped += result.skipped;
     } catch (e) {
-      errors.push(`${query}: ${e instanceof Error ? e.message : "שגיאה"}`);
+      errors.push(`${rawLabel}: ${e instanceof Error ? e.message : "שגיאה"}`);
     }
   }
 
