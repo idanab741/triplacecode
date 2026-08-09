@@ -1,13 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
-import { DISCOVERY_BUCKETS } from "@/services/admin/discoveryConfigV2";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
-const QUANTITY_OPTIONS = [10, 20, 50, 100, 250, 500, 1000];
+
+const TRIPMATCH_TAGS = [
+  { key: "coffee_carts", label: "☕ עגלות קפה" }, { key: "nature_trails", label: "🌿 מסלולי טבע" },
+  { key: "beaches_pools", label: "🏖️ חופים/בריכות" }, { key: "viewpoints", label: "🌅 תצפיות" },
+  { key: "parks_picnic", label: "🌳 פארקים" }, { key: "water_parks", label: "🎡 פארקי מים" },
+  { key: "attractions", label: "🎯 אטרקציות" }, { key: "sports_extreme", label: "🚴 ספורט" },
+  { key: "restaurants", label: "🍽️ מסעדות" }, { key: "wineries", label: "🍷 יקבים" },
+  { key: "culture_museums", label: "🏛️ תרבות" }, { key: "shopping", label: "🛍️ שופינג" },
+  { key: "events", label: "🎪 אירועים" }, { key: "nightlife", label: "🎭 חיי לילה" },
+  { key: "spa", label: "🧖 ספא" }, { key: "boating", label: "🛶 שיט" },
+  { key: "heritage", label: "🛕 מורשת" }, { key: "kids_family", label: "👨‍👩‍👧‍👦 ילדים" },
+  { key: "art_galleries", label: "🎨 אמנות" }, { key: "photo_spots", label: "📸 צילום" },
+];
+
+const DNA_TAGS = [
+  { key: "romantic", label: "רומנטי" }, { key: "family", label: "משפחתי" }, { key: "social", label: "חברתי" },
+  { key: "luxury", label: "יוקרתי" }, { key: "local_authentic", label: "מקומי" }, { key: "touristy", label: "תיירותי" },
+  { key: "special", label: "מיוחד" }, { key: "photogenic", label: "פוטוגני" }, { key: "adventurous", label: "הרפתקני" },
+  { key: "natural", label: "טבעי" }, { key: "urban", label: "עירוני" }, { key: "cultural", label: "תרבותי" },
+  { key: "culinary", label: "קולינרי" }, { key: "wellness_calm", label: "רגוע" }, { key: "active", label: "אקטיבי" },
+  { key: "hidden_gem", label: "פנינה נסתרת" },
+];
+
+interface Place {
+  id: string;
+  name: string;
+  short_description: string | null;
+  city: string | null;
+  country: string | null;
+  rating: number | null;
+  image_urls: string[];
+  category: string;
+  kosher: boolean | null;
+  accessible: boolean | null;
+  tripmatch_scores: Record<string, number>;
+  dna_scores: Record<string, number>;
+}
 
 interface Destination {
   id: string;
@@ -15,28 +49,16 @@ interface Destination {
   country: string | null;
 }
 
-/** מסך AI Discovery, גרסה 2 - נבנה מחדש לפי בקשה מפורשת: מיקום קודם
- *  (מדינה -> עיר, מתוך רשימת היעדים המתוירת שכבר קיימת + "אחר" חופשי,
- *  אף אחד לא חובה), ואז 4 אפשרויות פשוטות (מסעדה/אטרקציות/חיי לילה/לינה)
- *  במקום 7 סוגי טיול - כל אחת פותחת את מה שכבר קיים לה. */
-export default function DiscoveryWizardPage() {
+export default function DiscoveryPage() {
   const { secret: adminSecret } = useAdminSecret();
-  const router = useRouter();
-
   const [destinations, setDestinations] = useState<Destination[]>([]);
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
-  const [useOtherCity, setUseOtherCity] = useState(false);
-  const [otherCity, setOtherCity] = useState("");
-
-  const [bucketKey, setBucketKey] = useState<string | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [minRating, setMinRating] = useState(4.0);
-  const [minReviews, setMinReviews] = useState(0);
-  const [budget, setBudget] = useState("");
-  const [quantity, setQuantity] = useState(20);
-  const [submitting, setSubmitting] = useState(false);
+  const [freeText, setFreeText] = useState("");
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<Place[]>([]);
+  const [resultErrors, setResultErrors] = useState<string[]>([]);
 
   useEffect(() => {
     if (!adminSecret) return;
@@ -48,60 +70,65 @@ export default function DiscoveryWizardPage() {
 
   const countries = Array.from(new Set(destinations.map((d) => d.country).filter(Boolean))) as string[];
   const citiesForCountry = destinations.filter((d) => !country || d.country === country);
-  const bucket = DISCOVERY_BUCKETS.find((b) => b.key === bucketKey) ?? null;
 
-  function toggleCategory(key: string) {
-    setSelectedCategories((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-  }
-
-  async function handleLaunch() {
-    if (!bucket) return;
-    setSubmitting(true);
+  async function handleSearch() {
+    if (!freeText.trim()) return;
+    setSearching(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/discovery-jobs", {
+      const res = await fetch("/api/admin/discovery-jobs/smart-search", {
         method: "POST",
         headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
-        body: JSON.stringify({
-          tripType: bucket.key,
-          categories: selectedCategories,
-          filters: {
-            country,
-            city: useOtherCity ? otherCity : city,
-            budget,
-          },
-          quantity,
-          minRating,
-          minReviews,
-        }),
+        body: JSON.stringify({ freeText, country, city }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      router.push(`/admin/discovery-jobs/${data.job.id}`);
+      setResults((prev) => [...(data.places ?? []), ...prev]);
+      setResultErrors(data.errors ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "יצירת החיפוש נכשלה");
+      setError(e instanceof Error ? e.message : "החיפוש נכשל");
     } finally {
-      setSubmitting(false);
+      setSearching(false);
     }
+  }
+
+  async function toggleField(placeId: string, field: "kosher" | "accessible", current: boolean | null) {
+    const next = current === true ? null : true;
+    setResults((prev) => prev.map((p) => (p.id === placeId ? { ...p, [field]: next } : p)));
+    await fetch(`/api/admin/places/${placeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+      body: JSON.stringify({ [field]: next }),
+    });
+  }
+
+  async function toggleScore(placeId: string, scoreField: "tripmatch_scores" | "dna_scores", tagKey: string, current: Record<string, number>) {
+    const isOn = (current[tagKey] ?? 0) > 0;
+    const next = { ...current };
+    if (isOn) delete next[tagKey];
+    else next[tagKey] = 100;
+    setResults((prev) => prev.map((p) => (p.id === placeId ? { ...p, [scoreField]: next } : p)));
+    await fetch(`/api/admin/places/${placeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+      body: JSON.stringify({ [scoreField]: next }),
+    });
   }
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          🤖 מצא מקומות באמצעות AI
+          הוספת מקומות ואטרקציות
         </h1>
         <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-          מיקום → מה מחפשים → פילטרים → הפעל
+          כתוב בקשה חופשית, או הדבק רשימה מוכנה - Claude מבין את שניהם, גוגל מאמת כל מקום
         </p>
       </div>
 
-      {/* שלב 1 - מיקום: מדינה + עיר. שום דבר כאן לא חובה. */}
-      <div>
-        <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          איפה? (לא חובה)
-        </h2>
-        <div className="grid max-w-2xl grid-cols-2 gap-4">
+      {/* שורת החיפוש */}
+      <div className="max-w-3xl rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+        <div className="grid grid-cols-2 gap-3">
           <AdminField label="מדינה">
             <input
               list="discovery-countries"
@@ -112,7 +139,7 @@ export default function DiscoveryWizardPage() {
                 setCountry(e.target.value);
                 setCity("");
               }}
-              placeholder="לדוגמה: ישראל"
+              placeholder="לא חובה"
             />
             <datalist id="discovery-countries">
               {countries.map((c) => (
@@ -120,134 +147,144 @@ export default function DiscoveryWizardPage() {
               ))}
             </datalist>
           </AdminField>
-
-          {!useOtherCity ? (
-            <AdminField label="עיר / יעד">
-              <select className={adminInputClass} style={adminInputStyle} value={city} onChange={(e) => setCity(e.target.value)}>
-                <option value="">— לא הוגדר —</option>
-                {citiesForCountry.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </AdminField>
-          ) : (
-            <AdminField label="עיר / יעד (הזנה חופשית)">
-              <input className={adminInputClass} style={adminInputStyle} value={otherCity} onChange={(e) => setOtherCity(e.target.value)} placeholder="הקלד שם יעד" />
-            </AdminField>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setUseOtherCity((v) => !v)}
-          className="mt-2 text-[12.5px] font-medium"
-          style={{ color: "var(--admin-accent)" }}
-        >
-          {useOtherCity ? "← בחר מתוך הרשימה" : "אחר (יעד לא ברשימה)"}
-        </button>
-      </div>
-
-      {/* שלב 2 - 4 האפשרויות */}
-      <div>
-        <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          מה מחפשים?
-        </h2>
-        <div className="grid grid-cols-4 gap-3">
-          {DISCOVERY_BUCKETS.map((b) => (
-            <button
-              key={b.key}
-              type="button"
-              onClick={() => {
-                setBucketKey(b.key);
-                setSelectedCategories([]);
-              }}
-              className="flex flex-col items-center gap-2 rounded-[var(--admin-radius-lg)] border p-5 text-center transition"
-              style={{
-                borderColor: bucketKey === b.key ? "var(--admin-accent)" : "var(--admin-border)",
-                background: bucketKey === b.key ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
-              }}
-            >
-              <span className="text-[30px]">{b.emoji}</span>
-              <span className="text-[13.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
-                {b.label}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* שלב 3 - קטגוריות ספציפיות לאפשרות שנבחרה, בתיבה עם מסגרת */}
-      {bucket && (
-        <div
-          className="rounded-[var(--admin-radius-lg)] border p-5"
-          style={{ borderColor: "var(--admin-accent)", background: "var(--admin-bg-surface)" }}
-        >
-          <h2 className="mb-3 text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-            {bucket.emoji} {bucket.label} - איזה סוג?
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {bucket.categories.map((c) => {
-              const selected = selectedCategories.includes(c.key);
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => toggleCategory(c.key)}
-                  className="rounded-full border px-3.5 py-2 text-[13px] font-medium transition"
-                  style={{
-                    borderColor: selected ? "var(--admin-accent)" : "var(--admin-border)",
-                    background: selected ? "var(--admin-accent-soft)" : "var(--admin-bg)",
-                    color: selected ? "var(--admin-accent)" : "var(--admin-ink)",
-                  }}
-                >
-                  {c.emoji} {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* שלב 4 - פילטרים + הפעלה */}
-      {bucket && selectedCategories.length > 0 && (
-        <div className="flex flex-wrap items-end gap-6 rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-          <AdminField label="דירוג Google מינימלי">
-            <input type="number" step="0.1" min={1} max={5} className={adminInputClass} style={{ ...adminInputStyle, width: 90 }} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} />
-          </AdminField>
-          <AdminField label="מספר ביקורות מינימלי">
-            <input type="number" min={0} className={adminInputClass} style={{ ...adminInputStyle, width: 100 }} value={minReviews} onChange={(e) => setMinReviews(Number(e.target.value))} />
-          </AdminField>
-          <AdminField label="תקציב">
-            <input className={adminInputClass} style={{ ...adminInputStyle, width: 110 }} value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="לא חובה" />
-          </AdminField>
-          {minRating < 4 && <p className="text-[12.5px] text-amber-600">⚠️ מתחת ל-4.0</p>}
-          <AdminField label="כמה מקומות למצוא?">
-            <div className="flex flex-wrap gap-1.5">
-              {QUANTITY_OPTIONS.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setQuantity(q)}
-                  className="rounded-[var(--admin-radius-sm)] border px-3 py-1.5 text-[12.5px] font-medium"
-                  style={{
-                    borderColor: quantity === q ? "var(--admin-accent)" : "var(--admin-border)",
-                    background: quantity === q ? "var(--admin-accent-soft)" : "transparent",
-                    color: quantity === q ? "var(--admin-accent)" : "var(--admin-ink)",
-                  }}
-                >
-                  {q}
-                </button>
+          <AdminField label="עיר / יעד">
+            <input
+              list="discovery-cities"
+              className={adminInputClass}
+              style={adminInputStyle}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="לא חובה - מהרשימה או הקלדה חופשית"
+            />
+            <datalist id="discovery-cities">
+              {citiesForCountry.map((d) => (
+                <option key={d.id} value={d.name} />
               ))}
-            </div>
+            </datalist>
           </AdminField>
-          <AdminButton onClick={handleLaunch} disabled={submitting}>
-            {submitting ? "מפעיל..." : "🔍 הפעל חיפוש"}
+        </div>
+
+        <div className="mt-3">
+          <AdminField label="מה לחפש? (בקשה חופשית, או רשימה מוכנה שכתבת/הדבקת)">
+            <textarea
+              className={adminInputClass}
+              style={{ ...adminInputStyle, minHeight: 90 }}
+              value={freeText}
+              onChange={(e) => setFreeText(e.target.value)}
+              placeholder='לדוגמה: "100 עגלות קפה בתל אביב" או הדבקת רשימה שלמה עם תיאורים'
+            />
+          </AdminField>
+        </div>
+
+        <div className="mt-3">
+          <AdminButton onClick={handleSearch} disabled={searching || !freeText.trim()}>
+            {searching ? "מחפש ומאמת מול גוגל... (יכול לקחת זמן)" : "🔍 חפש והוסף"}
           </AdminButton>
         </div>
+        {error && <p className="mt-2 text-[12.5px] text-red-600">{error}</p>}
+      </div>
+
+      {resultErrors.length > 0 && (
+        <div className="max-w-3xl rounded-[var(--admin-radius-sm)] p-3" style={{ background: "#FEF3C7" }}>
+          <ul className="flex flex-col gap-1 text-[12px]" style={{ color: "#92400E" }}>
+            {resultErrors.map((e, i) => (
+              <li key={i}>⚠️ {e}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
-      {error && <p className="text-[13.5px] text-red-600">{error}</p>}
+      {/* תוצאות - כרטיס לכל מקום, עם תגיות לחיצות */}
+      <div className="flex flex-col gap-4">
+        {results.map((place) => (
+          <div key={place.id} className="rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+            <div className="flex gap-4">
+              {place.image_urls[0] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={place.image_urls[0]} alt="" className="h-20 w-20 shrink-0 rounded-[var(--admin-radius-md)] object-cover" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                  {place.name}
+                </p>
+                <p className="text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                  {[place.city, place.country].filter(Boolean).join(", ")} {place.rating ? `· ⭐ ${place.rating}` : ""}
+                </p>
+                {place.short_description && (
+                  <p className="mt-1 text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                    {place.short_description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* צ'יפים כלליים */}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <TagChip active={place.kosher === true} onClick={() => toggleField(place.id, "kosher", place.kosher)}>
+                כשר
+              </TagChip>
+              <TagChip active={place.accessible === true} onClick={() => toggleField(place.id, "accessible", place.accessible)}>
+                נגיש
+              </TagChip>
+            </div>
+
+            {/* 20 תגיות TripMatch */}
+            <div className="mt-3">
+              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "#548235" }}>
+                TripMatch
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {TRIPMATCH_TAGS.map((t) => (
+                  <TagChip
+                    key={t.key}
+                    active={(place.tripmatch_scores?.[t.key] ?? 0) > 0}
+                    onClick={() => toggleScore(place.id, "tripmatch_scores", t.key, place.tripmatch_scores ?? {})}
+                    color="#548235"
+                  >
+                    {t.label}
+                  </TagChip>
+                ))}
+              </div>
+            </div>
+
+            {/* DNA */}
+            <div className="mt-3">
+              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "#BF8F00" }}>
+                DNA
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {DNA_TAGS.map((t) => (
+                  <TagChip
+                    key={t.key}
+                    active={(place.dna_scores?.[t.key] ?? 0) > 0}
+                    onClick={() => toggleScore(place.id, "dna_scores", t.key, place.dna_scores ?? {})}
+                    color="#BF8F00"
+                  >
+                    {t.label}
+                  </TagChip>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+function TagChip({ children, active, onClick, color = "var(--admin-accent)" }: { children: React.ReactNode; active: boolean; onClick: () => void; color?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+      style={{
+        borderColor: active ? color : "var(--admin-border)",
+        background: active ? `${color}22` : "var(--admin-bg)",
+        color: active ? color : "var(--admin-ink-secondary)",
+      }}
+    >
+      {children}
+    </button>
   );
 }
