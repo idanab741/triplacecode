@@ -33,7 +33,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div dir="ltr" className={`admin-root flex h-screen ${mounted && dark ? "admin-dark" : ""}`}>
+    <div dir="rtl" className={`admin-root flex h-screen ${mounted && dark ? "admin-dark" : ""}`}>
       <AdminSidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <AdminHeader dark={dark} onToggleDark={toggleDark} />

@@ -68,7 +68,7 @@ export default function DiscoveryJobPage() {
   return (
     <div className="flex flex-col gap-5 p-6">
       <Link href="/admin/discovery" className="text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-        ← חיפוש חדש
+        → חיפוש חדש
       </Link>
       <h1 className="text-[19px] font-semibold" style={{ color: "var(--admin-ink)" }}>
         בקשת חיפוש

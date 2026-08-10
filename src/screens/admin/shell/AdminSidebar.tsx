@@ -9,7 +9,7 @@ export function AdminSidebar() {
 
   return (
     <aside
-      className="admin-scrollbar flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r"
+      className="admin-scrollbar flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-l"
       style={{ background: "var(--admin-bg-surface)", borderColor: "var(--admin-border)" }}
     >
       <div className="flex items-center gap-2 px-5 py-5">

@@ -175,7 +175,7 @@ export default function PlaceWorkspacePage() {
       <div className="p-6">
         <p className="text-[13.5px] text-red-600">{error}</p>
         <Link href="/admin/places" className="mt-3 inline-block text-[13.5px]" style={{ color: "var(--admin-accent)" }}>
-          ← חזרה לרשימת המקומות
+          → חזרה לרשימת המקומות
         </Link>
       </div>
     );
@@ -196,7 +196,7 @@ export default function PlaceWorkspacePage() {
             className="mb-1 text-[12.5px]"
             style={{ color: "var(--admin-ink-secondary)" }}
           >
-            ← כל המקומות
+            → כל המקומות
           </button>
           <h1 className="text-[19px] font-semibold" style={{ color: "var(--admin-ink)" }}>
             {place.name}
