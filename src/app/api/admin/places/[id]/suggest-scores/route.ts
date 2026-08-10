@@ -20,6 +20,21 @@ const DNA_KEYS = [
   "urban", "cultural", "culinary", "wellness_calm", "active", "hidden_gem",
 ];
 
+const CUISINE_KEYS = [
+  "coffee_cart", "israeli", "italian", "asian", "bbq", "burger_diner", "mexican", "greek",
+  "french_bistro", "indian", "mediterranean", "seafood", "pizza", "brunch", "cafe",
+  "chef_restaurant", "desserts",
+];
+
+const CATEGORY_KEYS = [
+  "nature_trails", "beaches_pools", "viewpoints", "parks_picnic", "water_parks",
+  "general_attractions", "sports_extreme", "wineries", "culture_museums", "shopping",
+  "events", "spa", "boating", "heritage", "kids_family", "art_galleries", "photo_spots",
+  "must_see_landmarks", "cocktail_bar", "wine_bar", "club", "live_show", "standup",
+  "theater", "karaoke", "bowling", "snooker", "arcade", "hotel", "resort", "apartment",
+  "cabin", "hostel", "camping", "glamping", "villa",
+];
+
 /**
  * ✨ מלא עם AI - Claude מנתח שם+תיאור+קטגוריה של מקום, ומחזיר ציון 0-100
  * לכל אחת מ-20 תגיות TripMatch ו-16 מאפייני DNA, בנוסף כשר/נגישות אם
@@ -52,15 +67,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 תגיות TripMatch (מפתח -> ציון 0-100): ${TRIPMATCH_KEYS.join(", ")}
 מאפייני DNA (מפתח -> ציון 0-100): ${DNA_KEYS.join(", ")}
 
+בנוסף - שני שדות שהם **בחירה בינארית** (המקום שייך/לא שייך), לא ציון:
+סוגי מטבח אפשריים (קבע לפי **שם ותיאור המקום בפועל**, לא רק שדה הקטגוריה שאולי לא מדויק -
+אם השם/תיאור מרמזים שזו מסעדה/בית קפה/עגלת קפה, כן למלא כאן, גם אם category רשום אחרת):
+${CUISINE_KEYS.join(", ")}
+קטגוריה/סוג מקום מדויק (בחר 1-2 הכי מדויקים מהרשימה, לא יותר): ${CATEGORY_KEYS.join(", ")}
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
 {
   "tripmatch_scores": {"מפתח": ציון, ...},
   "dna_scores": {"מפתח": ציון, ...},
+  "cuisine_tags": ["מפתח", ...],
+  "category_tags": ["מפתח", ...],
   "kosher": true | false | null,
   "accessible": true | false | null
 }`;
 
-  const { text, error } = await callClaude(prompt, 2000);
+  const { text, error } = await callClaude(prompt, 4000);
   if (error || !text) {
     logAiError("מילוי אוטומטי של תגיות נכשל", { placeId: id, error });
     return NextResponse.json({ error: "השלמת AI נכשלה" }, { status: 500 });
@@ -69,6 +92,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let suggestion: {
     tripmatch_scores?: Record<string, number>;
     dna_scores?: Record<string, number>;
+    cuisine_tags?: string[];
+    category_tags?: string[];
     kosher?: boolean | null;
     accessible?: boolean | null;
   };
@@ -89,6 +114,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .update({
       tripmatch_scores: suggestion.tripmatch_scores ?? {},
       dna_scores: suggestion.dna_scores ?? {},
+      cuisine_tags: suggestion.cuisine_tags ?? place.cuisine_tags ?? [],
+      tags: suggestion.category_tags ?? place.tags ?? [],
       kosher: suggestion.kosher ?? place.kosher,
       accessible: suggestion.accessible ?? place.accessible,
     })
