@@ -92,6 +92,47 @@ export default function DiscoveryPage() {
     }
   }
 
+  const [fillingAi, setFillingAi] = useState<string | null>(null);
+  const [fillingAll, setFillingAll] = useState(false);
+  const [fillAllProgress, setFillAllProgress] = useState(0);
+
+  async function handleAiFillOne(placeId: string): Promise<void> {
+    const res = await fetch(`/api/admin/places/${placeId}/suggest-scores`, {
+      method: "POST",
+      headers: { [ADMIN_SECRET_HEADER]: adminSecret },
+    });
+    const data = await res.json();
+    if (data.place) {
+      setResults((prev) => prev.map((p) => (p.id === placeId ? data.place : p)));
+    }
+  }
+
+  async function handleAiFill(placeId: string) {
+    setFillingAi(placeId);
+    try {
+      await handleAiFillOne(placeId);
+    } catch {
+      // שקט - לא חוסם, המשתמש עדיין יכול למלא ידנית
+    } finally {
+      setFillingAi(null);
+    }
+  }
+
+  async function handleAiFillAll() {
+    setFillingAll(true);
+    setFillAllProgress(0);
+    // ברצף, לא Promise.all - כדי לא להציף את Claude/למנוע חריגה ממגבלת קצב
+    for (let i = 0; i < results.length; i++) {
+      try {
+        await handleAiFillOne(results[i].id);
+      } catch {
+        // ממשיכים לבא בתור גם אם אחד נכשל
+      }
+      setFillAllProgress(i + 1);
+    }
+    setFillingAll(false);
+  }
+
   async function toggleField(placeId: string, field: "kosher" | "accessible", current: boolean | null) {
     const next = current === true ? null : true;
     setResults((prev) => prev.map((p) => (p.id === placeId ? { ...p, [field]: next } : p)));
@@ -194,6 +235,14 @@ export default function DiscoveryPage() {
         </div>
       )}
 
+      {results.length > 0 && (
+        <div className="flex items-center gap-3">
+          <AdminButton variant="secondary" onClick={handleAiFillAll} disabled={fillingAll}>
+            {fillingAll ? `ממלא... (${fillAllProgress}/${results.length})` : `✨ מלא הכל עם AI (${results.length})`}
+          </AdminButton>
+        </div>
+      )}
+
       {/* תוצאות - כרטיס לכל מקום, עם תגיות לחיצות */}
       <div className="flex flex-col gap-4">
         {results.map((place) => (
@@ -204,9 +253,14 @@ export default function DiscoveryPage() {
                 <img src={place.image_urls[0]} alt="" className="h-20 w-20 shrink-0 rounded-[var(--admin-radius-md)] object-cover" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-                  {place.name}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                    {place.name}
+                  </p>
+                  <AdminButton variant="secondary" onClick={() => handleAiFill(place.id)} disabled={fillingAi === place.id}>
+                    {fillingAi === place.id ? "ממלא..." : "✨ מלא עם AI"}
+                  </AdminButton>
+                </div>
                 <p className="text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
                   {[place.city, place.country].filter(Boolean).join(", ")} {place.rating ? `· ⭐ ${place.rating}` : ""}
                 </p>
