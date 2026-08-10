@@ -158,6 +158,23 @@ export async function POST(request: Request) {
   for (const item of extracted) {
     if (!item?.name?.trim()) continue;
     try {
+      // *** חיסכון בגוגל: קודם בודקים אם המקום כבר קיים אצלנו ב-DB ***
+      // (לפי שם דומה + עיר) - אם כן, לא פונים לגוגל בכלל, פשוט מציגים
+      // כרטיס למקום הקיים (עם is_legacy=false כדי שיופיע ברשימה החדשה).
+      let existingQuery = supabase.from("places").select("*").ilike("name", `%${item.name}%`);
+      if (city) existingQuery = existingQuery.ilike("city", `%${city}%`);
+      const { data: existingMatches } = await existingQuery.limit(1);
+
+      if (existingMatches && existingMatches.length > 0) {
+        const existing = existingMatches[0];
+        if (existing.is_legacy) {
+          await supabase.from("places").update({ is_legacy: false }).eq("id", existing.id);
+          existing.is_legacy = false;
+        }
+        savedPlaces.push(existing);
+        continue; // 0 קריאות גוגל למקום הזה
+      }
+
       const searchQuery = city ? `${item.name}, ${city}` : item.name;
       const result = await findPlaceStatusAndPhoto(searchQuery);
 
