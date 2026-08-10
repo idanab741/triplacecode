@@ -1,5 +1,6 @@
 import { INTERESTS } from "@/locales/he/preferences";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
+import { PLACE_CATEGORY_LABELS } from "@/constants/placeCategories";
 
 /** תוויות לקטגוריות שאינן חלק מרשימת INTERESTS של ההעדפות. */
 const EXTRA_CATEGORY_LABELS: Record<string, string> = {
@@ -43,6 +44,14 @@ const SUBTAG_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 export function getCategoryLabel(categoryId: string): string {
+  // *** תיקון: השדה `places.category` אמור להכיל תמיד אחת מ-5 הקטגוריות
+  // הראשיות (ראו src/constants/placeCategories.ts) - אלה נבדקות ראשונות
+  // כדי שיוצגו נכון בעמודת "קטגוריה" גם אם קיים בטעות ערך זהה בשם ברשימות
+  // האחרות (INTERESTS/EXTRA_CATEGORY_LABELS/SUBTAG_LABELS משמשות לתגיות
+  // עדינות יותר כמו subcategory/tags, לא ל-category הראשי).
+  if (PLACE_CATEGORY_LABELS[categoryId as keyof typeof PLACE_CATEGORY_LABELS]) {
+    return PLACE_CATEGORY_LABELS[categoryId as keyof typeof PLACE_CATEGORY_LABELS];
+  }
   const found = INTERESTS.find((option) => option.value === categoryId);
   if (found) return found.label;
   return EXTRA_CATEGORY_LABELS[categoryId] ?? SUBTAG_LABELS[categoryId] ?? categoryId;

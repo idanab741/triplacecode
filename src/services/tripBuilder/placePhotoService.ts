@@ -11,6 +11,46 @@ export async function findPlacePhotoReference(query: string): Promise<string | n
 }
 
 /**
+ * מחלץ את שם העיר (locality) לפי קואורדינטות, באמצעות Geocoding API
+ * (reverse geocoding) - נקרא רק כשלא סופקה עיר ידנית, כדי להשלים אותה
+ * אוטומטית לפי מה שגוגל בפועל מזהה במיקום שנמצא בחיפוש.
+ *
+ * `locality` הוא השם התקני של "עיר" אצל גוגל; כשהוא חסר (למשל אזורים
+ * כפריים/פארקים לאומיים) יש נפילה ל-`postal_town` ואז ל-`administrative_area_level_2`
+ * כדי עדיין להחזיר משהו שימושי במקום ערך ריק.
+ */
+export async function resolveCityFromCoordinates(latitude: number, longitude: number): Promise<string | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}&language=he`;
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const results: Array<{ address_components: Array<{ long_name: string; types: string[] }> }> = data?.results ?? [];
+
+    const findComponent = (type: string): string | null => {
+      for (const result of results) {
+        const match = result.address_components?.find((c) => c.types.includes(type));
+        if (match) return match.long_name;
+      }
+      return null;
+    };
+
+    return findComponent("locality") ?? findComponent("postal_town") ?? findComponent("administrative_area_level_2") ?? null;
+  } catch (error) {
+    logAiError("שגיאה בזיהוי עיר לפי קואורדינטות (reverse geocoding)", {
+      message: error instanceof Error ? error.message : String(error),
+      latitude,
+      longitude,
+    });
+    return null;
+  }
+}
+
+/**
  * אותה קריאת Text Search בדיוק כמו findPlacePhotoReference - אבל גם קוראת
  * את שדה business_status שגוגל כבר מחזיר בתשובה הזו (בלי עלות נוספת!).
  * בלעדיו, מקום שנסגר לצמיתות/זמנית עדיין נכנס למסלול כאילו הוא פתוח -

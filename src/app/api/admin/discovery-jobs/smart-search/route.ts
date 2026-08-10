@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
-import { findPlaceStatusAndPhoto } from "@/services/tripBuilder/placePhotoService";
+import { findPlaceStatusAndPhoto, resolveCityFromCoordinates } from "@/services/tripBuilder/placePhotoService";
 import { callClaude, logAiError } from "@/services/ai/claudeService";
+import { isValidPlaceCategory, type PlaceCategoryKey } from "@/constants/placeCategories";
 
 function checkAuth(request: Request): boolean {
   const secret = request.headers.get("x-admin-secret");
@@ -130,13 +131,30 @@ export async function POST(request: Request) {
     restaurants: "מסעדות ובתי קפה",
     hotels: "מלונות ולינה",
   };
-  const BUCKET_CATEGORIES: Record<string, string> = {
+  // *** התיקון המרכזי ***
+  // `category` חייב להישאר אחת מ-5 הקטגוריות הראשיות בלבד (ראו
+  // src/constants/placeCategories.ts) - זה מה שמוצג בעמודת "קטגוריה"
+  // וזה מה שמסונן עליו ברשימת המקומות. לפני התיקון, כאן נשמר בטעות
+  // תת-סוג עדין (general_attractions/nature_trails/cocktail_bar/cafe/hotel)
+  // ישירות לתוך category - זו הסיבה שכל השורות הוצגו עם אותו ערך.
+  // תת-הסוג העדין הזה שימושי בפני עצמו - הוא עובר עכשיו ל-subcategory.
+  const BUCKET_TO_CATEGORY: Record<string, PlaceCategoryKey> = {
+    attractions: "attractions",
+    nature: "nature",
+    nightlife: "nightlife",
+    restaurants: "restaurants",
+    hotels: "hotels",
+  };
+  const BUCKET_DEFAULT_SUBCATEGORY: Record<string, string> = {
     attractions: "general_attractions",
     nature: "nature_trails",
     nightlife: "cocktail_bar",
     restaurants: "cafe",
     hotels: "hotel",
   };
+  const resolvedCategory: PlaceCategoryKey = isValidPlaceCategory(BUCKET_TO_CATEGORY[bucket] ?? "")
+    ? BUCKET_TO_CATEGORY[bucket]
+    : "attractions";
 
   const location = [city, country].filter(Boolean).join(", ");
   const { places: extracted, debugInfo } = await extractPlacesFromFreeText(
@@ -187,13 +205,23 @@ export async function POST(request: Request) {
         continue;
       }
 
+      // *** תיקון: השלמת עיר אוטומטית ***
+      // אם האדמין לא הקליד עיר בשדה החיפוש, לא משאירים את זה ריק - שולפים
+      // אותה לפי הקואורדינטות שגוגל כבר החזיר עבור המקום הזה (reverse
+      // geocoding, קריאה נוספת רק כשבאמת חסר).
+      let resolvedCity = city || null;
+      if (!resolvedCity && result.latitude != null && result.longitude != null) {
+        resolvedCity = await resolveCityFromCoordinates(result.latitude, result.longitude);
+      }
+
       const { data, error: insertError } = await supabase
         .from("places")
         .insert({
           name: result.googleName ?? item.name,
           short_description: item.description,
-          category: BUCKET_CATEGORIES[bucket] ?? "general_attractions",
-          city: city || null,
+          category: resolvedCategory,
+          subcategory: BUCKET_DEFAULT_SUBCATEGORY[bucket] ?? null,
+          city: resolvedCity,
           country: country || null,
           rating: result.rating,
           rating_count: result.ratingCount,
