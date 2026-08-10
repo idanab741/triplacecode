@@ -3,6 +3,7 @@ import { findPlaceStatusAndPhoto } from "./placePhotoService";
 import { findExistingPlace } from "./aiPlaceInsertionService";
 import { logAiError } from "@/services/ai/claudeService";
 import { haversineDistanceKm } from "./geo";
+import { downloadAndStoreLegacyPhoto } from "@/services/places/legacyPhotoStorageService";
 import type { createAdminClient } from "@/services/supabase/admin";
 import type { CandidatePlace, LatLng, StopRole } from "./types";
 
@@ -72,9 +73,14 @@ export async function resolveAiSuggestedPlace(
     if (existing.imageUrls.length === 0) {
       const backfill = await findPlacePhotoReferenceWithFallback(existing.name, areaLabel);
       if (backfill.photoRef) {
-        const imageUrl = `/api/places/photo?ref=${encodeURIComponent(backfill.photoRef)}`;
-        await supabase.from("places").update({ image_urls: [imageUrl] }).eq("id", existing.id);
-        existing.imageUrls = [imageUrl];
+        // שומרים לצמיתות אצלנו, במקום URL "עצלן" שהיה גובה מגוגל שוב בכל
+        // צפייה עתידית של כל משתמש בכל טיול - זה בדיוק מה שגרם לרוב
+        // חיוב ה-Places Photo בפועל, כי הפונקציה הזו רצה בכל בניית מסלול.
+        const imageUrl = await downloadAndStoreLegacyPhoto(backfill.photoRef, `trip-places/${existing.name}-${Date.now()}.jpg`);
+        if (imageUrl) {
+          await supabase.from("places").update({ image_urls: [imageUrl] }).eq("id", existing.id);
+          existing.imageUrls = [imageUrl];
+        }
       }
     }
     return { ...existing, role: item.role, reason: item.reason };
@@ -181,7 +187,9 @@ export async function resolveAiSuggestedPlace(
   }
 
   const resolvedName = photoResult.googleName ?? item.name;
-  const imageUrls = [`/api/places/photo?ref=${encodeURIComponent(photoResult.photoRef)}`];
+  // שומרים לצמיתות אצלנו - אותו עיקרון כמו בענף ה-backfill למעלה.
+  const storedPhotoUrl = await downloadAndStoreLegacyPhoto(photoResult.photoRef, `trip-places/${resolvedName}-${Date.now()}.jpg`);
+  const imageUrls = storedPhotoUrl ? [storedPhotoUrl] : [];
 
   return {
     id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

@@ -3,6 +3,7 @@ import { geocodePlaceNameNear } from "./geocodingService";
 import { findPlaceStatusAndPhoto } from "./placePhotoService";
 import { findExistingPlace } from "./aiPlaceInsertionService";
 import { createAdminClient } from "@/services/supabase/admin";
+import { downloadAndStoreLegacyPhoto } from "@/services/places/legacyPhotoStorageService";
 import type { CandidatePlace, LatLng, StopRole } from "./types";
 
 export interface VacationDaySpec {
@@ -216,9 +217,11 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
         if (existing.imageUrls.length === 0) {
           const backfill = await findPlacePhotoReferenceWithFallback(existing.name, params.destination);
           if (backfill.photoRef) {
-            const imageUrl = `/api/places/photo?ref=${encodeURIComponent(backfill.photoRef)}`;
-            await supabase.from("places").update({ image_urls: [imageUrl] }).eq("id", existing.id);
-            existing.imageUrls = [imageUrl];
+            const imageUrl = await downloadAndStoreLegacyPhoto(backfill.photoRef, `trip-places/${existing.name}-${Date.now()}.jpg`);
+            if (imageUrl) {
+              await supabase.from("places").update({ image_urls: [imageUrl] }).eq("id", existing.id);
+              existing.imageUrls = [imageUrl];
+            }
           }
         }
         return { ...existing, role: item.role as StopRole, day: item.day, reason: item.reason };
@@ -265,7 +268,9 @@ ${params.travelDnaSummary ? `פרופיל המשתמש (אונבורדינג + �
       // תעתיק/תרגום.
       const resolvedName = photoResult.googleName ?? item.name;
 
-      const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
+      const imageUrls = photoRef
+        ? [(await downloadAndStoreLegacyPhoto(photoRef, `trip-places/${resolvedName}-${Date.now()}.jpg`)) ?? ""].filter(Boolean)
+        : [];
       return {
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         name: resolvedName,
