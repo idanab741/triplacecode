@@ -45,7 +45,7 @@ function tryParseStructuredList(freeText: string): ExtractedPlace[] {
  * מוכנה שהמשתמש הדביק (עם שמות ותיאורים) - Claude מחלץ בדיוק את זה,
  * לא כותב מחדש/מגניב תיאורים משלו.
  */
-async function extractPlacesFromFreeText(freeText: string, location: string): Promise<{ places: ExtractedPlace[]; debugInfo: string | null }> {
+async function extractPlacesFromFreeText(freeText: string, location: string, bucketLabel: string): Promise<{ places: ExtractedPlace[]; debugInfo: string | null }> {
   // שלב 0 - ניסיון פירוק ישיר בקוד, בלי Claude בכלל. אם זה מצליח (רשימה
   // מובנית שהמשתמש כבר כתב) - זהו, סיימנו, בלי טוקנים, בלי סיכון קטיעה.
   const structured = tryParseStructuredList(freeText);
@@ -66,6 +66,7 @@ async function extractPlacesFromFreeText(freeText: string, location: string): Pr
 בדיוק** את מה שכתוב - אל תשנה, תקצר, או תכתוב מחדש את התיאורים שהאדמין כבר סיפק.
 
 מיקום/הקשר גיאוגרפי (אם רלוונטי): ${location || "לא צוין"}
+קטגוריה מבוקשת: ${bucketLabel} (אם הבקשה כללית - התמקד בסוג הזה בלבד)
 
 הטקסט מהאדמין:
 """
@@ -114,12 +115,35 @@ export async function POST(request: Request) {
   const freeText: string | undefined = body?.freeText;
   const country: string = body?.country ?? "";
   const city: string = body?.city ?? "";
+  const bucket: string = body?.bucket ?? "attractions";
   if (!freeText?.trim()) {
     return NextResponse.json({ error: "יש להזין טקסט חיפוש" }, { status: 400 });
   }
+  if (!country.trim() && !city.trim()) {
+    return NextResponse.json({ error: "חובה למלא מדינה או עיר/יעד" }, { status: 400 });
+  }
+
+  const BUCKET_LABELS: Record<string, string> = {
+    attractions: "אטרקציות כלליות",
+    nature: "טבע (מסלולים, תצפיות, חופים, פארקים)",
+    nightlife: "חיי לילה (ברים, מועדונים, הופעות)",
+    restaurants: "מסעדות ובתי קפה",
+    hotels: "מלונות ולינה",
+  };
+  const BUCKET_CATEGORIES: Record<string, string> = {
+    attractions: "general_attractions",
+    nature: "nature_trails",
+    nightlife: "cocktail_bar",
+    restaurants: "cafe",
+    hotels: "hotel",
+  };
 
   const location = [city, country].filter(Boolean).join(", ");
-  const { places: extracted, debugInfo } = await extractPlacesFromFreeText(freeText, location);
+  const { places: extracted, debugInfo } = await extractPlacesFromFreeText(
+    freeText,
+    location,
+    BUCKET_LABELS[bucket] ?? BUCKET_LABELS.attractions
+  );
 
   if (extracted.length === 0) {
     return NextResponse.json({ places: [], errors: [debugInfo ?? "לא זוהו מקומות בטקסט - נסה לנסח אחרת"] });
@@ -151,7 +175,7 @@ export async function POST(request: Request) {
         .insert({
           name: result.googleName ?? item.name,
           short_description: item.description,
-          category: "general_attractions",
+          category: BUCKET_CATEGORIES[bucket] ?? "general_attractions",
           city: city || null,
           country: country || null,
           rating: result.rating,

@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 
+const BUCKETS = [
+  { key: "attractions", emoji: "🎯", label: "אטרקציות" },
+  { key: "nature", emoji: "🌿", label: "טבע" },
+  { key: "nightlife", emoji: "🌃", label: "חיי לילה" },
+  { key: "restaurants", emoji: "🍽️", label: "מסעדות" },
+  { key: "hotels", emoji: "🏨", label: "מלונות" },
+] as const;
+
+type BucketKey = (typeof BUCKETS)[number]["key"];
+
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
 const TRIPMATCH_TAGS = [
@@ -90,6 +100,7 @@ interface Destination {
 export default function DiscoveryPage() {
   const { secret: adminSecret } = useAdminSecret();
   const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [bucket, setBucket] = useState<BucketKey>("attractions");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [freeText, setFreeText] = useState("");
@@ -111,13 +122,17 @@ export default function DiscoveryPage() {
 
   async function handleSearch() {
     if (!freeText.trim()) return;
+    if (!country.trim() && !city.trim()) {
+      setError("חובה למלא מדינה או עיר/יעד (לפחות אחד מהשניים)");
+      return;
+    }
     setSearching(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/discovery-jobs/smart-search", {
         method: "POST",
         headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
-        body: JSON.stringify({ freeText, country, city }),
+        body: JSON.stringify({ freeText, country, city, bucket }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -214,6 +229,26 @@ export default function DiscoveryPage() {
         <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
           כתוב בקשה חופשית, או הדבק רשימה מוכנה - Claude מבין את שניהם, גוגל מאמת כל מקום
         </p>
+      </div>
+
+      {/* 5 קטגוריות ראשיות */}
+      <div className="flex flex-wrap gap-2">
+        {BUCKETS.map((b) => (
+          <button
+            key={b.key}
+            type="button"
+            onClick={() => setBucket(b.key)}
+            className="flex items-center gap-2 rounded-[var(--admin-radius-lg)] border px-4 py-2.5 text-[13.5px] font-medium transition"
+            style={{
+              borderColor: bucket === b.key ? "var(--admin-accent)" : "var(--admin-border)",
+              background: bucket === b.key ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+              color: bucket === b.key ? "var(--admin-accent)" : "var(--admin-ink)",
+            }}
+          >
+            <span>{b.emoji}</span>
+            {b.label}
+          </button>
+        ))}
       </div>
 
       {/* שורת החיפוש */}
