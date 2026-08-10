@@ -1,29 +1,31 @@
-"use client";
+﻿"use client";
 
-import { TRIPMATCH_INTEREST_OPTIONS } from "@/locales/he/tripBuilder";
+import { TRIPMATCH_CATEGORY_BUCKETS } from "@/locales/he/tripBuilder";
 
 interface CategoryPickerProps {
   onSelect: (categoryValue: string, categoryLabel: string) => void;
 }
 
-/** שלב 2 - בחירת סוג מסלול יחיד. באותו סגנון בדיוק כמו כפתורי הקטגוריה
- *  במסך הפתיחה של טריפי AI (CategoryOptions.tsx) - Chip דק עם אייקון
- *  עגול, לא כרטיס גדול. */
+/** שלב 2 - בחירת אחת מ-4 הקטגוריות הראשיות (מסעדות/חיי לילה/טבע/אטרקציות).
+ *  לפני התיקון הזה הוצגה כאן רשימה שטוחה של 19 תת-קטגוריות - זה עבר
+ *  לפילטרים בתוך ההחלקות (FiltersSheet), כדי שהבחירה הראשונית תהיה
+ *  פשוטה, ושהתוצאות תמיד יהיו מהקטגוריה הנכונה בלבד (לא עוד מלונות
+ *  שמתערבבים במסעדות וכו'). */
 export function CategoryPicker({ onSelect }: CategoryPickerProps) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {TRIPMATCH_INTEREST_OPTIONS.map((option) => (
+    <div className="grid grid-cols-2 gap-3">
+      {TRIPMATCH_CATEGORY_BUCKETS.map((bucket) => (
         <button
-          key={option.value}
+          key={bucket.value}
           type="button"
-          onClick={() => onSelect(option.value, option.label)}
-          className="flex items-center gap-2 rounded-pill py-1.5 ps-1.5 pe-4 text-[13.5px] font-medium text-ink transition active:scale-95"
+          onClick={() => onSelect(bucket.value, bucket.label)}
+          className="flex flex-col items-center gap-2 rounded-card py-6 px-3 text-center transition active:scale-95"
           style={{ background: "#ffffff", boxShadow: "0 2px 8px rgba(16,24,40,0.08)" }}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary text-base">
-            {option.emoji}
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary text-2xl">
+            {bucket.emoji}
           </span>
-          {option.label}
+          <span className="text-[14px] font-semibold text-ink">{bucket.label}</span>
         </button>
       ))}
     </div>

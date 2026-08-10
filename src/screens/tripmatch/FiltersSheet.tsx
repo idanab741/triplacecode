@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useMemo } from "react";
-import { getCategoryLabel } from "@/utils/categoryLabels";
+import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
 export interface TripMatchFilters {
@@ -41,7 +41,11 @@ export function applyFilters(candidates: CandidatePlace[], filters: TripMatchFil
     if (filters.accessibleOnly && !c.accessible) return false;
     if (filters.kidFriendlyOnly && c.suitableChildAges.length === 0) return false;
     if (filters.tags.length > 0) {
-      const candidateTags = new Set([...c.tripTypeTags, ...c.cuisineTags]);
+      // *** תיקון: לפני זה בדק רק tripTypeTags/cuisineTags (טקסונומיית
+      // האונבורדינג) - מקומות שתויגו רק דרך "✨ תקן עם AI" באדמין (שדה
+      // tags, טקסונומיה אחרת) פשוט לא היו עוברים אף פילטר, גם אם באמת
+      // מתאימים - זו הסיבה שהפילטרים "לא נתנו תוצאות".
+      const candidateTags = new Set([...c.tripTypeTags, ...c.cuisineTags, ...(c.tags ?? [])]);
       if (!filters.tags.every((t) => candidateTags.has(t))) return false;
     }
     return true;
@@ -53,6 +57,10 @@ interface FiltersSheetProps {
   filters: TripMatchFilters;
   onChange: (filters: TripMatchFilters) => void;
   onClose: () => void;
+  /** תגיות מהעדפות האונבורדינג (תחומי עניין + סגנון קולינרי) - אלה
+   *  מוצגות ראשונות ומסומנות בכוכב, כדי שהמשתמש יראה קודם כל את מה
+   *  שכבר סיפר לנו שהוא אוהב. */
+  preferredTags?: string[];
 }
 
 const PRICE_LABELS = ["חינם", "₪", "₪₪", "₪₪₪"];
@@ -60,20 +68,30 @@ const RATING_OPTIONS = [3, 4, 4.5];
 
 /** Bottom Sheet פילטרים - האפשרויות הקטגוריאליות (בתחתית) לא מקודדות
  *  מראש לפי סוג מסלול; הן נגזרות בזמן אמת מהתגיות שבאמת קיימות על
- *  המועמדים שכבר נטענו, כך שהפילטר תמיד רלוונטי ואמיתי לתוצאות. */
-export function FiltersSheet({ candidates, filters, onChange, onClose }: FiltersSheetProps) {
+ *  המועמדים שכבר נטענו, כך שהפילטר תמיד רלוונטי ואמיתי לתוצאות.
+ *  *** תיקון: לפני זה הרשימה מוינה רק לפי שכיחות בין המועמדים, בלי
+ *  שום קשר להעדפות שהמשתמש כבר ענה עליהן באונבורדינג - עכשיו תגיות
+ *  שמופיעות גם בפרופיל ההעדפות שלו קופצות ראשונות ומסומנות ⭐. */
+export function FiltersSheet({ candidates, filters, onChange, onClose, preferredTags = [] }: FiltersSheetProps) {
   const availableTags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of candidates) {
-      for (const tag of [...c.tripTypeTags, ...c.cuisineTags]) {
+      for (const tag of [...c.tripTypeTags, ...c.cuisineTags, ...(c.tags ?? [])]) {
+        if (!hasHebrewLabel(tag)) continue; // "רק בעברית" - לא מציגים תגיות שאין להן תרגום
         counts.set(tag, (counts.get(tag) ?? 0) + 1);
       }
     }
+    const preferredSet = new Set(preferredTags);
     return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
+      .sort((a, b) => {
+        const aPreferred = preferredSet.has(a[0]) ? 1 : 0;
+        const bPreferred = preferredSet.has(b[0]) ? 1 : 0;
+        if (aPreferred !== bPreferred) return bPreferred - aPreferred;
+        return b[1] - a[1];
+      })
+      .slice(0, 20)
       .map(([tag]) => tag);
-  }, [candidates]);
+  }, [candidates, preferredTags]);
 
   function toggleTag(tag: string) {
     onChange({
@@ -152,7 +170,7 @@ export function FiltersSheet({ candidates, filters, onChange, onClose }: Filters
 
           {availableTags.length > 0 && (
             <div>
-              <p className="mb-2 text-[13px] font-semibold text-ink-secondary">תגיות</p>
+              <p className="mb-2 text-[13px] font-semibold text-ink-secondary">תת-קטגוריה (בחירה מדויקת יותר)</p>
               <div className="flex flex-wrap gap-2">
                 {availableTags.map((tag) => (
                   <button
@@ -163,6 +181,7 @@ export function FiltersSheet({ candidates, filters, onChange, onClose }: Filters
                       filters.tags.includes(tag) ? "bg-accent text-white" : "bg-bg-secondary text-ink"
                     }`}
                   >
+                    {preferredTags.includes(tag) && "⭐ "}
                     {getCategoryLabel(tag)}
                   </button>
                 ))}

@@ -38,19 +38,10 @@ export async function GET(request: Request) {
   // ברירת מחדל: רק מקומות שאינם "ישן" (is_legacy) - מקומות שכבר היו
   // קיימים לפני שיפוץ המערכת. ?includeLegacy=1 מציג הכל (משמש בעמוד
   // הארכיון /admin/places-archive).
-  const url = new URL(request.url);
-  const includeLegacy = url.searchParams.get("includeLegacy") === "1";
-  // ?namesOnly=1 - מחזיר רק id+name (בלי שאר השדות הכבדים - תמונות, תגיות
-  // וכו'). משמש למסכים שרק מציגים רשימת שמות לעיון (כמו "יעדים ומקומות"),
-  // כדי לא לגרור אלפי רשומות מלאות כשצריך רק את השם.
-  const namesOnly = url.searchParams.get("namesOnly") === "1";
+  const includeLegacy = new URL(request.url).searchParams.get("includeLegacy") === "1";
 
   const supabase = createAdminClient();
-  let query = supabase
-    .from("places")
-    .select(namesOnly ? "id, name" : "*")
-    .order("created_at", { ascending: false })
-    .range(0, 4999);
+  let query = supabase.from("places").select("*").order("created_at", { ascending: false }).range(0, 4999);
   if (!includeLegacy) query = query.eq("is_legacy", false);
   const { data, error } = await query;
 

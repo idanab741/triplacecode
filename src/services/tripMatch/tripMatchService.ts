@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace, LatLng } from "@/services/tripBuilder/types";
@@ -7,6 +7,7 @@ export interface TripMatchSession {
   id: string;
   user_id: string;
   city: string;
+  category: string;
   interests: string[];
   liked_place_ids: string[];
   rejected_place_ids: string[];
@@ -16,11 +17,12 @@ export async function createTripMatchSession(
   supabase: SupabaseClient,
   userId: string,
   city: string,
+  category: string,
   interests: string[]
 ): Promise<TripMatchSession> {
   const { data, error } = await supabase
     .from("tripmatch_sessions")
-    .insert({ user_id: userId, city, interests })
+    .insert({ user_id: userId, city, category, interests })
     .select("*")
     .single();
 
@@ -40,22 +42,41 @@ export async function getTripMatchSession(
 export async function fetchTripMatchCandidates(
   supabase: SupabaseClient,
   session: TripMatchSession,
-  limit = 20
+  limit = 60
 ): Promise<CandidatePlace[]> {
 let query = supabase
     .from("places")
     .select(
-      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,tags,tripmatch_scores,dna_scores,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
     )
-    .ilike("city", `%${session.city}%`);
+    // *** תיקון: TripMatch היה שולף מכל 2717 השורות בטבלה, כולל כל
+    // מה שמסומן is_legacy=true (מקומות "בארכיון" שהאדמין בכוונה לא
+    // רוצה שיוצגו יותר). וגם היה מחזיר מקומות מכל קטגוריה (מסעדות,
+    // מלונות, חיי לילה וכו') ולא רק אטרקציות. שני הפילטרים האלה חסרים
+    // מקוריים - זה לא שינוי בהתנהגות אלא סגירת פער אמיתי.
+    .eq("is_legacy", false)
+    // *** תיקון: לפני זה היה .eq("category", "attractions") קבוע - עכשיו
+    // תלוי בקטגוריה שהמשתמש בחר בשלב 2 (מסעדות/חיי לילה/טבע/אטרקציות),
+    // כדי שבחירת "מסעדות וקולינריה" באמת תחזיר מסעדות ולא אטרקציות.
+    .eq("category", session.category)
+    .or(`city.ilike.%${session.city}%,country.ilike.%${session.city}%`);
 
   if (session.interests.length > 0) {
     query = query.overlaps("trip_type_tags", session.interests);
   }
 
-  const excluded = [...session.liked_place_ids, ...session.rejected_place_ids];
-  if (excluded.length > 0) {
-    query = query.not("id", "in", `(${excluded.join(",")})`);
+  // *** תיקון: לפני זה החרגה כללה רק liked_place_ids/rejected_place_ids
+  // של ה-session **הנוכחי** - session חדש (למשל בפעם הבאה שפותחים
+  // TripMatch לאותה עיר) מתחיל עם מערכים ריקים, כך שמקומות שכבר
+  // הוחלקו (בכל כיוון) בעבר חוזרים ומופיעים שוב. עכשיו מחריגים גם כל
+  // מקום שכבר קיים ב-favorites של המשתמש (liked/saved/skipped) בכלל -
+  // מצטבר לצמיתות, לא רק לתוך ה-session הזה.
+  const excluded = new Set([...session.liked_place_ids, ...session.rejected_place_ids]);
+  const { data: pastDecisions } = await supabase.from("favorites").select("place_id").eq("user_id", session.user_id).eq("place_type", "place");
+  for (const row of pastDecisions ?? []) excluded.add(row.place_id as string);
+
+  if (excluded.size > 0) {
+    query = query.not("id", "in", `(${Array.from(excluded).join(",")})`);
   }
 
   const { data, error } = await query.limit(limit);
@@ -82,6 +103,14 @@ let query = supabase
       etaMinutes: 0,
       tripTypeTags: row.trip_type_tags ?? [],
       cuisineTags: row.cuisine_tags ?? [],
+      // *** תיקון: לפני זה השדות tags/tripmatch_scores/dna_scores שהאדמין
+      // ממלא (כפתור "✨ תקן עם AI" ב-/admin/places) בכלל לא הגיעו ל-TripMatch -
+      // רק trip_type_tags/cuisine_tags הישנים היו בשימוש. זו הסיבה שהפילטרים
+      // לא הראו כלום למקומות שהאדמין תייג ידנית עם ה-AI, ושאחוז ההתאמה
+      // התעלם לגמרי מהתאמות שנקבעו באדמין.
+      tags: row.tags ?? [],
+      tripmatchScores: row.tripmatch_scores ?? {},
+      dnaScores: row.dna_scores ?? {},
       kosher: row.kosher,
       accessible: row.accessible,
       suitableChildAges: row.suitable_child_ages ?? [],

@@ -1,4 +1,4 @@
-import type { StepOption } from "@/services/tripBuilder/types";
+﻿import type { StepOption } from "@/services/tripBuilder/types";
 
 export const COMPANION_OPTIONS: StepOption[] = [
   { value: "couple", label: "זוג", emoji: "💑" },
@@ -88,4 +88,58 @@ export const TRIPMATCH_INTEREST_OPTIONS: StepOption[] = [
   { value: "kids_family_activities", label: "פעילויות לילדים ומשפחות", emoji: "👨‍👩‍👧‍👦" },
   { value: "art_galleries", label: "אמנות וגלריות", emoji: "🎨" },
   { value: "photo_spots", label: "נקודות צילום ונופי אינסטגרם", emoji: "📸" },
+];
+
+/**
+ * 4 הקטגוריות הראשיות ל-TripMatch (שלב 2 - אחרי בחירת יעד) - תואמות
+ * ל-5 הקטגוריות הראשיות שהוגדרו באדמין (placeCategories.ts), פחות
+ * "מלונות" (TripMatch הוא לפעילויות/חוויות, לא ללינה). לפני זה, שלב 2
+ * הציג ישירות את 19 תת-הקטגוריות של TRIPMATCH_INTEREST_OPTIONS כרשימה
+ * שטוחה - זה עבר לתוך הפילטרים בתוך ההחלקות עצמן, כדי שהבחירה הראשונית
+ * תהיה פשוטה (4 אפשרויות בלבד) והזיקוק יקרה אחרי שרואים תוצאות.
+ */
+export interface TripMatchCategoryBucket {
+  value: "restaurants" | "nightlife" | "nature" | "attractions";
+  label: string;
+  emoji: string;
+  /** אילו מתוך 19 תתי-הקטגוריות למעלה שייכות לדלי הזה - לשימוש עתידי
+   *  (למשל תיוג התחלתי) - הבחירה בפועל של תת-קטגוריה קורית בפילטרים. */
+  subTagValues: string[];
+}
+
+export const TRIPMATCH_CATEGORY_BUCKETS: TripMatchCategoryBucket[] = [
+  {
+    value: "restaurants",
+    label: "מסעדות וקולינריה",
+    emoji: "🍽️",
+    subTagValues: ["coffee_carts_cafes", "wineries_dining"],
+  },
+  {
+    value: "nightlife",
+    label: "חיי לילה ובילויים",
+    emoji: "🎭",
+    subTagValues: ["nightlife_entertainment", "events_festivals", "spa_relaxation"],
+  },
+  {
+    value: "nature",
+    label: "טבע ונופים",
+    emoji: "🌿",
+    subTagValues: ["nature_trails", "beaches_pools", "viewpoints", "parks_gardens", "boating_water_attractions"],
+  },
+  {
+    value: "attractions",
+    label: "אטרקציות ואתרים",
+    emoji: "🎯",
+    subTagValues: [
+      "water_amusement_parks",
+      "attractions_activities",
+      "sports_extreme",
+      "culture_history",
+      "shopping",
+      "heritage_holy_sites",
+      "kids_family_activities",
+      "art_galleries",
+      "photo_spots",
+    ],
+  },
 ];

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
@@ -14,8 +14,50 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 
-type Stage = "city" | "category" | "swiping";
+type Stage = "city" | "category" | "swiping" | "results";
+
+type UserPreferences = { interests: string[]; culinaryStyles: string[]; kosher: boolean; accessibility: boolean };
+
+/** ניקוד התאמה (60-99%): דירוג המקום + **התאמה אמיתית לפרופיל מהאונבורדינג**
+ *  (תחומי עניין וסגנון קולינרי שהמשתמש בחר בהעדפות, כשרות ונגישות אם
+ *  ביקש) + חפיפה עם הפילטרים הידניים שנבחרו כרגע. לפני זה זה התבסס רק
+ *  על דירוג גוגל + פילטרים ידניים - בלי שום קשר להעדפות שהמשתמש כבר
+ *  ענה עליהן באונבורדינג. */
+function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilters, userPreferences: UserPreferences | null): number {
+  let score = 45;
+  if (candidate.rating != null) score += (candidate.rating / 5) * 15;
+
+  const candidateTags = new Set([...candidate.tripTypeTags, ...candidate.cuisineTags, ...(candidate.tags ?? [])]);
+  const onboardingTags = [...(userPreferences?.interests ?? []), ...(userPreferences?.culinaryStyles ?? [])];
+
+  if (onboardingTags.length > 0) {
+    const overlap = onboardingTags.filter((t) => candidateTags.has(t)).length;
+    score += Math.min(1, overlap / Math.min(onboardingTags.length, 5)) * 15;
+  }
+
+  // *** נוסף: ציוני TripMatch/DNA שהאדמין קבע ידנית או עם "✨ תקן עם AI"
+  // (tripmatch_scores/dna_scores) - עד עכשיו בכלל לא נלקחו בחשבון כאן,
+  // למרות שזו בדיוק המטרה שלהם.
+  const adminScores = [...Object.values(candidate.tripmatchScores ?? {}), ...Object.values(candidate.dnaScores ?? {})];
+  if (adminScores.length > 0) {
+    const avg = adminScores.reduce((a, b) => a + b, 0) / adminScores.length;
+    score += (avg / 100) * 15;
+  }
+
+  if (filters.tags.length > 0) {
+    const overlap = filters.tags.filter((t) => candidateTags.has(t)).length;
+    score += (overlap / filters.tags.length) * 10;
+  } else if (onboardingTags.length === 0 && adminScores.length === 0) {
+    score += 8; // אין שום מידע (לא פילטר, לא אונבורדינג, לא תיוג אדמין) - ציון בסיס נדיב
+  }
+
+  if (userPreferences?.kosher && candidate.kosher) score += 5;
+  if (userPreferences?.accessibility && candidate.accessible) score += 5;
+
+  return Math.max(60, Math.min(99, Math.round(score)));
+}
 
 export default function TripMatchPage() {
   const router = useRouter();
@@ -24,11 +66,13 @@ export default function TripMatchPage() {
   const [heroVisible, setHeroVisible] = useState(true);
 
   const [cityInput, setCityInput] = useState("");
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<{ value: string; label: string; type: "city" | "country" }[]>([]);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedCityLabel, setSelectedCityLabel] = useState<string>("");
 
   const [categoryValue, setCategoryValue] = useState<string | null>(null);
   const [categoryLabel, setCategoryLabel] = useState<string>("");
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<CandidatePlace[]>([]);
@@ -39,6 +83,8 @@ export default function TripMatchPage() {
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
+  const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>([]);
+  const [hasSwipedAny, setHasSwipedAny] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,14 +98,15 @@ export default function TripMatchPage() {
     debounceRef.current = setTimeout(() => {
       fetch(`/api/places/cities?q=${encodeURIComponent(cityInput.trim())}`)
         .then((res) => res.json())
-        .then((data) => setCityOptions(data.cities ?? []))
+        .then((data) => setCityOptions(data.options ?? []))
         .catch(() => setCityOptions([]));
     }, 300);
   }, [cityInput, selectedCity]);
 
-  function handleSelectCity(city: string) {
-    setSelectedCity(city);
-    setCityInput(city);
+  function handleSelectCity(option: { value: string; label: string; type: "city" | "country" }) {
+    setSelectedCity(option.value);
+    setSelectedCityLabel(option.label);
+    setCityInput(option.label);
     setCityOptions([]);
     // ה-HERO נעלם ב-Fade+Slide (הטרנזישן מוגדר על ה-wrapper), ורק אז עוברים שלב
     setHeroVisible(false);
@@ -87,12 +134,13 @@ export default function TripMatchPage() {
       const response = await fetch("/api/tripmatch/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city: selectedCity, interests: [value] }),
+        body: JSON.stringify({ city: selectedCity, category: value, interests: [] }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "לא הצלחנו להתחיל");
       setSessionId(data.session.id);
       setCandidates(data.candidates ?? []);
+      setUserPreferences(data.userPreferences ?? null);
       setCandidateIndex(0);
       setStage("swiping");
     } catch (err) {
@@ -104,6 +152,19 @@ export default function TripMatchPage() {
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // *** נוסף: כשנגמרים המועמדים אחרי שכבר החליקו לפחות פעם אחת - אם לא
+  // סימנו שום לייק, חוזרים ישר לעמוד הבית (אין טעם במסך תוצאות ריק).
+  // אם כן סימנו לייקים, עוברים למסך תוצאות (כמו עמוד מסלול, בלי מפה).
+  useEffect(() => {
+    if (stage === "swiping" && hasSwipedAny && candidates.length === 0 && !busy) {
+      if (sessionLikedPlaces.length === 0) {
+        router.push("/home");
+      } else {
+        setStage("results");
+      }
+    }
+  }, [stage, hasSwipedAny, candidates, busy, sessionLikedPlaces, router]);
+
   useEffect(() => {
     if (stage !== "swiping" || userLocation || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -114,17 +175,25 @@ export default function TripMatchPage() {
 
   const visibleCandidates = useMemo(() => {
     const filtered = applyFilters(candidates, filters);
-    if (!userLocation) return filtered; // בלי מיקום אמיתי - לא ממציאים מספר
-    return filtered.map((c) => {
-      const distanceKm = haversineDistanceKm(userLocation, { lat: c.latitude, lng: c.longitude });
-      return { ...c, distanceKm, etaMinutes: estimateTravelMinutes(distanceKm, "drive") };
-    });
-  }, [candidates, filters, userLocation]);
+    const withDistance = !userLocation
+      ? filtered
+      : filtered.map((c) => {
+          const distanceKm = haversineDistanceKm(userLocation, { lat: c.latitude, lng: c.longitude });
+          return { ...c, distanceKm, etaMinutes: estimateTravelMinutes(distanceKm, "drive") };
+        });
+    // *** נוסף: מיון לפי אחוז התאמה - מהגבוה לנמוך, כדי שהמקומות
+    // הכי מתאימים למשתמש יוצגו קודם בהחלקה, לא לפי סדר אקראי מה-DB.
+    return [...withDistance].sort(
+      (a, b) => computeMatchPercent(b, filters, userPreferences) - computeMatchPercent(a, filters, userPreferences)
+    );
+  }, [candidates, filters, userLocation, userPreferences]);
   const currentCandidate = visibleCandidates[candidateIndex];
 
   async function handleDecision(liked: boolean) {
     if (!sessionId || busy || !currentCandidate) return;
     const decidedPlace = currentCandidate;
+    setHasSwipedAny(true);
+    if (liked) setSessionLikedPlaces((prev) => [...prev, decidedPlace]);
 
     setBusy(true);
     try {
@@ -185,7 +254,7 @@ export default function TripMatchPage() {
 
       {stage === "swiping" && currentCandidate && (
         <SwipeHeader
-          city={selectedCity ?? ""}
+          city={selectedCityLabel || selectedCity || ""}
           categoryLabel={categoryLabel}
           currentIndex={candidateIndex}
           total={visibleCandidates.length}
@@ -218,15 +287,18 @@ export default function TripMatchPage() {
                 className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
               {cityOptions.length > 0 && (
-                <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
-                  {cityOptions.map((city) => (
+                <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
+                  {cityOptions.map((option) => (
                     <button
-                      key={city}
+                      key={`${option.type}-${option.value}`}
                       type="button"
-                      onClick={() => handleSelectCity(city)}
-                      className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
+                      onClick={() => handleSelectCity(option)}
+                      className="flex w-full items-center justify-between px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
                     >
-                      {city}
+                      <span>{option.label}</span>
+                      {option.type === "country" && (
+                        <span className="text-[11px] text-ink-secondary">מדינה שלמה</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -237,7 +309,7 @@ export default function TripMatchPage() {
 
         {stage === "category" && (
           <div className="flex flex-col gap-3">
-            <ChatBubble>מה בא לכם לעשות ב{selectedCity}?</ChatBubble>
+            <ChatBubble>מה בא לכם לעשות ב{selectedCityLabel || selectedCity}?</ChatBubble>
             <CategoryPicker onSelect={handleSelectCategory} />
             {busy && <p className="text-center text-sm text-ink-secondary">טוען...</p>}
             {error && <p className="text-center text-sm text-danger">{error}</p>}
@@ -249,22 +321,84 @@ export default function TripMatchPage() {
             {!currentCandidate ? (
               <p className="pt-16 text-center text-ink-secondary">
                 {candidates.length === 0
-                  ? `לא מצאנו עדיין מקומות ב${selectedCity} בקטגוריה הזו.`
+                  ? `לא מצאנו עדיין מקומות ב${selectedCityLabel || selectedCity} בקטגוריה הזו.`
                   : visibleCandidates.length === 0
                     ? "אין תוצאות עם הפילטרים שנבחרו. נסו לרוקן חלק מהם."
                     : "נגמרו המועמדים כרגע."}
               </p>
             ) : (
               <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
-                <TripMatchCard candidate={currentCandidate} />
+                <TripMatchCard candidate={currentCandidate} matchPercent={computeMatchPercent(currentCandidate, filters, userPreferences)} />
               </SwipeCard>
             )}
           </>
         )}
+
+        {stage === "results" && (
+          <div className="flex flex-col gap-4">
+            <ChatBubble>
+              {sessionLikedPlaces.length > 0
+                ? `סיימנו לסרוק את ${selectedCityLabel || selectedCity}! אלה ${sessionLikedPlaces.length} המקומות שאהבתם:`
+                : `סיימנו לסרוק את ${selectedCityLabel || selectedCity} - לא סימנתם לייק הפעם, נסו יעד או קטגוריה אחרת.`}
+            </ChatBubble>
+
+            {sessionLikedPlaces.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {sessionLikedPlaces.map((place) => (
+                  <button
+                    key={place.id}
+                    type="button"
+                    onClick={() => router.push(`/place/${place.id}`)}
+                    className="flex items-center gap-3 rounded-card bg-white p-3 text-right shadow-soft"
+                  >
+                    {place.imageUrls[0] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={place.imageUrls[0]} alt="" className="h-16 w-16 shrink-0 rounded-[14px] object-cover" />
+                    ) : (
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-bg-secondary text-2xl">📍</div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
+                      <p className="text-[12.5px] text-ink-secondary">
+                        {getCategoryLabel(place.category)}
+                        {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setStage("city");
+                setHeroVisible(true);
+                setSelectedCity(null);
+                setSelectedCityLabel("");
+                setCityInput("");
+                setCategoryValue(null);
+                setSessionLikedPlaces([]);
+                setHasSwipedAny(false);
+                setCandidates([]);
+              }}
+              className="rounded-pill py-3 text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              יעד חדש
+            </button>
+          </div>
+        )}
       </div>
 
       {filtersOpen && (
-        <FiltersSheet candidates={candidates} filters={filters} onChange={setFilters} onClose={() => setFiltersOpen(false)} />
+        <FiltersSheet
+          candidates={candidates}
+          filters={filters}
+          onChange={setFilters}
+          onClose={() => setFiltersOpen(false)}
+          preferredTags={[...(userPreferences?.interests ?? []), ...(userPreferences?.culinaryStyles ?? [])]}
+        />
       )}
 
       {likedPlace && (
