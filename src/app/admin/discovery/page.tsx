@@ -220,10 +220,26 @@ export default function DiscoveryPage() {
     });
   }
 
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  function toggleExpanded(id: string) {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+        <h1 className="flex items-center gap-2 text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-[var(--admin-radius-md)]"
+            style={{ background: "var(--admin-accent-soft)" }}
+          >
+            🔍
+          </span>
           הוספת מקומות ואטרקציות
         </h1>
         <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
@@ -232,27 +248,32 @@ export default function DiscoveryPage() {
       </div>
 
       {/* 5 קטגוריות ראשיות */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-5 gap-3">
         {BUCKETS.map((b) => (
           <button
             key={b.key}
             type="button"
             onClick={() => setBucket(b.key)}
-            className="flex items-center gap-2 rounded-[var(--admin-radius-lg)] border px-4 py-2.5 text-[13.5px] font-medium transition"
+            className="flex flex-col items-center gap-2 rounded-[var(--admin-radius-lg)] border py-4 transition"
             style={{
               borderColor: bucket === b.key ? "var(--admin-accent)" : "var(--admin-border)",
               background: bucket === b.key ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
-              color: bucket === b.key ? "var(--admin-accent)" : "var(--admin-ink)",
+              boxShadow: bucket === b.key ? "var(--admin-shadow-sm)" : undefined,
             }}
           >
-            <span>{b.emoji}</span>
-            {b.label}
+            <span className="text-[24px]">{b.emoji}</span>
+            <span className="text-[13px] font-semibold" style={{ color: bucket === b.key ? "var(--admin-accent)" : "var(--admin-ink)" }}>
+              {b.label}
+            </span>
           </button>
         ))}
       </div>
 
       {/* שורת החיפוש */}
-      <div className="max-w-3xl rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+      <div
+        className="max-w-3xl rounded-[var(--admin-radius-lg)] border p-5"
+        style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)", boxShadow: "var(--admin-shadow-sm)" }}
+      >
         <div className="grid grid-cols-2 gap-3">
           <AdminField label="מדינה">
             <input
@@ -264,7 +285,7 @@ export default function DiscoveryPage() {
                 setCountry(e.target.value);
                 setCity("");
               }}
-              placeholder="לא חובה"
+              placeholder="לפחות אחד מהשניים"
             />
             <datalist id="discovery-countries">
               {countries.map((c) => (
@@ -279,7 +300,7 @@ export default function DiscoveryPage() {
               style={adminInputStyle}
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="לא חובה - מהרשימה או הקלדה חופשית"
+              placeholder="מהרשימה או הקלדה חופשית"
             />
             <datalist id="discovery-cities">
               {citiesForCountry.map((d) => (
@@ -290,7 +311,7 @@ export default function DiscoveryPage() {
         </div>
 
         <div className="mt-3">
-          <AdminField label="מה לחפש? (בקשה חופשית, או רשימה מוכנה שכתבת/הדבקת)">
+          <AdminField label={`מה לחפש? (בקשה חופשית, או רשימה שהדבקת - ${BUCKETS.find((b) => b.key === bucket)?.label})`}>
             <textarea
               className={adminInputClass}
               style={{ ...adminInputStyle, minHeight: 90 }}
@@ -301,17 +322,22 @@ export default function DiscoveryPage() {
           </AdminField>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 flex items-center gap-3">
           <AdminButton onClick={handleSearch} disabled={searching || !freeText.trim()}>
-            {searching ? "מחפש ומאמת מול גוגל... (יכול לקחת זמן)" : "🔍 חפש והוסף"}
+            {searching ? "מחפש ומאמת מול גוגל..." : "🔍 חפש והוסף"}
           </AdminButton>
+          {searching && (
+            <span className="text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+              יכול לקחת כמה שניות - בודקים כל מקום מול Google
+            </span>
+          )}
         </div>
         {error && <p className="mt-2 text-[12.5px] text-red-600">{error}</p>}
       </div>
 
       {resultErrors.length > 0 && (
-        <div className="max-w-3xl rounded-[var(--admin-radius-sm)] p-3" style={{ background: "#FEF3C7" }}>
-          <ul className="flex flex-col gap-1 text-[12px]" style={{ color: "#92400E" }}>
+        <div className="max-w-3xl rounded-[var(--admin-radius-md)] p-3" style={{ background: "var(--admin-warning-soft)" }}>
+          <ul className="flex flex-col gap-1 text-[12px]" style={{ color: "var(--admin-warning)" }}>
             {resultErrors.map((e, i) => (
               <li key={i}>⚠️ {e}</li>
             ))}
@@ -320,121 +346,156 @@ export default function DiscoveryPage() {
       )}
 
       {results.length > 0 && (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[13.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
+            {results.length} תוצאות
+          </p>
           <AdminButton variant="secondary" onClick={handleAiFillAll} disabled={fillingAll}>
-            {fillingAll ? `ממלא... (${fillAllProgress}/${results.length})` : `✨ מלא הכל עם AI (${results.length})`}
+            {fillingAll ? `✨ ממלא... (${fillAllProgress}/${results.length})` : `✨ מלא הכל עם AI (${results.length})`}
           </AdminButton>
         </div>
       )}
 
-      {/* תוצאות - כרטיס לכל מקום, עם תגיות לחיצות */}
-      <div className="flex flex-col gap-4">
-        {results.map((place) => (
-          <div key={place.id} className="rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-            <div className="flex gap-4">
-              {place.image_urls[0] && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={place.image_urls[0]} alt="" className="h-20 w-20 shrink-0 rounded-[var(--admin-radius-md)] object-cover" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+      {/* תוצאות */}
+      <div className="grid grid-cols-2 gap-4">
+        {results.map((place) => {
+          const activeCounts = {
+            tripmatch: (Object.values(place.tripmatch_scores ?? {}) as number[]).filter((v) => v > 0).length,
+            dna: (Object.values(place.dna_scores ?? {}) as number[]).filter((v) => v > 0).length,
+            cuisine: place.cuisine_tags?.length ?? 0,
+            category: place.tags?.length ?? 0,
+          };
+          const totalActive = activeCounts.tripmatch + activeCounts.dna + activeCounts.cuisine + activeCounts.category;
+          const expanded = expandedCards.has(place.id);
+
+          return (
+            <div
+              key={place.id}
+              className="flex flex-col overflow-hidden rounded-[var(--admin-radius-lg)] border"
+              style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)", boxShadow: "var(--admin-shadow-sm)" }}
+            >
+              <div className="flex gap-3 p-4">
+                {place.image_urls[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={place.image_urls[0]} alt="" className="h-16 w-16 shrink-0 rounded-[var(--admin-radius-md)] object-cover" />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--admin-radius-md)]" style={{ background: "var(--admin-bg-sunken)" }}>
+                    📍
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14.5px] font-semibold" style={{ color: "var(--admin-ink)" }}>
                     {place.name}
                   </p>
-                  <AdminButton variant="secondary" onClick={() => handleAiFill(place.id)} disabled={fillingAi === place.id}>
-                    {fillingAi === place.id ? "ממלא..." : "✨ מלא עם AI"}
-                  </AdminButton>
-                </div>
-                <p className="text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-                  {[place.city, place.country].filter(Boolean).join(", ")} {place.rating ? `· ⭐ ${place.rating}` : ""}
-                </p>
-                {place.short_description && (
-                  <p className="mt-1 text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-                    {place.short_description}
+                  <p className="truncate text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                    {[place.city, place.country].filter(Boolean).join(", ")}
+                    {place.rating ? ` · ⭐ ${place.rating}` : ""}
                   </p>
-                )}
+                  {place.short_description && (
+                    <p className="mt-1 line-clamp-2 text-[11.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                      {place.short_description}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* צ'יפים כלליים */}
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <TagChip active={place.kosher === true} onClick={() => toggleField(place.id, "kosher", place.kosher)}>
-                כשר
-              </TagChip>
-              <TagChip active={place.accessible === true} onClick={() => toggleField(place.id, "accessible", place.accessible)}>
-                נגיש
-              </TagChip>
-            </div>
-
-            {/* מטבח/סגנון קולינרי */}
-            <div className="mt-3">
-              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "var(--admin-ink-secondary)" }}>
-                מטבח / סגנון קולינרי
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {CUISINE_TAGS.map((t) => (
-                  <TagChip key={t.key} active={place.cuisine_tags?.includes(t.key) ?? false} onClick={() => toggleArrayTag(place.id, "cuisine_tags", t.key, place.cuisine_tags ?? [])}>
-                    {t.label}
-                  </TagChip>
-                ))}
+              {/* פס סטטוס תמציתי - כמה תגיות מכל סוג פעילות, בלי הצפה */}
+              <div className="flex items-center gap-1.5 border-t px-4 py-2" style={{ borderColor: "var(--admin-border)" }}>
+                <StatusPill label="TripMatch" count={activeCounts.tripmatch} color="#548235" />
+                <StatusPill label="DNA" count={activeCounts.dna} color="#BF8F00" />
+                <StatusPill label="מטבח" count={activeCounts.cuisine} />
+                <StatusPill label="קטגוריה" count={activeCounts.category} />
+                {place.kosher === true && <StatusPill label="כשר" count={1} solid />}
+                {place.accessible === true && <StatusPill label="נגיש" count={1} solid />}
               </div>
-            </div>
 
-            {/* כל שאר הקטגוריות - אטרקציות, חיי לילה, לינה */}
-            <div className="mt-3">
-              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "var(--admin-ink-secondary)" }}>
-                קטגוריה / סוג מקום
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {OTHER_CATEGORY_TAGS.map((t) => (
-                  <TagChip key={t.key} active={place.tags?.includes(t.key) ?? false} onClick={() => toggleArrayTag(place.id, "tags", t.key, place.tags ?? [])}>
-                    {t.label}
-                  </TagChip>
-                ))}
+              <div className="flex items-center gap-2 border-t px-4 py-2.5" style={{ borderColor: "var(--admin-border)" }}>
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(place.id)}
+                  className="text-[12.5px] font-medium"
+                  style={{ color: "var(--admin-accent)" }}
+                >
+                  {expanded ? "▲ סגור עריכת תגיות" : `▼ ערוך תגיות (${totalActive} פעילות)`}
+                </button>
+                <span className="flex-1" />
+                <AdminButton variant="secondary" onClick={() => handleAiFill(place.id)} disabled={fillingAi === place.id}>
+                  {fillingAi === place.id ? "ממלא..." : "✨ מלא עם AI"}
+                </AdminButton>
               </div>
-            </div>
 
-            {/* 20 תגיות TripMatch */}
-            <div className="mt-3">
-              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "#548235" }}>
-                TripMatch
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {TRIPMATCH_TAGS.map((t) => (
-                  <TagChip
-                    key={t.key}
-                    active={(place.tripmatch_scores?.[t.key] ?? 0) > 0}
-                    onClick={() => toggleScore(place.id, "tripmatch_scores", t.key, place.tripmatch_scores ?? {})}
-                    color="#548235"
-                  >
-                    {t.label}
-                  </TagChip>
-                ))}
-              </div>
-            </div>
+              {expanded && (
+                <div className="flex flex-col gap-4 border-t p-4" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-sunken)" }}>
+                  <div className="flex flex-wrap gap-1.5">
+                    <TagChip active={place.kosher === true} onClick={() => toggleField(place.id, "kosher", place.kosher)}>
+                      כשר
+                    </TagChip>
+                    <TagChip active={place.accessible === true} onClick={() => toggleField(place.id, "accessible", place.accessible)}>
+                      נגיש
+                    </TagChip>
+                  </div>
 
-            {/* DNA */}
-            <div className="mt-3">
-              <p className="mb-1.5 text-[11px] font-semibold" style={{ color: "#BF8F00" }}>
-                DNA
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {DNA_TAGS.map((t) => (
-                  <TagChip
-                    key={t.key}
-                    active={(place.dna_scores?.[t.key] ?? 0) > 0}
-                    onClick={() => toggleScore(place.id, "dna_scores", t.key, place.dna_scores ?? {})}
-                    color="#BF8F00"
-                  >
-                    {t.label}
-                  </TagChip>
-                ))}
-              </div>
+                  <TagSection title="מטבח / סגנון קולינרי">
+                    {CUISINE_TAGS.map((t) => (
+                      <TagChip key={t.key} active={place.cuisine_tags?.includes(t.key) ?? false} onClick={() => toggleArrayTag(place.id, "cuisine_tags", t.key, place.cuisine_tags ?? [])}>
+                        {t.label}
+                      </TagChip>
+                    ))}
+                  </TagSection>
+
+                  <TagSection title="קטגוריה / סוג מקום">
+                    {OTHER_CATEGORY_TAGS.map((t) => (
+                      <TagChip key={t.key} active={place.tags?.includes(t.key) ?? false} onClick={() => toggleArrayTag(place.id, "tags", t.key, place.tags ?? [])}>
+                        {t.label}
+                      </TagChip>
+                    ))}
+                  </TagSection>
+
+                  <TagSection title="TripMatch" color="#548235">
+                    {TRIPMATCH_TAGS.map((t) => (
+                      <TagChip key={t.key} active={(place.tripmatch_scores?.[t.key] ?? 0) > 0} onClick={() => toggleScore(place.id, "tripmatch_scores", t.key, place.tripmatch_scores ?? {})} color="#548235">
+                        {t.label}
+                      </TagChip>
+                    ))}
+                  </TagSection>
+
+                  <TagSection title="DNA" color="#BF8F00">
+                    {DNA_TAGS.map((t) => (
+                      <TagChip key={t.key} active={(place.dna_scores?.[t.key] ?? 0) > 0} onClick={() => toggleScore(place.id, "dna_scores", t.key, place.dna_scores ?? {})} color="#BF8F00">
+                        {t.label}
+                      </TagChip>
+                    ))}
+                  </TagSection>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+function TagSection({ title, color = "var(--admin-ink-secondary)", children }: { title: string; color?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color }}>
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function StatusPill({ label, count, color = "var(--admin-ink-secondary)", solid = false }: { label: string; count: number; color?: string; solid?: boolean }) {
+  if (count === 0 && !solid) return null;
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+      style={{ background: `${color}1a`, color }}
+    >
+      {label} {!solid && count}
+    </span>
   );
 }
 
@@ -446,7 +507,7 @@ function TagChip({ children, active, onClick, color = "var(--admin-accent)" }: {
       className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
       style={{
         borderColor: active ? color : "var(--admin-border)",
-        background: active ? `${color}22` : "var(--admin-bg)",
+        background: active ? `${color}22` : "var(--admin-bg-surface)",
         color: active ? color : "var(--admin-ink-secondary)",
       }}
     >
