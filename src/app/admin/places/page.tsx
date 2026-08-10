@@ -146,6 +146,8 @@ export default function AdminPlacesPage() {
   const { secret: adminSecret } = useAdminSecret();
   const router = useRouter();
   const [places, setPlaces] = useState<Place[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -419,6 +421,23 @@ while (true) {
     },
   ];
 
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`למחוק ${selectedIds.size} מקומות? לא ניתן לבטל.`)) return;
+    setDeleting(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((id) =>
+          fetch(`/api/admin/places/${id}`, { method: "DELETE", headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
+        )
+      );
+      setPlaces((prev) => prev.filter((p) => !selectedIds.has(p.id)));
+      setSelectedIds(new Set());
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
@@ -430,13 +449,26 @@ while (true) {
             מציג {filteredPlaces.length.toLocaleString()} מתוך {places.length.toLocaleString()}
           </p>
         </div>
-        <Link
-          href="/admin/discovery"
-          className="rounded-[var(--admin-radius-sm)] px-3.5 py-2 text-[13.5px] font-medium text-white"
-          style={{ background: "var(--admin-accent)" }}
-        >
-          + הוסף מקום
-        </Link>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={deleting}
+              className="rounded-[var(--admin-radius-sm)] px-3.5 py-2 text-[13.5px] font-medium"
+              style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}
+            >
+              {deleting ? "מוחק..." : `🗑️ מחק נבחרים (${selectedIds.size})`}
+            </button>
+          )}
+          <Link
+            href="/admin/discovery"
+            className="rounded-[var(--admin-radius-sm)] px-3.5 py-2 text-[13.5px] font-medium text-white"
+            style={{ background: "var(--admin-accent)" }}
+          >
+            + הוסף מקום
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -475,6 +507,16 @@ while (true) {
         keyFor={(p) => p.id}
         onRowClick={startEdit}
         emptyMessage="לא נמצאו מקומות תואמים"
+        selectable
+        selectedKeys={selectedIds}
+        onToggleSelect={(id) =>
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          })
+        }
       />
     </div>
   );
