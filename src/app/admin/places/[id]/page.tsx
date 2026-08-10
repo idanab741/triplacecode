@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { AdminField, AdminButton, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
+import { PLACE_CATEGORIES } from "@/constants/placeCategories";
+import { CUISINE_TAGS, PLACE_TYPE_TAGS, TRIPMATCH_TAGS, DNA_TAGS } from "@/constants/placeTagOptions";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
@@ -38,6 +40,8 @@ interface Place {
   google_maps_url: string | null;
   trip_type_tags: string[];
   cuisine_tags: string[];
+  tripmatch_scores: Record<string, number>;
+  dna_scores: Record<string, number>;
   kosher: boolean | null;
   accessible: boolean | null;
   seasons: string[];
@@ -133,6 +137,48 @@ export default function PlaceWorkspacePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  const [aiScoring, setAiScoring] = useState(false);
+
+  /** אותה קריאה בדיוק ל-suggest-scores כמו כפתור "מלא עם AI" בעמוד
+   *  ה-Discovery - ההבדל היחיד הוא שכאן היא זמינה גם *אחרי* שהמקום כבר
+   *  נוצר ונשמר, ישירות מתוך כרטיסיית המקום. שומרת ישירות ל-DB (לא רק
+   *  טופס מקומי) ואז מרעננת את הטופס עם התוצאה. */
+  async function handleAiFillScores() {
+    if (!place) return;
+    setAiScoring(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/places/${place.id}/suggest-scores`, {
+        method: "POST",
+        headers: { [ADMIN_SECRET_HEADER]: adminSecret },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "השלמת AI נכשלה");
+      setPlace(data.place);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "השלמת AI נכשלה");
+    } finally {
+      setAiScoring(false);
+    }
+  }
+
+  function toggleScore(scoreField: "tripmatch_scores" | "dna_scores", tagKey: string) {
+    if (!place) return;
+    const current = place[scoreField] ?? {};
+    const isOn = (current[tagKey] ?? 0) > 0;
+    const next = { ...current };
+    if (isOn) delete next[tagKey];
+    else next[tagKey] = 100;
+    update(scoreField, next);
+  }
+
+  function toggleArrayTag(field: "tags" | "cuisine_tags", tagKey: string) {
+    if (!place) return;
+    const current = place[field] ?? [];
+    const next = current.includes(tagKey) ? current.filter((t) => t !== tagKey) : [...current, tagKey];
+    update(field, next);
   }
 
   async function handleAiComplete() {
@@ -328,16 +374,29 @@ export default function PlaceWorkspacePage() {
         {tab === "categories" && (
           <div className="grid max-w-2xl grid-cols-2 gap-4">
             <AdminField label="קטגוריה ראשית">
+              {/* חייב להיות אחת מ-5 הקטגוריות הראשיות בלבד - לא כל 20+
+                  הקבוצות מ-tripTaxonomy (אלה מתאימות לתת-קטגוריה/תגיות). */}
               <select className={adminInputClass} style={adminInputStyle} value={place.category} onChange={(e) => update("category", e.target.value)}>
-                {TRIP_TYPE_GROUPS.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.label}
+                {PLACE_CATEGORIES.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
                   </option>
                 ))}
               </select>
             </AdminField>
-            <AdminField label="תת-קטגוריה">
-              <input className={adminInputClass} style={adminInputStyle} value={place.subcategory ?? ""} onChange={(e) => update("subcategory", e.target.value)} />
+            <AdminField label="תת-קטגוריה (סוג מדויק, למשל: nature_trails, cocktail_bar, cafe)">
+              <input
+                list="subcategory-options"
+                className={adminInputClass}
+                style={adminInputStyle}
+                value={place.subcategory ?? ""}
+                onChange={(e) => update("subcategory", e.target.value)}
+              />
+              <datalist id="subcategory-options">
+                {TRIP_TYPE_GROUPS.flatMap((g) => g.subTags).map((s) => (
+                  <option key={s.id} value={s.id} label={s.label} />
+                ))}
+              </datalist>
             </AdminField>
             <div className="col-span-2">
               <AdminField label="סוג יעד (place_type_key) - קובע אילו שדות AI מוצגים בטאב AI">
@@ -354,15 +413,60 @@ export default function PlaceWorkspacePage() {
                 />
               </AdminField>
             </div>
+
+            {/* אותה בדיוק רשימת "קטגוריה/סוג מקום" ו"מטבח" כמו בעמוד
+                Discovery - לפני התיקון היו כאן רק שדות טקסט חופשי, בלי
+                שום קשר לרשימות שמוצגות שם, אז המידע היה לא-עקבי בין
+                המסכים. עכשיו שני העמודים מייבאים מאותו קובץ קבועים. */}
             <div className="col-span-2">
-              <AdminField label="תגיות מטבח (cuisine_tags, מופרד בפסיקים)">
-                <input
-                  className={adminInputClass}
-                  style={adminInputStyle}
-                  value={place.cuisine_tags.join(", ")}
-                  onChange={(e) => update("cuisine_tags", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-                />
-              </AdminField>
+              <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
+                קטגוריה / סוג מקום (tags)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {PLACE_TYPE_TAGS.map((t) => {
+                  const active = place.tags?.includes(t.key) ?? false;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => toggleArrayTag("tags", t.key)}
+                      className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                      style={{
+                        borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                        background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                        color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="col-span-2">
+              <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
+                מטבח / סגנון קולינרי (cuisine_tags)
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {CUISINE_TAGS.map((t) => {
+                  const active = place.cuisine_tags?.includes(t.key) ?? false;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => toggleArrayTag("cuisine_tags", t.key)}
+                      className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                      style={{
+                        borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                        background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                        color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -418,6 +522,71 @@ export default function PlaceWorkspacePage() {
                   onChange={(e) => update("seasons", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
                 />
               </AdminField>
+            </div>
+
+            <div className="col-span-2 mt-2 flex items-center justify-between border-t pt-4" style={{ borderColor: "var(--admin-border)" }}>
+              <p className="text-[13px] font-medium" style={{ color: "var(--admin-ink)" }}>
+                ✨ ציוני התאמה (TripMatch / DNA)
+              </p>
+              <AdminButton variant="secondary" onClick={handleAiFillScores} disabled={aiScoring}>
+                {aiScoring ? "מנתח..." : "✨ מלא עם AI"}
+              </AdminButton>
+            </div>
+            <div className="col-span-2 flex flex-col gap-3">
+              <div>
+                <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#548235" }}>
+                  TripMatch
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {TRIPMATCH_TAGS.map((t) => {
+                    const active = (place.tripmatch_scores?.[t.key] ?? 0) > 0;
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => toggleScore("tripmatch_scores", t.key)}
+                        className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                        style={{
+                          borderColor: active ? "#548235" : "var(--admin-border)",
+                          background: active ? "#54823522" : "var(--admin-bg-surface)",
+                          color: active ? "#548235" : "var(--admin-ink-secondary)",
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: "#BF8F00" }}>
+                  DNA
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {DNA_TAGS.map((t) => {
+                    const active = (place.dna_scores?.[t.key] ?? 0) > 0;
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => toggleScore("dna_scores", t.key)}
+                        className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                        style={{
+                          borderColor: active ? "#BF8F00" : "var(--admin-border)",
+                          background: active ? "#BF8F0022" : "var(--admin-bg-surface)",
+                          color: active ? "#BF8F00" : "var(--admin-ink-secondary)",
+                        }}
+                      >
+                        {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p className="text-[11px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                לחיצה על תגית משנה את הציון מקומית בטופס בלבד - יש ללחוץ &quot;שמור שינויים&quot; למעלה כדי לפרסם.
+                כפתור &quot;מלא עם AI&quot; לעומת זאת שומר ישירות (בדיוק כמו בעמוד ה-Discovery).
+              </p>
             </div>
           </div>
         )}

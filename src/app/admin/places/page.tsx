@@ -168,6 +168,12 @@ const [bulkCity, setBulkCity] = useState("");
   const [bulkTagging, setBulkTagging] = useState(false);
   const [bulkTagResult, setBulkTagResult] = useState<{ total: number; tagged: number; failed: number } | null>(null);
 
+  const [bulkReclassifying, setBulkReclassifying] = useState(false);
+  const [bulkReclassifyResult, setBulkReclassifyResult] = useState<{ total: number; reclassified: number; unchanged: number; failed: number } | null>(null);
+
+  const [bulkCityFilling, setBulkCityFilling] = useState(false);
+  const [bulkCityResult, setBulkCityResult] = useState<{ total: number; filled: number; notFound: number } | null>(null);
+
 const [filterCategory, setFilterCategory] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [filterCountry, setFilterCountry] = useState("");
@@ -286,6 +292,77 @@ while (true) {
       alert(e instanceof Error ? e.message : "שגיאה לא ידועה");
     } finally {
       setBulkTagging(false);
+    }
+  }
+
+  async function handleBulkReclassifyCategory() {
+    if (!confirm("לסווג מחדש עם AI את הקטגוריה הראשית של כל המקומות שלא נערכו ידנית? זה ירוץ באצוות של 15 בכל פעם וידרוס את הקטגוריה הנוכחית שלהם.")) return;
+
+    setBulkReclassifying(true);
+    let totalReclassified = 0;
+    let totalUnchanged = 0;
+    let totalFailed = 0;
+    let afterId: string | null = null;
+    try {
+      while (true) {
+        const res: Response = await fetch("/api/admin/places/bulk-reclassify-category", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+          body: JSON.stringify({ mode: "all", afterId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "שגיאה");
+
+        totalReclassified += data.reclassified;
+        totalUnchanged += data.unchanged;
+        totalFailed += data.failed;
+        afterId = data.lastId ?? afterId;
+        setBulkReclassifyResult({
+          total: totalReclassified + totalUnchanged + totalFailed + data.remaining,
+          reclassified: totalReclassified,
+          unchanged: totalUnchanged,
+          failed: totalFailed,
+        });
+
+        if (data.processedNow === 0 || data.remaining === 0) break;
+      }
+      await loadPlaces();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "שגיאה לא ידועה");
+    } finally {
+      setBulkReclassifying(false);
+    }
+  }
+
+  async function handleBulkFillCities() {
+    if (!confirm("להשלים עיר אוטומטית (לפי קואורדינטות) לכל המקומות שחסרה להם עיר? זה ירוץ באצוות של 20 בכל פעם.")) return;
+
+    setBulkCityFilling(true);
+    let totalFilled = 0;
+    let totalNotFound = 0;
+    let afterId: string | null = null;
+    try {
+      while (true) {
+        const res: Response = await fetch("/api/admin/places/backfill-cities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+          body: JSON.stringify({ afterId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "שגיאה");
+
+        totalFilled += data.filled;
+        totalNotFound += data.notFound;
+        afterId = data.lastId ?? afterId;
+        setBulkCityResult({ total: totalFilled + totalNotFound + data.remaining, filled: totalFilled, notFound: totalNotFound });
+
+        if (data.processedNow === 0 || data.remaining === 0) break;
+      }
+      await loadPlaces();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "שגיאה לא ידועה");
+    } finally {
+      setBulkCityFilling(false);
     }
   }
 
@@ -461,6 +538,36 @@ while (true) {
               {deleting ? "מוחק..." : `🗑️ מחק נבחרים (${selectedIds.size})`}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => handleBulkTag("untagged")}
+            disabled={bulkTagging}
+            className="rounded-[var(--admin-radius-sm)] border px-3.5 py-2 text-[13.5px] font-medium"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
+            title="מריץ AI על כל המקומות שעדיין אין להם תגיות בכלל"
+          >
+            {bulkTagging ? "מתייג..." : "✨ תייג לא-מתויגים"}
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkReclassifyCategory}
+            disabled={bulkReclassifying}
+            className="rounded-[var(--admin-radius-sm)] border px-3.5 py-2 text-[13.5px] font-medium"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
+            title="מריץ AI שבודק מחדש את הקטגוריה הראשית (מסעדות/חיי לילה/אטרקציות/טבע/מלונות) לפי שם ותיאור בפועל"
+          >
+            {bulkReclassifying ? "מסווג..." : "🏷️ סווג קטגוריות מחדש"}
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkFillCities}
+            disabled={bulkCityFilling}
+            className="rounded-[var(--admin-radius-sm)] border px-3.5 py-2 text-[13.5px] font-medium"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
+            title="משלים שם עיר לפי קואורדינטות, למקומות שנוצרו לפני שהתיקון הזה נוסף"
+          >
+            {bulkCityFilling ? "משלים ערים..." : "🌍 השלם ערים חסרות"}
+          </button>
           <Link
             href="/admin/discovery"
             className="rounded-[var(--admin-radius-sm)] px-3.5 py-2 text-[13.5px] font-medium text-white"
@@ -474,6 +581,26 @@ while (true) {
       {error && (
         <div className="rounded-[var(--admin-radius-sm)] px-4 py-2.5 text-[13px]" style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}>
           {error}
+        </div>
+      )}
+
+      {(bulkTagging || bulkTagResult) && (
+        <div className="rounded-[var(--admin-radius-sm)] px-4 py-2.5 text-[13px]" style={{ background: "var(--admin-accent-soft)", color: "var(--admin-accent)" }}>
+          {bulkTagging ? "✨ מתייג..." : "✨ סיום תיוג:"}{" "}
+          {bulkTagResult && `${bulkTagResult.tagged} תויגו, ${bulkTagResult.failed} נכשלו, מתוך ${bulkTagResult.total}`}
+        </div>
+      )}
+      {(bulkReclassifying || bulkReclassifyResult) && (
+        <div className="rounded-[var(--admin-radius-sm)] px-4 py-2.5 text-[13px]" style={{ background: "var(--admin-accent-soft)", color: "var(--admin-accent)" }}>
+          {bulkReclassifying ? "🏷️ מסווג קטגוריות..." : "🏷️ סיום סיווג:"}{" "}
+          {bulkReclassifyResult &&
+            `${bulkReclassifyResult.reclassified} שונו, ${bulkReclassifyResult.unchanged} נשארו זהות, ${bulkReclassifyResult.failed} נכשלו, מתוך ${bulkReclassifyResult.total}`}
+        </div>
+      )}
+      {(bulkCityFilling || bulkCityResult) && (
+        <div className="rounded-[var(--admin-radius-sm)] px-4 py-2.5 text-[13px]" style={{ background: "var(--admin-accent-soft)", color: "var(--admin-accent)" }}>
+          {bulkCityFilling ? "🌍 משלים ערים..." : "🌍 סיום השלמת ערים:"}{" "}
+          {bulkCityResult && `${bulkCityResult.filled} הושלמו, ${bulkCityResult.notFound} לא זוהו, מתוך ${bulkCityResult.total}`}
         </div>
       )}
 
@@ -499,6 +626,10 @@ while (true) {
         />
         <FilterSelect value={filterCountry} onChange={setFilterCountry} placeholder="כל המדינות" options={uniqueCountries.map((c) => ({ value: c, label: c }))} />
         <FilterSelect value={filterCity} onChange={setFilterCity} placeholder="כל הערים" options={uniqueCities.map((c) => ({ value: c, label: c }))} />
+        <label className="flex items-center gap-1.5 text-[13px]" style={{ color: "var(--admin-ink-secondary)" }}>
+          <input type="checkbox" checked={filterUntaggedOnly} onChange={(e) => setFilterUntaggedOnly(e.target.checked)} />
+          רק לא-מתויגים
+        </label>
       </div>
 
       <DataTable

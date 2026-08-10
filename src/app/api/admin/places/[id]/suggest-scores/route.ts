@@ -1,39 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import { callClaude, logAiError } from "@/services/ai/claudeService";
+import { TRIPMATCH_KEYS, DNA_KEYS, CUISINE_KEYS, PLACE_TYPE_KEYS } from "@/constants/placeTagOptions";
+import { PLACE_CATEGORIES, isValidPlaceCategory, type PlaceCategoryKey } from "@/constants/placeCategories";
 
 function checkAuth(request: Request): boolean {
   const secret = request.headers.get("x-admin-secret");
   return Boolean(secret) && secret === process.env.ADMIN_API_SECRET;
 }
 
-const TRIPMATCH_KEYS = [
-  "coffee_carts", "nature_trails", "beaches_pools", "viewpoints", "parks_picnic",
-  "water_parks", "attractions", "sports_extreme", "restaurants", "wineries",
-  "culture_museums", "shopping", "events", "nightlife", "spa",
-  "boating", "heritage", "kids_family", "art_galleries", "photo_spots",
-];
-
-const DNA_KEYS = [
-  "romantic", "family", "social", "luxury", "local_authentic",
-  "touristy", "special", "photogenic", "adventurous", "natural",
-  "urban", "cultural", "culinary", "wellness_calm", "active", "hidden_gem",
-];
-
-const CUISINE_KEYS = [
-  "coffee_cart", "israeli", "italian", "asian", "bbq", "burger_diner", "mexican", "greek",
-  "french_bistro", "indian", "mediterranean", "seafood", "pizza", "brunch", "cafe",
-  "chef_restaurant", "desserts",
-];
-
-const CATEGORY_KEYS = [
-  "nature_trails", "beaches_pools", "viewpoints", "parks_picnic", "water_parks",
-  "general_attractions", "sports_extreme", "wineries", "culture_museums", "shopping",
-  "events", "spa", "boating", "heritage", "kids_family", "art_galleries", "photo_spots",
-  "must_see_landmarks", "cocktail_bar", "wine_bar", "club", "live_show", "standup",
-  "theater", "karaoke", "bowling", "snooker", "arcade", "hotel", "resort", "apartment",
-  "cabin", "hostel", "camping", "glamping", "villa",
-];
+const CATEGORY_KEYS = PLACE_TYPE_KEYS;
 
 /**
  * ✨ מלא עם AI - Claude מנתח שם+תיאור+קטגוריה של מקום, ומחזיר ציון 0-100
@@ -73,12 +49,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 ${CUISINE_KEYS.join(", ")}
 קטגוריה/סוג מקום מדויק (בחר 1-2 הכי מדויקים מהרשימה, לא יותר): ${CATEGORY_KEYS.join(", ")}
 
+בנוסף - קטגוריה ראשית (main_category): המקום הזה שייך ל**אחת בלבד** מתוך 5 האפשרויות
+הבאות (זו קביעה נפרדת מ-"קטגוריה/סוג מקום" למעלה - זו הקטגוריה הכי-עליונה שמוצגת ברשימה
+הראשית של מקומות). קבע לפי שם/תיאור המקום בפועל, **לא** לפי category הנוכחי שרשום למעלה
+(הוא עלול להיות שגוי מהזנה ידנית קודמת) - למשל בר-מסעדה עם רחבת ריקודים ואירועי DJ שייך
+ל-nightlife גם אם יש בו גם אוכל; מסעדת רופטופ ללא מוזיקה/ריקודים שייכת ל-restaurants:
+${PLACE_CATEGORIES.map((c) => c.key).join(", ")}
+
+הסבר קצר (category_reason): משפט אחד קצר למה בחרת את main_category הזו - כדי שאדמין
+אנושי יוכל לבדוק במהירות אם ההחלטה הגיונית לפני שהוא סומך עליה.
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
 {
   "tripmatch_scores": {"מפתח": ציון, ...},
   "dna_scores": {"מפתח": ציון, ...},
   "cuisine_tags": ["מפתח", ...],
   "category_tags": ["מפתח", ...],
+  "main_category": "restaurants | nightlife | attractions | nature | hotels",
+  "category_reason": "משפט קצר",
   "kosher": true | false | null,
   "accessible": true | false | null
 }`;
@@ -94,6 +82,8 @@ ${CUISINE_KEYS.join(", ")}
     dna_scores?: Record<string, number>;
     cuisine_tags?: string[];
     category_tags?: string[];
+    main_category?: string;
+    category_reason?: string;
     kosher?: boolean | null;
     accessible?: boolean | null;
   };
@@ -109,6 +99,14 @@ ${CUISINE_KEYS.join(", ")}
     return NextResponse.json({ error: "לא הצלחנו לפענח את הצעת Claude" }, { status: 500 });
   }
 
+  // *** תיקון: "מלא עם AI" עדיין לא נגע מעולם ב-category הראשי - זו הסיבה
+  // שקטגוריות שגויות (שהוזנו ידנית/הודבקו לפני התיקון הקודם) לא תוקנו
+  // גם אחרי לחיצה על "מלא עם AI". עכשיו, אם Claude החזיר main_category
+  // תקין (אחד מ-5), הוא כן נשמר - רק אם המקום לא נערך ידנית לאחרונה
+  // (is_manually_edited), כדי לא לדרוס שינוי קטגוריה מכוון של אדמין.
+  const suggestedCategory: PlaceCategoryKey | null =
+    suggestion.main_category && isValidPlaceCategory(suggestion.main_category) ? suggestion.main_category : null;
+
   const { data: updated, error: updateError } = await supabase
     .from("places")
     .update({
@@ -116,6 +114,7 @@ ${CUISINE_KEYS.join(", ")}
       dna_scores: suggestion.dna_scores ?? {},
       cuisine_tags: suggestion.cuisine_tags ?? place.cuisine_tags ?? [],
       tags: suggestion.category_tags ?? place.tags ?? [],
+      category: suggestedCategory && !place.is_manually_edited ? suggestedCategory : place.category,
       kosher: suggestion.kosher ?? place.kosher,
       accessible: suggestion.accessible ?? place.accessible,
     })
@@ -127,5 +126,5 @@ ${CUISINE_KEYS.join(", ")}
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ place: updated });
+  return NextResponse.json({ place: updated, categoryReason: suggestion.category_reason ?? null });
 }
