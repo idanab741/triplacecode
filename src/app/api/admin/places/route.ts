@@ -35,12 +35,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // ברירת מחדל: רק מקומות שאינם "ישן" (is_legacy) - מקומות שכבר היו
+  // קיימים לפני שיפוץ המערכת. ?includeLegacy=1 מציג הכל (משמש בעמוד
+  // הארכיון /admin/places-archive).
+  const includeLegacy = new URL(request.url).searchParams.get("includeLegacy") === "1";
+
   const supabase = createAdminClient();
-const { data, error } = await supabase
-    .from("places")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(0, 4999);
+  let query = supabase.from("places").select("*").order("created_at", { ascending: false }).range(0, 4999);
+  if (!includeLegacy) query = query.eq("is_legacy", false);
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
