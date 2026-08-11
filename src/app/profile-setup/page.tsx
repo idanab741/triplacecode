@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,24 @@ import { updateProfile, isMainOnboardingComplete, isProfileComplete, getProfile 
 import { isReasonableBirthDate, MAX_AGE, MIN_AGE } from "@/utils/validation";
 import { COUNTRIES } from "@/constants/countries";
 
+const HEBREW_MONTHS = [
+  "ינואר",
+  "פברואר",
+  "מרץ",
+  "אפריל",
+  "מאי",
+  "יוני",
+  "יולי",
+  "אוגוסט",
+  "ספטמבר",
+  "אוקטובר",
+  "נובמבר",
+  "דצמבר",
+];
+const CURRENT_YEAR = new Date().getFullYear();
+const BIRTH_YEARS = Array.from({ length: MAX_AGE - MIN_AGE + 1 }, (_, i) => String(CURRENT_YEAR - MIN_AGE - i));
+const BIRTH_DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { user, loading, profile, profileLoading, refreshProfile } = useAuth();
@@ -17,25 +35,28 @@ export default function ProfileSetupPage() {
   const [fullName, setFullName] = useState("");
   const [city, setCity] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
   const [country, setCountry] = useState("ישראל");
   const [agreed, setAgreed] = useState(false);
   const [errors, setErrors] = useState<{ fullName?: string; city?: string; birthDate?: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // דגל שמונע במפורש מה-useEffect למטה "לנצח במרוץ" נגד הניווט הידני
-  // שקורה בתוך handleSubmit. ברגע שהמשתמש לוחץ "שמור", אנחנו לוקחים
-  // בעלות מלאה על הניווט - שום אפקט פסיבי לא אמור להתערב יותר.
   const manualNavigationRef = useRef(false);
+
+  useEffect(() => {
+    if (birthDay && birthMonth && birthYear) {
+      setBirthDate(`${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`);
+    } else {
+      setBirthDate("");
+    }
+  }, [birthDay, birthMonth, birthYear]);
 
   useEffect(() => {
     if (manualNavigationRef.current) return;
     if (!profileLoading && isProfileComplete(profile)) {
-      // אותה בדיקה בדיוק כמו בכל שאר נקודות הניתוב - שדה ה-DB
-      // (profile.intro_completed_at), לא localStorage. זה קריטי: אם
-      // localStorage כבר מכיל דגל ישן מבדיקות קודמות (בדפדפן הזה), הוא
-      // היה גורם לניתוב הזה "לשקר" ולדלג על ה-Onboarding בזמן שכל שאר
-      // המערכת (auth/callback, getPostAuthPath) עדיין רואה שהוא לא הושלם.
       if (!isMainOnboardingComplete(profile)) {
         router.replace("/onboarding");
         return;
@@ -79,17 +100,9 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    // מסמנים *לפני* refreshProfile() - כך שברגע שהוא מעדכן את ה-state
-    // ומפעיל מחדש את ה-useEffect למעלה, הוא כבר יידע לוותר ולא להתערב.
     manualNavigationRef.current = true;
     await refreshProfile();
 
-    // בפעם הראשונה שמשתמש משלים את בניית הפרופיל - מציגים את ה-Onboarding
-    // *לפני* מסך ההעדפות. בודקים ישירות מול ה-DB (לא את משתנה ה-profile
-    // המקומי, שעדיין "ישן" ברגע הזה כי refreshProfile() לא מחזיר את הערך
-    // החדש באופן סינכרוני - הוא רק מעדכן state שמתעדכן ברינדור הבא).
-    // חשוב: זו אותה בדיקה בדיוק כמו בכל שאר נקודות הניתוב (auth/callback,
-    // getPostAuthPath) - לא localStorage, כדי שהכל יהיה עקבי.
     if (user) {
       const freshProfile = await getProfile(user.id);
       if (!isMainOnboardingComplete(freshProfile)) {
@@ -120,18 +133,16 @@ export default function ProfileSetupPage() {
           priority
           className="h-auto w-full"
         />
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="חזרה"
-          className="absolute start-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-ink shadow-soft"
-        >
-          <Icon name="back-chevron" size={18} />
-        </button>
-        {/* ממוקם בדיוק על החור השקוף שבתוך הטבעת הכחולה המצוירת בתמונה.
-            הערכים נמדדו מערוץ האלפא של קובץ התמונה עצמו (לא בהערכה):
-            מרכז החור 49.73%/69.28%, קוטר 40% - כאן 42% כדי להיכנס מעט
-            מתחת לשפת הטבעת בלי מרווח */}
+          <div className="absolute end-4 top-4">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="חזרה"
+              className="flex h-9 w-9 items-center justify-center text-ink"
+            >
+              <Icon name="back-chevron" size={18} />
+            </button>
+          </div>
         <div
           className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
           style={{ left: "49.73%", top: "69.28%", width: "42%" }}
@@ -147,20 +158,10 @@ export default function ProfileSetupPage() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pb-10 pt-6">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pb-4 pt-6">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-ink">בניית פרופיל</h1>
           <p className="mt-1 text-ink-secondary">עוד רגע מתחילים לטייל!</p>
-          <div className="mt-3 flex justify-center gap-2">
-            {[0, 1, 2].map((dot) => (
-              <span
-                key={dot}
-                className={`h-2 rounded-pill transition-all ${
-                  dot === 2 ? "w-6 bg-[var(--color-primary-start)]" : "w-2 bg-ink-secondary/25"
-                }`}
-              />
-            ))}
-          </div>
         </header>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -183,12 +184,44 @@ export default function ProfileSetupPage() {
           </Field>
 
           <Field label="תאריך לידה" error={errors.birthDate}>
-            <Input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              icon={<Icon name="calendar" size={18} />}
-            />
+            <div className="flex gap-2">
+              <select
+                value={birthDay}
+                onChange={(e) => setBirthDay(e.target.value)}
+                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+              >
+                <option value="">יום</option>
+                {BIRTH_DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+              >
+                <option value="">חודש</option>
+                {HEBREW_MONTHS.map((m, i) => (
+                  <option key={m} value={String(i + 1)}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+              >
+                <option value="">שנה</option>
+                {BIRTH_YEARS.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
           </Field>
 
           <Field label="מדינה">
@@ -216,7 +249,7 @@ export default function ProfileSetupPage() {
 
           {formError && <p className="text-sm text-danger">{formError}</p>}
 
-          <Button type="submit" variant={isValid ? "primary" : "secondary"} disabled={!isValid || submitting} fullWidth>
+          <Button type="submit" variant={isValid ? "primary" : "secondary"} disabled={!isValid || submitting} fullWidth className="!py-2 !text-sm !font-semibold">
             {submitting ? "שומר..." : "ממשיכים!"}
           </Button>
         </form>

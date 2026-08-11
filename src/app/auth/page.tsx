@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useState, type FormEvent } from "react";
 import Image from "next/image";
@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button, Field, Icon, Input, PasswordInput, Screen } from "@/components/ui";
 import {
   signUpWithEmail,
+  verifySignupOtp,
+  resendSignupOtp,
   signInWithEmail,
   signInAsGuest,
   signInWithOAuth,
@@ -71,8 +73,13 @@ function AuthPageContent() {
     confirm?: string;
   }>({});
   const [suLoading, setSuLoading] = useState(false);
-  const [suMessage, setSuMessage] = useState<string | null>(null);
   const [suFormError, setSuFormError] = useState<string | null>(null);
+
+  const [awaitingOtp, setAwaitingOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpResent, setOtpResent] = useState(false);
 
   const [siEmail, setSiEmail] = useState("");
   const [siPassword, setSiPassword] = useState("");
@@ -100,8 +107,6 @@ function AuthPageContent() {
       return;
     }
     if (data.user) {
-      // אין profile/preferences למשתמש אנונימי חדש - ישר לעמוד הבית,
-      // לא דרך redirectAfterAuth (שמצפה לפרופיל קיים).
       router.push("/home");
     }
   }
@@ -111,8 +116,6 @@ function AuthPageContent() {
     setSocialMessage(null);
     setOauthLoading(provider);
     const { error } = await signInWithOAuth(provider);
-    // בהצלחה, Supabase מפנה אוטומטית ל-provider - הדף הזה "עוזב" ואין צורך
-    // בניתוב ידני. מטפלים כאן רק בכישלון (למשל הספק לא מוגדר ב-Supabase).
     if (error) {
       setOauthLoading(null);
       setSocialMessage(translateAuthError(error.message));
@@ -146,8 +149,39 @@ function AuthPageContent() {
     if (data.session && data.user) {
       await redirectAfterAuth(data.user.id, router);
     } else {
-      setSuMessage("שלחנו אליך מייל לאימות החשבון. יש לאשר אותו כדי להתחבר.");
+      setAwaitingOtp(true);
     }
+  }
+
+  async function handleVerifyOtp(e: FormEvent) {
+    e.preventDefault();
+    if (otpCode.trim().length < 6) {
+      setOtpError("יש להזין קוד בן 6 ספרות");
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError(null);
+    const { data, error } = await verifySignupOtp(suEmail, otpCode.trim());
+    setOtpLoading(false);
+
+    if (error) {
+      setOtpError(translateAuthError(error.message));
+      return;
+    }
+    if (data.user) {
+      await redirectAfterAuth(data.user.id, router);
+    }
+  }
+
+  async function handleResendOtp() {
+    setOtpError(null);
+    setOtpResent(false);
+    const { error } = await resendSignupOtp(suEmail);
+    if (error) {
+      setOtpError(translateAuthError(error.message));
+      return;
+    }
+    setOtpResent(true);
   }
 
   async function handleSignIn(e: FormEvent) {
@@ -192,25 +226,26 @@ function AuthPageContent() {
   return (
     <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
       <div className="relative w-full">
-        <Image
-          src="/images/hero-auth.png"
-          alt="קמע triplace עם דרכון ומזוודה, מוקף בתמונות יעדי טיול"
-          width={800}
-          height={800}
-          priority
-          className="h-auto w-full"
-        />
+        <div className="relative h-64 w-full overflow-hidden">
+          <Image
+            src="/images/hero-auth.png"
+            alt="קמע triplace עם דרכון ומזוודה, מוקף בתמונות יעדי טיול"
+            fill
+            priority
+            className="object-cover"
+          />
+        </div>
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="חזרה"
-          className="absolute start-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-ink shadow-soft"
+          className="absolute end-4 top-4 flex h-9 w-9 items-center justify-center text-ink"
         >
           <BackIcon />
         </button>
       </div>
 
-      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pt-6 pb-10">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pt-6 pb-4">
         <header className="text-center">
           <h1 className="text-2xl font-bold text-ink">ברוכים הבאים!</h1>
           <p className="mt-1 text-ink-secondary">ההרפתקה שלכם מתחילה כאן!</p>
@@ -241,7 +276,7 @@ function AuthPageContent() {
           </button>
         </div>
 
-        {tab === "signup" && (
+        {tab === "signup" && !awaitingOtp && (
           <form onSubmit={handleSignUp} className="flex flex-col gap-4">
             <Field label="אימייל" error={suErrors.email}>
               <Input
@@ -267,10 +302,36 @@ function AuthPageContent() {
               />
             </Field>
             {suFormError && <p className="text-sm text-danger">{suFormError}</p>}
-            {suMessage && <p className="text-sm text-accent">{suMessage}</p>}
-            <Button type="submit" fullWidth disabled={suLoading}>
+            <Button type="submit" fullWidth disabled={suLoading} className="!py-2 !text-sm !font-semibold">
               {suLoading ? "רושם..." : "הרשמה"}
             </Button>
+          </form>
+        )}
+
+        {tab === "signup" && awaitingOtp && (
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
+            <p className="text-center text-sm text-ink-secondary">
+              שלחנו קוד בן 6 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
+            </p>
+            <Field label="קוד אימות">
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+                className="text-center tracking-[0.4em]"
+              />
+            </Field>
+            {otpError && <p className="text-sm text-danger">{otpError}</p>}
+            {otpResent && <p className="text-sm text-accent">קוד חדש נשלח.</p>}
+            <Button type="submit" fullWidth disabled={otpLoading} className="!py-2 !text-sm !font-semibold">
+              {otpLoading ? "מאמת..." : "אימות"}
+            </Button>
+            <button type="button" onClick={handleResendOtp} className="text-sm font-semibold text-accent">
+              לא קיבלתי קוד - שליחה מחדש
+            </button>
           </form>
         )}
 
@@ -300,7 +361,7 @@ function AuthPageContent() {
               שכחתי סיסמה
             </button>
             {siFormError && <p className="text-sm text-danger">{siFormError}</p>}
-            <Button type="submit" fullWidth disabled={siLoading}>
+            <Button type="submit" fullWidth disabled={siLoading} className="!py-2 !text-sm !font-semibold">
               {siLoading ? "מתחבר..." : "התחברות"}
             </Button>
           </form>
@@ -321,7 +382,7 @@ function AuthPageContent() {
               />
             </Field>
             {fpMessage && <p className="text-sm text-accent">{fpMessage}</p>}
-            <Button type="submit" fullWidth disabled={fpLoading}>
+            <Button type="submit" fullWidth disabled={fpLoading} className="!py-2 !text-sm !font-semibold">
               {fpLoading ? "שולח..." : "שלח קישור לאיפוס"}
             </Button>
             <button
