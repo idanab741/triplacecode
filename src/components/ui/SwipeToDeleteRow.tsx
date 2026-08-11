@@ -17,6 +17,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
   const swipeStartY = useRef<number | null>(null);
   const swipeStartOffset = useRef(0);
   const swipeDirection = useRef<"horizontal" | "vertical" | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSwipeOpen(false);
@@ -28,6 +29,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     swipeStartY.current = e.clientY;
     swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : 0;
     swipeDirection.current = null;
+    trackRef.current?.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -38,9 +40,6 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     if (swipeDirection.current == null) {
       if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
       swipeDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
-      if (swipeDirection.current === "horizontal") {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      }
     }
     if (swipeDirection.current !== "horizontal") return;
 
@@ -81,6 +80,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
       </div>
 
       <div
+        ref={trackRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

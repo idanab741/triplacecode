@@ -54,7 +54,7 @@ export async function getSavedTrips(
       const itinerary = session.final_itinerary as { stops?: { name?: string }[] } | null;
       const firstStopName = itinerary?.stops?.[0]?.name;
 
-      const destinationLabel = answers?.destination ?? answers?.requestedArea ?? "הטיול שלי";
+      const destinationLabel = answers?.destination ?? answers?.requestedArea ?? firstStopName ?? "הטיול שלי";
       const photoQuery = answers?.destination ?? answers?.requestedArea ?? firstStopName ?? null;
 
       const photoResult = photoQuery ? await findPlaceStatusAndPhoto(photoQuery) : null;

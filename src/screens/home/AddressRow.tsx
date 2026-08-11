@@ -12,9 +12,6 @@ interface AddressRowProps {
 
 const SWIPE_REVEAL_PX = 88;
 
-/** שורת כתובת עם סוויפ-לחשיפה (ימינה, כמו במסך "תוצאת חופשה בחו״ל" -
- *  SortableStopCard) - חושף אייקון "הפוך לבית/ברירת מחדל" ומחיקה, במקום
- *  כפתור טקסט קבוע. */
 export function AddressRow({ address, onSelect, onSetDefault, onDelete }: AddressRowProps) {
   const [swipeX, setSwipeX] = useState(0);
   const [swipeOpen, setSwipeOpen] = useState(false);
@@ -22,12 +19,14 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
   const swipeStartY = useRef<number | null>(null);
   const swipeStartOffset = useRef(0);
   const swipeDirection = useRef<"horizontal" | "vertical" | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   function handlePointerDown(e: React.PointerEvent) {
     swipeStartX.current = e.clientX;
     swipeStartY.current = e.clientY;
     swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : 0;
     swipeDirection.current = null;
+    trackRef.current?.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -38,14 +37,9 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
     if (swipeDirection.current == null) {
       if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
       swipeDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
-      if (swipeDirection.current === "horizontal") {
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      }
     }
     if (swipeDirection.current !== "horizontal") return;
 
-    // *** תיקון: כיוון הגרירה היה הפוך - גרירה ימינה חשפה את הפאנל.
-    // עכשיו גרירה שמאלה (deltaX שלילי) היא שחושפת אותו, כמצופה.
     const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
     setSwipeX(next);
   }
@@ -63,7 +57,6 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
     setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : 0);
   }
 
-  // אם הכתובת כבר ברירת מחדל, אין טעם לחשוף "הפוך לברירת מחדל" - רק מחיקה.
   useEffect(() => {
     if (address.is_default) {
       setSwipeOpen(false);
@@ -73,8 +66,6 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
 
   return (
     <div className="relative overflow-hidden border-t border-ink-secondary/10">
-      {/* פאנל החשיפה - יושב מתחת לכרטיס, נחשף כשהכרטיס נגרר ימינה. עוגן
-          פיזי מפורש (right-0, לא start-0) כדי לא להתהפך לפי RTL. */}
       <div className="absolute inset-y-0 right-0 flex" style={{ width: SWIPE_REVEAL_PX }}>
         {!address.is_default && (
           <button
@@ -110,6 +101,7 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
       </div>
 
       <div
+        ref={trackRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

@@ -114,7 +114,7 @@ function TripsPageContent() {
             </button>
           </div>
 
-          <div className="absolute right-2 top-4 flex h-9 items-center">
+          <div className="absolute right-5 top-4 flex h-9 items-center">
             <h1 className="text-base font-bold text-ink">הטיולים שלי</h1>
           </div>
         </div>
