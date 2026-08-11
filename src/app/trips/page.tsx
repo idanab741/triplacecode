@@ -97,9 +97,9 @@ function TripsPageContent() {
       : 'עוד לא שמרת אף טיול - כשתבנו מסלול ותשמרו אותו (בעזרת כפתור ה"שמור"), הוא יופיע כאן.';
 
   return (
-    <Screen>
-      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5">
-        <div className="relative -mx-5 h-16">
+    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
           <div className="absolute left-2 top-4 flex items-center gap-2">
             <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
             <button
@@ -113,10 +113,14 @@ function TripsPageContent() {
               </svg>
             </button>
           </div>
+
+          <div className="absolute right-2 top-4 flex h-9 items-center">
+            <h1 className="text-base font-bold text-ink">הטיולים שלי</h1>
+          </div>
         </div>
+      </header>
 
-        <h1 className="flex h-9 items-center text-xl font-bold text-ink">הטיולים שלי</h1>
-
+      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
         <div className="flex rounded-pill bg-bg-secondary p-1">
           {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
             <button
