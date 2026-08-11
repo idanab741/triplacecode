@@ -1,12 +1,11 @@
-import { createBrowserClient } from "@supabase/ssr";
+﻿import { createBrowserClient } from "@supabase/ssr";
 
-/**
- * לקוח Supabase לשימוש בקומפוננטות צד-לקוח ("use client").
- * ה-URL והמפתח מגיעים אך ורק ממשתני הסביבה (.env.local) — אין להקשיח אותם בקוד.
- */
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 100; // 100 יום
+
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookieOptions: { maxAge: COOKIE_MAX_AGE_SECONDS } }
   );
 }

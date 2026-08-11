@@ -1,10 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-/**
- * לקוח Supabase לשימוש ב-Server Components / Route Handlers.
- * קורא ורושם עוגיות session דרך next/headers.
- */
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 100; // 100 יום - תואם ל-client.ts
+
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -12,6 +10,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { maxAge: COOKIE_MAX_AGE_SECONDS },
       cookies: {
         getAll() {
           return cookieStore.getAll();

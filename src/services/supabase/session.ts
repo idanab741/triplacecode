@@ -1,10 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
+﻿import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/**
- * מרענן את ה-session של Supabase בכל בקשה. נקרא מתוך src/proxy.ts
- * (proxy הוא השם החדש ל-middleware החל מ-Next.js 16).
- */
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 100; // 100 יום - תואם ל-client.ts/server.ts
+
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -12,6 +10,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { maxAge: COOKIE_MAX_AGE_SECONDS },
       cookies: {
         getAll() {
           return request.cookies.getAll();
