@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { buildShortAddressLabel } from "@/services/places/shortAddressLabel";
 
 /** ממירה place_id (מהשלמה אוטומטית של כתובת) לפרטים מלאים - כתובת, עיר,
  *  קואורדינטות. המפתח נשאר בצד השרת. */
@@ -32,7 +33,9 @@ export async function GET(request: Request) {
   const cityComponent = result.address_components?.find((c: { types: string[] }) => c.types.includes("locality"));
 
   return NextResponse.json({
-    address_text: result.formatted_address as string,
+    // *** תיקון: אותו תיקון כמו ב-reverse-geocode - label קצר במקום
+    // formatted_address המלא (עם מיקוד+מדינה).
+    address_text: buildShortAddressLabel(result.address_components, result.formatted_address as string),
     city: (cityComponent?.long_name as string | undefined) ?? null,
     latitude: result.geometry?.location?.lat as number | undefined,
     longitude: result.geometry?.location?.lng as number | undefined,

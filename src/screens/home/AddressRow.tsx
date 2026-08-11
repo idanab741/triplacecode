@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { UserAddress } from "@/services/addresses/addressesService";
@@ -44,7 +44,9 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
     }
     if (swipeDirection.current !== "horizontal") return;
 
-    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current + deltaX));
+    // *** תיקון: כיוון הגרירה היה הפוך - גרירה ימינה חשפה את הפאנל.
+    // עכשיו גרירה שמאלה (deltaX שלילי) היא שחושפת אותו, כמצופה.
+    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
     setSwipeX(next);
   }
 
@@ -117,13 +119,16 @@ export function AddressRow({ address, onSelect, onSetDefault, onDelete }: Addres
       >
         <button type="button" onClick={onSelect} className="flex flex-1 items-center gap-3 text-start">
           <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
             style={{
               background: address.is_default ? "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" : "var(--color-bg-secondary)",
               color: address.is_default ? "#fff" : "var(--color-ink-secondary)",
             }}
           >
-            📍
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 21s-7-6.2-7-11.2A7 7 0 0 1 19 9.8C19 14.8 12 21 12 21z" />
+              <circle cx="12" cy="9.5" r="2.3" />
+            </svg>
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5 truncate text-[15px] font-semibold text-ink">

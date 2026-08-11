@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { buildShortAddressLabel } from "@/services/places/shortAddressLabel";
 
 /** ממירה קואורדינטות לכתובת קריאה (Google Geocoding API) - המפתח נשאר
  *  בצד השרת בלבד, בשימוש ל"השתמש במיקום הנוכחי שלי" בבחירת מיקום. */
@@ -28,7 +29,9 @@ export async function GET(request: Request) {
   const cityComponent = result.address_components?.find((c: { types: string[] }) => c.types.includes("locality"));
 
   return NextResponse.json({
-    address_text: result.formatted_address as string,
+    // *** תיקון: לפני זה formatted_address (כולל מיקוד+מדינה - ארוך מדי
+    // לתצוגה). עכשיו label קצר "רחוב ומספר, עיר" בלבד.
+    address_text: buildShortAddressLabel(result.address_components, result.formatted_address as string),
     city: (cityComponent?.long_name as string | undefined) ?? null,
   });
 }

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,6 +22,17 @@ interface AddressPrediction {
   description: string;
 }
 
+/** אייקון מיקום אחיד - קו (stroke), לא אימוג'י - תואם לסגנון האייקונים
+ *  האחרים באפליקציה (כמו המחיקה/ברירת המחדל ב-AddressRow). */
+function PinIcon({ className }: { className?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 21s-7-6.2-7-11.2A7 7 0 0 1 19 9.8C19 14.8 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.3" />
+    </svg>
+  );
+}
+
 /** Bottom Sheet לבחירת מיקום - בהשראת התבנית של Wolt (מיקום נוכחי, כתובות
  *  שמורות, הוספת כתובת), בנוי כולו עם ה-Design Tokens הקיימים של
  *  Triplace - בלי צבעים/גופנים/רכיבים חדשים. */
@@ -32,6 +43,10 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
   const [error, setError] = useState<string | null>(null);
 
   const [usingCurrentLocation, setUsingCurrentLocation] = useState(false);
+
+  const [allCitiesOpen, setAllCitiesOpen] = useState(false);
+  const [allCities, setAllCities] = useState<{ name: string; country: string }[]>([]);
+  const [allCitiesLoading, setAllCitiesLoading] = useState(false);
 
   const [addingAddress, setAddingAddress] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
@@ -65,6 +80,10 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
     }, 300);
   }, [addressQuery]);
 
+  /** *** תיקון: לפני זה "השתמש במיקום הנוכחי שלי" שמר כתובת חדשה בכל
+   *  לחיצה - לחיצות חוזרות יצרו כמה שורות "מיקום נוכחי" כפולות ברשימה
+   *  (בדיוק מה שנראה כ"2 כפתורי מיקום"). עכשיו זה תמיד ephemeral בלבד -
+   *  כפתור אחד שמתעדכן לפי המיקום האמיתי, לא נשמר כערך קבוע ברשימה. */
   async function handleUseCurrentLocation() {
     if (!navigator.geolocation) {
       setError("הדפדפן שלך לא תומך באיתור מיקום");
@@ -80,30 +99,17 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
           const data = await res.json();
           if (!res.ok) throw new Error(data.error);
 
-          if (user) {
-            const supabase = createClient();
-            const saved = await addAddress(supabase, user.id, {
-              label: data.address_text,
-              address_text: data.address_text,
-              city: data.city,
-              latitude,
-              longitude,
-              is_default: true,
-            });
-            onSelect(saved);
-          } else {
-            onSelect({
-              id: "current",
-              user_id: "",
-              label: data.address_text,
-              address_text: data.address_text,
-              city: data.city,
-              latitude,
-              longitude,
-              is_default: true,
-              created_at: new Date().toISOString(),
-            });
-          }
+          onSelect({
+            id: "current",
+            user_id: user?.id ?? "",
+            label: data.address_text,
+            address_text: data.address_text,
+            city: data.city,
+            latitude,
+            longitude,
+            is_default: false,
+            created_at: new Date().toISOString(),
+          });
         } catch {
           setError("לא הצלחנו לזהות את המיקום שלך. נסו שוב.");
         } finally {
@@ -128,7 +134,9 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
       if (user) {
         const supabase = createClient();
         const saved = await addAddress(supabase, user.id, {
-          label: prediction.description,
+          // *** תיקון: להשתמש ב-label הקצר שחזר מ-address-details, לא
+          // ב-prediction.description הארוך של גוגל (כולל "ישראל" בסוף).
+          label: data.address_text,
           address_text: data.address_text,
           city: data.city,
           latitude: data.latitude,
@@ -168,6 +176,34 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
     }
   }
 
+  /** *** תיקון: זה היה alert("בקרוב") בלבד - עכשיו שולף בפועל את 221
+   *  היעדים מ-destinations (אותה רשימה שכבר בשימוש ב-TripMatch). */
+  function handleOpenAllCities() {
+    setAllCitiesOpen(true);
+    if (allCities.length > 0) return;
+    setAllCitiesLoading(true);
+    fetch("/api/places/cities/all")
+      .then((res) => res.json())
+      .then((data) => setAllCities(data.cities ?? []))
+      .catch(() => setAllCities([]))
+      .finally(() => setAllCitiesLoading(false));
+  }
+
+  function handlePickCity(city: { name: string; country: string }) {
+    onSelect({
+      id: `city-${city.name}`,
+      user_id: user?.id ?? "",
+      label: city.name,
+      address_text: city.name,
+      city: city.name,
+      latitude: null,
+      longitude: null,
+      is_default: false,
+      created_at: new Date().toISOString(),
+    });
+    setAllCitiesOpen(false);
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={onClose}>
       <div
@@ -198,15 +234,19 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
             />
             {savingAddress && <p className="text-center text-sm text-ink-secondary">שומר...</p>}
-            <div className="flex flex-col">
+            {/* *** תיקון: לפני זה בלי שום הגבלת גובה - רשימה ארוכה נחתכה
+                ע"י גבולות ה-sheet. עכשיו גובה קבוע (כ-2 שורות) עם גלילה
+                פנימית, אותה תבנית שכבר תוקנה במקומות אחרים באפליקציה. */}
+            <div className="flex max-h-24 flex-col overflow-y-auto overscroll-contain">
               {predictions.map((p) => (
                 <button
                   key={p.placeId}
                   type="button"
                   onClick={() => handlePickPrediction(p)}
-                  className="border-b border-ink-secondary/10 py-3 text-start text-sm text-ink last:border-none"
+                  className="flex items-center gap-2 border-b border-ink-secondary/10 py-3 text-start text-sm text-ink last:border-none"
                 >
-                  📍 {p.description}
+                  <PinIcon className="shrink-0 text-ink-secondary" />
+                  {p.description}
                 </button>
               ))}
             </div>
@@ -223,10 +263,10 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               className="flex items-center gap-3 px-5 py-3.5 text-start disabled:opacity-60"
             >
               <span
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
-                📍
+                <PinIcon />
               </span>
               <span className="text-[15px] font-semibold text-ink">
                 {usingCurrentLocation ? "מאתר את המיקום שלך..." : "השתמש במיקום הנוכחי שלי"}
@@ -236,7 +276,9 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             {loading ? (
               <div className="admin-skeleton mx-5 h-16 rounded-card" />
             ) : (
-              addresses.map((address) => (
+              // *** תיקון: "רק 3 בנוסף למיקום הנוכחי" - לפני זה כל הכתובות
+              // השמורות הוצגו בלי הגבלה.
+              addresses.slice(0, 3).map((address) => (
                 <AddressRow
                   key={address.id}
                   address={address}
@@ -255,7 +297,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
 
             <button
               type="button"
-              onClick={() => alert("בקרוב - עיון בכל הערים שבהן זמין Triplace")}
+              onClick={handleOpenAllCities}
               className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5 text-start"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary text-lg">🗺️</span>
@@ -275,6 +317,43 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
           </div>
         )}
       </div>
+
+      {allCitiesOpen && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={() => setAllCitiesOpen(false)}>
+          <div className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg pb-8" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mt-3 h-1 w-10 rounded-pill bg-ink-secondary/30" />
+            <div className="flex items-center justify-between px-5 pt-4">
+              <button type="button" onClick={() => setAllCitiesOpen(false)} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+              <h2 className="text-lg font-bold text-ink">כל הערים שבהן יש Triplace</h2>
+              <div className="w-9" />
+            </div>
+            <div className="flex flex-col pt-3">
+              {allCitiesLoading ? (
+                <div className="admin-skeleton mx-5 h-16 rounded-card" />
+              ) : (
+                allCities.map((city) => (
+                  <button
+                    key={`${city.name}-${city.country}`}
+                    type="button"
+                    onClick={() => handlePickCity(city)}
+                    className="flex items-center gap-3 border-b border-ink-secondary/10 px-5 py-3 text-start"
+                  >
+                    <PinIcon className="shrink-0 text-ink-secondary" />
+                    <span>
+                      <span className="block text-[15px] font-semibold text-ink">{city.name}</span>
+                      <span className="block text-[12.5px] text-ink-secondary">{city.country}</span>
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "../theme/tokens.css";
 
 :root {
@@ -12,13 +12,15 @@ body {
   font-family: var(--font-sans);
 }
 
-/* אנימציית "פעימה" עדינה לכפתור התזכורת הצף של האונבורדינג/העדפות,
-   כדי שהוא ימשוך תשומת לב בלי להיות מטריד. */
-@keyframes fab-pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.06);
+/* *** תיקון: באייפון, כשה-font-size של input/textarea/select קטן מ-16px,
+   Safari מבצע זום אוטומטי בפוקוס (זה עיצוב מכוון של iOS, לא באג) - זה
+   מה שגרם ל"זום מעצבן" בכל שדה הקלדה. פותרים בלי לבטל pinch-zoom
+   (שפוגע בנגישות) - פשוט מבטיחים שגודל הטקסט בשדות תמיד לפחות 16px
+   במסכים ניידים, כדי ש-Safari לא יחשוב שצריך להתקרב. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
