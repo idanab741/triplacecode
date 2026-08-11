@@ -1,4 +1,4 @@
-export type TripType =
+﻿export type TripType =
   | "day_trip"
   | "nature_trip"
   | "weekend"
@@ -54,13 +54,13 @@ export interface CategoryPlanItem {
   category: string;
   role: StopRole;
   order: number;
-  /** יום בתוך מסלול מרובה-ימים (1, 2, 3...) - null לטיולים חד-יומיים. */
+  /** ×™×•× ×‘×ª×•×š ×ž×¡×œ×•×œ ×ž×¨×•×‘×”-×™×ž×™× (1, 2, 3...) - null ×œ×˜×™×•×œ×™× ×—×“-×™×•×ž×™×™×. */
   day?: number | null;
-  /** תיאור קצר בעברית של מה בדיוק התחנה הזו אמורה להיות, לפי המלל החופשי
-   *  (למשל "עגלת קפה בסביבה טבעית", לא רק role="coffee_dessert"). בלי זה,
-   *  שלב בחירת המקום הספציפי (generateDayTripPlaces) מקבל רק role/category
-   *  גנריים וצריך "לנחש מחדש" את הכוונה המדויקת מתוך המלל החופשי המלא -
-   *  וזה נכשל בפועל. */
+  /** ×ª×™××•×¨ ×§×¦×¨ ×‘×¢×‘×¨×™×ª ×©×œ ×ž×” ×‘×“×™×•×§ ×”×ª×—× ×” ×”×–×• ××ž×•×¨×” ×œ×”×™×•×ª, ×œ×¤×™ ×”×ž×œ×œ ×”×—×•×¤×©×™
+   *  (×œ×ž×©×œ "×¢×’×œ×ª ×§×¤×” ×‘×¡×‘×™×‘×” ×˜×‘×¢×™×ª", ×œ× ×¨×§ role="coffee_dessert"). ×‘×œ×™ ×–×”,
+   *  ×©×œ×‘ ×‘×—×™×¨×ª ×”×ž×§×•× ×”×¡×¤×¦×™×¤×™ (generateDayTripPlaces) ×ž×§×‘×œ ×¨×§ role/category
+   *  ×’× ×¨×™×™× ×•×¦×¨×™×š "×œ× ×—×© ×ž×—×“×©" ××ª ×”×›×•×•× ×” ×”×ž×“×•×™×§×ª ×ž×ª×•×š ×”×ž×œ×œ ×”×—×•×¤×©×™ ×”×ž×œ× -
+   *  ×•×–×” × ×›×©×œ ×‘×¤×•×¢×œ. */
   note?: string;
 }
 
@@ -84,6 +84,9 @@ export interface CandidatePlace {
   source?: "ai" | "fallback";
 tripTypeTags: string[];
   cuisineTags: string[];
+  tags?: string[];
+  tripmatchScores?: Record<string, number>;
+  dnaScores?: Record<string, number>;
   kosher: boolean | null;
   accessible: boolean | null;
   suitableChildAges: string[];
@@ -108,11 +111,11 @@ export interface FinalItineraryStop {
   longitude: number;
   openingHours: string[] | null;
   dayIndex: number | null;
-  /** סוג תחנה מיוחדת (נחיתה/צ'ק-אין/צ'ק-אאוט/טיסת חזרה) - null לתחנה רגילה. משמש
-   *  לתצוגה בלבד, לא נשלף מ-DB/AI. */
+  /** ×¡×•×’ ×ª×—× ×” ×ž×™×•×—×“×ª (× ×—×™×ª×”/×¦'×§-××™×Ÿ/×¦'×§-×××•×˜/×˜×™×¡×ª ×—×–×¨×”) - null ×œ×ª×—× ×” ×¨×’×™×œ×”. ×ž×©×ž×©
+   *  ×œ×ª×¦×•×’×” ×‘×œ×‘×“, ×œ× × ×©×œ×£ ×ž-DB/AI. */
   specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | null;
-  /** קישור להזמנת נסיעה (Google Maps directions - המשתמש בוחר שם אובר/מונית/
-   *  תחבורה ציבורית) - רק לתחנות לוגיסטיקה (נחיתה/טיסת חזרה). null/undefined לתחנה רגילה. */
+  /** ×§×™×©×•×¨ ×œ×”×–×ž× ×ª × ×¡×™×¢×” (Google Maps directions - ×”×ž×©×ª×ž×© ×‘×•×—×¨ ×©× ××•×‘×¨/×ž×•× ×™×ª/
+   *  ×ª×—×‘×•×¨×” ×¦×™×‘×•×¨×™×ª) - ×¨×§ ×œ×ª×—× ×•×ª ×œ×•×’×™×¡×˜×™×§×” (× ×—×™×ª×”/×˜×™×¡×ª ×—×–×¨×”). null/undefined ×œ×ª×—× ×” ×¨×’×™×œ×”. */
   directionsUrl?: string | null;
 }
 
@@ -154,7 +157,7 @@ export interface DayTripAnswers {
 }
 
 export type DifficultyLevel = "easy" | "moderate" | "challenging";
-/** כמו DurationBand, + "custom" (זמן מותאם אישית) - רלוונטי רק לטיול בטבע. */
+/** ×›×ž×• DurationBand, + "custom" (×–×ž×Ÿ ×ž×•×ª×× ××™×©×™×ª) - ×¨×œ×•×•× ×˜×™ ×¨×§ ×œ×˜×™×•×œ ×‘×˜×‘×¢. */
 export type NatureDurationBand = DurationBand | "custom";
 
 export interface NatureTripAnswers {
@@ -168,7 +171,7 @@ export interface NatureTripAnswers {
   natureTypes: string[];
   difficulty: DifficultyLevel;
   durationBand: NatureDurationBand;
-  /** רלוונטי רק אם durationBand === "custom" - תיאור חופשי של הזמן הרצוי. */
+  /** ×¨×œ×•×•× ×˜×™ ×¨×§ ×× durationBand === "custom" - ×ª×™××•×¨ ×—×•×¤×©×™ ×©×œ ×”×–×ž×Ÿ ×”×¨×¦×•×™. */
   customDuration: string | null;
   freeText: string;
 }
@@ -310,7 +313,7 @@ export interface AbroadVacationAnswers {
   budgetPerPerson: string;
   vacationTypes: string[];
   destination: string | null;
-  /** יעדים נוספים - רלוונטי כש-travelStyle הוא multi_destination. */
+  /** ×™×¢×“×™× × ×•×¡×¤×™× - ×¨×œ×•×•× ×˜×™ ×›×©-travelStyle ×”×•× multi_destination. */
   destinations: string[];
   surpriseMe: boolean;
   pace: VacationPace;

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 
@@ -12,6 +12,10 @@ interface SwipeHeaderProps {
   onEditCategory: () => void;
   onOpenFilters: () => void;
   activeFilterCount: number;
+  /** מסיים את הסבב הנוכחי באופן יזום - הולך הביתה אם לא היו לייקים,
+   *  או פותח את מסך התוצאות אם היו. בלי זה, המשתמש חייב להחליק דרך
+   *  כל המאגר (עד עשרות/מאות מקומות) כדי שסבב אי-פעם "יסתיים" לבד. */
+  onFinish: () => void;
 }
 
 /** Header של מסך ההחלקות - בלי HERO ובלי דקורציה, רק מה שצריך כדי להתמצא:
@@ -26,6 +30,7 @@ export function SwipeHeader({
   onEditCategory,
   onOpenFilters,
   activeFilterCount,
+  onFinish,
 }: SwipeHeaderProps) {
   const progressPct = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
 
@@ -84,9 +89,14 @@ export function SwipeHeader({
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <span className="text-[11.5px] font-medium text-ink-secondary">
-          {Math.min(currentIndex + 1, total)} מתוך {total}
-        </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[11.5px] font-medium text-ink-secondary">
+            {Math.min(currentIndex + 1, total)} מתוך {total}
+          </span>
+          <button type="button" onClick={onFinish} className="text-[12px] font-semibold text-accent">
+            סיימתי לסרוק ✓
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -152,16 +152,23 @@ export default function TripMatchPage() {
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // *** נוסף: מסיים את הסבב באופן יזום (כפתור "סיימתי לסרוק ✓") - בלי
+  // זה, המשתמש חייב להחליק את כל המאגר (יכול להיות עשרות/מאות מקומות,
+  // במיוחד אחרי שהתיקון להחרגה קבועה נוסף) לפני שהמעבר קורה לבד.
+  function handleFinish() {
+    if (sessionLikedPlaces.length === 0) {
+      router.push("/home");
+    } else {
+      setStage("results");
+    }
+  }
+
   // *** נוסף: כשנגמרים המועמדים אחרי שכבר החליקו לפחות פעם אחת - אם לא
   // סימנו שום לייק, חוזרים ישר לעמוד הבית (אין טעם במסך תוצאות ריק).
   // אם כן סימנו לייקים, עוברים למסך תוצאות (כמו עמוד מסלול, בלי מפה).
   useEffect(() => {
     if (stage === "swiping" && hasSwipedAny && candidates.length === 0 && !busy) {
-      if (sessionLikedPlaces.length === 0) {
-        router.push("/home");
-      } else {
-        setStage("results");
-      }
+      handleFinish();
     }
   }, [stage, hasSwipedAny, candidates, busy, sessionLikedPlaces, router]);
 
@@ -263,6 +270,7 @@ export default function TripMatchPage() {
           onEditCategory={handleEditCategory}
           onOpenFilters={() => setFiltersOpen(true)}
           activeFilterCount={countActiveFilters(filters)}
+          onFinish={handleFinish}
         />
       )}
 
