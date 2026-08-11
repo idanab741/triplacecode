@@ -19,3 +19,4 @@ export { RadioCardGroup } from "./RadioCardGroup";
 export { Stepper } from "./Stepper";
 export { SwipeCard } from "./SwipeCard";
 export { BottomSheet } from "./BottomSheet";
+export { SwipeToDeleteRow } from "./SwipeToDeleteRow";

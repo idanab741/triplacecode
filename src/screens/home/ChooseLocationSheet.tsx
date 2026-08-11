@@ -23,8 +23,6 @@ interface AddressPrediction {
   description: string;
 }
 
-/** אייקון מיקום אחיד - קו (stroke), לא אימוג'י - תואם לסגנון האייקונים
- *  האחרים באפליקציה (כמו המחיקה/ברירת המחדל ב-AddressRow). */
 function PinIcon({ className }: { className?: string }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -34,9 +32,8 @@ function PinIcon({ className }: { className?: string }) {
   );
 }
 
-/** Bottom Sheet לבחירת מיקום - בהשראת התבנית של Wolt (מיקום נוכחי, כתובות
- *  שמורות, הוספת כתובת), בנוי כולו עם ה-Design Tokens הקיימים של
- *  Triplace - בלי צבעים/גופנים/רכיבים חדשים. */
+type View = "main" | "addAddress" | "allCities";
+
 export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetProps) {
   const { user } = useAuth();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
@@ -45,11 +42,10 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
 
   const [usingCurrentLocation, setUsingCurrentLocation] = useState(false);
 
-  const [allCitiesOpen, setAllCitiesOpen] = useState(false);
+  const [view, setView] = useState<View>("main");
   const [allCities, setAllCities] = useState<{ name: string; country: string }[]>([]);
   const [allCitiesLoading, setAllCitiesLoading] = useState(false);
 
-  const [addingAddress, setAddingAddress] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
   const [predictions, setPredictions] = useState<AddressPrediction[]>([]);
   const [savingAddress, setSavingAddress] = useState(false);
@@ -81,10 +77,6 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
     }, 300);
   }, [addressQuery]);
 
-  /** *** תיקון: לפני זה "השתמש במיקום הנוכחי שלי" שמר כתובת חדשה בכל
-   *  לחיצה - לחיצות חוזרות יצרו כמה שורות "מיקום נוכחי" כפולות ברשימה
-   *  (בדיוק מה שנראה כ"2 כפתורי מיקום"). עכשיו זה תמיד ephemeral בלבד -
-   *  כפתור אחד שמתעדכן לפי המיקום האמיתי, לא נשמר כערך קבוע ברשימה. */
   async function handleUseCurrentLocation() {
     if (!navigator.geolocation) {
       setError("הדפדפן שלך לא תומך באיתור מיקום");
@@ -135,8 +127,6 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
       if (user) {
         const supabase = createClient();
         const saved = await addAddress(supabase, user.id, {
-          // *** תיקון: להשתמש ב-label הקצר שחזר מ-address-details, לא
-          // ב-prediction.description הארוך של גוגל (כולל "ישראל" בסוף).
           label: data.address_text,
           address_text: data.address_text,
           city: data.city,
@@ -145,7 +135,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
         });
         setAddresses((prev) => [saved, ...prev]);
       }
-      setAddingAddress(false);
+      setView("main");
       setAddressQuery("");
       setPredictions([]);
     } catch {
@@ -177,10 +167,8 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
     }
   }
 
-  /** *** תיקון: זה היה alert("בקרוב") בלבד - עכשיו שולף בפועל את 221
-   *  היעדים מ-destinations (אותה רשימה שכבר בשימוש ב-TripMatch). */
   function handleOpenAllCities() {
-    setAllCitiesOpen(true);
+    setView("allCities");
     if (allCities.length > 0) return;
     setAllCitiesLoading(true);
     fetch("/api/places/cities/all")
@@ -202,156 +190,143 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
       is_default: false,
       created_at: new Date().toISOString(),
     });
-    setAllCitiesOpen(false);
+    setView("main");
   }
 
+  const titles: Record<View, string> = {
+    main: "בחרו את המיקום שלכם",
+    addAddress: "הוספת כתובת",
+    allCities: "כל הערים שבהן יש Triplace",
+  };
+
   return (
-    <>
-      <BottomSheet onClose={onClose}>
-      <div className="flex items-center justify-between px-5 pt-4">
-        <button type="button" onClick={onClose} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-          <h2 className="text-lg font-bold text-ink">{addingAddress ? "הוספת כתובת" : "בחרו את המיקום שלכם"}</h2>
-          <div className="w-9" />
-        </div>
+    <BottomSheet onClose={onClose}>
+      <div className="px-5 pt-1 text-center">
+        <h2 className="text-lg font-bold text-ink">{titles[view]}</h2>
+      </div>
 
-        {error && <p className="mt-3 px-5 text-center text-[13px] text-danger">{error}</p>}
+      {error && <p className="mt-3 px-5 text-center text-[13px] text-danger">{error}</p>}
 
-        {addingAddress ? (
-          <div className="flex flex-col gap-3 px-5 pt-5">
-            <input
-              autoFocus
-              value={addressQuery}
-              onChange={(e) => setAddressQuery(e.target.value)}
-              placeholder="חפשו רחוב ומספר בית..."
-              className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            />
-            {savingAddress && <p className="text-center text-sm text-ink-secondary">שומר...</p>}
-            {/* *** תיקון: לפני זה בלי שום הגבלת גובה - רשימה ארוכה נחתכה
-                ע"י גבולות ה-sheet. עכשיו גובה קבוע (כ-2 שורות) עם גלילה
-                פנימית, אותה תבנית שכבר תוקנה במקומות אחרים באפליקציה. */}
-            <div className="flex max-h-28 flex-col overflow-y-auto overscroll-contain">
-              {predictions.map((p) => (
-                <button
-                  key={p.placeId}
-                  type="button"
-                  onClick={() => handlePickPrediction(p)}
-                  className="flex items-center gap-2 border-b border-ink-secondary/10 py-3 text-start text-sm text-ink last:border-none"
-                >
-                  <PinIcon className="shrink-0 text-ink-secondary" />
-                  {p.description}
-                </button>
-              ))}
-            </div>
-            <button type="button" onClick={() => setAddingAddress(false)} className="pt-2 text-center text-sm font-semibold text-accent">
-              ביטול
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1 pt-3">
-            <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              disabled={usingCurrentLocation}
-              className="flex items-center gap-3 px-5 py-3.5 text-start disabled:opacity-60"
-            >
-              <span
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
-                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-              >
-                <PinIcon />
-              </span>
-              <span className="text-[15px] font-semibold text-ink">
-                {usingCurrentLocation ? "מאתר את המיקום שלך..." : "השתמש במיקום הנוכחי שלי"}
-              </span>
-            </button>
-
-            {loading ? (
-              <div className="admin-skeleton mx-5 h-16 rounded-card" />
-            ) : (
-              // *** תיקון: "רק 3 בנוסף למיקום הנוכחי" - לפני זה כל הכתובות
-              // השמורות הוצגו בלי הגבלה.
-              addresses.slice(0, 3).map((address) => (
-                <AddressRow
-                  key={address.id}
-                  address={address}
-                  onSelect={() => onSelect(address)}
-                  onSetDefault={() => handleSetDefault(address)}
-                  onDelete={() => handleDelete(address)}
-                />
-              ))
-            )}
-
-            {!user && !loading && (
-              <p className="px-5 py-3 text-center text-[13px] text-ink-secondary">
-                יש להתחבר כדי לשמור כתובות לפעם הבאה.
-              </p>
-            )}
-
-            <button
-              type="button"
-              onClick={handleOpenAllCities}
-              className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5 text-start"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 20l-6 2V6l6-2 6 2 6-2v16l-6 2-6-2z" />
-                  <path d="M9 4v16M15 6v16" />
-                </svg>
-              </span>
-              <span className="text-[15px] font-semibold text-ink">כל הערים שבהן יש Triplace</span>
-            </button>
-
-            <div className="px-5 pt-4">
+      {view === "addAddress" && (
+        <div className="flex flex-col gap-3 px-5 pt-5">
+          <input
+            autoFocus
+            value={addressQuery}
+            onChange={(e) => setAddressQuery(e.target.value)}
+            placeholder="חפשו רחוב ומספר בית..."
+            className="w-full rounded-card border border-ink-secondary/25 bg-white px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+          />
+          {savingAddress && <p className="text-center text-sm text-ink-secondary">שומר...</p>}
+          <div className="flex max-h-28 flex-col overflow-y-auto overscroll-contain">
+            {predictions.map((p) => (
               <button
+                key={p.placeId}
                 type="button"
-                onClick={() => setAddingAddress(true)}
-                className="w-full rounded-pill px-6 py-2 text-sm font-semibold text-white shadow-soft"
-                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                onClick={() => handlePickPrediction(p)}
+                className="flex items-center gap-2 border-b border-ink-secondary/10 py-3 text-start text-sm text-ink last:border-none"
               >
-                + הוספת כתובת
+                <PinIcon className="shrink-0 text-ink-secondary" />
+                {p.description}
               </button>
-            </div>
+            ))}
           </div>
-        )}
-      </BottomSheet>
-
-      {allCitiesOpen && (
-        <BottomSheet onClose={() => setAllCitiesOpen(false)} zIndex={70}>
-          <div className="flex items-center justify-between px-5 pt-4">
-            <button type="button" onClick={() => setAllCitiesOpen(false)} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 6l12 12M18 6L6 18" />
-              </svg>
-            </button>
-            <h2 className="text-lg font-bold text-ink">כל הערים שבהן יש Triplace</h2>
-            <div className="w-9" />
-          </div>
-          <div className="flex flex-col pt-3">
-            {allCitiesLoading ? (
-              <div className="admin-skeleton mx-5 h-16 rounded-card" />
-            ) : (
-              allCities.map((city) => (
-                <button
-                  key={`${city.name}-${city.country}`}
-                  type="button"
-                  onClick={() => handlePickCity(city)}
-                  className="flex items-center gap-3 border-b border-ink-secondary/10 px-5 py-3 text-start"
-                >
-                  <PinIcon className="shrink-0 text-ink-secondary" />
-                  <span>
-                    <span className="block text-[15px] font-semibold text-ink">{city.name}</span>
-                    <span className="block text-[12.5px] text-ink-secondary">{city.country}</span>
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </BottomSheet>
+          <button type="button" onClick={() => setView("main")} className="pt-2 text-center text-sm font-semibold text-accent">
+            ביטול
+          </button>
+        </div>
       )}
-    </>
+
+      {view === "allCities" && (
+        <div className="flex flex-col pt-3">
+          <button type="button" onClick={() => setView("main")} className="px-5 pb-3 text-start text-sm font-semibold text-accent">
+            ← חזרה
+          </button>
+          {allCitiesLoading ? (
+            <div className="admin-skeleton mx-5 h-16 rounded-card" />
+          ) : (
+            allCities.map((city) => (
+              <button
+                key={`${city.name}-${city.country}`}
+                type="button"
+                onClick={() => handlePickCity(city)}
+                className="flex items-center gap-3 border-b border-ink-secondary/10 px-5 py-3 text-start"
+              >
+                <PinIcon className="shrink-0 text-ink-secondary" />
+                <span>
+                  <span className="block text-[15px] font-semibold text-ink">{city.name}</span>
+                  <span className="block text-[12.5px] text-ink-secondary">{city.country}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {view === "main" && (
+        <div className="flex flex-col gap-1 pt-3">
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={usingCurrentLocation}
+            className="flex items-center gap-3 px-5 py-3.5 text-start disabled:opacity-60"
+          >
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              <PinIcon />
+            </span>
+            <span className="text-[15px] font-semibold text-ink">
+              {usingCurrentLocation ? "מאתר את המיקום שלך..." : "השתמש במיקום הנוכחי שלי"}
+            </span>
+          </button>
+
+          {loading ? (
+            <div className="admin-skeleton mx-5 h-16 rounded-card" />
+          ) : (
+            addresses.slice(0, 3).map((address) => (
+              <AddressRow
+                key={address.id}
+                address={address}
+                onSelect={() => onSelect(address)}
+                onSetDefault={() => handleSetDefault(address)}
+                onDelete={() => handleDelete(address)}
+              />
+            ))
+          )}
+
+          {!user && !loading && (
+            <p className="px-5 py-3 text-center text-[13px] text-ink-secondary">
+              יש להתחבר כדי לשמור כתובות לפעם הבאה.
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={handleOpenAllCities}
+            className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5 text-start"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+              </svg>
+            </span>
+            <span className="text-[15px] font-semibold text-ink">כל הערים שבהן יש Triplace</span>
+          </button>
+
+          <div className="px-5 pt-4">
+            <button
+              type="button"
+              onClick={() => setView("addAddress")}
+              className="w-full rounded-pill px-6 py-2 text-sm font-semibold text-white shadow-soft"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              + הוספת כתובת
+            </button>
+          </div>
+        </div>
+      )}
+    </BottomSheet>
   );
 }

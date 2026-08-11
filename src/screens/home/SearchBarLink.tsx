@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,10 +9,6 @@ interface Suggestion {
   secondaryText: string;
 }
 
-/** שורת חיפוש אמיתית עם השלמה אוטומטית חיה מ-Google (אותו דפוס בדיוק
- *  כמו HotelAutocomplete בחו"ל) - במקום קישור סתמי ל-/search. בבחירת
- *  הצעה, או ב-Enter על טקסט חופשי, מנווט ל-/search?q=... שכבר יודע
- *  לחפש במאגר המקומות של האפליקציה. */
 export function SearchBarLink() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -73,7 +69,7 @@ export function SearchBarLink() {
       </div>
 
       {open && suggestions.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
+        <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-[120px] overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
           {suggestions.map((s) => (
             <button
               key={s.placeId}

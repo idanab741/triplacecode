@@ -1,10 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import { findPlaceStatusAndPhoto } from "./placePhotoService";
 
 export interface SavedTripSummary {
   sessionId: string;
   tripType: string;
-  /** שם היעד לתצוגה - "פריז", "אזור מרכז" וכו', תלוי בסוג הטיול */
   destinationLabel: string;
   imageUrl: string | null;
   stopCount: number;
@@ -18,17 +17,11 @@ const TRIP_TYPE_ROUTE: Record<string, string> = {
   nightlife: "nightlife",
 };
 
-/** ממיר trip_type לנתיב התוצאה המתאים - כל סוג טיול עם עמוד תוצאות משלו. */
 export function tripResultPath(tripType: string, sessionId: string): string {
   const routeSegment = TRIP_TYPE_ROUTE[tripType] ?? tripType.replace(/_/g, "-");
   return `/trip-builder/${routeSegment}/result?sessionId=${sessionId}`;
 }
 
-/**
- * מחזיר את טיולי המשתמש - כברירת מחדל רק "שמורים" (is_saved=true), או את
- * **כל** הטיולים שנבנו בפועל (יש להם final_itinerary) אם savedOnly=false.
- * limit אופציונלי - לתצוגת "תצוגה מקדימה" קצרה (למשל בעמוד הבית).
- */
 export async function getSavedTrips(
   supabase: SupabaseClient,
   userId: string,
@@ -38,12 +31,17 @@ export async function getSavedTrips(
 
   let query = supabase
     .from("trip_builder_sessions")
-    .select("id,trip_type,answers,final_itinerary,created_at")
+    .select("id,trip_type,answers,final_itinerary,created_at,is_saved")
     .eq("user_id", userId)
     .not("final_itinerary", "is", null)
     .order("created_at", { ascending: false });
 
-  if (savedOnly) query = query.eq("is_saved", true);
+  if (savedOnly) {
+    query = query.eq("is_saved", true);
+  } else {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    query = query.or(`is_saved.eq.true,created_at.gte.${weekAgo}`);
+  }
   if (options?.limit) query = query.limit(options.limit);
 
   const { data: sessions } = await query;
@@ -56,10 +54,6 @@ export async function getSavedTrips(
       const itinerary = session.final_itinerary as { stops?: { name?: string }[] } | null;
       const firstStopName = itinerary?.stops?.[0]?.name;
 
-      // תווית לתצוגה - אם אין יעד/אזור מפורש (יום כיף וכו') נשתמש בברירת
-      // מחדל קבועה. **חשוב**: לחיפוש התמונה לא משתמשים בברירת המחדל הזו
-      // בשום מקרה - חיפוש "הטיול שלי" בגוגל מחזיר תוצאה אקראית לא קשורה
-      // (זו הייתה בדיוק הסיבה לתמונות השגויות/לא רלוונטיות).
       const destinationLabel = answers?.destination ?? answers?.requestedArea ?? "הטיול שלי";
       const photoQuery = answers?.destination ?? answers?.requestedArea ?? firstStopName ?? null;
 

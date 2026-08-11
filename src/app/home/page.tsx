@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
+import { PartnersSection } from "@/screens/home/PartnersSection";
 
 export default function HomePage() {
   const {
@@ -34,24 +35,13 @@ export default function HomePage() {
   useEffect(() => {
     if (loading || profileLoading || !user) return;
 
-    // אורחים (anonymous auth) אין להם שורת profiles בכלל, ולכן אין להם
-    // איך "לזכור" שראו את ה-Onboarding ב-DB - חייבים לדלג עליהם *לפני*
-    // הבדיקה למטה, אחרת הם ייתקעו בלולאה (מופנים ל-/onboarding בכל
-    // ביקור, כי אין להם profile שאפשר לעדכן בו intro_completed_at).
     const isGuest = Boolean(user.is_anonymous);
 
-    // בפעם הראשונה שמשתמש מגיע לעמוד הבית אחרי התחברות/הרשמה - מציגים
-    // קודם את ה-Onboarding (חד-פעמי, לפי profiles.intro_completed_at ב-DB -
-    // לא localStorage, כדי שזה יהיה עקבי עם auth/callback/route.ts
-    // שרץ בשרת ואין לו גישה ל-localStorage בכלל).
     if (!isGuest && !isMainOnboardingComplete(profile)) {
       router.replace("/onboarding");
       return;
     }
 
-    // אורחים לא אמורים להיזרק אוטומטית להשלמת פרופיל - המטרה של מצב
-    // אורח היא שיוכלו לגלוש חופשי בעמוד הבית, ורק אם ילחצו על פעולה
-    // שדורשת חשבון אמיתי - שם תופיע הזמנה להירשם (לא אוטומטית).
     if (isGuest) return;
 
     if (!isProfileComplete(profile)) {
@@ -120,8 +110,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-bg pb-28">
       <div className="mx-auto max-w-xl">
-        {/* בלוק עליון מאוחד: ה-Hero ממשיך בצבע האחיד שלו (#e5e6f4, נדגם מתחתית תמונת ה-Hero)
-            עד אחרי הקטגוריות, ורק שם מתעגל ועובר לרקע הרגיל של הדף */}
         <div className="overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
           <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
           <HomeHero />
@@ -144,6 +132,7 @@ export default function HomePage() {
             destinations={destinations}
           />
           <MyTripsSection />
+          <PartnersSection />
         </div>
       </div>
 
