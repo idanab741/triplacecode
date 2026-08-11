@@ -1,4 +1,4 @@
-export { Button } from "./Button";
+﻿export { Button } from "./Button";
 export { Input } from "./Input";
 export { PasswordInput } from "./PasswordInput";
 export { Card } from "./Card";
@@ -18,3 +18,4 @@ export { ChipGroup } from "./ChipGroup";
 export { RadioCardGroup } from "./RadioCardGroup";
 export { Stepper } from "./Stepper";
 export { SwipeCard } from "./SwipeCard";
+export { BottomSheet } from "./BottomSheet";

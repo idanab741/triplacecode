@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
+import { BottomSheet } from "@/components/ui";
 import {
   listAddresses,
   addAddress,
@@ -205,19 +206,14 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg pb-24"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mt-3 h-1 w-10 rounded-pill bg-ink-secondary/30" />
-
-        <div className="flex items-center justify-between px-5 pt-4">
-          <button type="button" onClick={onClose} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
+    <>
+      <BottomSheet onClose={onClose}>
+      <div className="flex items-center justify-between px-5 pt-4">
+        <button type="button" onClick={onClose} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
           <h2 className="text-lg font-bold text-ink">{addingAddress ? "הוספת כתובת" : "בחרו את המיקום שלכם"}</h2>
           <div className="w-9" />
         </div>
@@ -237,7 +233,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             {/* *** תיקון: לפני זה בלי שום הגבלת גובה - רשימה ארוכה נחתכה
                 ע"י גבולות ה-sheet. עכשיו גובה קבוע (כ-2 שורות) עם גלילה
                 פנימית, אותה תבנית שכבר תוקנה במקומות אחרים באפליקציה. */}
-            <div className="flex max-h-24 flex-col overflow-y-auto overscroll-contain">
+            <div className="flex max-h-28 flex-col overflow-y-auto overscroll-contain">
               {predictions.map((p) => (
                 <button
                   key={p.placeId}
@@ -300,7 +296,12 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               onClick={handleOpenAllCities}
               className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5 text-start"
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary text-lg">🗺️</span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 20l-6 2V6l6-2 6 2 6-2v16l-6 2-6-2z" />
+                  <path d="M9 4v16M15 6v16" />
+                </svg>
+              </span>
               <span className="text-[15px] font-semibold text-ink">כל הערים שבהן יש Triplace</span>
             </button>
 
@@ -308,7 +309,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               <button
                 type="button"
                 onClick={() => setAddingAddress(true)}
-                className="w-full rounded-pill px-6 py-4 text-base font-bold text-white shadow-soft"
+                className="w-full rounded-pill px-6 py-2 text-sm font-semibold text-white shadow-soft"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
                 + הוספת כתובת
@@ -316,44 +317,41 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             </div>
           </div>
         )}
-      </div>
+      </BottomSheet>
 
       {allCitiesOpen && (
-        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50" onClick={() => setAllCitiesOpen(false)}>
-          <div className="max-h-[80vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg pb-8" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mt-3 h-1 w-10 rounded-pill bg-ink-secondary/30" />
-            <div className="flex items-center justify-between px-5 pt-4">
-              <button type="button" onClick={() => setAllCitiesOpen(false)} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-              <h2 className="text-lg font-bold text-ink">כל הערים שבהן יש Triplace</h2>
-              <div className="w-9" />
-            </div>
-            <div className="flex flex-col pt-3">
-              {allCitiesLoading ? (
-                <div className="admin-skeleton mx-5 h-16 rounded-card" />
-              ) : (
-                allCities.map((city) => (
-                  <button
-                    key={`${city.name}-${city.country}`}
-                    type="button"
-                    onClick={() => handlePickCity(city)}
-                    className="flex items-center gap-3 border-b border-ink-secondary/10 px-5 py-3 text-start"
-                  >
-                    <PinIcon className="shrink-0 text-ink-secondary" />
-                    <span>
-                      <span className="block text-[15px] font-semibold text-ink">{city.name}</span>
-                      <span className="block text-[12.5px] text-ink-secondary">{city.country}</span>
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
+        <BottomSheet onClose={() => setAllCitiesOpen(false)} zIndex={70}>
+          <div className="flex items-center justify-between px-5 pt-4">
+            <button type="button" onClick={() => setAllCitiesOpen(false)} aria-label="סגירה" className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-soft">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-bold text-ink">כל הערים שבהן יש Triplace</h2>
+            <div className="w-9" />
           </div>
-        </div>
+          <div className="flex flex-col pt-3">
+            {allCitiesLoading ? (
+              <div className="admin-skeleton mx-5 h-16 rounded-card" />
+            ) : (
+              allCities.map((city) => (
+                <button
+                  key={`${city.name}-${city.country}`}
+                  type="button"
+                  onClick={() => handlePickCity(city)}
+                  className="flex items-center gap-3 border-b border-ink-secondary/10 px-5 py-3 text-start"
+                >
+                  <PinIcon className="shrink-0 text-ink-secondary" />
+                  <span>
+                    <span className="block text-[15px] font-semibold text-ink">{city.name}</span>
+                    <span className="block text-[12.5px] text-ink-secondary">{city.country}</span>
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </BottomSheet>
       )}
-    </div>
+    </>
   );
 }

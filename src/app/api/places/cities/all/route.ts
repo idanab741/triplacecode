@@ -8,7 +8,10 @@ import { createClient } from "@/services/supabase/server";
  */
 export async function GET() {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("destinations").select("name, country").order("country").order("name");
+  // *** תיקון: מיון לפי שם העיר בלבד (א'-ת') - לא לפי מדינה קודם. לפני
+  // זה הרשימה קובצה לפי מדינה ורק בתוכה מוינה, מה שנראה "לא מסודר" כי
+  // זה לא תאם לציפייה של רשימה אלפביתית אחידה.
+  const { data, error } = await supabase.from("destinations").select("name, country").order("name");
 
   if (error) return NextResponse.json({ cities: [] });
 

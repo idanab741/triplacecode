@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
+import { BottomSheet } from "@/components/ui";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
 export interface TripMatchFilters {
@@ -101,12 +102,8 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-t-card bg-bg p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-pill bg-ink-secondary/30" />
+    <BottomSheet onClose={onClose}>
+      <div className="p-5">
         <h2 className="text-lg font-bold text-ink">פילטרים</h2>
 
         <div className="mt-5 flex flex-col gap-5">
@@ -204,6 +201,6 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
           </button>
         </div>
       </div>
-    </div>
+    </BottomSheet>
   );
 }
