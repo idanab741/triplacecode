@@ -138,9 +138,9 @@ export default function ProfileSetupPage() {
               type="button"
               onClick={() => router.back()}
               aria-label="חזרה"
-              className="flex h-9 w-9 items-center justify-center text-ink"
+              className="flex h-10 w-10 items-center justify-center text-ink"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m14 6-6 6 6 6" />
               </svg>
             </button>
