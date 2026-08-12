@@ -21,3 +21,4 @@ export { SwipeCard } from "./SwipeCard";
 export { BottomSheet } from "./BottomSheet";
 export { SwipeToDeleteRow } from "./SwipeToDeleteRow";
 export { SwipeUpToDeleteCard } from "./SwipeUpToDeleteCard";
+export { BackButton } from "./BackButton";

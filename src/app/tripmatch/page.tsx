@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Screen, SwipeCard } from "@/components/ui";
+import { Screen, SwipeCard, BackButton } from "@/components/ui";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { CategoryPicker } from "@/screens/tripmatch/CategoryPicker";
 import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
@@ -20,11 +20,6 @@ type Stage = "city" | "category" | "swiping" | "results";
 
 type UserPreferences = { interests: string[]; culinaryStyles: string[]; kosher: boolean; accessibility: boolean };
 
-/** ניקוד התאמה (60-99%): דירוג המקום + **התאמה אמיתית לפרופיל מהאונבורדינג**
- *  (תחומי עניין וסגנון קולינרי שהמשתמש בחר בהעדפות, כשרות ונגישות אם
- *  ביקש) + חפיפה עם הפילטרים הידניים שנבחרו כרגע. לפני זה זה התבסס רק
- *  על דירוג גוגל + פילטרים ידניים - בלי שום קשר להעדפות שהמשתמש כבר
- *  ענה עליהן באונבורדינג. */
 function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilters, userPreferences: UserPreferences | null): number {
   let score = 45;
   if (candidate.rating != null) score += (candidate.rating / 5) * 15;
@@ -37,9 +32,6 @@ function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilter
     score += Math.min(1, overlap / Math.min(onboardingTags.length, 5)) * 15;
   }
 
-  // *** נוסף: ציוני TripMatch/DNA שהאדמין קבע ידנית או עם "✨ תקן עם AI"
-  // (tripmatch_scores/dna_scores) - עד עכשיו בכלל לא נלקחו בחשבון כאן,
-  // למרות שזו בדיוק המטרה שלהם.
   const adminScores = [...Object.values(candidate.tripmatchScores ?? {}), ...Object.values(candidate.dnaScores ?? {})];
   if (adminScores.length > 0) {
     const avg = adminScores.reduce((a, b) => a + b, 0) / adminScores.length;
@@ -50,7 +42,7 @@ function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilter
     const overlap = filters.tags.filter((t) => candidateTags.has(t)).length;
     score += (overlap / filters.tags.length) * 10;
   } else if (onboardingTags.length === 0 && adminScores.length === 0) {
-    score += 8; // אין שום מידע (לא פילטר, לא אונבורדינג, לא תיוג אדמין) - ציון בסיס נדיב
+    score += 8;
   }
 
   if (userPreferences?.kosher && candidate.kosher) score += 5;
@@ -108,7 +100,6 @@ export default function TripMatchPage() {
     setSelectedCityLabel(option.label);
     setCityInput(option.label);
     setCityOptions([]);
-    // ה-HERO נעלם ב-Fade+Slide (הטרנזישן מוגדר על ה-wrapper), ורק אז עוברים שלב
     setHeroVisible(false);
     window.setTimeout(() => setStage("category"), 280);
   }
@@ -152,9 +143,6 @@ export default function TripMatchPage() {
 
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // *** נוסף: מסיים את הסבב באופן יזום (כפתור "סיימתי לסרוק ✓") - בלי
-  // זה, המשתמש חייב להחליק את כל המאגר (יכול להיות עשרות/מאות מקומות,
-  // במיוחד אחרי שהתיקון להחרגה קבועה נוסף) לפני שהמעבר קורה לבד.
   function handleFinish() {
     if (sessionLikedPlaces.length === 0) {
       router.push("/home");
@@ -163,9 +151,6 @@ export default function TripMatchPage() {
     }
   }
 
-  // *** נוסף: כשנגמרים המועמדים אחרי שכבר החליקו לפחות פעם אחת - אם לא
-  // סימנו שום לייק, חוזרים ישר לעמוד הבית (אין טעם במסך תוצאות ריק).
-  // אם כן סימנו לייקים, עוברים למסך תוצאות (כמו עמוד מסלול, בלי מפה).
   useEffect(() => {
     if (stage === "swiping" && hasSwipedAny && candidates.length === 0 && !busy) {
       handleFinish();
@@ -188,8 +173,6 @@ export default function TripMatchPage() {
           const distanceKm = haversineDistanceKm(userLocation, { lat: c.latitude, lng: c.longitude });
           return { ...c, distanceKm, etaMinutes: estimateTravelMinutes(distanceKm, "drive") };
         });
-    // *** נוסף: מיון לפי אחוז התאמה - מהגבוה לנמוך, כדי שהמקומות
-    // הכי מתאימים למשתמש יוצגו קודם בהחלקה, לא לפי סדר אקראי מה-DB.
     return [...withDistance].sort(
       (a, b) => computeMatchPercent(b, filters, userPreferences) - computeMatchPercent(a, filters, userPreferences)
     );
@@ -222,7 +205,6 @@ export default function TripMatchPage() {
       setBusy(false);
     }
 
-    // אין מעבר אוטומטי אחרי Like - עוצרים על Dialog, בדיוק כמו במפרט
     if (liked) setLikedPlace(decidedPlace);
   }
 
@@ -231,21 +213,14 @@ export default function TripMatchPage() {
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
       {stage !== "swiping" && (
-        <div className="relative h-16">
-          <div className="absolute left-2 top-4 flex items-center gap-2">
-            <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
-            <button
-              type="button"
-              onClick={() => router.push("/home")}
-              aria-label="חזרה"
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
-            </button>
+        <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+          <div className="relative h-16">
+            <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+              <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />
+              <BackButton onBack={() => router.push("/home")} />
+            </div>
           </div>
-        </div>
+        </header>
       )}
 
       {stage !== "swiping" && (

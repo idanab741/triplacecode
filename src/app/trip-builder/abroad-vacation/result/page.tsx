@@ -339,6 +339,43 @@ function AbroadVacationResultContent() {
 
   return (
     <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
+            <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Link
+              href="/home"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              aria-label="חזרה לדף הבית"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </Link>
+          </div>
+
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveTrip}
+              disabled={saving}
+              aria-label="שמור חופשה"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
+            >
+              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareTrip}
+              aria-label="שתף חופשה"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+            >
+              <Image src="/icons/share.png" alt="" width={26} height={26} />
+            </button>
+          </div>
+        </div>
+      </header>
+
       <div className="relative w-full">
         <Image
           src="/images/hero-abroad-vacation.png"
@@ -346,42 +383,8 @@ function AbroadVacationResultContent() {
           width={800}
           height={450}
           priority
-          className="h-56 w-full object-cover"
+          className="h-auto w-full"
         />
-        <div className="absolute left-2 top-4 flex items-center gap-2">
-          <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
-          <Link
-            href="/home"
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-            aria-label="חזרה לדף הבית"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </Link>
-        </div>
-
-        {/* שמור + שתף - בתוך תמונת ה-hero, בצד ימין, באותו גובה בדיוק כמו
-            הלוגו. רקע לבן-שקוף (כמו אייקוני הפעמון/מיקום בעמוד הבית). */}
-        <div className="absolute right-2 top-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSaveTrip}
-            disabled={saving}
-            aria-label="שמור חופשה"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm disabled:opacity-60"
-          >
-            {saved ? "✓" : <Image src="/icons/save.png" alt="" width={20} height={20} />}
-          </button>
-          <button
-            type="button"
-            onClick={handleShareTrip}
-            aria-label="שתף חופשה"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm"
-          >
-            <Image src="/icons/share.png" alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
-          </button>
-        </div>
       </div>
 
       <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-4">

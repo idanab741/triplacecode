@@ -1,13 +1,13 @@
 ﻿"use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoritePlaces, toggleFavorite } from "@/services/favorites/favoritesService";
 import type { UnifiedPlace } from "@/services/places/unifiedPlaceService";
 import { Screen, Skeleton, Button, SwipeToDeleteRow } from "@/components/ui";
+import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 
 interface SavedTrip {
@@ -98,27 +98,7 @@ function TripsPageContent() {
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
-        <div className="relative h-16">
-          <div className="absolute left-2 top-4 flex items-center gap-2">
-            <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
-            <button
-              type="button"
-              onClick={() => router.push("/home")}
-              aria-label="חזרה"
-              className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="absolute right-5 top-4 flex h-9 items-center">
-            <h1 className="text-base font-bold text-ink">הטיולים שלי</h1>
-          </div>
-        </div>
-      </header>
+      <SimpleAppHeader onBack={() => router.push("/home")} title="הטיולים שלי" />
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
         <div className="flex rounded-pill bg-bg-secondary p-1">

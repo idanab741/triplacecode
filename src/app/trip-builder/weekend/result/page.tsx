@@ -70,6 +70,21 @@ function WeekendResultContent() {
     }
   }
 
+  async function handleShareTrip() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `הסופ"ש שלי מוכן! תראו את המסלול: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const itinerary = session?.final_itinerary;
     if (!session || !itinerary || !event.over || event.active.id === event.over.id) return;
@@ -187,6 +202,43 @@ function WeekendResultContent() {
 
   return (
     <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
+            <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Link
+              href="/home"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              aria-label="חזרה לדף הבית"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </Link>
+          </div>
+
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSaveTrip}
+              disabled={saving}
+              aria-label="שמור מסלול"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
+            >
+              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareTrip}
+              aria-label="שתף מסלול"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+            >
+              <Image src="/icons/share.png" alt="" width={26} height={26} />
+            </button>
+          </div>
+        </div>
+      </header>
+
       <div className="relative w-full">
         <Image
           src="/images/hero-weekend.png"
@@ -194,20 +246,8 @@ function WeekendResultContent() {
           width={800}
           height={450}
           priority
-          className="h-56 w-full object-cover"
+          className="h-auto w-full"
         />
-        <div className="absolute left-2 top-4 flex items-center gap-2">
-          <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
-          <Link
-            href="/home"
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
-            aria-label="חזרה לדף הבית"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </Link>
-        </div>
       </div>
 
       <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-4">

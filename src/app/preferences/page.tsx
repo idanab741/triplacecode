@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { Chip, ImageOptionCard, Screen, Switch } from "@/components/ui";
+import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/profileService";
@@ -60,10 +60,6 @@ function PreferencesPageContent() {
     }
   }, [loading, profileLoading, user, profile, router]);
 
-  // בדיקה כפולה/עמידה: לא משנה איך המשתמש הגיע לכאן (מ-profile-setup או
-  // בכל דרך אחרת) - אם הוא עדיין לא ראה את ה-Onboarding, מיירטים אותו
-  // לכאן *לפני* שממשיכים בזרימת ההעדפות. זה נקודת עצירה אמינה יותר
-  // מלהסתמך רק על הניווט בתוך profile-setup.
   useEffect(() => {
     if (loading || profileLoading || !user || !isProfileComplete(profile)) return;
     if (!isMainOnboardingComplete(profile)) {
@@ -73,7 +69,6 @@ function PreferencesPageContent() {
 
   useEffect(() => {
     if (!preferencesLoading && isPreferencesComplete(preferences) && !returnTo) {
-      // אותה הגנה מפני מרוץ כמו ב-profile-setup - לא לדרוס ניווט ל-Onboarding
       if (!isMainOnboardingComplete(profile)) return;
       router.replace("/home");
     }
@@ -100,8 +95,6 @@ function PreferencesPageContent() {
     if (markComplete) {
       await completePreferences(user.id, updatedForm);
     } else {
-      // שלב הקולינריה ממוזג עם מגבלות התזונה/כשרות, ושלב ההתניידות ממוזג
-      // עם הנגישות - שומרים את שניהם יחד כשעוזבים את השלב המתאים.
       let fieldsToSave: Partial<PreferencesFormState>;
       if (step.key === "culinary_styles") {
         fieldsToSave = { culinary_styles: updatedForm.culinary_styles, dietary_restrictions: updatedForm.dietary_restrictions, kosher: updatedForm.kosher };
@@ -150,23 +143,13 @@ function PreferencesPageContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing>
-      <div className="-mx-5 -mt-8 flex items-center justify-end gap-2 px-5 py-4">
-        <Image src="/images/trip-triplace-logo.png" alt="" width={110} height={34} className="object-contain" />
-        <button
-          type="button"
-          onClick={() => (stepIndex > 0 ? handleBack() : router.push(returnTo || "/home"))}
-          disabled={saving}
-          aria-label="חזרה"
-          className="flex h-9 w-9 shrink-0 items-center justify-center text-ink disabled:opacity-40"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </button>
-      </div>
+    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+      <SimpleAppHeader
+        onBack={() => (stepIndex > 0 ? handleBack() : router.push(returnTo || "/home"))}
+        disabled={saving}
+      />
 
-      <div className="mx-auto flex max-w-xl flex-col gap-6 pb-4 pt-2">
+      <div className="mx-auto flex max-w-xl flex-col gap-6 px-5 pb-4 pt-5">
         <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary">
           <div
             className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all"
@@ -181,8 +164,6 @@ function PreferencesPageContent() {
           </p>
         </header>
 
-        {/* בלי כרטיסייה לבנה עוטפת בשום שלב - האריחים/הצ'יפים עומדים ישירות
-            על רקע העמוד, עקבי בין כל השלבים (לא רק שלבים עם תמונות). */}
         {step.type === "multi" && step.options.some((o) => o.imageSrc) && (
           <div className={`grid content-start gap-1.5 ${step.key === "vacation_preferences" ? "grid-cols-2" : "grid-cols-3"}`}>
             {step.options.map((option) => (
@@ -220,7 +201,6 @@ function PreferencesPageContent() {
           />
         )}
 
-        {/* מגבלות תזונה (כולל כשרות) ממוזגות באותו עמוד של סגנון קולינרי */}
         {step.key === "culinary_styles" && (
           <div className="border-t border-ink-secondary/10 pt-3">
             <p className="mb-2.5 text-center text-sm font-semibold text-ink">העדפות מיוחדות</p>
@@ -246,7 +226,6 @@ function PreferencesPageContent() {
           </div>
         )}
 
-        {/* נגישות ממוזגת באותו עמוד של התניידות, באותו פורמט של העדפות מיוחדות */}
         {step.key === "transportation" && (
           <div className="border-t border-ink-secondary/10 pt-3">
             <p className="mb-2.5 text-center text-sm font-semibold text-ink">העדפות נוספות</p>
