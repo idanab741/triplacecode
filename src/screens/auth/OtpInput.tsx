@@ -8,7 +8,7 @@ interface OtpInputProps {
   length?: number;
 }
 
-export function OtpInput({ value, onChange, length = 6 }: OtpInputProps) {
+export function OtpInput({ value, onChange, length = 8 }: OtpInputProps) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
 
@@ -40,7 +40,7 @@ export function OtpInput({ value, onChange, length = 6 }: OtpInputProps) {
   }
 
   return (
-    <div className="flex justify-center gap-2" dir="ltr">
+    <div className="flex justify-center gap-1.5" dir="ltr">
       {digits.map((digit, i) => (
         <input
           key={i}
@@ -54,7 +54,7 @@ export function OtpInput({ value, onChange, length = 6 }: OtpInputProps) {
           onChange={(e) => updateDigit(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(e, i)}
           onPaste={(e) => handlePaste(e, i)}
-          className="h-14 w-11 rounded-card border border-ink-secondary/25 bg-bg text-center text-xl font-bold text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
+          className="h-12 w-9 rounded-card border border-ink-secondary/25 bg-bg text-center text-lg font-bold text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       ))}
     </div>

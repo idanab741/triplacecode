@@ -156,8 +156,8 @@ function AuthPageContent() {
 
   async function handleVerifyOtp(e: FormEvent) {
     e.preventDefault();
-    if (otpCode.trim().length < 6) {
-      setOtpError("יש להזין קוד בן 6 ספרות");
+    if (otpCode.trim().length < 8) {
+      setOtpError("יש להזין קוד בן 8 ספרות");
       return;
     }
     setOtpLoading(true);
@@ -311,7 +311,7 @@ function AuthPageContent() {
         {tab === "signup" && awaitingOtp && (
           <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
             <p className="text-center text-sm text-ink-secondary">
-              שלחנו קוד בן 6 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
+              שלחנו קוד בן 8 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
             </p>
             <Field label="קוד אימות">
               <OtpInput value={otpCode} onChange={setOtpCode} />
