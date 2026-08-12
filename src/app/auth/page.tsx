@@ -17,6 +17,7 @@ import {
 import { getProfile } from "@/services/profile/profileService";
 import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
+import { OtpInput } from "@/screens/auth/OtpInput";
 
 type Tab = "signup" | "signin";
 
@@ -314,15 +315,7 @@ function AuthPageContent() {
               שלחנו קוד בן 6 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
             </p>
             <Field label="קוד אימות">
-              <Input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
-                className="text-center tracking-[0.4em]"
-              />
+              <OtpInput value={otpCode} onChange={setOtpCode} />
             </Field>
             {otpError && <p className="text-sm text-danger">{otpError}</p>}
             {otpResent && <p className="text-sm text-accent">קוד חדש נשלח.</p>}

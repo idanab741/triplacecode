@@ -140,7 +140,9 @@ export default function ProfileSetupPage() {
               aria-label="חזרה"
               className="flex h-9 w-9 items-center justify-center text-ink"
             >
-              <Icon name="back-chevron" size={18} />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
             </button>
           </div>
         <div
@@ -188,7 +190,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthDay}
                 onChange={(e) => setBirthDay(e.target.value)}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
               >
                 <option value="">יום</option>
                 {BIRTH_DAYS.map((d) => (
@@ -200,7 +202,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthMonth}
                 onChange={(e) => setBirthMonth(e.target.value)}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
               >
                 <option value="">חודש</option>
                 {HEBREW_MONTHS.map((m, i) => (
@@ -212,7 +214,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg px-3 py-3 text-sm text-ink"
+                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
               >
                 <option value="">שנה</option>
                 {BIRTH_YEARS.map((y) => (
