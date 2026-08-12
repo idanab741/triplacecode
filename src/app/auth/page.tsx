@@ -46,7 +46,7 @@ function AppleIcon() {
 
 function BackIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
       <path d="m14 6-6 6 6 6" />
     </svg>
   );
@@ -225,22 +225,21 @@ function AuthPageContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing={false} className="!bg-white !px-0 !pt-0">
       <div className="relative w-full">
-        <div className="relative h-64 w-full overflow-hidden">
-          <Image
-            src="/images/hero-auth.png"
-            alt="קמע triplace עם דרכון ומזוודה, מוקף בתמונות יעדי טיול"
-            fill
-            priority
-            className="object-cover"
-          />
-        </div>
+        <Image
+          src="/images/hero-auth.png"
+          alt="קמע triplace עם דרכון ומזוודה, מוקף בתמונות יעדי טיול"
+          width={800}
+          height={800}
+          priority
+          className="h-auto w-full"
+        />
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="חזרה"
-          className="absolute end-4 top-4 flex h-9 w-9 items-center justify-center text-ink"
+          className="absolute end-4 top-4 flex h-10 w-10 items-center justify-center text-ink"
         >
           <BackIcon />
         </button>

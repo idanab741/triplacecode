@@ -37,11 +37,11 @@ export default function SplashPage() {
   }
 
   if (loading || profileLoading || user) {
-    return <main className="min-h-screen bg-bg" />;
+    return <main className="min-h-screen bg-white" />;
   }
 
   return (
-    <main className="flex min-h-screen flex-1 flex-col bg-bg">
+    <main className="flex min-h-screen flex-1 flex-col bg-white">
       <Image
         src="/images/hero-splash.png"
         alt="קמע triplace, AI Powered by triplace"
@@ -51,9 +51,13 @@ export default function SplashPage() {
         className="h-auto w-full"
       />
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-10 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 bg-white px-6 pb-10 text-center">
         <div className="flex w-full max-w-xl flex-col gap-3">
-          <Button href="/auth" fullWidth className="!py-2 !text-sm !font-semibold">
+          <Button
+            href="/auth"
+            fullWidth
+            className="!bg-[var(--color-primary-end)] !py-2 !text-sm !font-semibold"
+          >
             בואו נתחיל!
           </Button>
           <Button
@@ -61,7 +65,7 @@ export default function SplashPage() {
             fullWidth
             onClick={handleGuestLogin}
             disabled={guestLoading}
-            className="!py-2 !text-sm !font-semibold"
+            className="!border !border-ink-secondary/15 !bg-white !py-2 !text-sm !font-semibold"
           >
             {guestLoading ? "נכנס..." : "היכנס כאורח"}
           </Button>
