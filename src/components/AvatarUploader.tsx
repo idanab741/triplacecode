@@ -7,15 +7,13 @@ interface AvatarUploaderProps {
   userId: string;
   initialUrl?: string | null;
   onUploaded?: (url: string) => void;
-  /** קוטר העיגול בפיקסלים. ברירת מחדל 112. מתעלמים ממנו במצב fluid. */
   size?: number;
-  /** במצב fluid העיגול ממלא את ההורה (ההורה קובע את הגודל) - למשל כשמצמידים אותו לחור בתמונת hero. */
   fluid?: boolean;
-  /** מסגרת כחולה סביב העיגול. מכבים כשהמסגרת כבר מצוירת בתמונת הרקע. */
   bordered?: boolean;
+  deferSave?: boolean;
+  onFileSelected?: (file: File) => void;
 }
 
-/** עיגול תמונת פרופיל עם כפתור פלוס להעלאת תמונה מהמכשיר. */
 export function AvatarUploader({
   userId,
   initialUrl,
@@ -23,6 +21,8 @@ export function AvatarUploader({
   size = 112,
   fluid = false,
   bordered = true,
+  deferSave = false,
+  onFileSelected,
 }: AvatarUploaderProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -32,6 +32,15 @@ export function AvatarUploader({
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (deferSave) {
+      setError(null);
+      const previewUrl = URL.createObjectURL(file);
+      setAvatarUrl(previewUrl);
+      onFileSelected?.(file);
+      e.target.value = "";
+      return;
+    }
 
     setUploading(true);
     setError(null);
