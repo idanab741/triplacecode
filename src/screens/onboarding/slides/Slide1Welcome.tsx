@@ -18,7 +18,7 @@ export function Slide1Welcome() {
           <RealPhoto src="/images/home-hero.png" alt="TRIPLACE - AI Powered by" />
         </div>
 
-        <div className="-mt-2 rounded-t-[26px] bg-bg px-4 pb-5 pt-4 text-center">
+        <div className="-mt-0 rounded-t-[26px] bg-bg px-4 pb-5 pt-4 text-center">
           <p className="text-lg font-bold text-ink">בוקר טוב!</p>
           <p className="mt-0.5 text-[13px] font-medium text-ink-secondary">הטיול הבא שלך מתחיל כאן</p>
 

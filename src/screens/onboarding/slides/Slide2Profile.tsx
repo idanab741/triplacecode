@@ -20,7 +20,7 @@ export function Slide2Profile() {
           />
           <div
             className="absolute aspect-square -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-2 border-white bg-bg-secondary shadow-soft"
-            style={{ left: "49.73%", top: "69.28%", width: "38%" }}
+            style={{ left: "49.73%", top: "71.7%", width: "38%" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/images/avatar-placeholder.png" alt="" className="h-full w-full object-cover" />

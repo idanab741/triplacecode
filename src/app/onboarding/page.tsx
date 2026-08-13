@@ -4,43 +4,37 @@ import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui";
 import { OnboardingProgress } from "@/screens/onboarding/OnboardingProgress";
 import { OnboardingBackdrop } from "@/screens/onboarding/OnboardingBackdrop";
 import { Slide1Welcome } from "@/screens/onboarding/slides/Slide1Welcome";
 import { Slide2Profile } from "@/screens/onboarding/slides/Slide2Profile";
+import { Slide3TripMatch } from "@/screens/onboarding/slides/Slide3TripMatch";
+import { Slide4Ai } from "@/screens/onboarding/slides/Slide4Ai";
+import { Slide5Route } from "@/screens/onboarding/slides/Slide5Route";
 
-/** מפתח localStorage שמסמן שהמשתמש כבר ראה את ה-Onboarding, כדי שלא יוצג שוב.
- *  המסך הזה מופיע פעם אחת, מיד אחרי שמשתמש מתחבר/נרשם ומגיע לעמוד הבית
- *  לראשונה (ראו את הבדיקה ב-src/app/home/page.tsx) - לכן אין כאן שום
- *  לוגיקת "המשך כאורח" - המשתמש כבר מחובר בשלב הזה. */
 export const ONBOARDING_STORAGE_KEY = "triplace_onboarding_completed";
 
-const SLIDES = [Slide1Welcome, Slide2Profile];
+const SLIDES = [Slide1Welcome, Slide2Profile, Slide3TripMatch, Slide4Ai, Slide5Route];
 
-/** תמונת הרקע (המטושטשת) של כל מסך - צילום ה-hero האמיתי של אותו פיצ'ר
- *  באפליקציה, כדי שהרקע מאחורי כל מסך Onboarding יהיה תמיד "חלון" לתוכן
- *  האמיתי, לא רקע לבן גנרי. הרקע ממוקם ברמת הדף (לא בתוך כל שקופית), כדי
- *  שהוא יכסה את המסך כולו - כולל פס ההתקדמות והכפתור התחתון. */
 const SLIDE_BACKDROPS = [
   "/images/home-hero.png",
   "/images/hero-profile-setup.png",
+  "/images/destination/newyork.png",
+  "/images/tripy.png",
+  "/images/hero-day-trip-result.png",
 ];
 
 const SWIPE_THRESHOLD_PX = 55;
-/** משיכה מעבר לקצה הראשון/אחרון מקבלת התנגדות (גומי), כמו בכל מנגנון סוויפ אחר באפליקציה. */
 const EDGE_RESISTANCE = 0.35;
 
 function BackArrow() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 6l6 6-6 6" />
     </svg>
   );
 }
 
-/** מסך ה-Onboarding המלא - 5 מסכים, כל אחד ממחיש יכולת אחת קיימת באפליקציה.
- *  מוצג פעם אחת בלבד למשתמש חדש, אחרי כניסה, לפני עמוד הבית. */
 export default function OnboardingPage() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
@@ -51,8 +45,6 @@ export default function OnboardingPage() {
 
   const trackRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  // דגלים/מיקומים של מחוות הסוויפ - לא state בכוונה, כדי לא לגרום ל-re-render
-  // בכל פיקסל תזוזה (בדיוק כמו הלוגיקה הקיימת ב-SortableStopCard.tsx).
   const dragState = useRef({
     active: false,
     startX: 0,
@@ -66,19 +58,12 @@ export default function OnboardingPage() {
     try {
       window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
     } catch {
-      // localStorage לא זמין (מצב פרטי וכו') - לא קריטי, לא חוסם את הזרימה
+      // localStorage לא זמין - לא קריטי
     }
-    // כותבים ל-DB וממתינים לזה *לפני* שממשיכים - קריטי: אם לא נחכה,
-    // המשתמש ינווט ל-/home בזמן שה-profile הישן (מלפני העדכון) עדיין
-    // יושב ב-context, ועמוד הבית יראה intro_completed_at ריק ויקפיץ
-    // בחזרה ל-/onboarding מיד. refreshProfile() בסוף מוודא שה-context
-    // מתעדכן עם הנתון החדש לפני שהניווט קורה.
     try {
       const res = await fetch("/api/onboarding/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ feature: "main" }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        // מציגים את זה בגלוי - אחרת המשתמש רק "ייתקע" בלולאה בחזרה
-        // ל-Onboarding בלי שום הסבר למה.
         alert(`שגיאה בסימון הסיור כהושלם:\n\n${data?.error ?? res.status}\n\nהמשך לאפליקציה ינסה בכל זאת, אבל ייתכן שתחזור לכאן שוב.`);
         return false;
       }
@@ -102,9 +87,6 @@ export default function OnboardingPage() {
   }
 
   function renderTrack(nextStep: number) {
-    // הערה: הכיוון פה (חיובי) נכון לצורה שבה track מקונן בתוך stage כשניהם
-    // יורשים dir="rtl" באופן טבעי (בלי לאלץ direction:ltr על אף אחד מהם) -
-    // זה שונה ממימוש עצמאי עם position:absolute, שם הסימן היה הפוך.
     setTrackTransform(nextStep * (100 / total), true);
   }
 
@@ -127,9 +109,6 @@ export default function OnboardingPage() {
     goTo(step - 1);
   }
 
-  // --- סוויפ אופקי: שמאלה = הבא, ימינה = אחורה (כמו קרוסלת RTL רגילה) ---
-  // תופס pointer capture כבר ב-pointerdown (ולא רק אחרי זיהוי כיוון), כדי
-  // שגרירה על תמונה בתוך המסך לא "תיחטף" ע"י גרירת-תמונה מובנית של הדפדפן.
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     dragState.current = {
       active: true,
@@ -145,9 +124,6 @@ export default function OnboardingPage() {
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const drag = dragState.current;
     if (!drag.active) return;
-    // dx הפוך בכוונה: המשתמשים דיווחו שההחלקה עבדה הפוך (שמאלה הזיז ימינה
-    // ולהפך) - כך שההגדרה הנכונה בפועל היא ההפך ממה שהאינטואיציה הגיאומטרית
-    // הראשונית הייתה מציעה.
     const dx = -(e.clientX - drag.startX);
     const dy = e.clientY - drag.startY;
 
@@ -251,9 +227,14 @@ export default function OnboardingPage() {
 
       <div className="px-6 pb-8 pt-4">
         <p className="mb-2.5 text-center text-xs text-ink-secondary/70">החליקו ימינה או שמאלה, או השתמשו בכפתורים</p>
-        <Button fullWidth onClick={handleNext}>
+        <button
+          type="button"
+          onClick={handleNext}
+          className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+        >
           {isLast ? "המשך לאפליקציה" : "הבא"}
-        </Button>
+        </button>
       </div>
       </div>
     </div>

@@ -8,14 +8,16 @@ import { signOut } from "@/services/auth/authService";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { Button, Field, Input, Skeleton } from "@/components/ui";
-import { updateProfile } from "@/services/profile/profileService";
+import { updateProfile, uploadAvatar } from "@/services/profile/profileService";
 
 export default function ProfilePage() {
   const { user, loading, profile, profileLoading, refreshProfile } = useAuth();
   const router = useRouter();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [savingName, setSavingName] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -39,19 +41,30 @@ export default function ProfilePage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "מחיקת החשבון נכשלה";
       setDeleteError(message);
-      // alert() בכוונה - בנוסף לטקסט בעמוד - כדי שהשגיאה בלתי-אפשרית
-      // לפספס, גם בלי DevTools.
       alert(`שגיאה במחיקת החשבון:\n\n${message}`);
       setDeleting(false);
     }
   }
 
   async function handleSaveName() {
-    if (!user || !fullName.trim()) return;
+    if (!user) return;
     setSavingName(true);
-    await updateProfile(user.id, { full_name: fullName.trim() });
-    await refreshProfile();
-    setSavingName(false);
+    setSaveError(null);
+    try {
+      if (pendingAvatarFile) {
+        const url = await uploadAvatar(user.id, pendingAvatarFile);
+        await updateProfile(user.id, { avatar_url: url });
+        setPendingAvatarFile(null);
+      }
+      if (fullName.trim()) {
+        await updateProfile(user.id, { full_name: fullName.trim() });
+      }
+      await refreshProfile();
+    } catch {
+      setSaveError("שמירת השינויים נכשלה, נסו שוב");
+    } finally {
+      setSavingName(false);
+    }
   }
 
   function ChevronLeft() {
@@ -99,26 +112,46 @@ export default function ProfilePage() {
             />
             <div
               className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
-              style={{ left: "49.73%", top: "69.28%", width: "42%" }}
+              style={{ left: "49.73%", top: "71.7%", width: "42%" }}
             >
-              {user && <AvatarUploader userId={user.id} initialUrl={profile?.avatar_url} fluid bordered={false} />}
+              {user && (
+                <AvatarUploader
+                  userId={user.id}
+                  initialUrl={profile?.avatar_url}
+                  fluid
+                  bordered={false}
+                  deferSave
+                  onFileSelected={setPendingAvatarFile}
+                />
+              )}
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4 px-5 pb-6 pt-4 text-center">
+          <div className="flex flex-col items-center gap-3 px-5 pb-6 pt-0 text-center">
             <div>
               <h1 className="text-xl font-bold text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
               <p className="text-sm text-ink-secondary">{profile?.city || "—"}</p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => router.push("/preferences?returnTo=/profile")}
-              className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-            >
-              <span className="font-bold text-ink">התאמות אישיות</span>
-              <ChevronLeft />
-            </button>
+            <div className="flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => router.push("/onboarding")}
+                className="flex w-full items-center justify-between rounded-card border-2 border-accent bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+              >
+                <span className="font-bold text-ink">הכירו את triplace</span>
+                <ChevronLeft />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => router.push("/preferences?returnTo=/profile")}
+                className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+              >
+                <span className="font-bold text-ink">התאמות אישיות</span>
+                <ChevronLeft />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -132,11 +165,12 @@ export default function ProfilePage() {
               <Field label="אימייל">
                 <Input value={user?.email ?? ""} disabled />
               </Field>
+              {saveError && <p className="text-center text-xs text-danger">{saveError}</p>}
               <Button
                 variant="primary"
                 fullWidth
                 onClick={handleSaveName}
-                disabled={savingName || fullName.trim() === profile?.full_name}
+                disabled={savingName || (fullName.trim() === profile?.full_name && !pendingAvatarFile)}
               >
                 {savingName ? "שומר..." : "שמור שינויים"}
               </Button>
@@ -152,19 +186,19 @@ export default function ProfilePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/favorites?tab=history")}
+            onClick={() => router.push("/trips")}
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
-            <span className="font-bold text-ink">היסטוריית הטיולים שלי</span>
+            <span className="font-bold text-ink">הטיולים שלי</span>
             <ChevronLeft />
           </button>
 
           <button
             type="button"
-            onClick={() => router.push("/trips")}
+            onClick={() => router.push("/calendar")}
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
-            <span className="font-bold text-ink">הטיולים השמורים שלי</span>
+            <span className="font-bold text-ink">היומן שלי</span>
             <ChevronLeft />
           </button>
 
