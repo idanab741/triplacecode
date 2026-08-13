@@ -18,6 +18,7 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
   const { user } = useAuth();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +42,9 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
   }
 
   async function handleShare() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = window.location.href;
     if (navigator.share) {
       try {
@@ -73,7 +77,7 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
             aria-label={saved ? "הסרה משמורים" : "שמירה"}
             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm disabled:opacity-60"
           >
-            {saved ? "✓" : <Image src="/icons/save.png" alt="" width={20} height={20} />}
+            <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={20} height={20} />
           </button>
         )}
         <button
@@ -82,7 +86,7 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
           aria-label="שיתוף"
           className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm"
         >
-          <Image src="/icons/share.png" alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
+          <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
         </button>
       </div>
     </>

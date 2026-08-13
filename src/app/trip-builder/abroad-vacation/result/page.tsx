@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
@@ -31,13 +32,11 @@ function AbroadVacationResultContent() {
  const [activeDayFilter, setActiveDayFilter] = useState<number | "all">("all");
   const [stopTimeOverrides, setStopTimeOverrides] = useState<Record<string, number>>({});
   const [editingStopId, setEditingStopId] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [hotelDraft, setHotelDraft] = useState<{ name: string; address: string }>({ name: "", address: "" });
   const [savingHotel, setSavingHotel] = useState(false);
   const [hotelSaved, setHotelSaved] = useState(false);
   const [editingHotel, setEditingHotel] = useState(false);
+  const [justShared, setJustShared] = useState(false);
   const [logisticsImages, setLogisticsImages] = useState<Record<string, string | null>>({});
   const [airportInfo, setAirportInfo] = useState<{
     name: string;
@@ -77,24 +76,13 @@ function AbroadVacationResultContent() {
     }
   }
 
-  async function handleSaveTrip() {
-    if (!sessionId || saving) return;
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/save`, { method: "POST" });
-      if (!response.ok) throw new Error();
-      setSaved(true);
-    } catch {
-      // שקט - לא חוסם את המשתמש אם השמירה נכשלת
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** שיתוף - מעדיף את ה-share sheet הטבעי של המכשיר (navigator.share) אם
+    /** שיתוף - מעדיף את ה-share sheet הטבעי של המכשיר (navigator.share) אם
    *  קיים; אחרת נופל ל-וואטסאפ ישירות. שיתוף PDF אמיתי (לא רק לינק) הוא
    *  פיצ'ר נפרד וגדול יותר - זה כרגע שיתוף קישור למסלול. */
   async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = `החופשה שלי ל${answersTyped?.destination ?? "היעד"} מוכנה! תראו את המסלול: ${url}`;
 
@@ -355,22 +343,14 @@ function AbroadVacationResultContent() {
           </div>
 
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTrip}
-              disabled={saving}
-              aria-label="שמור חופשה"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
-            >
-              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
-            </button>
+            <SaveTripIconButton sessionId={sessionId} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף חופשה"
               className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
             >
-              <Image src="/icons/share.png" alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
             </button>
           </div>
         </div>

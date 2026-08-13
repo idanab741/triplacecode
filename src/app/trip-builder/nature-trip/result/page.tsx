@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
@@ -30,6 +32,7 @@ function NatureTripResultContent() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
   async function handleDeleteStop(stopId: string) {
     if (!sessionId || !session?.final_itinerary) return;
@@ -68,6 +71,9 @@ function NatureTripResultContent() {
   }
 
   async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = `יום הטבע שלי מוכן! תראו את המסלול: ${url}`;
 
@@ -205,7 +211,7 @@ function NatureTripResultContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
       {/* Hero עליון עם הלוגו בפינה */}
             <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
         <div className="relative h-16">
@@ -223,22 +229,14 @@ function NatureTripResultContent() {
           </div>
 
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTrip}
-              disabled={saving}
-              aria-label="שמור מסלול"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
-            >
-              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
-            </button>
+            <SaveTripIconButton sessionId={sessionId} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף מסלול"
               className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
             >
-              <Image src="/icons/share.png" alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
             </button>
           </div>
         </div>
@@ -362,6 +360,8 @@ function NatureTripResultContent() {
           {saving ? "שומר..." : saved ? "✓ המסלול נשמר" : "שמור מסלול"}
         </button>
       </div>
+
+      <MainBottomNav active="home" />
     </Screen>
   );
 }

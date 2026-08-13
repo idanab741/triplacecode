@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import type { TripBuilderSession } from "@/services/tripBuilder/types";
@@ -26,6 +28,7 @@ function RestaurantResultContent() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -69,6 +72,9 @@ function RestaurantResultContent() {
   }
 
   async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = `המקום שמצאתי לי מוכן! תראו את המסלול: ${url}`;
 
@@ -133,7 +139,7 @@ function RestaurantResultContent() {
   const startMinutes = manualStartMinutes ?? defaultStartMinutes;
 
   return (
-    <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
       {/* Hero עליון עם הלוגו בפינה - זהה לעמוד תוצאות הטיול היומי */}
             <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
         <div className="relative h-16">
@@ -151,22 +157,14 @@ function RestaurantResultContent() {
           </div>
 
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTrip}
-              disabled={saving}
-              aria-label="שמור מקום"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
-            >
-              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
-            </button>
+            <SaveTripIconButton sessionId={sessionId} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף מקום"
               className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
             >
-              <Image src="/icons/share.png" alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
             </button>
           </div>
         </div>
@@ -245,6 +243,8 @@ function RestaurantResultContent() {
           {saving ? "שומר..." : saved ? "✓ המקום נשמר" : "שמור מקום"}
         </button>
       </div>
+
+      <MainBottomNav active="home" />
     </Screen>
   );
 }

@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
@@ -28,6 +29,7 @@ function WeekendResultContent() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -71,6 +73,9 @@ function WeekendResultContent() {
   }
 
   async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = `הסופ"ש שלי מוכן! תראו את המסלול: ${url}`;
 
@@ -218,22 +223,14 @@ function WeekendResultContent() {
           </div>
 
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTrip}
-              disabled={saving}
-              aria-label="שמור מסלול"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
-            >
-              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
-            </button>
+            <SaveTripIconButton sessionId={sessionId} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף מסלול"
               className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
             >
-              <Image src="/icons/share.png" alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
             </button>
           </div>
         </div>

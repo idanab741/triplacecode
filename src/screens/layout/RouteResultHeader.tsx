@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { BackButton } from "@/components/ui";
 
@@ -12,6 +13,14 @@ interface RouteResultHeaderProps {
 }
 
 export function RouteResultHeader({ onBack, heroSrc, onSave, saved, onShare }: RouteResultHeaderProps) {
+  const [justShared, setJustShared] = useState(false);
+
+  function handleShareClick() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+    onShare?.();
+  }
+
   return (
     <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
       <div className="relative h-16">
@@ -29,21 +38,17 @@ export function RouteResultHeader({ onBack, heroSrc, onSave, saved, onShare }: R
                 aria-label="שמירה"
                 className="flex h-10 w-10 items-center justify-center text-ink"
               >
-                {saved ? (
-                  <span className="text-lg text-accent">✓</span>
-                ) : (
-                  <Image src="/icons/save.png" alt="" width={22} height={22} />
-                )}
+                <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={22} height={22} />
               </button>
             )}
             {onShare && (
               <button
                 type="button"
-                onClick={onShare}
+                onClick={handleShareClick}
                 aria-label="שיתוף"
                 className="flex h-10 w-10 items-center justify-center text-ink"
               >
-                <Image src="/icons/share.png" alt="" width={24} height={24} />
+                <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={24} height={24} />
               </button>
             )}
           </div>

@@ -4,6 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Screen } from "@/components/ui";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { useAuth } from "@/hooks/useAuth";
+import { createClient } from "@/services/supabase/client";
+import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
 
 interface PlaceResult {
   placeId: string;
@@ -19,6 +23,7 @@ interface PlaceResult {
 
 function SearchResultContent() {
   const router = useRouter();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const placeId = searchParams.get("placeId");
 
@@ -27,6 +32,10 @@ function SearchResultContent() {
   const [addedToJournal, setAddedToJournal] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
+
+  const [saved, setSaved] = useState(false);
+  const [savingPlace, setSavingPlace] = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
   useEffect(() => {
     if (!placeId) {
@@ -42,32 +51,100 @@ function SearchResultContent() {
       .catch((e) => setError(e instanceof Error ? e.message : "שגיאה בטעינת המקום"));
   }, [placeId]);
 
+  useEffect(() => {
+    if (!user || !placeId) return;
+    const supabase = createClient();
+    getFavoriteStatus(supabase, user.id, placeId).then((status) => setSaved(status === "saved"));
+  }, [user, placeId]);
+
+  async function handleSavePlace() {
+    if (!user || !placeId || savingPlace) return;
+    setSavingPlace(true);
+    setSaved((s) => !s);
+    try {
+      const supabase = createClient();
+      const status = await toggleFavorite(supabase, user.id, placeId, "place", "saved");
+      setSaved(status === "saved");
+    } catch {
+      setSaved((s) => !s);
+    } finally {
+      setSavingPlace(false);
+    }
+  }
+
+  async function handleSharePlace() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = result ? `תראו את ${result.name} ב-TRIPLACE: ${url}` : url;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: result?.name ?? "TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
   function handleAddToJournal() {
-    // היומן עצמו עוד לא בנוי - זה placeholder מכוון, נחבר בפועל כשנבנה
-    // את עמוד היומן.
     setAddedToJournal(true);
   }
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      {/* HERO - זהה בסגנון לעמודי תוצאת מסלול: לוגו Triplace + חזור בשמאל */}
-      <div className="relative h-56 w-full">
-        <Image src="/images/hero-search-result.png" alt="" fill priority className="object-cover" />
-        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.35),transparent_50%)]" />
+      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <button
+              type="button"
+              onClick={() => router.push("/home")}
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              aria-label="חזרה לדף הבית"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </button>
+          </div>
 
-        <div className="absolute left-2 top-4 flex items-center gap-2">
-          <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
-          <button
-            type="button"
-            onClick={() => router.push("/home")}
-            aria-label="חזרה"
-            className="flex h-9 w-9 shrink-0 items-center justify-center text-white"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </button>
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            {user && (
+              <button
+                type="button"
+                onClick={handleSavePlace}
+                disabled={savingPlace}
+                aria-label={saved ? "הסרה משמורים" : "שמור מקום"}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
+              >
+                <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={23} height={23} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSharePlace}
+              aria-label="שתף מקום"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+            >
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+            </button>
+          </div>
         </div>
+      </header>
+
+      <div className="relative w-full">
+        <Image
+          src="/images/hero-search-result.png"
+          alt="תוצאת חיפוש"
+          width={800}
+          height={450}
+          priority
+          className="h-auto w-full"
+        />
       </div>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
@@ -77,7 +154,6 @@ function SearchResultContent() {
 
         {result && (
           <>
-            {/* שורת התוצאה - בדיוק המקום שנמצא בחיפוש */}
             <div className="flex items-start gap-3 rounded-card bg-white p-4 shadow-soft">
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
                 {result.imageUrl && !imageFailed ? (
@@ -107,7 +183,6 @@ function SearchResultContent() {
               </div>
             </div>
 
-            {/* מפה */}
             <div className="overflow-hidden rounded-card bg-bg-secondary">
               {mapFailed ? (
                 <a
@@ -134,7 +209,7 @@ function SearchResultContent() {
               type="button"
               onClick={handleAddToJournal}
               disabled={addedToJournal}
-              className="w-full rounded-pill px-6 py-4 text-base font-bold text-white shadow-soft disabled:opacity-70"
+              className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               {addedToJournal ? "✓ נוסף ליומן" : "+ הוספה ליומן"}
@@ -142,6 +217,8 @@ function SearchResultContent() {
           </>
         )}
       </div>
+
+      <MainBottomNav active="home" />
     </Screen>
   );
 }

@@ -8,6 +8,10 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Button, Screen } from "@/components/ui";
+import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
@@ -15,7 +19,6 @@ import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
-// המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
   ssr: false,
 });
@@ -27,16 +30,13 @@ function DayTripResultContent() {
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
   const [editingTime, setEditingTime] = useState(false);
+  const [justShared, setJustShared] = useState(false);
   const [swappingStopId, setSwappingStopId] = useState<string | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
-
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   async function handleDeleteStop(stopId: string) {
     if (!sessionId || !session?.final_itinerary) return;
 
-    // עדכון אופטימי - מוחקים מהתצוגה מיד, בלי לחכות לשרת
     const remainingStops = session.final_itinerary.stops.filter((s) => s.stopId !== stopId);
     setSession((s) => (s ? { ...s, final_itinerary: { ...s.final_itinerary!, stops: remainingStops } } : s));
 
@@ -51,25 +51,14 @@ function DayTripResultContent() {
         setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
       }
     } catch {
-      // עדכון אופטימי כבר קרה - לא הופכים אותו אם השרת נכשל בשקט, רק לא מסנכרנים חזרה
-    }
-  }
-
-  async function handleSaveTrip() {
-    if (!sessionId || saving) return;
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/save`, { method: "POST" });
-      if (!response.ok) throw new Error();
-      setSaved(true);
-    } catch {
-      // שקט - לא חוסם את המשתמש אם השמירה נכשלת
-    } finally {
-      setSaving(false);
+      // עדכון אופטימי כבר קרה
     }
   }
 
   async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
     const url = typeof window !== "undefined" ? window.location.href : "";
     const text = `הטיול היומי שלי מוכן! תראו את המסלול: ${url}`;
 
@@ -78,14 +67,13 @@ function DayTripResultContent() {
         await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
         return;
       } catch {
-        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+        // המשתמש ביטל
       }
     }
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
-  
-async function handleSwapStop(stopId: string) {
+  async function handleSwapStop(stopId: string) {
     if (!sessionId || swappingStopId) return;
     setSwappingStopId(stopId);
     setSwapError(null);
@@ -103,7 +91,7 @@ async function handleSwapStop(stopId: string) {
     }
   }
 
-const sensors = useSensors(
+  const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
@@ -167,11 +155,11 @@ const sensors = useSensors(
       if (intervalId) clearInterval(intervalId);
     };
   }, [sessionId]);
-const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
+  const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
   const answers = session?.answers as unknown as DayTripAnswers | undefined;
 
   const defaultStartMinutes = useMemo(() => {
-    if (!itinerary || !answers || itinerary.stops.length === 0) return 9 * 60; // ברירת מחדל 09:00
+    if (!itinerary || !answers || itinerary.stops.length === 0) return 9 * 60;
     const dayOfWeek = getTripDayOfWeek(answers.timing, answers.otherDate);
     const hours = parseOpeningHoursForDay(itinerary.stops[0].openingHours, dayOfWeek);
     if (hours && hours !== "closed") return hours.openMinutes;
@@ -224,10 +212,8 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
     );
   }
 
-
   return (
-    <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
-      {/* Hero עליון עם הלוגו בפינה */}
+    <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
       <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
         <div className="relative h-16">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
@@ -244,22 +230,14 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
 
           <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveTrip}
-              disabled={saving}
-              aria-label="שמור טיול"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
-            >
-              {saved ? "✓" : <Image src="/icons/save.png" alt="" width={26} height={26} />}
-            </button>
+            <SaveTripIconButton sessionId={sessionId} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף טיול"
               className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
             >
-              <Image src="/icons/share.png" alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
             </button>
           </div>
         </div>
@@ -276,7 +254,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
         />
       </div>
 
-<div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-0">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-xl font-bold text-ink">הטיול שלכם מוכן!</h1>
@@ -298,7 +276,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
                 className="w-20 rounded-pill border border-accent/30 px-2 py-1.5 text-sm font-semibold"
               />
             ) : (
-<button
+              <button
                 type="button"
                 onClick={() => setEditingTime(true)}
                 className="rounded-pill border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm font-semibold text-accent"
@@ -309,7 +287,6 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
         </div>
 
-{/* מפה אינטראקטיבית - Leaflet + OpenStreetMap, חינמי לגמרי */}
         <ResultMap
           stops={itinerary.stops.map((s) => ({
             stopId: s.stopId,
@@ -325,7 +302,7 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-3">
-{itinerary.stops.map((stop) => (
+              {itinerary.stops.map((stop) => (
                 <div key={stop.stopId} className="flex flex-col gap-1">
                   <p className="pr-1 text-sm font-bold text-accent">
                     🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
@@ -350,8 +327,9 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold text-ink">אירועים בסביבה השבוע</h2>
             <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-   {itinerary.events.map((event) => (
-                <a
+              {itinerary.events.map((event) => (
+                
+                  <a
                   key={event.id}
                   href={event.url}
                   target="_blank"
@@ -373,17 +351,10 @@ const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
           </div>
         )}
 
-<button
-          type="button"
-          onClick={handleSaveTrip}
-          disabled={saving}
-          className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
-          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-        >
-          {saving ? "שומר..." : saved ? "✓ נוסף ליומן" : "+ הוספה ליומן"}
-        </button>
-      
+        <AddToCalendarButton sessionId={sessionId} date={resolveTripCalendarDate(session?.answers)} />
       </div>
+
+      <MainBottomNav active="home" />
     </Screen>
   );
 }
