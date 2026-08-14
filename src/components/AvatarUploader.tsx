@@ -13,6 +13,12 @@ interface AvatarUploaderProps {
   fluid?: boolean;
   /** מסגרת כחולה סביב העיגול. מכבים כשהמסגרת כבר מצוירת בתמונת הרקע. */
   bordered?: boolean;
+  /** true = לא מעלים מיד בבחירת קובץ - רק מציגים תצוגה מקדימה מקומית
+   *  ומעבירים את הקובץ להורה דרך onFileSelected, שאחראי להעלות אותו
+   *  בעצמו (למשל יחד עם שמירת שדות אחרים בטופס, בלחיצה אחת על "שמירה"). */
+  deferSave?: boolean;
+  /** נקרא במצב deferSave כשנבחר קובץ - מעביר את ה-File הגולמי להורה. */
+  onFileSelected?: (file: File) => void;
 }
 
 /** עיגול תמונת פרופיל עם כפתור פלוס להעלאת תמונה מהמכשיר. */
@@ -23,6 +29,8 @@ export function AvatarUploader({
   size = 112,
   fluid = false,
   bordered = true,
+  deferSave = false,
+  onFileSelected,
 }: AvatarUploaderProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialUrl ?? null);
   const [uploading, setUploading] = useState(false);
@@ -32,6 +40,16 @@ export function AvatarUploader({
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (deferSave) {
+      // לא מעלים כלום כרגע - רק תצוגה מקדימה מקומית, וההורה שומר את
+      // הקובץ בעצמו (בדרך כלל יחד עם שאר הטופס, בלחיצה על "שמירה").
+      setError(null);
+      setAvatarUrl(URL.createObjectURL(file));
+      onFileSelected?.(file);
+      e.target.value = "";
+      return;
+    }
 
     setUploading(true);
     setError(null);

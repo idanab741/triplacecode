@@ -315,7 +315,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             <span className="text-[15px] font-semibold text-ink">כל הערים שבהן יש Triplace</span>
           </button>
 
-          <div className="px-5 pb-10 pt-4">
+          <div className="px-5 pb-8 pt-4">
             <button
               type="button"
               onClick={() => setView("addAddress")}
