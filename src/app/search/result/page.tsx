@@ -2,12 +2,18 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Screen } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
+import { AddPlaceToCalendarSheet } from "@/screens/search/AddPlaceToCalendarSheet";
+
+const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
+  ssr: false,
+});
 
 interface PlaceResult {
   placeId: string;
@@ -29,13 +35,15 @@ function SearchResultContent() {
 
   const [result, setResult] = useState<PlaceResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [addedToJournal, setAddedToJournal] = useState(false);
+  const [showCalendarSheet, setShowCalendarSheet] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  const [mapFailed, setMapFailed] = useState(false);
 
   const [saved, setSaved] = useState(false);
   const [savingPlace, setSavingPlace] = useState(false);
   const [justShared, setJustShared] = useState(false);
+
+  const [inCalendar, setInCalendar] = useState(false);
+  const [removingFromCalendar, setRemovingFromCalendar] = useState(false);
 
   useEffect(() => {
     if (!placeId) {
@@ -57,14 +65,26 @@ function SearchResultContent() {
     getFavoriteStatus(supabase, user.id, placeId).then((status) => setSaved(status === "saved"));
   }, [user, placeId]);
 
+  useEffect(() => {
+    if (!user || !placeId) return;
+    fetch(`/api/places/calendar?placeId=${encodeURIComponent(placeId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setInCalendar(data.inCalendar === true);
+      })
+      .catch(() => {});
+  }, [user, placeId]);
+
   async function handleSavePlace() {
     if (!user || !placeId || savingPlace) return;
+    const nextSaved = !saved;
     setSavingPlace(true);
-    setSaved((s) => !s);
+    setSaved(nextSaved);
     try {
       const supabase = createClient();
       const status = await toggleFavorite(supabase, user.id, placeId, "place", "saved");
       setSaved(status === "saved");
+      if (status === "saved") router.push("/home");
     } catch {
       setSaved((s) => !s);
     } finally {
@@ -91,7 +111,23 @@ function SearchResultContent() {
   }
 
   function handleAddToJournal() {
-    setAddedToJournal(true);
+    setShowCalendarSheet(true);
+  }
+
+  async function handleRemoveFromCalendar() {
+    if (!placeId || removingFromCalendar) return;
+    setRemovingFromCalendar(true);
+    setInCalendar(false); // עדכון אופטימי
+    try {
+      const response = await fetch(`/api/places/calendar?placeId=${encodeURIComponent(placeId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error();
+    } catch {
+      setInCalendar(true); // rollback אם נכשל
+    } finally {
+      setRemovingFromCalendar(false);
+    }
   }
 
   return (
@@ -183,40 +219,45 @@ function SearchResultContent() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-card bg-bg-secondary">
-              {mapFailed ? (
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${result.latitude},${result.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-48 w-full flex-col items-center justify-center gap-1.5 text-ink-secondary"
-                >
-                  <span className="text-2xl">🗺️</span>
-                  <span className="text-[13px] font-medium">לא ניתן לטעון תצוגת מפה כרגע - לחצו לפתיחה בגוגל מפות</span>
-                </a>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/api/places/static-map?lat=${result.latitude}&lng=${result.longitude}`}
-                  alt="מפה"
-                  className="h-48 w-full object-cover"
-                  onError={() => setMapFailed(true)}
-                />
-              )}
-            </div>
+            <ResultMap
+              stops={[{ stopId: result.placeId, name: result.name, latitude: result.latitude, longitude: result.longitude }]}
+            />
 
-            <button
-              type="button"
-              onClick={handleAddToJournal}
-              disabled={addedToJournal}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-            >
-              {addedToJournal ? "✓ נוסף ליומן" : "+ הוספה ליומן"}
-            </button>
+            {inCalendar ? (
+              <button
+                type="button"
+                onClick={handleRemoveFromCalendar}
+                disabled={removingFromCalendar}
+                className="w-full rounded-pill border border-[var(--color-primary-start)] py-2 text-sm font-semibold text-[var(--color-primary-start)] disabled:opacity-60"
+              >
+                {removingFromCalendar ? "מסיר..." : "✓ ביומן - הסרה מהיומן"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAddToJournal}
+                className="w-full rounded-pill py-2 text-sm font-semibold text-white"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              >
+                + הוספה ליומן
+              </button>
+            )}
           </>
         )}
       </div>
+
+      {showCalendarSheet && result && (
+        <AddPlaceToCalendarSheet
+          placeId={result.placeId}
+          placeName={result.name}
+          imageUrl={result.imageUrl}
+          onClose={() => setShowCalendarSheet(false)}
+          onAdded={() => {
+            setInCalendar(true);
+            router.push("/home");
+          }}
+        />
+      )}
 
       <MainBottomNav active="home" />
     </Screen>

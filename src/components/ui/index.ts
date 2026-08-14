@@ -10,6 +10,7 @@ export { Select } from "./Select";
 export { Field } from "./Field";
 export { Chip } from "./Chip";
 export { ImageOptionCard } from "./ImageOptionCard";
+export { ImageOptionRow } from "./ImageOptionRow";
 export { Switch } from "./Switch";
 export { Skeleton } from "./Skeleton";
 export { Icon } from "./Icon";

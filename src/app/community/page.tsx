@@ -10,10 +10,10 @@ export default function CommunityPage() {
       <Screen>
         <div className="flex min-h-[75vh] flex-col items-center justify-center gap-5 px-6 text-center">
           <div
-            className="relative flex h-48 w-48 items-center justify-center rounded-full"
+            className="relative flex h-64 w-64 items-center justify-center rounded-full"
             style={{ background: "radial-gradient(circle, rgba(24,119,242,0.14), transparent 70%)" }}
           >
-            <div className="relative h-70 w-70">
+            <div className="relative h-[22rem] w-[22rem]">
               <Image src="/images/community-coming-soon.png" alt="" fill className="object-contain" priority />
             </div>
           </div>

@@ -94,12 +94,16 @@ export function ResultMap({ stops }: ResultMapProps) {
         {/* prefix={false} מסיר את התוספת של Leaflet עצמו לשליטה (כולל דגל
             שהם הוסיפו ל"קרדיט" שלהם) - נשאר רק הקרדיט המשפטי הנדרש בפועל
             (OpenStreetMap/CARTO), לא המותג של Leaflet. */}
+        {/* אריחי OpenStreetMap הרגילים (לא CARTO) - CARTO Voyager מציג
+            שמות מקומות בתעתיק אנגלי במקום עברית עבור ישראל, בעוד
+            שהעיצוב הסטנדרטי של OSM מציג את השם המקומי (עברית) כברירת
+            מחדל, מה שמתאים יותר לקהל היעד של האפליקציה. */}
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={20}
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          subdomains="abc"
+          maxZoom={19}
         />
         {Array.from(dayGroups.entries()).map(([day, dayStops]) => (
           <Polyline

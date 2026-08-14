@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 interface SaveTripIconButtonProps {
   sessionId: string | null;
 }
 
-/** כפתור שמירה/הסרה מהשמורים לטיול (הופך מצב בכל לחיצה - לא מנווט לעמוד אחר). */
+/** כפתור שמירה/הסרה מהשמורים לטיול. בשמירה (הפיכה לכחול) הטיול נכנס
+ *  ללשונית "שמורים" והמשתמש חוזר מיד לעמוד הבית. בביטול שמירה נשארים בעמוד. */
 export function SaveTripIconButton({ sessionId }: SaveTripIconButtonProps) {
+  const router = useRouter();
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +35,7 @@ export function SaveTripIconButton({ sessionId }: SaveTripIconButtonProps) {
         method: nextSaved ? "POST" : "DELETE",
       });
       if (!response.ok) throw new Error();
+      if (nextSaved) router.push("/home");
     } catch {
       setSaved(!nextSaved); // rollback אם נכשל
       alert("שמירת הטיול נכשלה, נסו שוב");

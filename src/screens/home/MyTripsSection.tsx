@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Skeleton, SwipeUpToDeleteCard } from "@/components/ui";
@@ -68,15 +69,13 @@ export function MyTripsSection() {
         <div className="px-6">
           <button
             type="button"
-            onClick={() => router.push("/trip-builder/build")}
-            className="relative h-44 w-full overflow-hidden rounded-card"
+            onClick={() => router.push("/ai")}
+            className="flex h-28 w-full flex-col items-center justify-center gap-2 rounded-card border-[3px] border-dashed border-[var(--color-primary-start)]/70 bg-transparent transition active:scale-[0.98]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/cta-no-trips.png"
-              alt="אין לכם עוד טיול? לחצו כאן"
-              className="absolute inset-0 h-full w-full object-contain"
-            />
+            {/* עיגול ה-"+" המעוצב שנשלח - קובץ עצמאי, לא חלק מהבלוק עצמו,
+                כך שאפשר להחליף אותו בעתיד בלי לגעת במסגרת/בטקסט. */}
+            <Image src="/icons/add-trip-plus.png" alt="" width={44} height={44} className="h-11 w-11" />
+            <span className="text-sm font-semibold text-accent">אין לכם עוד טיול? לחצו כאן</span>
           </button>
         </div>
       )}
@@ -100,17 +99,17 @@ export function MyTripsSection() {
                   <button
                     type="button"
                     onClick={() => router.push(tripResultPath(trip.tripType, trip.sessionId))}
-                    className="flex h-32 w-full flex-col overflow-hidden rounded-card bg-white text-right shadow-soft"
+                    className="relative block h-32 w-full overflow-hidden rounded-card bg-bg-secondary text-right shadow-soft"
                   >
                     {trip.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={trip.imageUrl} alt={trip.destinationLabel} className="h-20 w-full object-cover" />
+                      <img src={trip.imageUrl} alt={trip.destinationLabel} className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-20 w-full items-center justify-center bg-bg-secondary text-xl">🧳</div>
+                      <div className="flex h-full w-full items-center justify-center bg-bg-secondary text-xl">🧳</div>
                     )}
-                    <div className="p-2">
-                      <p className="truncate text-xs font-bold text-ink">{trip.destinationLabel}</p>
-                      <p className="mt-0.5 text-[10px] text-ink-secondary">{trip.stopCount} תחנות</p>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.7)_0%,rgba(0,0,0,.3)_60%,transparent_100%)] p-2 pt-8">
+                      <p className="truncate text-xs font-bold text-white">{trip.destinationLabel}</p>
+                      <p className="mt-0.5 text-[10px] text-white/85">{trip.stopCount} תחנות</p>
                     </div>
                   </button>
                 </SwipeUpToDeleteCard>

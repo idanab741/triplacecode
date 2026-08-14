@@ -9,6 +9,7 @@ import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type 
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
@@ -16,6 +17,7 @@ import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { LogisticsStopCard } from "@/screens/trip-builder/LogisticsStopCard";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
+import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -622,6 +624,8 @@ function AbroadVacationResultContent() {
             ))}
           </SortableContext>
         </DndContext>
+
+        <AddToCalendarButton sessionId={sessionId} date={resolveTripCalendarDate(session?.answers)} />
       </div>
       <MainBottomNav active="home" />
     </Screen>

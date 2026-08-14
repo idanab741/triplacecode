@@ -9,10 +9,12 @@ import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type 
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -27,8 +29,6 @@ function RomanticDateResultContent() {
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
   const [editingTime, setEditingTime] = useState(false);
 
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [justShared, setJustShared] = useState(false);
 
   const sensors = useSensors(
@@ -55,20 +55,6 @@ function RomanticDateResultContent() {
       }
     } catch {
       // עדכון אופטימי כבר קרה - לא הופכים אותו אם השרת נכשל בשקט, רק לא מסנכרנים חזרה
-    }
-  }
-
-  async function handleSaveTrip() {
-    if (!sessionId || saving) return;
-    setSaving(true);
-    try {
-      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/save`, { method: "POST" });
-      if (!response.ok) throw new Error();
-      setSaved(true);
-    } catch {
-      // שקט - לא חוסם את המשתמש אם השמירה נכשלת
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -267,15 +253,7 @@ function RomanticDateResultContent() {
           </SortableContext>
         </DndContext>
 
-        <button
-          type="button"
-          onClick={handleSaveTrip}
-          disabled={saving}
-          className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
-          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-        >
-          {saving ? "שומר..." : saved ? "✓ הדייט נשמר" : "שמור דייט"}
-        </button>
+        <AddToCalendarButton sessionId={sessionId} date={resolveTripCalendarDate(session?.answers)} />
       </div>
 
       <MainBottomNav active="home" />

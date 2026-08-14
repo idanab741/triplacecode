@@ -28,6 +28,7 @@ export const CULINARY_STYLES: PreferenceOption[] = [
   { value: "breakfast_brunch", label: "ארוחת בוקר ובראנץ'", imageSrc: "/images/preferences/culinary/breakfast_brunch.png" },
   { value: "cafe", label: "בית קפה", imageSrc: "/images/preferences/culinary/cafe.png" },
   { value: "fine_dining", label: "מסעדות שף", imageSrc: "/images/preferences/culinary/chef.png" },
+  { value: "local_food", label: "אוכל מקומי", imageSrc: "/images/preferences/culinary/local_food.png" },
   { value: "snacks_sweets", label: "מאנצ'ים ומתוקים", imageSrc: "/images/preferences/culinary/snacks_sweets.png" },
 ];
 

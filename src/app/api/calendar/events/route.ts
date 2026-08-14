@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const events = await Promise.all(
+  const tripEvents = await Promise.all(
     (data ?? []).map(async (session) => {
       const answers = session.answers as { destination?: string; requestedArea?: string } | null;
       const itinerary = session.final_itinerary as { stops?: { name?: string }[] } | null;
@@ -46,6 +46,7 @@ export async function GET(request: Request) {
       });
 
       return {
+        kind: "trip" as const,
         sessionId: session.id as string,
         tripType: session.trip_type as string,
         destinationLabel,
@@ -55,5 +56,24 @@ export async function GET(request: Request) {
     })
   );
 
-  return NextResponse.json({ events });
+  // מקומות בודדים שנוספו ליומן מעמוד תוצאת חיפוש (לא חלק ממסלול מלא).
+  const { data: placeRows, error: placeError } = await supabase
+    .from("place_calendar_entries")
+    .select("id,place_id,place_name,image_url,calendar_date")
+    .eq("user_id", user.id)
+    .gte("calendar_date", start)
+    .lt("calendar_date", end);
+
+  if (placeError) return NextResponse.json({ error: placeError.message }, { status: 500 });
+
+  const placeEvents = (placeRows ?? []).map((row) => ({
+    kind: "place" as const,
+    entryId: row.id as string,
+    placeId: row.place_id as string,
+    destinationLabel: row.place_name as string,
+    calendarDate: row.calendar_date as string,
+    imageUrl: row.image_url as string | null,
+  }));
+
+  return NextResponse.json({ events: [...tripEvents, ...placeEvents] });
 }

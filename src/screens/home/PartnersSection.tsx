@@ -6,14 +6,13 @@ import useEmblaCarousel from "embla-carousel-react";
 interface Partner {
   id: string;
   name: string;
-  emoji: string;
 }
 
 const PLACEHOLDER_PARTNERS: Partner[] = [
-  { id: "1", name: "בקרוב", emoji: "🎁" },
-  { id: "2", name: "בקרוב", emoji: "🏨" },
-  { id: "3", name: "בקרוב", emoji: "🍽️" },
-  { id: "4", name: "בקרוב", emoji: "✈️" },
+  { id: "1", name: "בקרוב" },
+  { id: "2", name: "בקרוב" },
+  { id: "3", name: "בקרוב" },
+  { id: "4", name: "בקרוב" },
 ];
 
 export function PartnersSection() {
@@ -37,9 +36,8 @@ export function PartnersSection() {
         <div className="flex">
           {PLACEHOLDER_PARTNERS.map((partner) => (
             <div key={partner.id} className="min-w-0 shrink-0 grow-0" style={{ flexBasis: "45%", marginInlineEnd: 12 }}>
-              <div className="flex h-32 w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-card bg-white text-center shadow-soft">
-                <span className="text-2xl">{partner.emoji}</span>
-                <p className="text-xs font-medium text-ink-secondary">{partner.name}</p>
+              <div className="flex h-32 w-full flex-col items-center justify-center overflow-hidden rounded-card bg-white text-center shadow-soft">
+                <p className="text-sm font-semibold text-ink-secondary">{partner.name}</p>
               </div>
             </div>
           ))}

@@ -1,9 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getDestinationById } from "@/services/destinations/destinationsServerService";
 import { getPlacesByCityAndCategory } from "@/services/places/placesServerService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { Screen } from "@/components/ui";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { WeatherRow } from "@/screens/destination/WeatherRow";
 import { EventsRow } from "@/screens/destination/EventsRow";
 import { PlaceRow } from "@/screens/destination/PlaceRow";
@@ -41,7 +43,24 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   ]);
 
   return (
-    <div className="min-h-screen bg-bg pb-10">
+    <div className="min-h-screen bg-bg pb-28">
+      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Link
+              href="/home"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              aria-label="חזרה לדף הבית"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      </header>
+
       <div className="relative h-72 w-full">
         {destination.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -51,16 +70,6 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
             className="h-full w-full object-cover"
           />
         )}
-
-        <Link
-          href="/home"
-          aria-label="חזרה"
-          className="absolute start-4 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-soft"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="2">
-            <path d="m14 6-6 6 6 6" />
-          </svg>
-        </Link>
 
         <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.65),transparent)] px-6 pb-5 pt-16">
           <h1 className="text-2xl font-extrabold text-white">{destination.name}</h1>
@@ -92,6 +101,8 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
         <BusinessOwnersRow />
       </div>
+
+      <MainBottomNav active="home" />
     </div>
   );
 }

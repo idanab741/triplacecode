@@ -9,8 +9,10 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { MonthCalendar } from "@/screens/calendar/MonthCalendar";
 
 interface CalendarEvent {
-  sessionId: string;
-  tripType: string;
+  kind: "trip" | "place";
+  sessionId?: string;
+  tripType?: string;
+  placeId?: string;
   destinationLabel: string;
   calendarDate: string;
   imageUrl: string | null;
@@ -86,15 +88,23 @@ export default function CalendarPage() {
               <div className="flex flex-col gap-2">
                 {selectedDayEvents.map((event) => (
                   <button
-                    key={event.sessionId}
+                    key={event.kind === "trip" ? event.sessionId : `place-${event.placeId}-${event.calendarDate}`}
                     type="button"
-                    onClick={() => router.push(tripResultPath(event.tripType, event.sessionId))}
+                    onClick={() =>
+                      router.push(
+                        event.kind === "trip"
+                          ? tripResultPath(event.tripType!, event.sessionId!)
+                          : `/search/result?placeId=${encodeURIComponent(event.placeId!)}`
+                      )
+                    }
                     className="flex items-center gap-3 rounded-card bg-bg px-3 py-2.5 text-right transition active:scale-[0.98]"
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-lg shadow-soft">
                       {event.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={event.imageUrl} alt={event.destinationLabel} className="h-full w-full object-cover" />
+                      ) : event.kind === "place" ? (
+                        "📍"
                       ) : (
                         "🧳"
                       )}

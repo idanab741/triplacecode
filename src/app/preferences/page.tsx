@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Chip, ImageOptionCard, Screen, Switch } from "@/components/ui";
+import { Chip, ImageOptionCard, ImageOptionRow, Screen, Switch } from "@/components/ui";
 import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,6 +19,10 @@ import {
   type MultiFieldKey,
 } from "./steps";
 import { DIETARY_RESTRICTIONS } from "@/locales/he/preferences";
+
+/** שלבים שמוצגים כצ'יפים עם עיגול תמונה קטן (במקום אריח תמונה גדול) -
+ *  מתאים לרשימות ארוכות שבהן עדיפה סריקה מהירה. */
+const ROW_STYLE_STEP_KEYS: MultiFieldKey[] = ["culinary_styles", "accommodation_types"];
 
 function PreferencesPageContent() {
   const router = useRouter();
@@ -120,6 +124,10 @@ function PreferencesPageContent() {
     advance(form, isLastStep);
   }
 
+  // כפתור "הבא" נחסם אם זה שלב בחירה מרובה ולא נבחר אף פריט - למי שלא
+  // רוצה לבחור כלום יש את כפתור "דלג" הייעודי מתחתיו.
+  const nextDisabled = saving || (step.type === "multi" && form[step.key].length === 0);
+
   function handleSkip() {
     const cleared: PreferencesFormState = {
       ...form,
@@ -164,8 +172,41 @@ function PreferencesPageContent() {
           </p>
         </header>
 
-        {step.type === "multi" && step.options.some((o) => o.imageSrc) && (
-          <div className={`grid content-start gap-1.5 ${step.key === "vacation_preferences" ? "grid-cols-2" : "grid-cols-3"}`}>
+        {step.type === "multi" && ROW_STYLE_STEP_KEYS.includes(step.key) && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {step.options.map((option) => (
+              <ImageOptionRow
+                key={option.value}
+                selected={form[step.key].includes(option.value)}
+                onClick={() => toggleChip(step.key, option.value)}
+                label={option.label}
+                imageSrc={option.imageSrc}
+              />
+            ))}
+          </div>
+        )}
+
+        {step.type === "multi" && step.key === "vacation_preferences" && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {step.options.map((option) => (
+              <ImageOptionRow
+                key={option.value}
+                selected={form[step.key].includes(option.value)}
+                onClick={() => toggleChip(step.key, option.value)}
+                label={option.label}
+                imageSrc={option.imageSrc}
+                imageWidth={64}
+                imageHeight={44}
+              />
+            ))}
+          </div>
+        )}
+
+        {step.type === "multi" &&
+          !ROW_STYLE_STEP_KEYS.includes(step.key) &&
+          step.key !== "vacation_preferences" &&
+          step.options.some((o) => o.imageSrc) && (
+          <div className="grid content-start grid-cols-3 gap-1.5">
             {step.options.map((option) => (
          <ImageOptionCard
                 key={option.value}
@@ -173,13 +214,12 @@ function PreferencesPageContent() {
                 onClick={() => toggleChip(step.key, option.value)}
                 label={option.label}
                 imageSrc={option.imageSrc}
-                aspectRatio={step.key === "vacation_preferences" ? "555 / 369" : "1 / 1"}
               />
             ))}
           </div>
         )}
 
-{step.type === "multi" && !step.options.some((o) => o.imageSrc) && (
+{step.type === "multi" && !ROW_STYLE_STEP_KEYS.includes(step.key) && step.key !== "vacation_preferences" && !step.options.some((o) => o.imageSrc) && (
           <div className="flex flex-wrap justify-center gap-2">
             {step.options.map((option) => (
               <Chip
@@ -243,7 +283,7 @@ function PreferencesPageContent() {
         <button
           type="button"
           onClick={handleNext}
-          disabled={saving}
+          disabled={nextDisabled}
           className="rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >

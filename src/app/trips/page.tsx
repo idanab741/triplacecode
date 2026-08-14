@@ -137,7 +137,7 @@ function TripsPageContent() {
                   <button
                     type="button"
                     onClick={() => router.push(tripResultPath(trip.tripType, trip.sessionId))}
-                    className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-white p-3 text-right shadow-soft"
+                    className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
                   >
                     {trip.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -174,7 +174,7 @@ function TripsPageContent() {
                 <button
                   type="button"
                   onClick={() => router.push(place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`)}
-                  className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-white p-3 text-right shadow-soft"
+                  className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
                 >
                   {place.imageUrls[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
