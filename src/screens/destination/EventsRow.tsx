@@ -16,27 +16,31 @@ export function EventsRow({ events }: EventsRowProps) {
   return (
     <div className="px-6">
       <h3 className="mb-3 text-lg font-semibold text-ink">קורה השבוע</h3>
-      <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-        {events.map((event) => (
-          <a
-            key={event.id}
-            href={event.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-44 shrink-0"
-          >
-            <div className="h-28 w-44 overflow-hidden rounded-card bg-bg-secondary shadow-soft">
-              {event.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={event.imageUrl} alt={event.name} className="h-full w-full object-cover" />
-              )}
-            </div>
-            <p className="mt-1.5 truncate text-sm font-medium text-ink">{event.name}</p>
-            <p className="truncate text-xs text-ink-secondary">
-              {[formatEventDate(event.date), event.venueName].filter(Boolean).join(" · ")}
-            </p>
-          </a>
-        ))}
+      <div className="-mx-6 overflow-x-auto ps-6 pb-1" style={{ scrollbarWidth: "none" }}>
+        <div className="flex gap-4">
+          {events.map((event) => (
+            <a
+              key={event.id}
+              href={event.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-44 shrink-0"
+            >
+              <div className="h-28 w-44 overflow-hidden rounded-card bg-bg-secondary shadow-soft">
+                {event.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={event.imageUrl} alt={event.name} className="h-full w-full object-cover" />
+                )}
+              </div>
+              <p className="mt-1.5 truncate text-sm font-medium text-ink">{event.name}</p>
+              <p className="truncate text-xs text-ink-secondary">
+                {[formatEventDate(event.date), event.venueName].filter(Boolean).join(" · ")}
+              </p>
+            </a>
+          ))}
+          {/* spacer סוף הרשימה - ראו הערה ב-WeatherRow. */}
+          <div className="w-2 shrink-0" aria-hidden />
+        </div>
       </div>
     </div>
   );

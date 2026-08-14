@@ -315,14 +315,14 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             <span className="text-[15px] font-semibold text-ink">כל הערים שבהן יש Triplace</span>
           </button>
 
-          <div className="px-5 pt-4">
+          <div className="px-5 pb-10 pt-4">
             <button
               type="button"
               onClick={() => setView("addAddress")}
               className="w-full rounded-pill px-6 py-2 text-sm font-semibold text-white shadow-soft"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
-              + הוספת כתובת
+              הוספת כתובת
             </button>
           </div>
         </div>

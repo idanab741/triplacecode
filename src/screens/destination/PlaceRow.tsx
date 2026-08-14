@@ -17,25 +17,29 @@ export function PlaceRow({ title, places, emptyMessage }: PlaceRowProps) {
           {emptyMessage}
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-          {places.map((place) => (
-            <Link key={place.id} href={`/place/${place.id}`} className="w-40 shrink-0">
-              <div className="h-28 w-40 overflow-hidden rounded-card bg-bg-secondary shadow-soft">
-                {place.image_urls[0] && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={place.image_urls[0]}
-                    alt={place.name}
-                    className="h-full w-full object-cover"
-                  />
+        <div className="-mx-6 overflow-x-auto ps-6 pb-1" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-4">
+            {places.map((place) => (
+              <Link key={place.id} href={`/place/${place.id}`} className="w-40 shrink-0">
+                <div className="h-28 w-40 overflow-hidden rounded-card bg-bg-secondary shadow-soft">
+                  {place.image_urls[0] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={place.image_urls[0]}
+                      alt={place.name}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </div>
+                <p className="mt-1.5 truncate text-sm font-medium text-ink">{place.name}</p>
+                {place.rating != null && (
+                  <p className="text-xs text-ink-secondary">★ {place.rating.toFixed(1)}</p>
                 )}
-              </div>
-              <p className="mt-1.5 truncate text-sm font-medium text-ink">{place.name}</p>
-              {place.rating != null && (
-                <p className="text-xs text-ink-secondary">★ {place.rating.toFixed(1)}</p>
-              )}
-            </Link>
-          ))}
+              </Link>
+            ))}
+            {/* spacer סוף הרשימה - ראו הערה ב-WeatherRow. */}
+            <div className="w-2 shrink-0" aria-hidden />
+          </div>
         </div>
       )}
     </div>
