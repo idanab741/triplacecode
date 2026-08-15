@@ -41,7 +41,8 @@ export function HotelAutocomplete({ name, address, onChange, destination }: Hote
       setSearchError(null);
       return;
     }
-    if (query.trim().length < 2) {
+    if (query.trim().length < 3) {
+      // תיקון עלויות: 2 היה נמוך מדי - כמו בשאר תיבות ה-autocomplete באפליקציה
       setOptions([]);
       setSearchError(null);
       return;
@@ -62,7 +63,7 @@ export function HotelAutocomplete({ name, address, onChange, destination }: Hote
           setOptions([]);
           setSearchError("שגיאת רשת בחיפוש");
         });
-    }, 300);
+    }, 450); // תיקון עלויות: הוארך מ-300ms - פחות קריאות בתשלום לגוגל בזמן הקלדה
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, destination]);
 

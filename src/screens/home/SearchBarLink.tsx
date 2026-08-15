@@ -28,7 +28,7 @@ export function SearchBarLink() {
         .then((res) => res.json())
         .then((data) => setSuggestions(data.suggestions ?? []))
         .catch(() => setSuggestions([]));
-    }, 300);
+    }, 450); // תיקון עלויות: הוארך מ-300ms - פחות קריאות בתשלום לגוגל בזמן הקלדה
   }, [query]);
 
   useEffect(() => {

@@ -74,7 +74,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
         .then((res) => res.json())
         .then((data) => setPredictions(data.predictions ?? []))
         .catch(() => setPredictions([]));
-    }, 300);
+    }, 450); // תיקון עלויות: הוארך מ-300ms - פחות קריאות בתשלום לגוגל בזמן הקלדה
   }, [addressQuery]);
 
   async function handleUseCurrentLocation() {

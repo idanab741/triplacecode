@@ -34,6 +34,11 @@ export async function GET(request: Request) {
 
   const imageBuffer = await mapResponse.arrayBuffer();
   return new NextResponse(imageBuffer, {
-    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" },
+    headers: {
+      "Content-Type": "image/png",
+      // ר' הערה זהה ב-/api/places/photo - s-maxage מאפשר cache משותף ב-CDN
+      // בין כל המשתמשים, לא רק בדפדפן של כל אחד בנפרד.
+      "Cache-Control": "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=86400",
+    },
   });
 }

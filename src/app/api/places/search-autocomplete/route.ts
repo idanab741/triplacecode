@@ -6,7 +6,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim() ?? "";
-  if (query.length < 2) return NextResponse.json({ suggestions: [] });
+  // *** תיקון עלויות: 2 תווים היה נמוך מדי - "תל", "פיצ" וכו' יוצרים המון
+  // קריאות חיוביות לגוגל (כל אחת בתשלום, בלי session token) על כל הקלדה,
+  // עוד לפני שיש מספיק טקסט לתוצאה שימושית. 3 תווים - כמו ב-address-autocomplete. ***
+  if (query.length < 3) return NextResponse.json({ suggestions: [] });
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
