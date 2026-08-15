@@ -63,6 +63,10 @@ type EditForm = {
   cuisine_tags: string[];
   tripmatch_scores: Record<string, number>;
   dna_scores: Record<string, number>;
+  // השדה שבאמת נאכף במאגר המועמדים (kosher.eq.true - ר' candidatePoolService.ts).
+  // מתעדכן אוטומטית כשלוחצים על הצ'יפ "✡️ כשר" תחת "מטבח / סגנון קולינרי",
+  // כדי שסימון הצ'יפ יעשה משהו אמיתי - לא רק תיוג קוסמטי.
+  kosher: boolean | null;
 };
 
 function placeToForm(p: Place): EditForm {
@@ -81,6 +85,7 @@ function placeToForm(p: Place): EditForm {
     cuisine_tags: p.cuisine_tags ?? [],
     tripmatch_scores: p.tripmatch_scores ?? {},
     dna_scores: p.dna_scores ?? {},
+    kosher: p.kosher ?? null,
   };
 }
 
@@ -100,6 +105,7 @@ function formToPatchBody(f: EditForm) {
     cuisine_tags: f.cuisine_tags,
     tripmatch_scores: f.tripmatch_scores,
     dna_scores: f.dna_scores,
+    kosher: f.kosher,
   };
 }
 
@@ -152,7 +158,16 @@ export default function AdminPlacesPage() {
 
   const filteredPlaces = places.filter((p) => {
     if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
-    if (filterCategory && p.category !== filterCategory) return false;
+    // "כשר" הוא ערך מיוחד ברשימת הקטגוריות של "מסעדה" (ר' discoveryConfigV2.ts) -
+    // בניגוד לשאר תתי-הקטגוריות שם, זה לא נשמר בשדה category/subcategory של
+    // המקום, אלא בשדה הבוליאני kosher (אותו שדה שנאכף באופן מחייב במאגר
+    // המועמדים למשתמש קצה - ר' candidatePoolService.ts). לכן כשבוחרים אותו כאן
+    // מסננים לפי kosher===true, לא לפי השוואת category רגילה.
+    if (filterCategory === "kosher") {
+      if (p.kosher !== true) return false;
+    } else if (filterCategory && p.category !== filterCategory) {
+      return false;
+    }
     if (filterCity && p.city !== filterCity) return false;
     if (filterCountry && p.country !== filterCountry) return false;
     if (filterTripType && !(p.trip_type_tags ?? []).includes(filterTripType)) return false;
@@ -314,6 +329,22 @@ export default function AdminPlacesPage() {
       const current = f[field];
       const next = current.includes(key) ? current.filter((v) => v !== key) : [...current, key];
       return { ...f, [field]: next };
+    });
+  }
+
+  /** צ'יפ "✡️ כשר" תחת cuisine_tags הוא מיוחד: בנוסף להוספה/הסרה הרגילה
+   *  מהמערך (לתצוגה/AI), הוא גם קובע את השדה הבוליאני kosher עצמו - זה
+   *  השדה היחיד שבאמת נבדק במאגר המועמדים המחייב (candidatePoolService.ts,
+   *  kosher.eq.true). בלי זה, סימון הצ'יפ היה קוסמטי בלבד ולא משפיע על
+   *  מה שמשתמש שסימן "כשר" בהעדפות שלו בפועל רואה. */
+  function toggleKosherCuisineTag() {
+    setEditForm((f) => {
+      if (!f) return f;
+      const turningOn = !f.cuisine_tags.includes("kosher");
+      const nextCuisineTags = turningOn
+        ? [...f.cuisine_tags, "kosher"]
+        : f.cuisine_tags.filter((v) => v !== "kosher");
+      return { ...f, cuisine_tags: nextCuisineTags, kosher: turningOn ? true : null };
     });
   }
 
@@ -817,11 +848,13 @@ export default function AdminPlacesPage() {
               <div className="flex flex-wrap gap-1.5">
                 {CUISINE_TAGS.map((t) => {
                   const active = editForm.cuisine_tags.includes(t.key);
+                  const isKosher = t.key === "kosher";
                   return (
                     <button
                       key={t.key}
                       type="button"
-                      onClick={() => toggleFormArray("cuisine_tags", t.key)}
+                      onClick={() => (isKosher ? toggleKosherCuisineTag() : toggleFormArray("cuisine_tags", t.key))}
+                      title={isKosher ? "מסמן גם את השדה kosher=כן - זה מה שנאכף בפועל למשתמשים שסימנו 'כשר' בהעדפות" : undefined}
                       className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
                       style={{
                         borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",

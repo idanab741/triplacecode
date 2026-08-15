@@ -17,6 +17,10 @@ export const CUISINE_TAGS = [
   { key: "pizza", label: "🍕 פיצה" }, { key: "brunch", label: "🥐 בראנץ'" },
   { key: "cafe", label: "☕ בית קפה" }, { key: "chef_restaurant", label: "👨‍🍳 מסעדת שף" },
   { key: "desserts", label: "🍰 מתוקים" },
+  // אפשרות נוספת, בנוסף לכל מה שיש למעלה: מסעדה כשרה - זה השדה היחיד ברשימה
+  // הזו שגם קובע (בתוספת עדכון בטופס עצמו) את kosher=true על המקום, שהוא
+  // השדה שנאכף באופן מחייב במאגר המועמדים - ר' candidatePoolService.ts.
+  { key: "kosher", label: "✡️ כשר" },
 ] as const;
 
 /** תת-סוג מדויק - "קטגוריה/סוג מקום" בעמוד ה-Discovery. שייכות ל-`tags`
