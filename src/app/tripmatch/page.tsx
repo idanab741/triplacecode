@@ -425,7 +425,7 @@ export default function TripMatchPage() {
   if (!ready) return null;
 
   return (
-    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}>
       {stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
           <div className="relative h-16">
@@ -448,22 +448,7 @@ export default function TripMatchPage() {
         </div>
       )}
 
-      {stage === "swiping" && currentCandidate && (
-        <SwipeHeader
-          city={selectedCityLabel || selectedCity || ""}
-          categoryLabel={categoryLabel}
-          currentIndex={totalDecisions}
-          total={totalDecisions + visibleCandidates.length}
-          onBack={() => router.push("/home")}
-          onEditDestination={handleEditDestination}
-          onEditCategory={handleEditCategory}
-          onOpenFilters={() => setFiltersOpen(true)}
-          activeFilterCount={countActiveFilters(filters)}
-          onFinish={handleFinish}
-        />
-      )}
-
-      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-10 pt-5">
+      <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : "gap-4 px-5 pb-10 pt-5"}`}>
         {stage === "city" && (
           <div className="flex flex-col gap-3">
             <ChatBubble>
@@ -684,29 +669,53 @@ export default function TripMatchPage() {
         )}
 
         {stage === "swiping" && (
-          <>
-            {!currentCandidate ? (
-              <p className="pt-16 text-center text-ink-secondary">
-                {candidates.length === 0
-                  ? `לא מצאנו עדיין מקומות ב${selectedCityLabel || selectedCity} בקטגוריה הזו.`
-                  : visibleCandidates.length === 0
-                    ? "אין תוצאות עם הפילטרים שנבחרו. נסו לרוקן חלק מהם."
-                    : "נגמרו המועמדים כרגע."}
-              </p>
-            ) : (
-              <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
-                {({ onLike, onNope, disabled: swipeDisabled }) => (
-                  <TripMatchCard
-                    candidate={currentCandidate}
-                    matchPercent={computeMatchPercent(currentCandidate, filters, userPreferences)}
-                    onLike={onLike}
-                    onNope={onNope}
-                    disabled={swipeDisabled}
-                  />
-                )}
-              </SwipeCard>
+          <div className="flex flex-col" style={{ height: "100dvh" }}>
+            {currentCandidate && (
+              <SwipeHeader
+                city={selectedCityLabel || selectedCity || ""}
+                categoryLabel={categoryLabel}
+                currentIndex={totalDecisions}
+                total={totalDecisions + visibleCandidates.length}
+                onBack={() => router.push("/home")}
+                onEditDestination={handleEditDestination}
+                onEditCategory={handleEditCategory}
+                onOpenFilters={() => setFiltersOpen(true)}
+                activeFilterCount={countActiveFilters(filters)}
+                onFinish={handleFinish}
+              />
             )}
-          </>
+
+            {/* אזור הכרטיס - flex-1 סופג את כל הגובה הפנוי בין ה-header
+                לתחתית המסך. בלי padding אופקי - הכרטיס נצמד לשני קצוות
+                המסך ומהווה "עמוד מלא" (edge-to-edge), לא כרטיס צף בתוך
+                שוליים לבנים. ה-padding-bottom (112px) שומר בדיוק על אותו
+                מרווח בטוח שהיה קודם קבוע ב-Screen (pb-28) כדי שהכרטיס
+                יגיע בדיוק עד קצה ה-BottomNav הצף, בלי חפיפה ובלי רווח
+                מיותר. */}
+            <div className="min-h-0 flex-1 pt-3" style={{ paddingBottom: 112 }}>
+              {!currentCandidate ? (
+                <p className="pt-16 text-center text-ink-secondary">
+                  {candidates.length === 0
+                    ? `לא מצאנו עדיין מקומות ב${selectedCityLabel || selectedCity} בקטגוריה הזו.`
+                    : visibleCandidates.length === 0
+                      ? "אין תוצאות עם הפילטרים שנבחרו. נסו לרוקן חלק מהם."
+                      : "נגמרו המועמדים כרגע."}
+                </p>
+              ) : (
+                <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
+                  {({ onLike, onNope, disabled: swipeDisabled }) => (
+                    <TripMatchCard
+                      candidate={currentCandidate}
+                      matchPercent={computeMatchPercent(currentCandidate, filters, userPreferences)}
+                      onLike={onLike}
+                      onNope={onNope}
+                      disabled={swipeDisabled}
+                    />
+                  )}
+                </SwipeCard>
+              )}
+            </div>
+          </div>
         )}
 
         {stage === "results" && (

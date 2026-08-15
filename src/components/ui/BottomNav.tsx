@@ -37,13 +37,16 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               </span>
             );
           const elevatedLabel = item.label ? (
-              <span className="text-xs font-medium" style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+              <span
+                className="w-full truncate whitespace-nowrap text-center text-xs font-medium"
+                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+              >
                 {item.label}
               </span>
             ) : null;
 
             return item.href ? (
-          <Link key={item.id} href={item.href} className="relative z-10 flex flex-1 flex-col items-center gap-px px-2 py-1">
+          <Link key={item.id} href={item.href} className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-px px-2 py-1">
                 {content}
                 {elevatedLabel}
               </Link>
@@ -52,7 +55,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
                 key={item.id}
                 type="button"
                 onClick={() => onChange?.(item.id)}
-                className="relative z-10 flex flex-1 flex-col items-center gap-px px-2 py-1"
+                className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-px px-2 py-1"
               >
                 {content}
                 {elevatedLabel}
@@ -60,14 +63,24 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
             );
           }
 
-          const itemClasses = "flex flex-1 flex-col items-center gap-px px-3 py-1 text-xs font-medium transition-colors";
+          // *** תיקון קריטי: min-w-0 הכרחי - בלי זה, פריטי flex-1 עדיין
+          // מכבדים את ה-min-content הטבעי שלהם (רוחב התווית בפועל), וזה
+          // שובר את החלוקה השווה בין 5 הפריטים כשהתוויות שונות באורכן
+          // ("trippy AI" מול "בית") - מה שגורם למרכז (כפתור ה-AI המורם)
+          // "לזוז" בהתאם לרוחב המסך, בדיוק הבאג שדווח. min-w-0 מבטל את
+          // ה-min-content ומאלץ 5 עמודות שוות בדיוק תמיד, כך שהאמצע נשאר
+          // מדויק על כל גודל מסך.
+          const itemClasses = "flex min-w-0 flex-1 flex-col items-center gap-px px-3 py-1 text-xs font-medium transition-colors";
 
           return item.href ? (
             <Link key={item.id} href={item.href} className={itemClasses}>
               <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
                 <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
               </span>
-              <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+              <span
+                className="w-full truncate whitespace-nowrap text-center"
+                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+              >
                 {item.label}
               </span>
             </Link>
@@ -76,7 +89,10 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
                 <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
               </span>
-              <span style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}>
+              <span
+                className="w-full truncate whitespace-nowrap text-center"
+                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+              >
                 {item.label}
               </span>
             </button>
