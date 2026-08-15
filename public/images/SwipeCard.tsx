@@ -3,23 +3,8 @@
 import { Fragment, useRef, type ReactNode } from "react";
 import Image from "next/image";
 
-interface SwipeCardActions {
-  onLike: () => void;
-  onNope: () => void;
-  disabled?: boolean;
-}
-
 interface SwipeCardProps {
-  /** *** שדרוג UI/UX (TripMatch בלבד): SwipeCard משמש גם במסכי trip-builder
-   *  אחרים (build page) עם כפתורי Like/X חיצוניים צפים - כדי לא לשבור
-   *  אותם, children תומך בשני מצבים:
-   *  1) ReactNode רגיל (ברירת המחדל הישנה) - הכרטיס מוצג כמו שהוא, וה-
-   *     כפתורים החיצוניים הישנים (fixed) ממשיכים להופיע מתחת לכרטיס,
-   *     בדיוק כמו קודם. זה המצב שמשמש trip-builder/build.
-   *  2) פונקציית render-prop שמקבלת onLike/onNope/disabled - משמש כרטיסים
-   *     כמו TripMatchCard שמשלבים את כפתורי הפעולה *בתוך* הכרטיס עצמו;
-   *     במצב הזה לא מוצגים הכפתורים החיצוניים (הכרטיס כבר כולל אותם). */
-  children: ReactNode | ((actions: SwipeCardActions) => ReactNode);
+  children: ReactNode;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
   disabled?: boolean;
@@ -99,15 +84,6 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
     }, 180);
   }
 
-  const isInlineActionsMode = typeof children === "function";
-  const resolvedChildren = isInlineActionsMode
-    ? (children as (actions: SwipeCardActions) => ReactNode)({
-        onLike: () => flyOut("right"),
-        onNope: () => flyOut("left"),
-        disabled,
-      })
-    : children;
-
   return (
     <Fragment>
       <div
@@ -120,7 +96,7 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
         style={{ willChange: "transform" }}
       >
         <div className="relative">
-          {resolvedChildren}
+          {children}
 
           {/* תגית "אהבתי" - מופיעה תוך כדי גרירה ימינה */}
           <div
@@ -142,34 +118,37 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
         </div>
       </div>
 
-      {/* כפתורים חיצוניים צפים - רק במצב הישן (children כ-ReactNode רגיל,
-          כמו ב-trip-builder/build). כשה-children היא פונקציה (TripMatchCard),
-          הכרטיס עצמו כבר כולל אזור פעולה משולב ולא צריך את הכפתורים האלה. */}
-      {!isInlineActionsMode && (
-        <div
-          className="fixed inset-x-0 z-40 flex items-center justify-center gap-8"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 86px)" }}
+      {/* *** תיקון: הכפתורים עברו ממיקום זורם (מיד מתחת לכרטיס - נראה
+          "מנותק" כשהכרטיס לא ממלא את כל הגובה) למיקום קבוע צף מעל בר
+          הניווט התחתון - קבועים במקום אחד תמיד, בסגנון Tinder, ומרגישים
+          חלק אינטגרלי מהמסך במקום שני כפתורים בודדים בחלל ריק.
+          *** קריטי: זה חייב להיות ה-DOM *מחוץ* לדיב שמקבל את ה-transform
+          למעלה (cardRef) - transform על הורה יוצר containing block חדש
+          ל-fixed descendants, כך שאם הכפתורים היו בפנים, הם היו "טסים"
+          יחד עם הכרטיס בזמן ה-swipe במקום להישאר קבועים במסך. */}
+      <div
+        className="fixed inset-x-0 z-40 flex items-center justify-center gap-8"
+        style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 100px)" }}
+      >
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => flyOut("right")}
+          aria-label="אהבתי"
+          className="transition active:scale-90 disabled:opacity-50"
         >
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => flyOut("right")}
-            aria-label="אהבתי"
-            className="transition active:scale-90 disabled:opacity-50"
-          >
-            <Image src="/images/tripmatch/action-like.png" alt="" width={68} height={68} />
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => flyOut("left")}
-            aria-label="לא מתאים"
-            className="transition active:scale-90 disabled:opacity-50"
-          >
-            <Image src="/images/tripmatch/action-nope.png" alt="" width={68} height={68} />
-          </button>
-        </div>
-      )}
+          <Image src="/images/tripmatch/action-like.png" alt="" width={68} height={68} />
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => flyOut("left")}
+          aria-label="לא מתאים"
+          className="transition active:scale-90 disabled:opacity-50"
+        >
+          <Image src="/images/tripmatch/action-nope.png" alt="" width={68} height={68} />
+        </button>
+      </div>
     </Fragment>
   );
 }

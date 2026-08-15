@@ -74,7 +74,10 @@ function TripsPageContent() {
   useEffect(() => {
     if (!user || tab !== "liked") return;
     setPlaces(null);
-    getFavoritePlaces(user.id, "liked")
+    // *** תיקון: getFavoritePlaces בלי סינון מקור החזירה כל לייק בכל
+    // האפליקציה (גם מבניית מסלולים, לא רק TripMatch) - הלשונית הזו
+    // אמורה להציג רק לייקים שנעשו ב-TripMatch עצמו.
+    getFavoritePlaces(user.id, "liked", "tripmatch")
       .then(setPlaces)
       .catch(() => setPlaces([]));
   }, [user, tab]);

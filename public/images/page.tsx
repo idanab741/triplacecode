@@ -425,7 +425,7 @@ export default function TripMatchPage() {
   if (!ready) return null;
 
   return (
-    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}>
       {stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
           <div className="relative h-16">
@@ -463,7 +463,13 @@ export default function TripMatchPage() {
         />
       )}
 
-      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pb-10 pt-5">
+      <div
+        className={
+          stage === "swiping"
+            ? "mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-5 pb-0 pt-3"
+            : "mx-auto flex max-w-xl flex-col gap-4 px-5 pb-10 pt-5"
+        }
+      >
         {stage === "city" && (
           <div className="flex flex-col gap-3">
             <ChatBubble>
@@ -695,15 +701,7 @@ export default function TripMatchPage() {
               </p>
             ) : (
               <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
-                {({ onLike, onNope, disabled: swipeDisabled }) => (
-                  <TripMatchCard
-                    candidate={currentCandidate}
-                    matchPercent={computeMatchPercent(currentCandidate, filters, userPreferences)}
-                    onLike={onLike}
-                    onNope={onNope}
-                    disabled={swipeDisabled}
-                  />
-                )}
+                <TripMatchCard candidate={currentCandidate} matchPercent={computeMatchPercent(currentCandidate, filters, userPreferences)} />
               </SwipeCard>
             )}
           </>

@@ -30,9 +30,9 @@ export async function POST(
   // ישפיעו על אותו Travel DNA וילמדו את אותן העדפות
   await recordSwipeSignal(supabase, user.id, placeId, liked);
   if (liked) {
-    await toggleFavorite(supabase, user.id, placeId, "place", "liked");
+    await toggleFavorite(supabase, user.id, placeId, "place", "liked", "tripmatch");
   } else {
-    await skipPlace(supabase, user.id, placeId, "place");
+    await skipPlace(supabase, user.id, placeId, "place", "tripmatch");
   }
 
   const session = await getTripMatchSession(supabase, sessionId);

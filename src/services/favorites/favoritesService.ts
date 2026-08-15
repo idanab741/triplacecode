@@ -5,6 +5,12 @@ import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
 
 export type FavoriteStatus = "liked" | "saved" | "skipped";
 export type PlaceType = "place" | "destination";
+/** מקור הפעולה - איזה פיצ'ר יצר את הלייק/שמירה הזו. אותה טבלת favorites
+ *  משותפת לכל האפליקציה (TripMatch, בניית מסלולים וכו') - המקור מאפשר
+ *  למסכים ספציפיים (כמו "לייקים" בעמוד "כל הטיולים") להציג רק מה שנוצר
+ *  אצלם, במקום את כל הלייקים בכל האפליקציה. undefined/null = לא מתויג
+ *  (נתונים ישנים, מלפני הוספת השדה). */
+export type FavoriteSource = "tripmatch" | "trip_builder";
 
 export async function getFavoriteStatus(
   supabase: SupabaseClient,
@@ -26,7 +32,8 @@ export async function toggleFavorite(
   userId: string,
   placeId: string,
   placeType: PlaceType,
-  action: "liked" | "saved"
+  action: "liked" | "saved",
+  source?: FavoriteSource
 ): Promise<FavoriteStatus | null> {
   const current = await getFavoriteStatus(supabase, userId, placeId);
 
@@ -39,7 +46,7 @@ export async function toggleFavorite(
   await supabase
     .from("favorites")
     .upsert(
-      { user_id: userId, place_id: placeId, place_type: placeType, status: action },
+      { user_id: userId, place_id: placeId, place_type: placeType, status: action, ...(source ? { source } : {}) },
       { onConflict: "user_id,place_id" }
     );
   if (placeType === "place") await recomputeTravelDna(supabase, userId);
@@ -50,29 +57,31 @@ export async function skipPlace(
   supabase: SupabaseClient,
   userId: string,
   placeId: string,
-  placeType: PlaceType
+  placeType: PlaceType,
+  source?: FavoriteSource
 ) {
   await supabase
     .from("favorites")
     .upsert(
-      { user_id: userId, place_id: placeId, place_type: placeType, status: "skipped" },
+      { user_id: userId, place_id: placeId, place_type: placeType, status: "skipped", ...(source ? { source } : {}) },
       { onConflict: "user_id,place_id" }
     );
   if (placeType === "place") await recomputeTravelDna(supabase, userId);
 }
 
-/** יעדי המועדפים של המשתמש לפי סטטוס, עם פרטי התצוגה המלאים. */
+/** יעדי המועדפים של המשתמש לפי סטטוס, עם פרטי התצוגה המלאים.
+ *  source אופציונלי - מסנן להצגת לייקים שמקורם בפיצ'ר ספציפי בלבד
+ *  (למשל "לייקים" בעמוד "כל הטיולים" מציג רק source="tripmatch",
+ *  כדי לא לערבב לייקים שנעשו תוך כדי בניית מסלול). */
 export async function getFavoritePlaces(
   userId: string,
-  status: FavoriteStatus
+  status: FavoriteStatus,
+  source?: FavoriteSource
 ): Promise<UnifiedPlace[]> {
   const supabase = createClient();
-  const { data: favorites } = await supabase
-    .from("favorites")
-    .select("place_id")
-    .eq("user_id", userId)
-    .eq("status", status)
-    .order("created_at", { ascending: false });
+  let query = supabase.from("favorites").select("place_id").eq("user_id", userId).eq("status", status);
+  if (source) query = query.eq("source", source);
+  const { data: favorites } = await query.order("created_at", { ascending: false });
 
   if (!favorites || favorites.length === 0) return [];
 

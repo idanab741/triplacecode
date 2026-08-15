@@ -19,7 +19,7 @@ export async function likeStop(
     })
     .eq("id", stopId);
 
-await toggleFavorite(supabase, userId, candidate.id, "place", "liked");
+await toggleFavorite(supabase, userId, candidate.id, "place", "liked", "trip_builder");
   await recordSwipeSignal(supabase, userId, candidate.id, true);
 }
 
@@ -43,6 +43,6 @@ export async function unlikeStop(
       .eq("id", stopId);
   }
 
-await skipPlace(supabase, userId, candidate.id, "place");
+await skipPlace(supabase, userId, candidate.id, "place", "trip_builder");
   await recordSwipeSignal(supabase, userId, candidate.id, false);
 }

@@ -102,6 +102,9 @@ export interface TripMatchCategoryBucket {
   value: "restaurants" | "nightlife" | "nature" | "attractions";
   label: string;
   emoji: string;
+  /** אייקון (PNG) לכפתור הבחירה בעמוד TripMatch - מוצג בעיגול קטן,
+   *  במקום/בנוסף לאימוג'י, בסגנון לחצני ה"התאמה אישית" (ImageOptionRow). */
+  imageSrc: string;
   /** אילו מתוך 19 תתי-הקטגוריות למעלה שייכות לדלי הזה - לשימוש עתידי
    *  (למשל תיוג התחלתי) - הבחירה בפועל של תת-קטגוריה קורית בפילטרים. */
   subTagValues: string[];
@@ -112,24 +115,28 @@ export const TRIPMATCH_CATEGORY_BUCKETS: TripMatchCategoryBucket[] = [
     value: "restaurants",
     label: "מסעדות וקולינריה",
     emoji: "🍽️",
+    imageSrc: "/images/tripmatch/category-restaurants.png",
     subTagValues: ["coffee_carts_cafes", "wineries_dining"],
   },
   {
     value: "nightlife",
     label: "חיי לילה ובילויים",
     emoji: "🎭",
+    imageSrc: "/images/tripmatch/category-nightlife.png",
     subTagValues: ["nightlife_entertainment", "events_festivals", "spa_relaxation"],
   },
   {
     value: "nature",
     label: "טבע ונופים",
     emoji: "🌿",
+    imageSrc: "/images/tripmatch/category-nature.png",
     subTagValues: ["nature_trails", "beaches_pools", "viewpoints", "parks_gardens", "boating_water_attractions"],
   },
   {
     value: "attractions",
     label: "אטרקציות ואתרים",
     emoji: "🎯",
+    imageSrc: "/images/tripmatch/category-attractions.png",
     subTagValues: [
       "water_amusement_parks",
       "attractions_activities",

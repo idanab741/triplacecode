@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   await recordTripMatchDecision(supabase, sessionId, placeId, liked);
 
   if (liked) {
-    await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
+    await toggleFavorite(supabase, user.id, placeId, "place", "liked", "tripmatch").catch(() => {});
   }
 
   const updatedSession = await getTripMatchSession(supabase, sessionId);
