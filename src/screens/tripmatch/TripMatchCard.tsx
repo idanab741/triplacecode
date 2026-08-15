@@ -11,8 +11,8 @@ interface TripMatchCardProps {
   /** אחוז התאמה אישית (0-100) - מוצג כתגית מעל הכרטיס. */
   matchPercent: number;
   /** מפעילים ע"י ה-SwipeCard העוטף - מריצים את אנימציית ה-fly-out ואז את
-   *  ה-callback המקורי (onSwipeRight/onSwipeLeft), בדיוק כמו לחיצה על
-   *  הכפתורים החיצוניים הישנים - הלוגיקה לא השתנתה, רק המיקום הוויזואלי. */
+   *  ה-callback המקורי (onSwipeRight/onSwipeLeft). הלוגיקה לא השתנתה, רק
+   *  המיקום הוויזואלי של הכפתורים. */
   onLike: () => void;
   onNope: () => void;
   disabled?: boolean;
@@ -69,113 +69,125 @@ function deriveTags(candidate: CandidatePlace): string[] {
   return Array.from(new Set([...baseTags, ...contentTags, ...badgeTags])).slice(0, 4);
 }
 
-/** כרטיס ההחלקה - יחידה אחת שלמה: תמונה בגובה קבוע, אזור מידע עם גבהים
- *  קבועים לכל תת-חלק (כותרת/תיאור/תגיות), ואזור פעולה משולב בתחתית עם
- *  כפתורי Like/X - כך שכל הכרטיסים יוצאים באותו גובה כולל בדיוק, בלי
- *  קשר לאורך השם/התיאור/מספר התגיות של כל מקום.
+/** מבנה גבהים קשיח לכל הכרטיס - זהה תמיד, בלי קשר לתוכן:
  *
- *  *** שדרוג UI/UX (לפי מפרט): כפתורי ה-Like/X עברו מלהיות שני כפתורים
- *  צפים מחוץ לכרטיס (fixed, בתוך SwipeCard) להיות אזור פעולה משולב
- *  *בתוך* הכרטיס עצמו, בתחתית - חלק אינטגרלי מהעיצוב במקום "מודבק"
- *  מבחוץ. הלוגיקה של ה-swipe (גרירה, אנימציית fly-out, ה-callbacks
- *  onSwipeLeft/onSwipeRight) לא השתנתה כלל - SwipeCard מעביר onLike/
- *  onNope כ-render-prop, והכרטיס רק קורא להם בלחיצה על הכפתורים.
+ *  CARD_HEIGHT (גוף הכרטיס: תמונה + מידע + תגיות, גבהים קבועים לכל תת-חלק)
+ *    ↓ ACTION_GAP (המרחק הקבוע בין תחתית הכרטיס לכפתורים)
+ *  ACTION_ROW_HEIGHT (שורת הפעולות - X ו-Like)
+ *    = TOTAL_HEIGHT הכולל, קבוע ואחיד לכל כרטיסי TripMatch.
  *
- *  *** גבהים קבועים לכל תת-אזור (לא עוד flex-1/min-h גמישים):
- *  - תמונה: h-56 קבוע (היה h-64 - צומצם כדי לפנות מקום לאזור הפעולה
- *    החדש בתוך הכרטיס, מבלי להגדיל את הגובה הכולל).
- *  - כותרת: line-clamp-2 (מעל התמונה, לא משפיע על גובה התמונה עצמה כי
- *    היא overlay מוחלט - אבל מונע משם ארוך מדי "להציף" את השכבה).
- *  - תיאור: גובה קבוע (h-11, שתי שורות) עם line-clamp-2 - לא עוד גלילה
- *    פנימית, כי המטרה עכשיו היא גובה קבוע ולא "להראות הכל".
- *  - תגיות: גובה קבוע (h-8, שורה אחת) עם overflow-hidden - תגיות
- *    שלא נכנסות לשורה הראשונה נחתכות, אבל האזור עצמו תמיד קיים ונראה.
- *  - אזור פעולה: תמיד באותו גובה (padding+כפתורים קבועים), עם קו הפרדה
- *    עדין (border-t) שמחבר אותו חזותית לגוף הכרטיס במקום להרגיש מנותק. */
+ *  התוצאה: "Card Area → Action Extension Area", בגובה סופי קבוע מראש -
+ *  לא תלוי באורך שם/תיאור/מספר תגיות. ה-"Safe Bottom Spacing" מול
+ *  ה-BottomNav הצף מגיע כבר מ-Screen (pb-28), כי כל הרכיב הזה (כרטיס +
+ *  כפתורים) זורם בתוך התוכן הרגיל של המסך ולא fixed - כך שהוא לעולם לא
+ *  יכול "להתנגש" ב-BottomNav. */
+const IMAGE_HEIGHT = 224; // h-56
+const INFO_HEIGHT = 112; // pt-4(16) + תיאור h-11(44) + gap-2(8) + תגיות h-8(32) + pb-3(12)
+const CARD_HEIGHT = IMAGE_HEIGHT + INFO_HEIGHT; // 336 - קבוע לחלוטין, לא תלוי בתוכן
+const ACTION_GAP = 20; // המרחק הקבוע בין תחתית הכרטיס לכפתורים
+const BUTTON_SIZE = 60;
+const ACTION_ROW_HEIGHT = BUTTON_SIZE; // 60
+const TOTAL_HEIGHT = CARD_HEIGHT + ACTION_GAP + ACTION_ROW_HEIGHT; // גובה כולל קבוע לכל כרטיס
+
+/** כרטיס ההחלקה - יחידה אחת שלמה בגובה קבוע ואחיד לחלוטין (TOTAL_HEIGHT),
+ *  כדי שכל הכרטיסים המתחלפים ב-swipe יישבו בדיוק באותו שטח בלי "ריקוד" של
+ *  הממשק. גוף הכרטיס עצמו (תמונה+מידע+תגיות) נשאר מלבן מעוגל רגיל; מתחתיו,
+ *  בגובה ובריווח קבועים, יושבת שורת הפעולות (X / Like) - שני עיגולים
+ *  סימטריים סביב מרכז הכרטיס בדיוק (flex + justify-center מבטיחים סימטריה
+ *  מוחלטת), עם shadow עדין ועקבי לכל אחד מהם כך שכל האלמנט נתפס כיחידה
+ *  אחת שממשיכה אורגנית מהכרטיס - לא כאלמנטים שהודבקו עליו. */
 export function TripMatchCard({ candidate, matchPercent, onLike, onNope, disabled }: TripMatchCardProps) {
   const tags = deriveTags(candidate);
 
   return (
-    <div className="relative flex w-full flex-col overflow-hidden rounded-card border border-black/5 bg-white shadow-[0_2px_16px_rgba(16,24,40,0.07)]">
-      <div className="relative h-56 shrink-0 bg-bg-secondary">
-        {candidate.imageUrls[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={candidate.imageUrls[0]}
-            alt={candidate.name}
-            className="h-full w-full object-cover object-center"
-            draggable={false}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-4xl">📍</div>
-        )}
-        {/* גרדיאנט תחתון - מבטיח שהטקסט הלבן קריא גם על תמונה בהירה */}
-        <div className="absolute inset-x-0 bottom-0 h-44 bg-[linear-gradient(0deg,rgba(0,0,0,0.75),transparent)]" />
+    <div className="flex w-full flex-col items-center" style={{ height: TOTAL_HEIGHT }}>
+      {/* Card Area - גוף הכרטיס, גובה קבוע (CARD_HEIGHT), לא תלוי בתוכן */}
+      <div
+        className="w-full shrink-0 overflow-hidden rounded-card border border-black/5 bg-white shadow-[0_4px_16px_rgba(16,24,40,0.08)]"
+        style={{ height: CARD_HEIGHT }}
+      >
+        <div className="relative h-56 shrink-0 bg-bg-secondary">
+          {candidate.imageUrls[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={candidate.imageUrls[0]}
+              alt={candidate.name}
+              className="h-full w-full object-cover object-center"
+              draggable={false}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-4xl">📍</div>
+          )}
+          {/* גרדיאנט תחתון - מבטיח שהטקסט הלבן קריא גם על תמונה בהירה */}
+          <div className="absolute inset-x-0 bottom-0 h-44 bg-[linear-gradient(0deg,rgba(0,0,0,0.75),transparent)]" />
 
-        {/* תגית אחוז התאמה - קבועה בפינה, לא תלויה בתוכן שאר הכרטיס */}
-        <div
-          className="absolute right-4 top-4 flex items-center gap-1 rounded-pill px-3 py-1.5 text-[13px] font-bold text-white shadow-lg"
-          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-        >
-          <span>✨</span>
-          <span>{matchPercent}% התאמה</span>
-        </div>
-
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-5 pb-5 text-white">
-          <div className="flex items-center gap-2 text-xs font-medium text-white/85">
-            <span>{getCategoryLabel(candidate.category)}</span>
-            {candidate.rating != null && (
-              <>
-                <span className="opacity-60">•</span>
-                <span>⭐ {candidate.rating.toFixed(1)}</span>
-              </>
-            )}
+          {/* תגית אחוז התאמה - קבועה בפינה, לא תלויה בתוכן שאר הכרטיס */}
+          <div
+            className="absolute right-4 top-4 flex items-center gap-1 rounded-pill px-3 py-1.5 text-[13px] font-bold text-white shadow-lg"
+            style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+          >
+            <span>✨</span>
+            <span>{matchPercent}% התאמה</span>
           </div>
-          <h2 className="line-clamp-2 text-xl font-extrabold leading-tight">{candidate.name}</h2>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-white/90">
-            {candidate.distanceKm > 0 &&
-              (candidate.distanceKm <= MAX_REASONABLE_DRIVING_KM ? (
+
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-5 pb-5 text-white">
+            <div className="flex items-center gap-2 text-xs font-medium text-white/85">
+              <span>{getCategoryLabel(candidate.category)}</span>
+              {candidate.rating != null && (
                 <>
-                  <span>🚗 {candidate.etaMinutes} דק&apos;</span>
-                  <span>📍 {candidate.distanceKm.toFixed(1)} ק&quot;מ</span>
+                  <span className="opacity-60">•</span>
+                  <span>⭐ {candidate.rating.toFixed(1)}</span>
                 </>
-              ) : (
-                <span>✈️ {Math.round(candidate.distanceKm).toLocaleString()} ק&quot;מ ממך</span>
-              ))}
-            {candidate.priceLevel != null && <span>{"₪".repeat(candidate.priceLevel + 1)}</span>}
+              )}
+            </div>
+            <h2 className="line-clamp-2 text-xl font-extrabold leading-tight">{candidate.name}</h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-medium text-white/90">
+              {candidate.distanceKm > 0 &&
+                (candidate.distanceKm <= MAX_REASONABLE_DRIVING_KM ? (
+                  <>
+                    <span>🚗 {candidate.etaMinutes} דק&apos;</span>
+                    <span>📍 {candidate.distanceKm.toFixed(1)} ק&quot;מ</span>
+                  </>
+                ) : (
+                  <span>✈️ {Math.round(candidate.distanceKm).toLocaleString()} ק&quot;מ ממך</span>
+                ))}
+              {candidate.priceLevel != null && <span>{"₪".repeat(candidate.priceLevel + 1)}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* אזור המידע התחתון - תיאור ותגיות בגבהים קבועים, כדי שגוף הכרטיס
+            תמיד יגיע לאותו גובה בדיוק, בלי תלות באורך התוכן האמיתי. */}
+        <div className="flex shrink-0 flex-col gap-2 px-5 pt-4 pb-3">
+          <p className="line-clamp-2 h-11 text-[13.5px] leading-relaxed text-ink-secondary">
+            {candidate.shortDescription || "מקום מומלץ שנבחר במיוחד עבורכם באזור."}
+          </p>
+          <div className="flex h-8 flex-wrap gap-1.5 overflow-hidden">
+            {tags.map((tag) => (
+              <span key={tag} className="h-fit shrink-0 rounded-pill bg-bg-secondary px-2.5 py-1 text-[11.5px] font-medium text-ink-secondary">
+                {tag}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* אזור המידע התחתון - תיאור ותגיות בגבהים קבועים, כדי שכל הכרטיסים
-          יגיעו לאותו גובה כולל בדיוק, בלי תלות באורך התוכן האמיתי. */}
-      <div className="flex shrink-0 flex-col gap-2 px-5 pt-4 pb-3">
-        <p className="line-clamp-2 h-11 text-[13.5px] leading-relaxed text-ink-secondary">
-          {candidate.shortDescription || "מקום מומלץ שנבחר במיוחד עבורכם באזור."}
-        </p>
-        <div className="flex h-8 flex-wrap gap-1.5 overflow-hidden">
-          {tags.map((tag) => (
-            <span key={tag} className="h-fit shrink-0 rounded-pill bg-bg-secondary px-2.5 py-1 text-[11.5px] font-medium text-ink-secondary">
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* אזור הפעולה - Like/X משולבים בתוך הכרטיס עצמו, עם קו הפרדה עדין
-          שמחבר אותו חזותית לגוף הכרטיס. onPointerDown עוצר את ה-bubbling
-          כדי שלחיצה על הכפתורים לא תתפרש כתחילת גרירה של הכרטיס כולו
-          (SwipeCard מאזין ל-pointerDown על כל הכרטיס לצורך ה-swipe). */}
-      <div className="flex shrink-0 items-center justify-center gap-10 border-t border-black/5 bg-white py-4">
+      {/* Action Extension Area - ריווח קבוע (ACTION_GAP) ואז שורת הפעולות,
+          תמיד באותו גובה ומיקום מדויק ביחס לכרטיס. flex + justify-center +
+          gap מבטיחים שהעיגולים תמיד סימטריים לחלוטין סביב מרכז הכרטיס.
+          onPointerDown עוצר את ה-bubbling כדי שלחיצה על כפתור לא תתפרש
+          כתחילת גרירה של הכרטיס (SwipeCard מאזין ל-pointerDown על כל
+          האלמנט לצורך ה-swipe). */}
+      <div className="flex shrink-0 items-center justify-center gap-10" style={{ height: ACTION_ROW_HEIGHT, marginTop: ACTION_GAP }}>
         <button
           type="button"
           disabled={disabled}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onLike}
           aria-label="אהבתי"
-          className="transition active:scale-90 disabled:opacity-50"
+          className="rounded-full shadow-[0_4px_12px_rgba(16,24,40,0.14)] transition active:scale-90 disabled:opacity-50"
         >
-          <Image src="/images/tripmatch/action-like.png" alt="" width={60} height={60} />
+          <Image src="/images/tripmatch/action-like.png" alt="" width={BUTTON_SIZE} height={BUTTON_SIZE} />
         </button>
         <button
           type="button"
@@ -183,9 +195,9 @@ export function TripMatchCard({ candidate, matchPercent, onLike, onNope, disable
           onPointerDown={(e) => e.stopPropagation()}
           onClick={onNope}
           aria-label="לא מתאים"
-          className="transition active:scale-90 disabled:opacity-50"
+          className="rounded-full shadow-[0_4px_12px_rgba(16,24,40,0.14)] transition active:scale-90 disabled:opacity-50"
         >
-          <Image src="/images/tripmatch/action-nope.png" alt="" width={60} height={60} />
+          <Image src="/images/tripmatch/action-nope.png" alt="" width={BUTTON_SIZE} height={BUTTON_SIZE} />
         </button>
       </div>
     </div>
