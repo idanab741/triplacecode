@@ -1,5 +1,4 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
-import { findPlaceStatusAndPhoto } from "./placePhotoService";
 
 export interface SavedTripSummary {
   sessionId: string;
@@ -48,30 +47,31 @@ export async function getSavedTrips(
 
   if (!sessions || sessions.length === 0) return [];
 
-  const summaries = await Promise.all(
-    sessions.map(async (session) => {
-      const answers = session.answers as { destination?: string; requestedArea?: string } | null;
-      const itinerary = session.final_itinerary as { stops?: { name?: string }[] } | null;
-      const firstStopName = itinerary?.stops?.[0]?.name;
+  // *** תיקון: לפני זה כל טיול בעמוד "הטיולים שלי" ביצע קריאה חדשה
+  // ל-Google Places (findPlaceStatusAndPhoto) רק כדי לשלוף תמונת תצוגה
+  // מקדימה - שימוש ב-Google בלי אישור מפורש, וגם מיותר: לתחנה הראשונה
+  // של הטיול כבר יש תמונה שמורה (imageUrls) מהרגע שהיא נוספה למסלול.
+  // עכשיו פשוט משתמשים בתמונה הקיימת הזו - בלי שום קריאת רשת נוספת
+  // ל-Google. אם אין תמונה שמורה, פשוט אין תמונה (לא נופלים בחזרה
+  // לחיפוש Google).
+  const summaries = sessions.map((session) => {
+    const answers = session.answers as { destination?: string; requestedArea?: string } | null;
+    const itinerary = session.final_itinerary as { stops?: { name?: string; imageUrls?: string[] }[] } | null;
+    const firstStop = itinerary?.stops?.[0];
 
-      const destinationLabel = answers?.destination ?? answers?.requestedArea ?? firstStopName ?? "הטיול שלי";
-      const photoQuery = answers?.destination ?? answers?.requestedArea ?? firstStopName ?? null;
+    const destinationLabel = answers?.destination ?? answers?.requestedArea ?? firstStop?.name ?? "הטיול שלי";
+    const imageUrl = firstStop?.imageUrls?.[0] ?? null;
+    const stopCount = itinerary?.stops?.length ?? 0;
 
-      const photoResult = photoQuery ? await findPlaceStatusAndPhoto(photoQuery) : null;
-      const imageUrl = photoResult?.photoRef ? `/api/places/photo?ref=${encodeURIComponent(photoResult.photoRef)}` : null;
-
-      const stopCount = itinerary?.stops?.length ?? 0;
-
-      return {
-        sessionId: session.id as string,
-        tripType: session.trip_type as string,
-        destinationLabel,
-        imageUrl,
-        stopCount,
-        createdAt: session.created_at as string,
-      } satisfies SavedTripSummary;
-    })
-  );
+    return {
+      sessionId: session.id as string,
+      tripType: session.trip_type as string,
+      destinationLabel,
+      imageUrl,
+      stopCount,
+      createdAt: session.created_at as string,
+    } satisfies SavedTripSummary;
+  });
 
   return summaries;
 }

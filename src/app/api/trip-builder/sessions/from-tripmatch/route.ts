@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
-/** "שמירת הטיול" ממסך התוצאות של TripMatch - יוצר שורת trip_builder_sessions
- *  חדשה (trip_type: "tripmatch") עם final_itinerary בנוי מתוך המקומות
- *  שאהבתם, מסומנת is_saved=true מייד - כדי שהטיול יופיע בעמוד "הטיולים
- *  שלי", בלשונית "שמורים", עם שם היעד ככותרת (בדיוק כמו טיולים אחרים -
- *  ראו getSavedTrips: destinationLabel נגזר מ-answers.destination). */
+/** יוצר/מעדכן שורת trip_builder_sessions (trip_type: "tripmatch") מתוך
+ *  המקומות שאהבתם ב-TripMatch - נקרא אוטומטית ברגע שמגיעים למסך התוצאות
+ *  (is_saved=false כברירת מחדל, כדי שהטיול יופיע תחת "כל הטיולים" ויחולו
+ *  עליו אותם כללים כמו כל טיול אחר - כולל היעלמות מהרשימה אחרי שבוע אם
+ *  לא נשמר, לפי getSavedTrips הקיים). "שמירת הטיול" בפועל (הפיכה
+ *  ל-is_saved=true) קורית בנפרד דרך /api/trip-builder/sessions/[id]/save
+ *  (אותו endpoint ששאר סוגי הטיולים כבר משתמשים בו - SaveTripIconButton).
+ *  אם body כולל sessionId קיים - מעדכנים את אותה שורה (המקומות מצטברים/
+ *  משתנים תוך כדי סריקה, ולא רוצים ליצור שורה חדשה בכל שינוי). */
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -17,7 +21,17 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const city: string | undefined = body?.city;
+  // *** ערך העיר הגולמי (למשל "דובאי", בלי המדינה) - זה מה שבאמת שמור
+  // ב-places.city ומשמש לחיפוש. שונה מ-city (התווית לתצוגה, "דובאי,
+  // איחוד האמירויות") - בלי ההפרדה הזו, חיפוש עתידי (resume) עם התווית
+  // המלאה כ"עיר" לא מוצא כלום, כי אף עמודה ב-DB לא שווה למחרוזת המשולבת.
+  const cityValue: string | undefined = typeof body?.cityValue === "string" && body.cityValue.trim() ? body.cityValue : city;
   const places: CandidatePlace[] | undefined = Array.isArray(body?.places) ? body.places : undefined;
+  const existingSessionId: string | undefined = body?.sessionId;
+  // *** קטגוריות (מתוך nightlife/restaurants/attractions) שכבר נסרקו
+  // ליעד הזה - נשמר על answers.completedCategories, כדי שגם עמוד הצפייה
+  // בטיול שמור (לא רק מסך התוצאות החי) ידע אם יש "המשך לקטגוריה הבאה".
+  const completedCategories: string[] = Array.isArray(body?.completedCategories) ? body.completedCategories : [];
 
   if (!city || !city.trim()) {
     return NextResponse.json({ error: "יש לספק יעד" }, { status: 400 });
@@ -52,18 +66,34 @@ export async function POST(request: Request) {
     warnings: [],
   };
 
+  const answers = { destination: city.trim(), cityValue: cityValue?.trim() ?? city.trim(), completedCategories };
+
+  if (existingSessionId) {
+    const { data, error } = await supabase
+      .from("trip_builder_sessions")
+      .update({ final_itinerary: finalItinerary, answers })
+      .eq("id", existingSessionId)
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (data) return NextResponse.json({ sessionId: data.id });
+    // השורה לא נמצאה (למשל נמחקה) - ניפול ליצירת שורה חדשה במקום לכשול.
+  }
+
   const { data, error } = await supabase
     .from("trip_builder_sessions")
     .insert({
       user_id: user.id,
       trip_type: "tripmatch",
-      answers: { destination: city.trim() },
+      answers,
       origin_latitude: places[0].latitude,
       origin_longitude: places[0].longitude,
       category_plan: [],
       final_itinerary: finalItinerary,
       status: "completed",
-      is_saved: true,
+      is_saved: false,
     })
     .select("id")
     .single();

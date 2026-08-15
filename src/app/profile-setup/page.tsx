@@ -54,6 +54,27 @@ export default function ProfileSetupPage() {
     }
   }, [birthDay, birthMonth, birthYear]);
 
+  // *** תיקון קריטי - דחיית App Store (גרסה 1.0.7): Apple מעבירה שם
+  // וגם אימייל דרך Sign in with Apple (Authentication Services) - אבל
+  // המסך הזה תמיד התחיל עם שדה "שם מלא" ריק, בלי להשתמש במידע שכבר
+  // התקבל מ-Apple, וגרם למשתמש להקליד מחדש משהו שכבר סופק. זו הפרה
+  // ישירה של הנחיות Apple (Sign in with Apple חייב להשתמש במידע שכבר
+  // התקבל, לא לבקש אותו שוב). ממלאים מראש מ-user_metadata (השם היחיד
+  // שנבדק כי זה השדה היחיד שהמסך הזה שואל שוב בפועל - האימייל עצמו
+  // כבר קיים ב-user.email ולעולם לא נשאל כאן מחדש). בודקים כמה מוסכמות
+  // שם אפשריות כי ספקי OAuth שונים (וגם גרסאות Supabase) לא תמיד
+  // עקביים באיזה מפתח הם שומרים את זה תחת.
+  useEffect(() => {
+    if (!user || fullName) return;
+    const metadata = user.user_metadata as Record<string, unknown> | undefined;
+    const prefilledName =
+      (metadata?.full_name as string | undefined) ||
+      (metadata?.name as string | undefined) ||
+      [metadata?.given_name, metadata?.family_name].filter(Boolean).join(" ").trim() ||
+      "";
+    if (prefilledName) setFullName(prefilledName);
+  }, [user, fullName]);
+
   useEffect(() => {
     if (manualNavigationRef.current) return;
     if (!profileLoading && isProfileComplete(profile)) {

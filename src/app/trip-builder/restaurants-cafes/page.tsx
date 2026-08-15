@@ -13,6 +13,7 @@ import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: RestaurantAnswers = {
   companions: "solo",
@@ -640,15 +641,5 @@ export default function RestaurantsCafesQuestionnairePage() {
 }
 
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("הדפדפן שלך לא תומך באיתור מיקום"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => reject(new Error("יש לאשר גישה למיקום כדי למצוא מקום קרוב אליכם")),
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
-  });
+  return getCurrentPositionSafe("יש לאשר גישה למיקום כדי למצוא מקום קרוב אליכם");
 }

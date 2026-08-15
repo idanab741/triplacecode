@@ -22,6 +22,8 @@ export interface PlaceDetail {
   image_urls: string[];
   opening_hours: string[] | null;
   tags: string[];
+  trip_type_tags: string[];
+  cuisine_tags: string[];
   latitude: number;
   longitude: number;
 }

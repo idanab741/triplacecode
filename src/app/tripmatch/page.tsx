@@ -1,8 +1,8 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Screen, SwipeCard, BackButton, Chip, ImageOptionRow, SwipeToDeleteRow } from "@/components/ui";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { CategoryPicker } from "@/screens/tripmatch/CategoryPicker";
@@ -17,11 +17,13 @@ import { TripMatchCard } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import dynamic from "next/dynamic";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { getCategoryLabel } from "@/utils/categoryLabels";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -36,6 +38,13 @@ type UserPreferences = { interests: string[]; culinaryStyles: string[]; kosher: 
 // מסעדות, אטרקציות), לפי בקשה מפורשת - "טבע" מטופל בנפרד (יש לו זרימת
 // בניית-טיול משלו, לא מחזור החלקות כמו השאר) ולכן לא נכלל במחזור הזה.
 const CONTINUE_CATEGORY_VALUES: string[] = ["nightlife", "restaurants", "attractions"];
+
+// *** ניווט החוצה מ-TripMatch (למשל לצפייה בפרטי מקום) וחזרה היה מאפס
+// את כל מצב מסך התוצאות (כולל "המשך לקטגוריה הבאה") כי הוא חי רק
+// בזיכרון של React - ברגע שהרכיב נטען מחדש, הכל התאפס לעמוד ההתחלה.
+// שומרים את מצב מסך התוצאות ב-sessionStorage (נמחק כשסוגרים את הטאב,
+// לא נשאר "תקוע" לתמיד) כדי שחזרה ל-TripMatch תשחזר בדיוק איפה שהפסיקו.
+const RESULTS_STATE_STORAGE_KEY = "tripmatch:results-state";
 
 /** "אחר" ב"קרוב אליי" - השלמה אוטומטית מתוך תחומי עניין + העדפות חופשות
  *  בחו"ל (אותן רשימות מההתאמה האישית) - לא קשור ל-4 הדליים הראשיים. */
@@ -73,7 +82,16 @@ function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilter
 }
 
 export default function TripMatchPage() {
+  return (
+    <Suspense>
+      <TripMatchPageContent />
+    </Suspense>
+  );
+}
+
+function TripMatchPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { ready } = useFeatureOnboardingGuard("tripmatch", "/onboarding/tripmatch");
   const [stage, setStage] = useState<Stage>("city");
@@ -120,8 +138,165 @@ export default function TripMatchPage() {
   // הושלמו ליעד הנוכחי (מתאפס בכל בחירת יעד חדש) - כדי לדעת מתי להציג
   // את הכפתור ולאיזו קטגוריה לקפוץ בלחיצה עליו.
   const [completedCategories, setCompletedCategories] = useState<string[]>([]);
-  const [savingTrip, setSavingTrip] = useState(false);
-  const [tripSaved, setTripSaved] = useState(false);
+  // *** הטיול נוצר אוטומטית ב-trip_builder_sessions ברגע שמגיעים לתוצאות
+  // (is_saved=false) - כדי שיופיע תחת "כל הטיולים" ויחולו עליו אותם
+  // כללים כמו כל טיול אחר (כולל היעלמות אחרי שבוע אם לא נשמר). "שמירה"
+  // בפועל קורית דרך SaveTripIconButton (אותו רכיב ששאר האפליקציה
+  // משתמשת בו), לא כפתור נפרד פה.
+  const [tripRecordId, setTripRecordId] = useState<string | null>(null);
+  const [syncingTrip, setSyncingTrip] = useState(false);
+  const [justShared, setJustShared] = useState(false);
+  // *** true מהרגע שמתחילים לטעון טיול שמור עם resumeSessionId, עד
+  // שההחלקות באמת מתחילות (או שנכשל). בלי זה, הבקשה ל-/api/tripmatch/
+  // sessions (שיכולה לקחת הרבה שניות אם צריך ליצור המלצות חדשות ל-AI
+  // לקטגוריה הזו) לא נראית שונה מ"כלום לא קורה" - בדיוק הבלבול שקרה כאן.
+  const [resuming, setResuming] = useState(false);
+
+  // שחזור מצב מסך התוצאות מ-sessionStorage בטעינה ראשונה (אחרי חזרה
+  // ל-TripMatch מעמוד אחר) - רק אם יש תוצאות משמעותיות לשחזר. לא רץ אם
+  // מגיעים עם resumeSessionId (ראו האפקט הבא) - אז טוענים מהשרת במקום.
+  useEffect(() => {
+    if (searchParams.get("resumeSessionId")) return;
+    try {
+      const raw = sessionStorage.getItem(RESULTS_STATE_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || !Array.isArray(saved.sessionLikedPlaces) || saved.sessionLikedPlaces.length === 0) return;
+      setSelectedCity(saved.selectedCity ?? null);
+      setSelectedCityLabel(saved.selectedCityLabel ?? "");
+      setCategoryValue(saved.categoryValue ?? null);
+      setCategoryLabel(saved.categoryLabel ?? "");
+      setSessionLikedPlaces(saved.sessionLikedPlaces);
+      setCompletedCategories(Array.isArray(saved.completedCategories) ? saved.completedCategories : []);
+      setTripRecordId(saved.tripRecordId ?? null);
+      setHeroVisible(false);
+      setStage("results");
+    } catch {
+      // sessionStorage לא זמין/JSON פגום - פשוט ממשיכים ממסך ההתחלה הרגיל
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // *** "המשך לקטגוריה הבאה" מעמוד טיול שמור - מגיעים לפה עם
+  // ?resumeSessionId=X (מקושר מ-trip-builder/tripmatch/result). טוענים
+  // את הטיול השמור מהשרת (לא מ-sessionStorage - זה טיול ישן מסשן אחר
+  // לגמרי, לא הזיכרון הנוכחי של הדפדפן) ומשחזרים איתו בדיוק כמו מסך
+  // תוצאות רגיל: יעד, רשימת המקומות שכבר אהבו, קטגוריות שכבר הושלמו,
+  // ואותו tripRecordId (כדי שהמשך הסריקה יעדכן את אותה שורה, לא ייצור
+  // כפילות).
+  useEffect(() => {
+    const resumeSessionId = searchParams.get("resumeSessionId");
+    if (!resumeSessionId) return;
+    setResuming(true);
+    fetch(`/api/trip-builder/sessions/${resumeSessionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        const answers = data.session?.answers as { destination?: string; cityValue?: string; completedCategories?: string[] } | null;
+        const itinerary = data.session?.final_itinerary as { stops?: Array<Record<string, unknown>> } | null;
+        const stops = itinerary?.stops ?? [];
+        // ממיר את התחנות השמורות בחזרה לצורת CandidatePlace - חלק
+        // מהשדות (תגיות/כשרות/נגישות) לא נשמרו בפועל בתחנה עצמה, אז
+        // ממלאים ברירות מחדל ריקות/ניטרליות (לא משפיע על תצוגת התוצאות -
+        // מפה/רשימה/מחיקה - רק על שדות שלא מוצגים שם בכלל).
+        const restoredPlaces = stops.map(
+          (s) =>
+            ({
+              id: s.placeId,
+              name: s.name,
+              category: s.category,
+              subcategory: null,
+              shortDescription: s.shortDescription ?? null,
+              imageUrls: s.imageUrls ?? [],
+              rating: s.rating ?? null,
+              ratingCount: null,
+              priceLevel: s.priceLevel ?? null,
+              estimatedVisitMinutes: s.estimatedVisitMinutes ?? null,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              distanceKm: 0,
+              etaMinutes: s.etaMinutes ?? 0,
+              tripTypeTags: [],
+              cuisineTags: [],
+              kosher: null,
+              accessible: null,
+              suitableChildAges: [],
+              budgetTier: null,
+              isAreaExperience: false,
+            }) as unknown as CandidatePlace
+        );
+
+        const destination = answers?.destination ?? "";
+        // *** cityValue הוא הערך הגולמי (למשל "דובאי") ששמור בפועל
+        // ב-places.city - זה מה שחייב לשמש לחיפוש. destination הוא
+        // התווית לתצוגה בלבד ("דובאי, איחוד האמירויות") - שימוש בו
+        // כערך חיפוש (הבאג המקורי) תמיד מחזיר 0 תוצאות, כי אף עמודה
+        // ב-DB לא שווה למחרוזת המשולבת "עיר, מדינה".
+        const cityValue = answers?.cityValue || destination;
+        const restoredCompleted = Array.isArray(answers?.completedCategories) ? answers!.completedCategories! : [];
+        setSelectedCity(cityValue);
+        setSelectedCityLabel(destination);
+        setSessionLikedPlaces(restoredPlaces);
+        setCompletedCategories(restoredCompleted);
+        setTripRecordId(resumeSessionId);
+        setHeroVisible(false);
+
+        // *** קפיצה ישירה להחלקות בקטגוריה הבאה - לא עוצרים במסך התוצאות
+        // (שם המשתמש יצטרך ללחוץ "המשך" שוב, בלי לראות שינוי ויזואלי -
+        // בדיוק מה שהתבלבל). אם אין קטגוריה נוספת (כבר עברו על כל 3),
+        // נופלים חזרה למסך התוצאות הרגיל.
+        const nextBucket = TRIPMATCH_CATEGORY_BUCKETS.find(
+          (bucket) => CONTINUE_CATEGORY_VALUES.includes(bucket.value) && !restoredCompleted.includes(bucket.value)
+        );
+        if (nextBucket && cityValue) {
+          // *** ה-fetch הפנימי כאן (יצירת session חדש להחלקות) יכול
+          // לקחת הרבה שניות אם צריך ליצור המלצות AI חדשות לקטגוריה הזו -
+          // resuming נשאר true (מציג מסך טעינה) עד שהוא באמת מסתיים.
+          handleSelectCategory(nextBucket.value, nextBucket.label, { cityOverride: cityValue }).finally(() =>
+            setResuming(false)
+          );
+        } else {
+          setStage("results");
+          setResuming(false);
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "לא הצלחנו לטעון את הטיול השמור");
+        setResuming(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+
+  // שומר את מצב מסך התוצאות בכל שינוי, כדי שניווט החוצה וחזרה ישחזר בדיוק
+  // איפה שהפסיקו (כולל "המשך לקטגוריה הבאה").
+  useEffect(() => {
+    if (stage !== "results" || sessionLikedPlaces.length === 0) return;
+    try {
+      sessionStorage.setItem(
+        RESULTS_STATE_STORAGE_KEY,
+        JSON.stringify({
+          selectedCity,
+          selectedCityLabel,
+          categoryValue,
+          categoryLabel,
+          sessionLikedPlaces,
+          completedCategories,
+          tripRecordId,
+        })
+      );
+    } catch {
+      // אחסון לא זמין (מצב פרטי וכו') - לא קריטי, פשוט לא נשמר
+    }
+  }, [stage, selectedCity, selectedCityLabel, categoryValue, categoryLabel, sessionLikedPlaces, completedCategories, tripRecordId]);
+
+  function clearPersistedResultsState() {
+    try {
+      sessionStorage.removeItem(RESULTS_STATE_STORAGE_KEY);
+    } catch {
+      // לא קריטי
+    }
+  }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -147,7 +322,8 @@ export default function TripMatchPage() {
     setCityOptions([]);
     setHeroVisible(false);
     setCompletedCategories([]);
-    setTripSaved(false);
+    setTripRecordId(null);
+    clearPersistedResultsState();
     window.setTimeout(() => setStage("category"), 280);
   }
 
@@ -162,7 +338,8 @@ export default function TripMatchPage() {
     setNearMeOtherTags([]);
     setCompletedCategories([]);
     setSessionLikedPlaces([]);
-    setTripSaved(false);
+    setTripRecordId(null);
+    clearPersistedResultsState();
   }
 
   function handleEditCategory() {
@@ -292,16 +469,13 @@ export default function TripMatchPage() {
       }
 
       if (lat == null || lng == null) {
-        if (!navigator.geolocation) throw new Error("הדפדפן לא תומך באיתור מיקום");
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            () => reject(new Error("לא הצלחנו לאתר את המיקום שלך - יש לאשר גישה למיקום ולנסות שוב")),
-            { enableHighAccuracy: true, timeout: 10000 }
-          );
-        });
-        lat = pos.coords.latitude;
-        lng = pos.coords.longitude;
+        // *** getCurrentPositionSafe (לא getCurrentPosition הגולמי) - יש
+        // WebViews (בעיקר בתוך אפליקציית native) שאף פעם לא קוראים לאף
+        // callback של ה-API, גם לא אחרי timeout - התוצאה בלי ההגנה הזו
+        // הייתה "טוען לנצח" בלי שום הודעת שגיאה.
+        const pos = await getCurrentPositionSafe();
+        lat = pos.lat;
+        lng = pos.lng;
         // ה-city כאן משמש רק לתצוגה (כותרת) - לא לחיפוש עצמו, שרץ לפי
         // רדיוס אמיתי מהקואורדינטות. אם reverse geocoding נכשל, ממשיכים
         // בכל זאת עם שם גנרי.
@@ -396,33 +570,84 @@ export default function TripMatchPage() {
 
   function handleContinueToNextCategory() {
     if (!nextContinueCategory) return;
-    setTripSaved(false);
     handleSelectCategory(nextContinueCategory.value, nextContinueCategory.label);
   }
 
-  async function handleSaveTrip() {
-    if (savingTrip || sessionLikedPlaces.length === 0) return;
-    setSavingTrip(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/trip-builder/sessions/from-tripmatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city: selectedCityLabel || selectedCity, places: sessionLikedPlaces }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "שמירת הטיול נכשלה");
-      setTripSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "שמירת הטיול נכשלה, נסו שוב");
-    } finally {
-      setSavingTrip(false);
+  /** שיתוף טיול ה-TripMatch - בדיוק אותו דפוס כמו שאר עמודי התוצאות
+   *  (navigator.share אם קיים, אחרת נופל לוואטסאפ). דורש tripRecordId
+   *  כי הקישור המשותף מפנה לעמוד הצפייה בטיול השמור. */
+  async function handleShareTrip() {
+    if (!tripRecordId) return;
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
+    const url = typeof window !== "undefined" ? `${window.location.origin}/trip-builder/tripmatch/result?sessionId=${tripRecordId}` : "";
+    const text = `הטיול שלי ב-TRIPLACE! תראו את המקומות שאהבתי: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "הטיול שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet
+      }
     }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
+
+  // *** יוצר/מעדכן את שורת הטיול ב-DB בכל שינוי ברשימת האהבתם (מגיעים
+  // לתוצאות, ממשיכים לקטגוריה הבאה וחוזרים עם עוד לייקים, או מוחקים
+  // מקום מהרשימה) - כדי שהטיול תמיד יהיה עדכני תחת "כל הטיולים", בלי
+  // תלות בלחיצה מפורשת על כפתור שמירה.
+  useEffect(() => {
+    if (stage !== "results" || sessionLikedPlaces.length === 0) return;
+    const city = selectedCityLabel || selectedCity;
+    if (!city) return;
+
+    let cancelled = false;
+    setSyncingTrip(true);
+    fetch("/api/trip-builder/sessions/from-tripmatch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // *** cityValue (הערך הגולמי, "דובאי" - לא "דובאי, איחוד האמירויות")
+      // חייב להישמר בנפרד מ-city (התווית לתצוגה) - ראו הסבר מפורט
+      // ב-from-tripmatch/route.ts. בלי זה, "המשך לקטגוריה הבאה" מטיול
+      // שמור מחפש עם התווית המלאה ותמיד מוצא 0 תוצאות.
+      body: JSON.stringify({
+        city,
+        cityValue: selectedCity,
+        places: sessionLikedPlaces,
+        sessionId: tripRecordId ?? undefined,
+        completedCategories,
+      }),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error ?? "יצירת הטיול נכשלה");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (data?.sessionId) setTripRecordId(data.sessionId);
+      })
+      .catch((err) => {
+        // *** לא מציגים שגיאה חוסמת (זה סנכרון רקע, לא פעולה שהמשתמש
+        // ביקש במפורש) - אבל כן רושמים ל-console, כדי שכשל בשקט (למשל
+        // constraint שדוחה את ה-insert) לא ייעלם בלי עקבות כמו שקרה כאן.
+        if (!cancelled) console.error("tripmatch trip sync failed:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setSyncingTrip(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, sessionLikedPlaces, completedCategories]);
 
   async function handleRemoveLikedPlace(placeId: string) {
     setSessionLikedPlaces((prev) => prev.filter((p) => p.id !== placeId));
-    setTripSaved(false);
     if (!user) return;
     const supabase = createClient();
     await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
@@ -472,7 +697,11 @@ export default function TripMatchPage() {
     setCandidates((prev) => prev.filter((c) => c.id !== decidedPlace.id));
     setCandidateIndex(0);
     if (liked) {
-      setSessionLikedPlaces((prev) => [...prev, decidedPlace]);
+      // *** תיקון: מקום עלול להופיע שוב במחזור קטגוריה אחרת (למשל
+      // מסעדות ואטרקציות חופפות חלקית) - בלי בדיקת כפילות, לייק חוזר על
+      // אותו מקום היה יוצר שני איברים עם אותו id ברשימה, וזה גרם לשגיאת
+      // React "two children with the same key" במסך התוצאות.
+      setSessionLikedPlaces((prev) => (prev.some((p) => p.id === decidedPlace.id) ? prev : [...prev, decidedPlace]));
       setLikedPlace(decidedPlace);
     }
 
@@ -493,6 +722,21 @@ export default function TripMatchPage() {
 
   if (!ready) return null;
 
+  // *** מסך טעינה מפורש בזמן טעינת/המשך טיול שמור - בלי זה, הבקשה
+  // האיטית (יצירת המלצות AI לקטגוריה חדשה יכולה לקחת עשרות שניות)
+  // נראית כאילו "כלום לא קורה" בזמן שבפועל היא עדיין בתהליך.
+  if (resuming) {
+    return (
+      <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+        <div className="flex h-[70vh] flex-col items-center justify-center gap-4 px-8 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
+          <p className="text-sm font-medium text-ink-secondary">טוענים את הקטגוריה הבאה... זה יכול לקחת כמה שניות</p>
+        </div>
+        <MainBottomNav active="favorites" />
+      </Screen>
+    );
+  }
+
   return (
     <Screen withBottomNavSpacing className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}>
       {stage !== "swiping" && (
@@ -502,6 +746,23 @@ export default function TripMatchPage() {
               <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />
               <BackButton onBack={() => router.push("/home")} />
             </div>
+
+            {/* מסך תוצאות - כפתורי שיתוף+שמירה בעיצוב זהה לשאר עמודי
+                התוצאות באפליקציה (SaveTripIconButton המשותף + אותו כפתור
+                שיתוף), במקום כפתור "שמירת הטיול" נפרד בגוף העמוד. */}
+            {stage === "results" && sessionLikedPlaces.length > 0 && tripRecordId && (
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+                <SaveTripIconButton sessionId={tripRecordId} />
+                <button
+                  type="button"
+                  onClick={handleShareTrip}
+                  aria-label="שתף טיול"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+                >
+                  <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+                </button>
+              </div>
+            )}
           </div>
         </header>
       )}
@@ -517,7 +778,7 @@ export default function TripMatchPage() {
         </div>
       )}
 
-      <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : "gap-4 px-5 pb-10 pt-5"}`}>
+      <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
         {stage === "city" && (
           <div className="flex flex-col gap-3">
             <ChatBubble>
@@ -788,15 +1049,21 @@ export default function TripMatchPage() {
         )}
 
         {stage === "results" && (
-          <div className="flex flex-col gap-4">
-            <ChatBubble>
-              {sessionLikedPlaces.length > 0
-                ? `סיימנו לסרוק את ${selectedCityLabel || selectedCity}! אלה ${sessionLikedPlaces.length} המקומות שאהבתם:`
-                : `סיימנו לסרוק את ${selectedCityLabel || selectedCity} - לא סימנתם לייק הפעם, נסו יעד או קטגוריה אחרת.`}
-            </ChatBubble>
+          <div className="flex flex-col gap-3">
+            {sessionLikedPlaces.length === 0 && (
+              <ChatBubble>{`סיימנו לסרוק את ${selectedCityLabel || selectedCity} - לא סימנתם לייק הפעם, נסו יעד או קטגוריה אחרת.`}</ChatBubble>
+            )}
 
             {sessionLikedPlaces.length > 0 && (
               <>
+                {/* כותרת הטיול - שם היעד מעל המפה, בדיוק כמו בשאר עמודי
+                    התוצאות (day-trip/nature-trip וכו') - לא בבר העליון,
+                    שם נשארים רק כפתורי ניווט/שיתוף/שמירה. */}
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-xl font-bold text-ink">{selectedCityLabel || selectedCity}</h1>
+                  <p className="text-sm text-ink-secondary">{sessionLikedPlaces.length} מקומות שאהבתם</p>
+                </div>
+
                 {/* מפה עובדת - מיקום כל האטרקציות שאהבתם, בדיוק כמו במסכי
                     תוצאות אחרים באפליקציה (ResultMap הקיים, לא רכיב חדש). */}
                 <ResultMap
@@ -824,8 +1091,10 @@ export default function TripMatchPage() {
                         ) : (
                           <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
                         )}
+                        {/* *** תיקון: השם לא נחתך יותר (בלי truncate) - מוצג
+                            במלואו, ומקסימום יורד לשורה שנייה (line-clamp-2). */}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
+                          <p className="line-clamp-2 text-[15px] font-bold leading-snug text-ink">{place.name}</p>
                           <p className="mt-0.5 text-xs text-ink-secondary">
                             {getCategoryLabel(place.category)}
                             {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
@@ -838,20 +1107,11 @@ export default function TripMatchPage() {
 
                 {error && <p className="text-center text-sm text-danger">{error}</p>}
 
-                {/* שני כפתורים: שמירת הטיול, והמשך לקטגוריה הבאה (חיי
-                    לילה/מסעדות/אטרקציות בלבד - טבע לא נכלל). הכפתור השני
-                    נעלם לגמרי ברגע שכל 3 הקטגוריות הושלמו ליעד הזה. */}
+                {/* שני כפתורים בלבד: המשך לקטגוריה הבאה (חיי לילה/מסעדות/
+                    אטרקציות בלבד - טבע לא נכלל, נעלם כשכל 3 הושלמו),
+                    וטיול חדש. שמירה/שיתוף עברו לכפתורי האייקון בבר העליון. */}
                 <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    disabled={savingTrip}
-                    onClick={handleSaveTrip}
-                    className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink disabled:opacity-50"
-                  >
-                    {tripSaved ? "הטיול נשמר ✓" : savingTrip ? "שומר..." : "שמירת הטיול"}
-                  </button>
-
-                  {nextContinueCategory && (
+                  {nextContinueCategory ? (
                     <button
                       type="button"
                       onClick={handleContinueToNextCategory}
@@ -860,36 +1120,78 @@ export default function TripMatchPage() {
                     >
                       המשך לקטגוריה הבאה - {nextContinueCategory.label}
                     </button>
+                  ) : (
+                    // *** אם אין קטגוריה הבאה, זה לא באג - זה אומר שכבר
+                    // עברתם על כל 3 הקטגוריות (חיי לילה/מסעדות/אטרקציות)
+                    // ליעד הזה. בלי ההודעה הזו, ההיעלמות של הכפתור נראית
+                    // כמו תקלה. מוצג רק אם באמת יש קטגוריות רלוונטיות
+                    // (לא במצב "קרוב אליי" למשל, ששם categoryValue תמיד
+                    // "attractions" גם ל"הכל").
+                    completedCategories.length > 0 && (
+                      <p className="rounded-pill bg-bg-secondary py-3 text-center text-sm font-medium text-ink-secondary">
+                        סרקתם את כל הקטגוריות ליעד הזה 🎉
+                      </p>
+                    )
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStage("city");
+                      setHeroVisible(true);
+                      setSelectedCity(null);
+                      setSelectedCityLabel("");
+                      setCityInput("");
+                      setCategoryValue(null);
+                      setSessionLikedPlaces([]);
+                      setHasSwipedAny(false);
+                      setCandidates([]);
+                      setTotalDecisions(0);
+                      setNearMeActive(false);
+                      setOtherQuery("");
+                      setOtherTags([]);
+                      setNearMeOtherQuery("");
+                      setNearMeOtherTags([]);
+                      setCompletedCategories([]);
+                      setTripRecordId(null);
+    clearPersistedResultsState();
+                    }}
+                    className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink"
+                  >
+                    טיול חדש
+                  </button>
                 </div>
               </>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setStage("city");
-                setHeroVisible(true);
-                setSelectedCity(null);
-                setSelectedCityLabel("");
-                setCityInput("");
-                setCategoryValue(null);
-                setSessionLikedPlaces([]);
-                setHasSwipedAny(false);
-                setCandidates([]);
-                setTotalDecisions(0);
-                setNearMeActive(false);
-                setOtherQuery("");
-                setOtherTags([]);
-                setNearMeOtherQuery("");
-                setNearMeOtherTags([]);
-                setCompletedCategories([]);
-                setTripSaved(false);
-              }}
-              className="rounded-pill py-3 text-sm font-semibold text-ink-secondary"
-            >
-              יעד חדש
-            </button>
+            {sessionLikedPlaces.length === 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStage("city");
+                  setHeroVisible(true);
+                  setSelectedCity(null);
+                  setSelectedCityLabel("");
+                  setCityInput("");
+                  setCategoryValue(null);
+                  setSessionLikedPlaces([]);
+                  setHasSwipedAny(false);
+                  setCandidates([]);
+                  setTotalDecisions(0);
+                  setNearMeActive(false);
+                  setOtherQuery("");
+                  setOtherTags([]);
+                  setNearMeOtherQuery("");
+                  setNearMeOtherTags([]);
+                  setCompletedCategories([]);
+                  setTripRecordId(null);
+    clearPersistedResultsState();
+                }}
+                className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink"
+              >
+                טיול חדש
+              </button>
+            )}
           </div>
         )}
       </div>

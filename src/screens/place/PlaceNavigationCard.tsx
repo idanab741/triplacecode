@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+// המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
+const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
+  ssr: false,
+});
 
 interface PlaceNavigationCardProps {
   placeId: string;
@@ -39,7 +45,6 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
-  const [mapFailed, setMapFailed] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -87,27 +92,11 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
         </div>
       )}
 
-      <div className="overflow-hidden rounded-card bg-bg-secondary">
-        {mapFailed ? (
-          <button
-            type="button"
-            onClick={handleStartNavigation}
-            className="flex h-40 w-full flex-col items-center justify-center gap-1.5 text-ink-secondary"
-          >
-            <span className="text-2xl">🗺️</span>
-            <span className="text-[13px] font-medium">לא ניתן לטעון תצוגת מפה כרגע - לחצו לפתיחה בגוגל מפות</span>
-          </button>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`/api/places/${placeId}/map-preview`}
-            alt="מפה"
-            className="h-40 w-full object-cover"
-            loading="lazy"
-            onError={() => setMapFailed(true)}
-          />
-        )}
-      </div>
+      {/* *** תיקון: זו הייתה תמונת Google Static Maps (קריאת רשת ל-Google
+          בכל טעינת עמוד) - עברנו למפת Leaflet משלנו (ResultMap, אותה
+          שכבר בשימוש בכל שאר האפליקציה), עם סמן בודד. בלי שום קריאה
+          ל-Google בכלל. */}
+      <ResultMap stops={[{ stopId: placeId, name: "", latitude, longitude }]} />
 
       <button
         type="button"

@@ -14,6 +14,7 @@ import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import Image from "next/image";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: NatureTripAnswers = {
   companions: "solo",
@@ -765,15 +766,5 @@ export default function NatureTripQuestionnairePage() {
 }
 
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error("הדפדפן שלך לא תומך באיתור מיקום"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => reject(new Error("יש לאשר גישה למיקום כדי לבנות טיול קרוב אליכם")),
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
-  });
+  return getCurrentPositionSafe("יש לאשר גישה למיקום כדי לבנות טיול קרוב אליכם");
 }

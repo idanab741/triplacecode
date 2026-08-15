@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
@@ -12,8 +11,11 @@ interface PlaceHeroActionsProps {
   placeName: string;
 }
 
-/** לוגו + חזרה (בצד ה-start) ו-שמירה/שיתוף (בצד ה-end) - באותו סגנון בדיוק
- *  כמו header ה-HERO בעמוד תוצאת "חופשה בחו״ל" (trip-builder/abroad-vacation/result). */
+/** בר עליון קבוע - לוגו+חזרה משמאל, שמירה+שיתוף מימין - באותו מבנה
+ *  בדיוק כמו שאר עמודי התוצאות באפליקציה (day-trip/result וכו').
+ *  *** תיקון: לפני זה זה היה overlay שקוף מעל תמונת ה-HERO (position:
+ *  absolute) - עכשיו זה בר עליון אמיתי, נפרד, מעל התמונה בזרימה הרגילה
+ *  של העמוד, לא צף עליה. */
 export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) {
   const { user } = useAuth();
   const [saved, setSaved] = useState(false);
@@ -58,37 +60,44 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
   }
 
   return (
-    <>
-      <div className="absolute left-2 top-4 flex items-center gap-2">
-        <Image src="/images/trip-tripmatch-logo.png" alt="" width={130} height={40} className="object-contain" />
-        <button type="button" onClick={() => window.history.back()} className="flex h-9 w-9 shrink-0 items-center justify-center text-ink" aria-label="חזרה">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="absolute right-2 top-4 flex items-center gap-2">
-        {user && (
+    <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+      <div className="relative h-16">
+        <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
           <button
             type="button"
-            onClick={handleSave}
-            disabled={busy}
-            aria-label={saved ? "הסרה משמורים" : "שמירה"}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm disabled:opacity-60"
+            onClick={() => window.history.back()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+            aria-label="חזרה"
           >
-            <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={20} height={20} />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m14 6-6 6 6 6" />
+            </svg>
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleShare}
-          aria-label="שיתוף"
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/70 backdrop-blur-sm"
-        >
-          <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={24} height={24} style={{ transform: "translate(1px, 1px)" }} />
-        </button>
+        </div>
+
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          {user && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={busy}
+              aria-label={saved ? "הסרה משמורים" : "שמירה"}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
+            >
+              <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={23} height={23} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label="שיתוף"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+          >
+            <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+          </button>
+        </div>
       </div>
-    </>
+    </header>
   );
 }

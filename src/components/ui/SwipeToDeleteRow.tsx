@@ -9,25 +9,30 @@ interface SwipeToDeleteRowProps {
 }
 
 const SWIPE_REVEAL_PX = 76;
+// *** פס אדום קבוע וברור בקצה (לא רק חשיפה מלאה תוך כדי גרירה) - כדי
+// שברור מיד, בלי צורך לגרור בכלל, שיש כאן פעולת מחיקה. לפני זה זה היה
+// לגמרי מוסתר במנוחה (swipeX=0), וכל מה שנראה היה "פס דק בטעות" (עיגול
+// פינות/עיגול סאב-פיקסל) - לא עיצוב מכוון. עכשיו זה עבה ומכוון.
+const REST_PEEK_PX = 6;
 
 export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDeleteRowProps) {
-  const [swipeX, setSwipeX] = useState(0);
+  const [swipeX, setSwipeX] = useState(REST_PEEK_PX);
   const [swipeOpen, setSwipeOpen] = useState(false);
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
-  const swipeStartOffset = useRef(0);
+  const swipeStartOffset = useRef(REST_PEEK_PX);
   const swipeDirection = useRef<"horizontal" | "vertical" | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSwipeOpen(false);
-    setSwipeX(0);
+    setSwipeX(REST_PEEK_PX);
   }, [resetKey]);
 
   function handlePointerDown(e: React.PointerEvent) {
     swipeStartX.current = e.clientX;
     swipeStartY.current = e.clientY;
-    swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : 0;
+    swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX;
     swipeDirection.current = null;
     trackRef.current?.setPointerCapture(e.pointerId);
   }
@@ -43,7 +48,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     }
     if (swipeDirection.current !== "horizontal") return;
 
-    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
+    const next = Math.max(REST_PEEK_PX, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
     setSwipeX(next);
   }
 
@@ -57,7 +62,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
 
     const shouldOpen = swipeX > SWIPE_REVEAL_PX / 2;
     setSwipeOpen(shouldOpen);
-    setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : 0);
+    setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX);
   }
 
   return (
@@ -68,7 +73,7 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
           onClick={() => {
             onDelete();
             setSwipeOpen(false);
-            setSwipeX(0);
+            setSwipeX(REST_PEEK_PX);
           }}
           aria-label="מחיקה"
           className="flex flex-1 items-center justify-center bg-danger text-white"
@@ -85,7 +90,10 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        style={{ transform: `translateX(${-swipeX}px)`, transition: swipeX === 0 || swipeX === SWIPE_REVEAL_PX ? "transform 0.2s ease-out" : "none" }}
+        style={{
+          transform: `translateX(${-swipeX}px)`,
+          transition: swipeX === REST_PEEK_PX || swipeX === SWIPE_REVEAL_PX ? "transform 0.2s ease-out" : "none",
+        }}
         className="relative touch-pan-y bg-bg"
       >
         {children}

@@ -83,7 +83,7 @@ export function ResultMap({ stops }: ResultMapProps) {
   }
 
   return (
-    <div className="relative h-64 w-full overflow-hidden rounded-card shadow-soft">
+    <div className="tm-result-map relative isolate z-0 h-64 w-full overflow-hidden rounded-card shadow-soft">
       <MapContainer
         center={positions[0]}
         zoom={13}
@@ -93,16 +93,19 @@ export function ResultMap({ stops }: ResultMapProps) {
       >
         {/* prefix={false} מסיר את התוספת של Leaflet עצמו לשליטה (כולל דגל
             שהם הוסיפו ל"קרדיט" שלהם) - נשאר רק הקרדיט המשפטי הנדרש בפועל
-            (OpenStreetMap/CARTO), לא המותג של Leaflet. */}
-        {/* אריחי OpenStreetMap הרגילים (לא CARTO) - CARTO Voyager מציג
-            שמות מקומות בתעתיק אנגלי במקום עברית עבור ישראל, בעוד
-            שהעיצוב הסטנדרטי של OSM מציג את השם המקומי (עברית) כברירת
-            מחדל, מה שמתאים יותר לקהל היעד של האפליקציה. */}
+            (CARTO/OpenStreetMap), לא המותג של Leaflet. */}
+        {/* *** שינוי: עברנו מ-OSM סטנדרטי (+ CSS filter שניסה "לצבוע
+            מחדש") ל-CARTO Voyager - בסיס מפה איכותי ומעוצב בפועל (לא
+            טריק CSS), עם פלטה נקייה ומודרנית שמתאימה הרבה יותר לזהות
+            האפליקציה. *** טרייד-אוף מודע: ב-Voyager שמות מקומות בישראל
+            מוצגים בתעתיק אנגלי במקום עברית (זו הסיבה שבעבר נשארנו עם
+            OSM סטנדרטי) - אם זה מפריע במסכי טיולים בארץ, אפשר להחזיר
+            תנאי שמחליף ספק לפי מיקום (ישראל -> OSM, אחרת -> Voyager). */}
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          subdomains="abc"
+          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
           maxZoom={19}
         />
         {Array.from(dayGroups.entries()).map(([day, dayStops]) => (
@@ -124,18 +127,8 @@ export function ResultMap({ stops }: ResultMapProps) {
         <FitBounds stops={validStops} />
       </MapContainer>
 
-      {/* שכבת "מיתוג" עדינה מעל המפה - הבסיס (CARTO) הוא ניטרלי/אפור בכוונה,
-          והשכבה הזו נותנת לו גוון כחול-סגול שמתאים לזהות של המותג, בלי
-          להסתמך על שירות מפה בתשלום עם עיצוב מותאם אישית. pointer-events:none
-          כדי לא לחסום גרירה/זום של המפה מתחתיה. */}
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: "linear-gradient(135deg, #1E3A8A, #4C1D95)",
-          opacity: 0.12,
-          mixBlendMode: "color",
-        }}
-      />
+      {/* Voyager (CARTO) כבר מגיע בפלטה מעוצבת ונקייה מהקופסה - אין צורך
+          יותר בשכבת overlay/filter ידני מעל האריחים. */}
     </div>
   );
 }
