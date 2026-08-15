@@ -86,17 +86,19 @@ export default function ProfileSetupPage() {
     }
   }, [profileLoading, profile, router]);
 
-  const isValid =
-    fullName.trim().length > 1 &&
-    city.trim().length > 1 &&
-    birthDate.length > 0 &&
-    country.length > 0 &&
-    agreed;
+  // *** תיקון קריטי נוסף (דחיית App Store 1.0.7): מעבר לבעיית ה-prefill,
+  // "שם מלא" היה שדה חוסם-חובה - Apple *מאפשרת* למשתמש לבחור לא לשתף שם
+  // בכלל דרך Sign in with Apple ("Don't Share My Name" באפליקציית
+  // ההרשמה של Apple עצמה). כשזה קורה, Apple לא שולחת שום שם - זה תקין
+  // ומכוון, לא שגיאה. אילוץ הזנה ידנית במקרה כזה בעצם מבטל את הבחירה
+  // שהמשתמש כבר עשה מול Apple, וזו בדיוק הפרת ההנחיות שדווחה. השם עכשיו
+  // אופציונלי לגמרי - אם נשאר ריק, נשתמש בברירת מחדל סבירה (מקידומת
+  // האימייל, או כינוי גנרי) בזמן השמירה, בלי לחסום את המשתמש בכלל.
+  const isValid = city.trim().length > 1 && birthDate.length > 0 && country.length > 0 && agreed;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const nextErrors: typeof errors = {};
-    if (fullName.trim().length < 2) nextErrors.fullName = "יש להזין שם מלא";
     if (city.trim().length < 2) nextErrors.city = "יש להזין עיר מגורים";
     if (!birthDate) {
       nextErrors.birthDate = "יש לבחור תאריך לידה";
@@ -107,9 +109,13 @@ export default function ProfileSetupPage() {
     setFormError(null);
     if (Object.keys(nextErrors).length > 0 || !agreed || !user) return;
 
+    // ברירת מחדל סבירה אם המשתמש בחר לא לשתף שם (או פשוט השאיר ריק) -
+    // לא חוסמים, לא כופים הקלדה מחדש של משהו ש-Apple כבר איפשרה להסתיר.
+    const resolvedName = fullName.trim() || user.email?.split("@")[0] || "מטייל/ת חדש/ה";
+
     setSubmitting(true);
     const { error } = await updateProfile(user.id, {
-      full_name: fullName.trim(),
+      full_name: resolvedName,
       city: city.trim(),
       birth_date: birthDate,
       country,
@@ -188,7 +194,7 @@ export default function ProfileSetupPage() {
         </header>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field label="שם מלא" error={errors.fullName}>
+          <Field label="שם מלא (לא חובה)" error={errors.fullName}>
             <Input
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
