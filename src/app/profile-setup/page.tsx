@@ -174,7 +174,7 @@ export default function ProfileSetupPage() {
           </div>
         <div
           className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
-          style={{ left: "49.73%", top: "69.28%", width: "42%" }}
+          style={{ left: "49.73%", top: "71.7%", width: "42%" }}
         >
           {user && (
             <AvatarUploader

@@ -32,6 +32,9 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
+/** אופציית השלמה אוטומטית ליעד, כפי שמוחזרת מ-/api/places/cities (מתוך רשימת 221 היעדים). */
+type DestinationOption = { value: string; label: string; type: "city" | "country" };
+
 type Stage =
   | "dates"
   | "travelStyle"
@@ -132,9 +135,9 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   const [tempBudget, setTempBudget] = useState<string | null>(null);
   const [tempTypes, setTempTypes] = useState<string[]>([]);
   const [destinationInput, setDestinationInput] = useState("");
-  const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
+  const [destinationOptions, setDestinationOptions] = useState<DestinationOption[]>([]);
   const [tempDestinations, setTempDestinations] = useState<string[]>([""]);
-  const [destinationOptionsMulti, setDestinationOptionsMulti] = useState<Record<number, string[]>>({});
+  const [destinationOptionsMulti, setDestinationOptionsMulti] = useState<Record<number, DestinationOption[]>>({});
   const [tempPace, setTempPace] = useState<string | null>(null);
   const [tempTravelStyle, setTempTravelStyle] = useState<string | null>(null);
   const [tempFreeText, setTempFreeText] = useState("");
@@ -150,9 +153,9 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   const [editTempEndDate, setEditTempEndDate] = useState("");
   const [editTempFreeText, setEditTempFreeText] = useState("");
   const [editTempDestinationInput, setEditTempDestinationInput] = useState("");
-  const [editTempDestinationOptions, setEditTempDestinationOptions] = useState<string[]>([]);
+  const [editTempDestinationOptions, setEditTempDestinationOptions] = useState<DestinationOption[]>([]);
   const [editTempDestinations, setEditTempDestinations] = useState<string[]>([""]);
-  const [editTempDestOptionsMulti, setEditTempDestOptionsMulti] = useState<Record<number, string[]>>({});
+  const [editTempDestOptionsMulti, setEditTempDestOptionsMulti] = useState<Record<number, DestinationOption[]>>({});
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -200,7 +203,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     debounceRef.current = setTimeout(() => {
       fetch(`/api/places/cities?q=${encodeURIComponent(destinationInput.trim())}`)
         .then((res) => res.json())
-        .then((data) => setDestinationOptions(data.cities ?? []))
+        .then((data) => setDestinationOptions(data.options ?? []))
         .catch(() => setDestinationOptions([]));
     }, 300);
   }, [destinationInput]);
@@ -215,7 +218,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     const timeout = setTimeout(() => {
       fetch(`/api/places/cities?q=${encodeURIComponent(value)}`)
         .then((res) => res.json())
-        .then((data) => setEditTempDestinationOptions(data.cities ?? []))
+        .then((data) => setEditTempDestinationOptions(data.options ?? []))
         .catch(() => setEditTempDestinationOptions([]));
     }, 300);
     return () => clearTimeout(timeout);
@@ -237,7 +240,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     multiDestDebounceRef.current[index] = setTimeout(() => {
       fetch(`/api/places/cities?q=${encodeURIComponent(value.trim())}`)
         .then((res) => res.json())
-        .then((data) => setDestinationOptionsMulti((m) => ({ ...m, [index]: data.cities ?? [] })))
+        .then((data) => setDestinationOptionsMulti((m) => ({ ...m, [index]: data.options ?? [] })))
         .catch(() => setDestinationOptionsMulti((m) => ({ ...m, [index]: [] })));
     }, 300);
   }
@@ -472,7 +475,7 @@ function confirmBooked() {
     }
     fetch(`/api/places/cities?q=${encodeURIComponent(value.trim())}`)
       .then((res) => res.json())
-      .then((data) => setEditTempDestOptionsMulti((m) => ({ ...m, [index]: data.cities ?? [] })))
+      .then((data) => setEditTempDestOptionsMulti((m) => ({ ...m, [index]: data.options ?? [] })))
       .catch(() => setEditTempDestOptionsMulti((m) => ({ ...m, [index]: [] })));
   }
 
@@ -673,14 +676,14 @@ function confirmBooked() {
                     />
                     {editTempDestinationOptions.length > 0 && (
                       <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
-                        {editTempDestinationOptions.map((city) => (
+                        {editTempDestinationOptions.map((option) => (
                           <button
-                            key={city}
+                            key={`${option.type}-${option.value}`}
                             type="button"
-                            onClick={() => selectEditDestination(city)}
+                            onClick={() => selectEditDestination(option.value)}
                             className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
                           >
-                            {city}
+                            {option.label}
                           </button>
                         ))}
                       </div>
@@ -710,14 +713,14 @@ function confirmBooked() {
                         />
                         {(editTempDestOptionsMulti[i]?.length ?? 0) > 0 && (
                           <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
-                            {editTempDestOptionsMulti[i].map((city) => (
+                            {editTempDestOptionsMulti[i].map((option) => (
                               <button
-                                key={city}
+                                key={`${option.type}-${option.value}`}
                                 type="button"
-                                onClick={() => selectEditDestinationAt(i, city)}
+                                onClick={() => selectEditDestinationAt(i, option.value)}
                                 className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
                               >
-                                {city}
+                                {option.label}
                               </button>
                             ))}
                           </div>
@@ -984,14 +987,14 @@ function confirmBooked() {
                   />
                   {destinationOptions.length > 0 && (
                     <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
-                      {destinationOptions.map((city) => (
+                      {destinationOptions.map((option) => (
                         <button
-                          key={city}
+                          key={`${option.type}-${option.value}`}
                           type="button"
-                          onClick={() => selectDestination(city)}
+                          onClick={() => selectDestination(option.value)}
                           className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
                         >
-                          {city}
+                          {option.label}
                         </button>
                       ))}
                     </div>
@@ -1021,14 +1024,14 @@ function confirmBooked() {
                       />
                       {(destinationOptionsMulti[i]?.length ?? 0) > 0 && (
                         <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
-                          {destinationOptionsMulti[i].map((city) => (
+                          {destinationOptionsMulti[i].map((option) => (
                             <button
-                              key={city}
+                              key={`${option.type}-${option.value}`}
                               type="button"
-                              onClick={() => selectDestinationAt(i, city)}
+                              onClick={() => selectDestinationAt(i, option.value)}
                               className="block w-full px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
                             >
-                              {city}
+                              {option.label}
                             </button>
                           ))}
                         </div>
@@ -1143,5 +1146,3 @@ function confirmBooked() {
 function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
   return getCurrentPositionSafe("יש לאשר גישה למיקום ולנסות שוב");
 }
-
-
