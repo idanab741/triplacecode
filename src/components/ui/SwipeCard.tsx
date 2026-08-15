@@ -116,10 +116,10 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="touch-none select-none"
+        className="h-full touch-none select-none"
         style={{ willChange: "transform" }}
       >
-        <div className="relative">
+        <div className="relative h-full">
           {resolvedChildren}
 
           {/* תגית "אהבתי" - מופיעה תוך כדי גרירה ימינה */}

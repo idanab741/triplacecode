@@ -150,8 +150,15 @@ function TripsPageContent() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[15px] font-bold text-ink">{trip.destinationLabel}</p>
+                      {/* *** טיולים שנשמרו מ-TripMatch (לא מבנה-טיול רגיל) - שורה
+                          שנייה מזהה את המקור בתור "tripmatch" במקום ספירת
+                          תחנות/תאריך, לפי בקשה מפורשת. */}
                       <p className="mt-0.5 text-xs text-ink-secondary">
-                        {trip.stopCount} תחנות · נשמר ב-{formatDate(trip.createdAt)}
+                        {trip.tripType === "tripmatch" ? (
+                          <span className="font-semibold text-accent">tripmatch</span>
+                        ) : (
+                          `${trip.stopCount} תחנות · נשמר ב-${formatDate(trip.createdAt)}`
+                        )}
                       </p>
                     </div>
                   </button>

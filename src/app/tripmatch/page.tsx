@@ -3,27 +3,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Screen, SwipeCard, BackButton, Chip, ImageOptionRow } from "@/components/ui";
+import { Screen, SwipeCard, BackButton, Chip, ImageOptionRow, SwipeToDeleteRow } from "@/components/ui";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { CategoryPicker } from "@/screens/tripmatch/CategoryPicker";
 import { TRIPMATCH_INTEREST_OPTIONS, TRIPMATCH_CATEGORY_BUCKETS } from "@/locales/he/tripBuilder";
 import { INTERESTS, VACATION_PREFERENCES, type PreferenceOption } from "@/locales/he/preferences";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
+import { toggleFavorite } from "@/services/favorites/favoritesService";
 import { listAddresses } from "@/services/addresses/addressesService";
 import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
 import { TripMatchCard } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import dynamic from "next/dynamic";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 
+// המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
+const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
+  ssr: false,
+});
+
 type Stage = "city" | "category" | "otherPicker" | "nearMeCategory" | "nearMeOtherPicker" | "swiping" | "results";
 
 type UserPreferences = { interests: string[]; culinaryStyles: string[]; kosher: boolean; accessibility: boolean };
+
+// *** "המשך לקטגוריה הבאה" - מתייחס רק ל-3 מתוך 4 הדליים (חיי לילה,
+// מסעדות, אטרקציות), לפי בקשה מפורשת - "טבע" מטופל בנפרד (יש לו זרימת
+// בניית-טיול משלו, לא מחזור החלקות כמו השאר) ולכן לא נכלל במחזור הזה.
+const CONTINUE_CATEGORY_VALUES: string[] = ["nightlife", "restaurants", "attractions"];
 
 /** "אחר" ב"קרוב אליי" - השלמה אוטומטית מתוך תחומי עניין + העדפות חופשות
  *  בחו"ל (אותן רשימות מההתאמה האישית) - לא קשור ל-4 הדליים הראשיים. */
@@ -104,6 +116,12 @@ export default function TripMatchPage() {
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
   const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>([]);
   const [hasSwipedAny, setHasSwipedAny] = useState(false);
+  // *** עוקב אחרי אילו מתוך 3 הקטגוריות של "המשך לקטגוריה הבאה" כבר
+  // הושלמו ליעד הנוכחי (מתאפס בכל בחירת יעד חדש) - כדי לדעת מתי להציג
+  // את הכפתור ולאיזו קטגוריה לקפוץ בלחיצה עליו.
+  const [completedCategories, setCompletedCategories] = useState<string[]>([]);
+  const [savingTrip, setSavingTrip] = useState(false);
+  const [tripSaved, setTripSaved] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -128,6 +146,8 @@ export default function TripMatchPage() {
     setCityInput(option.label);
     setCityOptions([]);
     setHeroVisible(false);
+    setCompletedCategories([]);
+    setTripSaved(false);
     window.setTimeout(() => setStage("category"), 280);
   }
 
@@ -140,6 +160,9 @@ export default function TripMatchPage() {
     setOtherTags([]);
     setNearMeOtherQuery("");
     setNearMeOtherTags([]);
+    setCompletedCategories([]);
+    setSessionLikedPlaces([]);
+    setTripSaved(false);
   }
 
   function handleEditCategory() {
@@ -357,6 +380,52 @@ export default function TripMatchPage() {
     } else {
       setStage("results");
     }
+  }
+
+  // *** מסמן את הקטגוריה הנוכחית כ"הושלמה" ברגע שמגיעים למסך התוצאות -
+  // כדי ש"המשך לקטגוריה הבאה" ידע איזו מ-3 הקטגוריות עוד לא נסרקה.
+  useEffect(() => {
+    if (stage !== "results" || !categoryValue) return;
+    if (!CONTINUE_CATEGORY_VALUES.includes(categoryValue)) return;
+    setCompletedCategories((prev) => (prev.includes(categoryValue) ? prev : [...prev, categoryValue]));
+  }, [stage, categoryValue]);
+
+  const nextContinueCategory = TRIPMATCH_CATEGORY_BUCKETS.find(
+    (bucket) => CONTINUE_CATEGORY_VALUES.includes(bucket.value) && !completedCategories.includes(bucket.value)
+  );
+
+  function handleContinueToNextCategory() {
+    if (!nextContinueCategory) return;
+    setTripSaved(false);
+    handleSelectCategory(nextContinueCategory.value, nextContinueCategory.label);
+  }
+
+  async function handleSaveTrip() {
+    if (savingTrip || sessionLikedPlaces.length === 0) return;
+    setSavingTrip(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/trip-builder/sessions/from-tripmatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city: selectedCityLabel || selectedCity, places: sessionLikedPlaces }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "שמירת הטיול נכשלה");
+      setTripSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שמירת הטיול נכשלה, נסו שוב");
+    } finally {
+      setSavingTrip(false);
+    }
+  }
+
+  async function handleRemoveLikedPlace(placeId: string) {
+    setSessionLikedPlaces((prev) => prev.filter((p) => p.id !== placeId));
+    setTripSaved(false);
+    if (!user) return;
+    const supabase = createClient();
+    await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
   }
 
   useEffect(() => {
@@ -669,7 +738,7 @@ export default function TripMatchPage() {
         )}
 
         {stage === "swiping" && (
-          <div className="flex flex-col" style={{ height: "100dvh" }}>
+          <div className="h-viewport-safe flex flex-col">
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}
@@ -727,30 +796,73 @@ export default function TripMatchPage() {
             </ChatBubble>
 
             {sessionLikedPlaces.length > 0 && (
-              <div className="flex flex-col gap-3">
-                {sessionLikedPlaces.map((place) => (
+              <>
+                {/* מפה עובדת - מיקום כל האטרקציות שאהבתם, בדיוק כמו במסכי
+                    תוצאות אחרים באפליקציה (ResultMap הקיים, לא רכיב חדש). */}
+                <ResultMap
+                  stops={sessionLikedPlaces.map((place) => ({
+                    stopId: place.id,
+                    name: place.name,
+                    latitude: place.latitude,
+                    longitude: place.longitude,
+                  }))}
+                />
+
+                {/* רשימה מסודרת - באותו סגנון בדיוק כמו עמוד "כל הטיולים"
+                    (SwipeToDeleteRow), כולל אפשרות מחיקה בהחלקה. */}
+                <div className="flex flex-col gap-3">
+                  {sessionLikedPlaces.map((place) => (
+                    <SwipeToDeleteRow key={place.id} resetKey={String(sessionLikedPlaces.length)} onDelete={() => handleRemoveLikedPlace(place.id)}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/place/${place.id}`)}
+                        className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
+                      >
+                        {place.imageUrls[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={place.imageUrls[0]} alt="" className="h-20 w-24 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
+                          <p className="mt-0.5 text-xs text-ink-secondary">
+                            {getCategoryLabel(place.category)}
+                            {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
+                          </p>
+                        </div>
+                      </button>
+                    </SwipeToDeleteRow>
+                  ))}
+                </div>
+
+                {error && <p className="text-center text-sm text-danger">{error}</p>}
+
+                {/* שני כפתורים: שמירת הטיול, והמשך לקטגוריה הבאה (חיי
+                    לילה/מסעדות/אטרקציות בלבד - טבע לא נכלל). הכפתור השני
+                    נעלם לגמרי ברגע שכל 3 הקטגוריות הושלמו ליעד הזה. */}
+                <div className="flex flex-col gap-2">
                   <button
-                    key={place.id}
                     type="button"
-                    onClick={() => router.push(`/place/${place.id}`)}
-                    className="flex items-center gap-3 rounded-card bg-white p-3 text-right shadow-soft"
+                    disabled={savingTrip}
+                    onClick={handleSaveTrip}
+                    className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink disabled:opacity-50"
                   >
-                    {place.imageUrls[0] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={place.imageUrls[0]} alt="" className="h-16 w-16 shrink-0 rounded-[14px] object-cover" />
-                    ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-bg-secondary text-2xl">📍</div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
-                      <p className="text-[12.5px] text-ink-secondary">
-                        {getCategoryLabel(place.category)}
-                        {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
-                      </p>
-                    </div>
+                    {tripSaved ? "הטיול נשמר ✓" : savingTrip ? "שומר..." : "שמירת הטיול"}
                   </button>
-                ))}
-              </div>
+
+                  {nextContinueCategory && (
+                    <button
+                      type="button"
+                      onClick={handleContinueToNextCategory}
+                      className="rounded-pill py-3 text-sm font-semibold text-white"
+                      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                    >
+                      המשך לקטגוריה הבאה - {nextContinueCategory.label}
+                    </button>
+                  )}
+                </div>
+              </>
             )}
 
             <button
@@ -771,9 +883,10 @@ export default function TripMatchPage() {
                 setOtherTags([]);
                 setNearMeOtherQuery("");
                 setNearMeOtherTags([]);
+                setCompletedCategories([]);
+                setTripSaved(false);
               }}
-              className="rounded-pill py-3 text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              className="rounded-pill py-3 text-sm font-semibold text-ink-secondary"
             >
               יעד חדש
             </button>
