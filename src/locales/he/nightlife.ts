@@ -44,6 +44,11 @@ export const NIGHTLIFE_BUDGET_STEPS: StepOption[] = [
 
 // סוג הבילוי - בחירה מרובה. ה-value כאן הוא זהות ייחודית של סוג הבילוי
 // (לא קטגוריית DB) - כדי שבחירה מרובה תעבוד נכון בלי התנגשויות.
+// תוקן: 4 האימוג'ים האחרונים (קריוקי/באולינג/סנוקר/ארקייד) היו מוזזים
+// אחד ביחס לשני - קריוקי הציג כדור באולינג, באולינג הציג כדור ביליארד,
+// סנוקר הציג ג'ויסטיק, וארקייד הציג קוביות. תואם עכשיו למה שכבר מוגדר
+// נכון ב-PLACE_TYPE_TAGS (constants/placeTagOptions.ts) - אותו מקור אמת
+// שמשמש את האדמין לתיוג אותם סוגי מקומות בדיוק.
 export const NIGHTLIFE_VENUE_TYPE_OPTIONS: StepOption[] = [
   { value: "cocktail_bar", label: "בר קוקטיילים", emoji: "🍸" },
   { value: "wine_bar", label: "בר יין", emoji: "🍷" },
@@ -51,10 +56,10 @@ export const NIGHTLIFE_VENUE_TYPE_OPTIONS: StepOption[] = [
   { value: "live_show", label: "הופעה חיה", emoji: "🎤" },
   { value: "standup", label: "סטנדאפ", emoji: "🎭" },
   { value: "theater", label: "תיאטרון", emoji: "🎙️" },
-  { value: "karaoke", label: "קריוקי", emoji: "🎳" },
-  { value: "bowling", label: "באולינג", emoji: "🎱" },
-  { value: "snooker", label: "סנוקר", emoji: "🕹️" },
-  { value: "arcade", label: "בר משחקים / ארקייד", emoji: "🎲" },
+  { value: "karaoke", label: "קריוקי", emoji: "🎤" },
+  { value: "bowling", label: "באולינג", emoji: "🎳" },
+  { value: "snooker", label: "סנוקר", emoji: "🎱" },
+  { value: "arcade", label: "בר משחקים / ארקייד", emoji: "🕹️" },
 ];
 
 // מיפוי מסוג הבילוי (מה שהמשתמש בוחר) לקטגוריית ה-DB בפועל (trip_type_tags group).

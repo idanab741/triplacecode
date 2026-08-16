@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
 import { AdminField, AdminButton, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
-import { PLACE_CATEGORIES } from "@/constants/placeCategories";
+import { PLACE_CATEGORIES, CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS, type PlaceCategoryKey } from "@/constants/placeCategories";
 import { CUISINE_TAGS, PLACE_TYPE_TAGS, TRIPMATCH_TAGS, DNA_TAGS } from "@/constants/placeTagOptions";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
@@ -375,8 +375,31 @@ export default function PlaceWorkspacePage() {
           <div className="grid max-w-2xl grid-cols-2 gap-4">
             <AdminField label="קטגוריה ראשית">
               {/* חייב להיות אחת מ-5 הקטגוריות הראשיות בלבד - לא כל 20+
-                  הקבוצות מ-tripTaxonomy (אלה מתאימות לתת-קטגוריה/תגיות). */}
-              <select className={adminInputClass} style={adminInputStyle} value={place.category} onChange={(e) => update("category", e.target.value)}>
+                  הקבוצות מ-tripTaxonomy (אלה מתאימות לתת-קטגוריה/תגיות).
+                  שים לב: זה שדה תצוגה/סינון באדמין בלבד - מנוע החיפוש של
+                  בניית הטיול לא בודק אותו, הוא בודק רק trip_type_tags
+                  (למטה). לכן בבחירה כאן, אם עדיין אין תגיות סוג טיול
+                  בכלל, ממלאים אוטומטית הצעה סבירה - כדי שמקום חדש לא
+                  "ייעלם" בשקט מהחיפוש רק כי נבחרה כאן קטגוריה בלי למלא
+                  גם את השדה השני. */}
+              <select
+                className={adminInputClass}
+                style={adminInputStyle}
+                value={place.category}
+                onChange={(e) => {
+                  const nextCategory = e.target.value as PlaceCategoryKey;
+                  setPlace((p) => {
+                    if (!p) return p;
+                    const suggested = CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS[nextCategory] ?? [];
+                    const shouldAutoFill = p.trip_type_tags.length === 0 && suggested.length > 0;
+                    return {
+                      ...p,
+                      category: nextCategory,
+                      trip_type_tags: shouldAutoFill ? [suggested[0]] : p.trip_type_tags,
+                    };
+                  });
+                }}
+              >
                 {PLACE_CATEGORIES.map((c) => (
                   <option key={c.key} value={c.key}>
                     {c.label}
@@ -412,6 +435,28 @@ export default function PlaceWorkspacePage() {
                   onChange={(e) => update("trip_type_tags", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
                 />
               </AdminField>
+              {(() => {
+                const suggested = CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS[place.category as PlaceCategoryKey] ?? [];
+                if (suggested.length === 0) return null;
+                const hasMatch = suggested.some((tag) => place.trip_type_tags.includes(tag));
+                if (hasMatch) return null;
+                return (
+                  <p className="col-span-2 mt-1 text-sm text-red-500">
+                    ⚠️ קטגוריה ראשית "{PLACE_CATEGORIES.find((c) => c.key === place.category)?.label}" בדרך כלל
+                    צריכה לפחות אחת מהתגיות הבאות ב-trip_type_tags כדי שהמקום יופיע בחיפוש בפועל בבניית הטיול:{" "}
+                    <strong>{suggested.join(", ")}</strong>. ללא זה, המקום לא יוחזר כמועמד גם אם הוא הכי קרוב/מתאים.{" "}
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() =>
+                        setPlace((p) => (p ? { ...p, trip_type_tags: Array.from(new Set([...p.trip_type_tags, suggested[0]])) } : p))
+                      }
+                    >
+                      הוסף אוטומטית את "{suggested[0]}"
+                    </button>
+                  </p>
+                );
+              })()}
             </div>
 
             {/* אותה בדיוק רשימת "קטגוריה/סוג מקום" ו"מטבח" כמו בעמוד

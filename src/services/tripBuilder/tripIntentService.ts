@@ -16,6 +16,12 @@ export interface TripIntent {
    *  שבחר בשאלון - זו בדיוק הסיבה שהמסלול "לא יוצא מתל אביב" גם כשהמשתמש
    *  ביקש בפירוש שהמערכת תבחר בעצמה. */
   openAreaChoice: boolean;
+  /** שם עסק ספציפי (לא אזור כללי) שהמשתמש ביקש במפורש - למשל "עדיפות
+   *  במסעדת מלכה". בניגוד ל-requestedArea (שכם/עיר/רחוב) - זה שם עסק
+   *  יחיד וממשי. בלי השדה הזה, בקשה מפורשת כזו הייתה נטמעת בתוך freeText
+   *  הכללי ומקבלת רק משקל "רך" בדירוג - לא הופכת לחיפוש ישיר וממוקד אחרי
+   *  המקום הזה עצמו קודם כל (ב-DB ולפני זה, ואם לא נמצא - כרמז חזק ל-AI). */
+  requestedPlaceName: string | null;
 }
 
 const TRIP_INTENT_PROMPT_RULES = `אתה מתכנן טיולים מקצועי ב-TRIPLACE. המשתמש אינו ממלא טופס - הוא
@@ -42,6 +48,11 @@ requestedArea. אם לא הוזכר מקום ספציפי, החזר null.
 מ"לא הוזכר מקום" (requestedArea=null בלי openAreaChoice) - כאן המשתמש ביקש בפירוש חופש
 בחירה, ולא מצפה שהמערכת תיצמד למיקום הנוכחי שלו/לרדיוס קטן מהבית.
 
+אם המלל החופשי מזכיר **שם עסק ספציפי וממשי** שהמשתמש רוצה (למשל "עדיפות במסעדת מלכה",
+"רוצים ללכת לקפה לואיז", "מקווה שיהיה מקום במסעדת הבית של בוריס") - זה שונה לגמרי מ-
+requestedArea (ששם *אזור* כללי, לא עסק ספציפי). חלץ את שם העסק המדויק לשדה
+requestedPlaceName. אם לא הוזכר שם עסק ספציפי, החזר null.
+
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף לפני או אחרי:
 {
   "summary": "משפט או שניים בעברית שמתארים את הטיול הרצוי, כאילו מתארים אותו לחבר שיתכנן אותו",
@@ -50,7 +61,8 @@ requestedArea. אם לא הוזכר מקום ספציפי, החזר null.
   "avoid": ["...", "..."],
   "accessibilityNotes": ["...", "..."],
   "requestedArea": "שם המקום או null",
-  "openAreaChoice": true | false
+  "openAreaChoice": true | false,
+  "requestedPlaceName": "שם העסק הספציפי או null"
 }`;
 
 interface GenerateTripIntentParams {
@@ -117,6 +129,8 @@ return {
       accessibilityNotes: Array.isArray(parsed.accessibilityNotes) ? parsed.accessibilityNotes : [],
       requestedArea: typeof parsed.requestedArea === "string" && parsed.requestedArea.trim() ? parsed.requestedArea : null,
       openAreaChoice: parsed.openAreaChoice === true,
+      requestedPlaceName:
+        typeof parsed.requestedPlaceName === "string" && parsed.requestedPlaceName.trim() ? parsed.requestedPlaceName : null,
     };
   } catch (parseError) {
     logAiError("כשל בפענוח Trip Intent", {

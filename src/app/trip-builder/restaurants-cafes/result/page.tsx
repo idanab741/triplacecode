@@ -13,6 +13,7 @@ import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton"
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { TripBuilderSession } from "@/services/tripBuilder/types";
 
@@ -75,18 +76,47 @@ function RestaurantResultContent() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
+  // תיקון קריטי: הבנייה בפועל (auto-build) רצה ברקע ב-fetch שלא ממתינים לו
+  // (fire-and-forget) מעמוד השאלון, ולוקחת בפועל עשרות שניות (כמה קריאות
+  // Claude ברצף - חיפוש מסעדה, geocoding, דירוג). קודם כאן הייתה קריאה
+  // *בודדת* ל-session מייד עם הניווט לעמוד הזה - שכמעט תמיד "תפסה" את
+  // ה-session עדיין ב-status="building" עם final_itinerary ריק, ולכן
+  // הציגה "לא מצאנו מקום מתאים" מיידית, בזמן שהחיפוש בפועל עוד לא הסתיים
+  // בכלל ברקע. זו הייתה הסיבה האמיתית ל"לא נמצא" - לא בעיית מרחק/תיוג.
+  // התיקון: פולינג כל 2.5 שניות (בדיוק כמו day-trip/result) עד
+  // status==="completed" בפועל - ורק אז יש משמעות אמיתית ל"נמצא/לא נמצא".
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.session) {
-          setError("לא הצלחנו לטעון את המקום");
-          return;
-        }
-        setSession(data.session);
-      })
-      .catch(() => setError("לא הצלחנו לטעון את המקום"));
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    function fetchOnce() {
+      fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.session) {
+            setError("לא הצלחנו לטעון את המקום");
+            return;
+          }
+          setSession(data.session);
+          if (data.session.status === "completed" && intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError("לא הצלחנו לטעון את המקום");
+        });
+    }
+
+    fetchOnce();
+    intervalId = setInterval(fetchOnce, 2500);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [sessionId]);
 
   const itinerary = session?.final_itinerary ?? null;
@@ -104,6 +134,23 @@ function RestaurantResultContent() {
       <Screen>
         <p className="pt-10 text-center text-ink-secondary">מוצאים לכם את המקום המושלם...</p>
       </Screen>
+    );
+  }
+
+  // כל עוד הבנייה עדיין רצה ברקע - עמוד הטעינה בסגנון המשחק (בדיוק כמו
+  // בטיול היומי), לא הודעת "לא נמצא". "לא נמצא" הוא מסקנה תקפה רק אחרי
+  // שה-build באמת הסתיים (status "completed") ועדיין אין אף תחנה.
+  if (session.status !== "completed") {
+    return (
+      <LoadingGame
+        statusText="רגע, מוצאים לכם את המקום..."
+        steps={[
+          "🔍 סורקים מסעדות ובתי קפה באזור שלכם",
+          "📍 בודקים מרחק וזמן הגעה מהבית",
+          "⭐ מסננים לפי דירוג ותקציב",
+          "🍽️ בוחרים את ההתאמה המדויקת ביותר",
+        ]}
+      />
     );
   }
 
@@ -209,11 +256,17 @@ function RestaurantResultContent() {
               <p className="pr-1 text-sm font-bold text-accent">
                 🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
               </p>
+              {/* תחנה בודדת תמיד (מסעדות = תמיד תחנה אחת) - draggable=false
+                  ובלי onDelete בכוונה (אין טעם לגרור/למחוק תחנה יחידה).
+                  "שינוי עם TRIPPY" נשאר תמיד זמין, וגם ניווט לעמוד
+                  האטרקציה המלא (placeHref) - שני הדברים גם יחד. */}
               <SortableStopCard
                 stop={stop}
                 sessionId={sessionId}
                 onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                onDelete={() => handleDeleteStop(stop.stopId)}
+                draggable={false}
+                onDelete={undefined}
+                placeHref={`/place/${stop.placeId}?from=ai`}
               />
             </div>
           </SortableContext>

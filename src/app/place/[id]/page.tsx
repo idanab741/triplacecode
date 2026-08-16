@@ -9,6 +9,12 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 
 interface PlacePageProps {
   params: Promise<{ id: string }>;
+  /** "from" אופציונלי בכתובת - קובע איזה טאב בסרגל התחתון מודגש כ"פעיל".
+   *  בלי זה, העמוד תמיד סימן "tripmatch" כפעיל (ר' MainBottomNav.tsx -
+   *  ה-id הפנימי "favorites" מוצג בפועל בתור "tripmatch" ומוביל ל-/tripmatch),
+   *  גם כשהגעת לכאן מבניית טיול ב-AI (trippy), לא מ-TripMatch בכלל -
+   *  מבלבל למשתמש לגבי היכן הוא נמצא באפליקציה. */
+  searchParams: Promise<{ from?: string }>;
 }
 
 /**
@@ -18,8 +24,10 @@ interface PlacePageProps {
  * מפה, וכפתורי דירוג (Google - קישור בלבד, לא קריאת API; TripLace -
  * דירוג פנימי אמיתי עם אפשרות למשתמשים לדרג).
  */
-export default async function PlacePage({ params }: PlacePageProps) {
+export default async function PlacePage({ params, searchParams }: PlacePageProps) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const activeNavTab = from === "ai" ? "ai" : "favorites";
   const place = await getPlaceById(id);
 
   if (!place) {
@@ -123,7 +131,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
         <TripLaceRatingSection placeId={place.id} />
       </div>
 
-      <MainBottomNav active="favorites" />
+      <MainBottomNav active={activeNavTab} />
     </div>
   );
 }

@@ -15,6 +15,11 @@ interface SuggestRestaurantParams {
    *  exists/rating/type check בכלל). */
   areaOrigin: LatLng;
   maxDistanceKm: number;
+  /** שם עסק ספציפי שהמשתמש ביקש במפורש (tripIntent.requestedPlaceName) -
+   *  אם הועבר, זו העדיפות המוחלטת של הפרומפט. משמש רק כשהחיפוש הישיר
+   *  ב-DB (findRequestedPlaceNear) לא מצא את המקום בעצמו - למשל כי הוא
+   *  עדיין לא קיים אצלנו במאגר בכלל. */
+  requestedPlaceName?: string | null;
 }
 
 interface ClaudeRestaurantSuggestion {
@@ -69,10 +74,14 @@ export async function suggestRealRestaurant(
 async function askClaudeForRestaurant(params: SuggestRestaurantParams): Promise<ClaudeRestaurantSuggestion | null> {
   const cuisineLabels = params.cuisine.length > 0 ? params.cuisine.map(getCategoryLabel).join(", ") : "כל סוג אוכל";
 
+  const requestedPlaceInstruction = params.requestedPlaceName
+    ? `\n*** המשתמש ביקש במפורש את המקום "${params.requestedPlaceName}" - זו העדיפות המוחלטת. אם קיים מקום אמיתי בשם הזה (או דומה מאוד) ליד ${params.city} - החזר אותו, גם אם הוא לא תואם באופן מושלם לסוג המטבח/תקציב שסומנו. רק אם אתה בטוח שאין מקום כזה בכלל באזור - חזור להמלצה רגילה לפי שאר הפרטים. ***\n`
+    : "";
+
   const prompt = `אתה מכיר היטב מסעדות ובתי קפה אמיתיים ב-${params.city}. המשתמש מחפש: ${cuisineLabels}.
 בקשה נוספת מהמשתמש: ${JSON.stringify(params.freeText || null)}
 תקציב: ${params.budgetLabel}
-
+${requestedPlaceInstruction}
 המלץ על מסעדה או בית קפה **אמיתיים וקיימים בפועל** ב-${params.city}, שמתאימים בדיוק לבקשה -
 לא מקום מומצא. אם אתה לא בטוח שיש מקום אמיתי שמתאים היטב, השב עם name ריק.
 

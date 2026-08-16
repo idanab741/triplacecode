@@ -21,11 +21,16 @@ const EXTRA_CATEGORY_LABELS: Record<string, string> = {
   events_festivals: "אירועים ופסטיבלים",
 spa_relaxation: "ספא ורוגע",
 
-  // סוגי מטבח - למסעדות ובתי קפה
+  // סוגי מטבח - למסעדות ובתי קפה. שומרים גם את המפתחות הישנים (bbq/brunch/
+  // sweets) לתאימות לאחור עם נתונים שכבר נשמרו, וגם את המפתחות התואמים
+  // ל-CULINARY_STYLES (locales/he/preferences.ts, ההתאמה האישית) - כדי
+  // ששני המקומות ידברו באותה "שפה" ותהיה עקביות בין מה שנבחר בצ'אט לבין
+  // מה שנלמד/מוצג מהפרופיל.
   israeli: "ישראלי",
   italian: "איטלקי",
   asian: "אסייתי",
   bbq: "בשרים ועל האש",
+  meat_bbq: "בשרים ועל האש",
   burger_diner: "המבורגר ודיינר אמריקאי",
   mexican: "מקסיקני",
   greek: "יווני",
@@ -35,8 +40,12 @@ spa_relaxation: "ספא ורוגע",
   seafood: "דגים ופירות ים",
   pizza: "פיצה",
   brunch: "ארוחת בוקר ובראנץ'",
+  breakfast_brunch: "ארוחת בוקר ובראנץ'",
   cafe: "בית קפה",
   sweets: "מאנצ'ים ומתוקים",
+  snacks_sweets: "מאנצ'ים ומתוקים",
+  fine_dining: "מסעדות שף",
+  local_food: "אוכל מקומי",
 };
 
 // כל תתי-התגיות (154) מתוך tripTaxonomy.ts - נבנה פעם אחת, לא בכל קריאה.

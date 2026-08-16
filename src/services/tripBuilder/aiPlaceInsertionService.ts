@@ -1,5 +1,6 @@
 import type { CandidatePlace } from "./types";
 import { createAdminClient } from "@/services/supabase/admin";
+import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES, isValidPlaceCategory } from "@/constants/placeCategories";
 
 /**
  * הופך המלצת AI (עם ID זמני "ai-...") למקום אמיתי בטבלת places, ומחזיר
@@ -25,12 +26,24 @@ export async function ensurePlaceExists(
   const existing = await findExistingPlace(supabase, candidate.name, city);
   if (existing) return existing;
 
+  // תיקון: candidate.category מגיע תמיד כאחת מ-20+ הקבוצות העדינות של
+  // tripTaxonomy (למשל "wineries_dining", "attractions_activities") -
+  // *לא* אחת מ-5 הקטגוריות הראשיות שבפועל מותרות בשדה `places.category`
+  // (ר' constants/placeCategories.ts). הכנסת הערך הגולמי ישירות לשם
+  // (כמו שהיה קודם) יצרה מקומות עם category לא-תקין לגמרי - בלתי-נראים
+  // בסינון הקטגוריה באדמין (/admin/places) למרות שהם קיימים ב-DB בפועל.
+  // זו בדיוק אותה מחלקת באג שכבר תוקנה פעם באדמין (bulk-reclassify-category,
+  // ר' ההערה שם) - כאן מתקנים את המקור עצמו, לא רק תוצאה קיימת.
+  const mainCategory = isValidPlaceCategory(candidate.category)
+    ? candidate.category
+    : TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES[candidate.category]?.[0] ?? "attractions";
+
   const { data, error } = await supabase
     .from("places")
     .insert({
       name: candidate.name,
       city,
-      category: candidate.category,
+      category: mainCategory,
       subcategory: candidate.subcategory,
       short_description: candidate.shortDescription,
       image_urls: candidate.imageUrls,

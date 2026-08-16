@@ -136,7 +136,16 @@ export default function DiscoveryPage() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setResults((prev) => [...(data.places ?? []), ...prev]);
+      // תיקון: מיזוג תוצאות חיפוש חדשות עם קיימות בלי דה-דופ גרם ל-id
+      // כפול ב-React key כשאותו מקום חוזר בין שתי חיפושים חופפים (למשל
+      // חיפוש שני שמכסה אזור/מונח קרוב לקודם) - "Encountered two children
+      // with the same key". שומרים על הגרסה החדשה (data.places) ומסירים
+      // מהרשימה הישנה כל מקום שכבר מופיע בתוצאות החדשות, לפי id.
+      setResults((prev) => {
+        const incoming = data.places ?? [];
+        const incomingIds = new Set(incoming.map((p: Place) => p.id));
+        return [...incoming, ...prev.filter((p) => !incomingIds.has(p.id))];
+      });
       setResultErrors(data.errors ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "החיפוש נכשל");

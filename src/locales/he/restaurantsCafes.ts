@@ -1,4 +1,5 @@
 import type { StepOption } from "@/services/tripBuilder/types";
+import { CULINARY_STYLES } from "@/locales/he/preferences";
 
 export const RESTAURANT_COMPANION_OPTIONS: StepOption[] = [
   { value: "couple", label: "זוג", emoji: "💑" },
@@ -45,22 +46,42 @@ export const RESTAURANT_BUDGET_STEPS: StepOption[] = [
   { value: "unlimited", label: "ללא הגבלה" },
 ];
 
-export const CUISINE_OPTIONS: StepOption[] = [
-{ value: "israeli", label: "ישראלי", emoji: "🥙" },
-  { value: "italian", label: "איטלקי", emoji: "🍝" },
-  { value: "asian", label: "אסייתי", emoji: "🥢" },
-  { value: "bbq", label: "בשרים ועל האש", emoji: "🍖" },
-  { value: "burger_diner", label: "המבורגר ודיינר אמריקאי", emoji: "🍔" },
-  { value: "mexican", label: "מקסיקני", emoji: "🌮" },
-{ value: "greek", label: "יווני", emoji: "🫓" },
-{ value: "french_bistro", label: "ביסטרו צרפתי", emoji: "🥖" },
-  { value: "indian", label: "הודי", emoji: "🍛" },
-  { value: "mediterranean", label: "ים־תיכוני", emoji: "🫒" },
-  { value: "seafood", label: "דגים ופירות ים", emoji: "🐟" },
-  { value: "pizza", label: "פיצה", emoji: "🍕" },
-  { value: "brunch", label: "ארוחת בוקר ובראנץ'", emoji: "🥐" },
-  { value: "cafe", label: "בית קפה", emoji: "☕" },
-  { value: "sweets", label: "מאנצ'ים ומתוקים", emoji: "🍰" },
-];
+// אימוג'י גיבוי לכל סגנון - משמש כברירת מחדל אם עדיין אין imageSrc
+// (CULINARY_STYLES) לערך הזה, וגם כ-fallback אוטומטי אם התמונה נכשלת
+// לטעון בפועל (ר' ChipGroup.tsx) - למשל local_food.png שעוד לא הועלה
+// לתיקיית /public/images/preferences/culinary.
+const CUISINE_EMOJI_FALLBACK: Record<string, string> = {
+  israeli: "🥙",
+  italian: "🍝",
+  asian: "🥢",
+  meat_bbq: "🍖",
+  burger_diner: "🍔",
+  mexican: "🌮",
+  greek: "🫓",
+  french_bistro: "🥖",
+  indian: "🍛",
+  mediterranean: "🫒",
+  seafood: "🐟",
+  pizza: "🍕",
+  breakfast_brunch: "🥐",
+  cafe: "☕",
+  fine_dining: "👨‍🍳",
+  local_food: "🍲",
+  snacks_sweets: "🍰",
+};
+
+// *** מקור אמת יחיד: נבנה ישירות מ-CULINARY_STYLES (locales/he/preferences.ts,
+// אותה רשימה המוצגת בהתאמה האישית) - כולל אותן תמונות (imageSrc) בדיוק,
+// כדי שהצ'אט של מסעדות/קפה יציג את אותם אייקונים אמיתיים שכבר קיימים
+// בתמונות ההעדפות, לא רק אימוג'י. קודם הרשימה כאן הייתה מוגדרת בנפרד
+// לגמרי (בלי imageSrc בכלל, ועם כמה value-ים לא תואמים) - מה שגם גרם
+// לחוסר עקביות מול dna.culinary_styles וגם השאיר את הצ'אט בלי האייקונים
+// האמיתיים שכבר קיימים במערכת.
+export const CUISINE_OPTIONS: StepOption[] = CULINARY_STYLES.map((style) => ({
+  value: style.value,
+  label: style.label,
+  imageSrc: style.imageSrc,
+  emoji: CUISINE_EMOJI_FALLBACK[style.value],
+}));
 
 export const SURPRISE_ME_OPTION: StepOption = { value: "surprise_me", label: "תפתיע אותי", emoji: "🎁" };

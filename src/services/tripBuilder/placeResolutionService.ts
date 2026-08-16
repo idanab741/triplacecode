@@ -217,3 +217,73 @@ export async function resolveAiSuggestedPlace(
     reason: item.reason,
   } as ResolvedAiPlace;
 }
+
+/**
+ * חיפוש ישיר לפי שם עסק ספציפי שהמשתמש ביקש במפורש (tripIntent.requestedPlaceName,
+ * למשל "עדיפות במסעדת מלכה") - עוקף לגמרי סינון קטגוריה/trip_type_tags, כי
+ * המשתמש כבר אמר בדיוק מה הוא רוצה; אין טעם לסנן לפי תיוג כשיש שם מדויק.
+ * שונה מ-findExistingPlace (שלא בודק מרחק בכלל) - כאן המרחק מהאזור המבוקש
+ * הוא תנאי, כדי לא "לתפוס" עסק אחר עם שם דומה/זהה שנמצא בעיר אחרת לגמרי.
+ * מחפש בכל הקטגוריות (לא רק "places" שכבר מתויגות למסעדות) כי ייתכן שהעסק
+ * טרם תויג נכון בכלל - אם המשתמש נקב בשמו, זה כשלעצמו אישור שהוא המקום הנכון.
+ */
+export async function findRequestedPlaceNear(
+  supabase: ReturnType<typeof createAdminClient>,
+  requestedName: string,
+  origin: LatLng,
+  maxDistanceKm: number
+): Promise<CandidatePlace | null> {
+  const normalizedName = requestedName.trim();
+  if (!normalizedName) return null;
+
+  const { data } = await supabase
+    .from("places")
+    .select(
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
+    )
+    .ilike("name", `%${normalizedName}%`)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    .limit(10);
+
+  if (!data || data.length === 0) return null;
+
+  // אם יש כמה תוצאות עם שם דומה (למשל רשת סניפים) - בוחרים את הקרוב ביותר
+  // בפועל למקור, ולא סתם את הראשון שחזר מה-DB.
+  let closest: (typeof data)[number] | null = null;
+  let closestDistanceKm = Infinity;
+  for (const row of data) {
+    if (row.latitude == null || row.longitude == null) continue;
+    const distanceKm = haversineDistanceKm(origin, { lat: row.latitude, lng: row.longitude });
+    if (distanceKm < closestDistanceKm) {
+      closestDistanceKm = distanceKm;
+      closest = row;
+    }
+  }
+
+  if (!closest || closestDistanceKm > maxDistanceKm) return null;
+
+  return {
+    id: closest.id,
+    name: closest.name,
+    category: closest.category,
+    subcategory: closest.subcategory,
+    shortDescription: closest.short_description,
+    imageUrls: closest.image_urls ?? [],
+    rating: closest.rating,
+    ratingCount: closest.rating_count,
+    priceLevel: closest.price_level,
+    estimatedVisitMinutes: closest.estimated_visit_minutes,
+    latitude: closest.latitude,
+    longitude: closest.longitude,
+    distanceKm: closestDistanceKm,
+    etaMinutes: 0,
+    tripTypeTags: closest.trip_type_tags ?? [],
+    cuisineTags: closest.cuisine_tags ?? [],
+    kosher: closest.kosher,
+    accessible: closest.accessible,
+    suitableChildAges: closest.suitable_child_ages ?? [],
+    budgetTier: closest.budget_tier,
+    isAreaExperience: closest.is_area_experience ?? false,
+  } satisfies CandidatePlace;
+}

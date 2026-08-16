@@ -14,6 +14,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
@@ -58,24 +59,6 @@ function NightlifeResultContent() {
     }
   }
 
-  async function handleShareTrip() {
-    setJustShared(true);
-    setTimeout(() => setJustShared(false), 1500);
-
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const text = `הערב שלי מוכן! תראו את המסלול: ${url}`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: "הערב שלי ב-TRIPLACE", text, url });
-        return;
-      } catch {
-        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
-      }
-    }
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-  }
-
   function handleDragEnd(event: DragEndEvent) {
     const itinerary = session?.final_itinerary;
     if (!session || !itinerary || !event.over || event.active.id === event.over.id) return;
@@ -102,18 +85,62 @@ function NightlifeResultContent() {
     }
   }
 
+  async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `הערב שלי מוכן! תראו את המסלול: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "הערב שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  // אותה בעיה בדיוק כמו שהייתה בעמוד תוצאה של מסעדות/קפה: fetch יחיד
+  // בלי polling "תפס" את ה-session כמעט תמיד עדיין ב-status="building"
+  // (הבנייה בפועל של הערב - כמה תחנות, קריאות Claude - לוקחת עשרות
+  // שניות), והציג "לא נבחרו מספיק תחנות" מיידית, בזמן שהבנייה עוד לא
+  // הסתיימה בכלל ברקע. תוקן לאותו פתרון בדיוק - polling כל 2.5 שניות
+  // עד status==="completed" בפועל, עם מסך טעינה בסגנון משחק בינתיים.
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.session) {
-          setError("לא הצלחנו לטעון את הערב");
-          return;
-        }
-        setSession(data.session);
-      })
-      .catch(() => setError("לא הצלחנו לטעון את הדייט"));
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    function fetchOnce() {
+      fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.session) {
+            setError("לא הצלחנו לטעון את הערב");
+            return;
+          }
+          setSession(data.session);
+          if (data.session.status === "completed" && intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError("לא הצלחנו לטעון את הערב");
+        });
+    }
+
+    fetchOnce();
+    intervalId = setInterval(fetchOnce, 2500);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [sessionId]);
 
   const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
@@ -135,6 +162,22 @@ function NightlifeResultContent() {
   <Screen>
         <p className="pt-10 text-center text-ink-secondary">בונים את הערב שלכם...</p>
       </Screen>
+    );
+  }
+
+  // כל עוד הבנייה עדיין רצה ברקע - מסך טעינה בסגנון משחק, לא "לא נמצא".
+  // "לא נבחרו מספיק תחנות" הוא מסקנה תקפה רק אחרי שה-build באמת הסתיים.
+  if (session.status !== "completed") {
+    return (
+      <LoadingGame
+        statusText="רגע, בונים לכם את הערב..."
+        steps={[
+          "🍸 מחפשים ברים ומקומות בילוי מתאימים",
+          "🎧 בוחרים לפי מה שסימנתם",
+          "📍 בודקים מרחק וזמן הגעה",
+          "🕺 מסדרים מסלול רציף לערב",
+        ]}
+      />
     );
   }
 
@@ -233,6 +276,8 @@ function NightlifeResultContent() {
           }))}
         />
 
+        {/* גרירה+מחיקה רק כשיש יותר מ-2 תחנות; "שינוי עם TRIPPY" תמיד זמין;
+            לחיצה על התמונה/טקסט מנווטת לעמוד האטרקציה המלא (/place/[id]). */}
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={itinerary.stops.map((s) => s.stopId)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
@@ -245,7 +290,9 @@ function NightlifeResultContent() {
                     stop={stop}
                     sessionId={sessionId}
                     onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                    onDelete={() => handleDeleteStop(stop.stopId)}
+                    draggable={itinerary.stops.length > 2}
+                    onDelete={itinerary.stops.length > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                    placeHref={`/place/${stop.placeId}?from=ai`}
                   />
                 </div>
               ))}

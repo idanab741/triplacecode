@@ -321,6 +321,11 @@ function AbroadVacationResultContent() {
   const visibleDayGroups = dayGroups.filter(
     ({ day }) => activeDayFilter === "all" || day === activeDayFilter
   );
+  // סה"כ תחנות אמיתיות (לא סינתטיות כמו נחיתה/מלון) על פני כל הימים -
+  // אותו חישוב בדיוק כמו ה-items של ה-SortableContext למטה. משמש לקבוע
+  // אם גרירה/מחיקה בכלל רלוונטיות (מעל 2 תחנות) - "שינוי עם TRIPPY"
+  // תמיד זמין בלי קשר לכך.
+  const totalRealStopsCount = visibleDayGroups.flatMap(({ stops }) => stops.filter((s) => !s.specialType)).length;
   const visibleStopsForMap = itinerary.stops.filter((s) => {
     if (activeDayFilter === "all") return true;
     const stopDay = (s as unknown as { dayIndex: number | null }).dayIndex ?? 1;
@@ -614,7 +619,9 @@ function AbroadVacationResultContent() {
                           stop={stop}
                           sessionId={sessionId}
                           onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                          onDelete={() => handleDeleteStop(stop.stopId)}
+                          draggable={totalRealStopsCount > 2}
+                          onDelete={totalRealStopsCount > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                          placeHref={`/place/${stop.placeId}?from=ai`}
                         />
                       </div>
                     );

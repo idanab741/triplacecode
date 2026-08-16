@@ -13,6 +13,7 @@ import { findBestCluster } from "@/services/tripBuilder/clusterService";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperienceService";
 import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggestionService";
+import { findRequestedPlaceNear } from "@/services/tripBuilder/placeResolutionService";
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
@@ -21,7 +22,8 @@ import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/a
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import { saveTripIntent } from "@/services/tripBuilder/sessionService";
-import { normalizeAnswers } from "@/services/tripBuilder/categoryPlanService";
+import { normalizeAnswers, decideCategoryPlan } from "@/services/tripBuilder/categoryPlanService";
+import { saveCategoryPlan } from "@/services/tripBuilder/sessionService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { describeWeatherCode } from "@/utils/weatherCodes";
 import { generateDayTripPlaces } from "@/services/tripBuilder/dayTripAttractionListService";
@@ -67,7 +69,8 @@ export async function POST(
   const result = await getSessionWithStops(supabase, sessionId);
   if (!result) return NextResponse.json({ error: "ה-session לא נמצא" }, { status: 404 });
 
-  const { session, stops } = result;
+  const { session } = result;
+  let stops = result.stops;
   if (session.origin_latitude == null || session.origin_longitude == null) {
     return NextResponse.json({ error: "חסר מיקום מוצא ל-session" }, { status: 400 });
   }
@@ -82,11 +85,69 @@ export async function POST(
     const rules = getTripTypeRules(session.trip_type);
     const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
 
+    // "חיי לילה ובילויים", "דייט רומנטי" ו"טיול בטבע" (ובעתיד סוגי טיול
+    // נוספים שיאמצו את אותו דפוס): ה-POST שיצר את ה-session החזיר תשובה
+    // מיד בלי שום תחנות (כדי לא לחסום את הניווט למסך הטעינה בקריאת
+    // Claude) - אם עדיין אין תוכנית בכלל (stops ריק), בונים אותה כאן,
+    // אחרי שהמשתמש כבר במסך הטעינה. Claude עדיין רץ במלואו (לא מדלגים
+    // עליו) - רק לא לפני הניווט.
+    if (
+      (session.trip_type === "nightlife" ||
+        session.trip_type === "romantic_date" ||
+        session.trip_type === "nature_trip") &&
+      stops.length === 0
+    ) {
+      try {
+        const weatherSummary = await getWeatherSummary(session.origin_latitude, session.origin_longitude);
+        const generated = await generateTripIntent({
+          dna,
+          answers: normalizeAnswers(session.trip_type, answers),
+          weatherSummary,
+        });
+        if (generated) {
+          tripIntent = generated;
+          await saveTripIntent(supabase, sessionId, generated);
+        }
+        const plan = await decideCategoryPlan({
+          tripType: session.trip_type,
+          dna,
+          answers,
+          weatherSummary,
+          tripIntent,
+        });
+        stops = await saveCategoryPlan(supabase, sessionId, plan);
+      } catch (err) {
+        console.error("[auto-build] בניית תוכנית נכשלה (חיי לילה/דייט רומנטי/טיול בטבע)", err);
+      }
+    }
+
     const origin = { lat: session.origin_latitude, lng: session.origin_longitude };
     const pendingStops = stops
       .filter((s) => s.status === "pending")
       .sort((a, b) => (a.day_index ?? 0) - (b.day_index ?? 0) || a.slot_index - b.slot_index);
     const excludePlaceIds = stops.filter((s) => s.place_id).map((s) => s.place_id as string);
+
+    // "מסעדות ובתי קפה": ה-POST שיצר את ה-session (sessions/route.ts) מדלג
+    // בכוונה על חישוב tripIntent שם (כדי לא לחסום את הניווט למסך הטעינה
+    // בקריאת Claude נוספת) - מחשבים אותו כאן, אחרי שהמשתמש כבר במסך
+    // הטעינה. עדיין קריטי: הוא מזהה requestedPlaceName/requestedArea
+    // שהחיפוש למטה תלוי בהם.
+    if (session.trip_type === "restaurants_cafes" && !tripIntent) {
+      try {
+        const weatherSummary = await getWeatherSummary(session.origin_latitude, session.origin_longitude);
+        const generated = await generateTripIntent({
+          dna,
+          answers: normalizeAnswers(session.trip_type, answers),
+          weatherSummary,
+        });
+        if (generated) {
+          tripIntent = generated;
+          await saveTripIntent(supabase, sessionId, generated);
+        }
+      } catch (err) {
+        console.error("[auto-build] חישוב trip intent למסעדות/קפה נכשל", err);
+      }
+    }
 
     // עבור חופשה בחו"ל: מיקום ה"בית" לכל יום הוא מיקום המלון של אותו יום
     // (אם המשתמש הזין כמה מלונות), לא מיקום ה-GPS המקורי של המשתמש
@@ -479,17 +540,121 @@ export async function POST(
     // ומתחיל מהאזור שזוהה (לא מהבית) - כדי שהמסלול יהיה קרוב פיזית ולא מפוזר.
     let cursor = clusterCenter;
 
+    // תיקון: קודם נשלח ל-Claude city="האזור המבוקש" כברירת מחדל קבועה
+    // (המחרוזת המילולית עצמה, לא שם אזור אמיתי) בכל פעם שהמשתמש לא כתב
+    // אזור מפורש במלל חופשי - כלומר כמעט תמיד. "המלץ על מסעדה אמיתית
+    // ב'האזור המבוקש'" הוא פרומפט חסר-משמעות ל-Claude, ולכן ההמלצה נוטה
+    // להיכשל/להיפסל באימות מול Google כמעט בכל פעם - מה שדחף כל בקשה
+    // כמעט תמיד ל-fallback של המאגר המקומי, גם כשהיה מקום מתאים אמיתי.
+    // עכשיו, בהיעדר אזור מפורש, הופכים את מיקום הבית לשם עיר/אזור קריא
+    // (reverse geocoding) - בדיוק כמו ש-day_trip/nature_trip כבר עושים.
+    const restaurantAreaLabel =
+      session.trip_type === "restaurants_cafes"
+        ? tripIntent?.requestedArea ?? (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש"
+        : null;
+
     for (let i = 0; i < pendingStops.length; i++) {
       const stop = pendingStops[i];
       const isFirstStop = i === 0;
 
-      // עבור מסעדות ובתי קפה - Claude מוביל עם המלצה אמיתית מהידע הכללי שלו,
-      // לא רק בוחר מתוך המאגר הקיים. המאגר הוא רק גיבוי אם Claude לא בטוח.
-      // חריג: אם המשתמש דרש כשרות - Claude לא יכול לערוב לכשרות של מקום
-      // שהוא ממליץ עליו מהידע הכללי שלו (אין לו איך לדעת), אז מדלגים על
-      // הנתיב הזה ונופלים ישירות למאגר ה-DB, ששם קטגורית dna.kosher/kosher.eq.true
-      // מחייב - כדי לא "לזלוג" מקום לא-מאומת כשר למשתמש שסימן כשר.
-      if (session.trip_type === "restaurants_cafes" && dna?.kosher !== true) {
+      // עדיפות מוחלטת (חדש): אם המשתמש נקב בשם עסק ספציפי במלל החופשי
+      // (tripIntent.requestedPlaceName, למשל "עדיפות במסעדת מלכה") - מחפשים
+      // אותו ישירות ב-DB לפי שם, לפני כל דבר אחר ובלי סינון קטגוריה/תיוג
+      // בכלל (המשתמש כבר אמר בדיוק מה הוא רוצה). קודם בקשה כזו הייתה נטמעת
+      // בתוך freeText הכללי, מקבלת רק משקל "רך" בדירוג בין המועמדים שכבר
+      // חזרו מהחיפוש הרגיל - ואם המקום המבוקש לא נכנס למאגר הזה מלכתחילה
+      // (למשל תיוג לא מדויק, או שלא היה בטווח distanceBand הרגיל), הוא
+      // מעולם לא קיבל סיכוי אמיתי, גם אם המשתמש ביקש אותו בפירוש בשמו.
+      if (session.trip_type === "restaurants_cafes" && tripIntent?.requestedPlaceName) {
+        const requestedPlaceMaxDistanceKm = Math.max(
+          25,
+          requestedAreaRadiusKm ?? distanceBandToRadiusKm(answers.distanceBand)
+        );
+        const requestedPlace = await findRequestedPlaceNear(
+          supabase,
+          tripIntent.requestedPlaceName,
+          cursor,
+          requestedPlaceMaxDistanceKm
+        );
+        if (requestedPlace && !excludePlaceIds.includes(requestedPlace.id)) {
+          await likeStop(supabase, user.id, stop.id, requestedPlace);
+          excludePlaceIds.push(requestedPlace.id);
+          cursor = { lat: requestedPlace.latitude, lng: requestedPlace.longitude };
+          continue;
+        }
+      }
+
+      // סדר עדיפויות (תוקן): קודם המאגר הפנימי שלנו (ADMIN PLACES,
+      // fetchCandidatePool) - כי אלה מקומות שאדמין בדק/אצר בעצמו. Claude +
+      // Google Places הם *רק* רשת ביטחון, למקרה שהמאגר הפנימי ריק לגמרי
+      // באזור המבוקש - לא הנתיב הראשי כמו שהיה קודם. קודם הסדר היה הפוך
+      // (Claude קודם, DB רק גיבוי) - זו הייתה בדיוק הסיבה שמקום קיים ומאומת
+      // באדמין (למשל "מלכה", 3 דק' מהבית) יכול להיות מתעלם: ברגע ש-Claude
+      // הצליח להציע *משהו* שעבר אימות Google (גם אם רחוק/פחות מתאים), הקוד
+      // היה משתמש בו ולעולם לא פונה בכלל למאגר הפנימי.
+      const effectiveOrigin = dayOriginOverride ?? (requestedAreaRadiusKm ? searchOrigin : cursor);
+      const pool = await fetchCandidatePool(supabase, {
+        category: stop.category,
+        origin: effectiveOrigin,
+        distanceBand: answers.distanceBand,
+        maxDistanceKm: dayOriginOverride ? 15 : requestedAreaRadiusKm ?? (isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand]),
+        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+        excludePlaceIds,
+        requireKosher: dna?.kosher === true,
+        requireAccessible: dna?.accessibility === true,
+      });
+
+      if (pool.length > 0) {
+        // עבור מסעדות (ורק שם) - בחירת סוג המטבח לא מגיעה דרך "interests" הרגיל,
+        // אלא דרך שדה "cuisine" נפרד. מוסיפים אותה למלל שנשלח לדירוג, אחרת
+        // הבחירה הספציפית של המשתמש (למשל "המבורגר") אף פעם לא מגיעה ל-Claude.
+        const cuisineSelection = (answers as unknown as { cuisine?: string[] }).cuisine;
+        const combinedFreeText = cuisineSelection?.length
+          ? `${answers.freeText}. סוג מטבח מועדף: ${cuisineSelection.map(getCategoryLabel).join(", ")}`
+          : answers.freeText;
+
+        // תשובות השאלון המפורשות לפרומפט הדירוג (rankCandidates) - עדיין לא
+        // מחובר לאף סוג טיול (day_trip לא מגיע לכאן בכלל - יש לו נתיב נפרד,
+        // ר' questionnaireSummary ב-generateDayTripPlaces למעלה). יחובר לכאן
+        // כשנעבור על שאר סוגי הטיול אחד-אחד.
+        const questionnaireAnswers = undefined;
+
+        const ranked = await rankCandidates({
+          dna,
+          candidates: pool,
+          freeText: combinedFreeText,
+          remainingBudgetLabel,
+          rankingPromptRules: rules.rankingPromptRules,
+          attributeScoreMap,
+          learnedAttributes,
+          tripIntent,
+          questionnaireAnswers,
+        });
+
+        const top = ranked[0];
+        if (top) {
+          await likeStop(supabase, user.id, stop.id, top);
+          excludePlaceIds.push(top.id);
+          cursor = { lat: top.latitude, lng: top.longitude };
+
+          // Area Experience: אם התחנה שנבחרה היא אזור חוויה שלם (למשל "נווה צדק"),
+          // התחנות הבאות לא אמורות להיבחר מתוכו - הן כבר "בפנים" את החוויה הזו.
+          // מרחיבים משמעותית את המרחק המינימלי הבא, כדי לא לבחור עוד תחנה
+          // שנמצאת בתוך אותו אזור ממש.
+          if (top.isAreaExperience) {
+            excludePlaceIds.push(
+              ...(await getPlaceIdsWithinRadius(supabase, cursor, 0.8, excludePlaceIds))
+            );
+          }
+          continue;
+        }
+      }
+
+      // המאגר הפנימי ריק (או שהדירוג לא החזיר מועמד) - fallback ל-Claude,
+      // רק עבור מסעדות/בתי קפה, ורק אם לא נדרשה כשרות (Claude לא יכול
+      // לערוב לכשרות של מקום שהוא ממליץ עליו מהידע הכללי שלו - אין לו
+      // איך לדעת, אז כשכשרות נדרשת נשארים עם "לא נמצא" ולא מסתכנים).
+      if (pool.length === 0 && session.trip_type === "restaurants_cafes" && dna?.kosher !== true) {
         const restaurantAnswers = answers as unknown as { cuisine?: string[]; distanceBand?: string };
         const baseRestaurantMaxDistanceKm =
           requestedAreaRadiusKm ?? distanceBandToRadiusKm((restaurantAnswers.distanceBand ?? "30min") as never);
@@ -505,40 +670,25 @@ export async function POST(
         let aiSuggestion = null as Awaited<ReturnType<typeof suggestRealRestaurant>>;
         for (const attemptMaxDistanceKm of distanceAttemptsKm) {
           aiSuggestion = await suggestRealRestaurant(supabase, {
-            city: tripIntent?.requestedArea ?? "האזור המבוקש",
+            city: restaurantAreaLabel ?? "האזור המבוקש",
             cuisine: restaurantAnswers.cuisine ?? [],
             freeText: answers.freeText,
             budgetLabel: remainingBudgetLabel,
             areaOrigin: cursor,
             maxDistanceKm: attemptMaxDistanceKm,
+            requestedPlaceName: tripIntent?.requestedPlaceName ?? null,
           });
           if (aiSuggestion) break;
         }
 
         if (aiSuggestion) {
-          const realPlace = await ensurePlaceExists(aiSuggestion, tripIntent?.requestedArea ?? "");
+          const realPlace = await ensurePlaceExists(aiSuggestion, restaurantAreaLabel ?? "");
           await likeStop(supabase, user.id, stop.id, realPlace);
           excludePlaceIds.push(realPlace.id);
           cursor = { lat: realPlace.latitude, lng: realPlace.longitude };
           continue;
         }
       }
-
-      // כשיש אזור מבוקש מפורש - כל התחנות (לא רק הראשונה) נשארות ברדיוס קטן
-      // וקבוע ממרכז האזור עצמו, לא מהתחנה הקודמת. אחרת כל תחנה "מרשה לעצמה"
-      // לנוע עוד קצת רחוק יותר, ולאורך כמה תחנות זה מצטבר לדליפה גדולה
-      // הרחק מהאזור שהמשתמש ביקש בפועל.
-      const effectiveOrigin = dayOriginOverride ?? (requestedAreaRadiusKm ? searchOrigin : cursor);
-      const pool = await fetchCandidatePool(supabase, {
-        category: stop.category,
-        origin: effectiveOrigin,
-        distanceBand: answers.distanceBand,
-        maxDistanceKm: dayOriginOverride ? 15 : requestedAreaRadiusKm ?? (isFirstStop ? undefined : MAX_STOP_DISTANCE_KM[answers.durationBand]),
-        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
-        excludePlaceIds,
-        requireKosher: dna?.kosher === true,
-        requireAccessible: dna?.accessibility === true,
-      });
 
       // אין מועמד מתאים ב-DB, אבל המשתמש ביקש אזור ספציפי - ה-AI יוצר בעצמו
       // חוויית הסתובבות באזור, במקום פשוט לדלג על התחנה. ה-DB הוא רק גיבוי,
@@ -559,51 +709,16 @@ export async function POST(
         }
       }
 
-      if (pool.length === 0) continue;
-
-      // עבור מסעדות (ורק שם) - בחירת סוג המטבח לא מגיעה דרך "interests" הרגיל,
-      // אלא דרך שדה "cuisine" נפרד. מוסיפים אותה למלל שנשלח לדירוג, אחרת
-      // הבחירה הספציפית של המשתמש (למשל "המבורגר") אף פעם לא מגיעה ל-Claude.
-      const cuisineSelection = (answers as unknown as { cuisine?: string[] }).cuisine;
-      const combinedFreeText = cuisineSelection?.length
-        ? `${answers.freeText}. סוג מטבח מועדף: ${cuisineSelection.map(getCategoryLabel).join(", ")}`
-        : answers.freeText;
-
-      // תשובות השאלון המפורשות לפרומפט הדירוג (rankCandidates) - עדיין לא
-      // מחובר לאף סוג טיול (day_trip לא מגיע לכאן בכלל - יש לו נתיב נפרד,
-      // ר' questionnaireSummary ב-generateDayTripPlaces למעלה). יחובר לכאן
-      // כשנעבור על שאר סוגי הטיול אחד-אחד.
-      const questionnaireAnswers = undefined;
-
-      const ranked = await rankCandidates({
-        dna,
-        candidates: pool,
-        freeText: combinedFreeText,
-        remainingBudgetLabel,
-        rankingPromptRules: rules.rankingPromptRules,
-        attributeScoreMap,
-        learnedAttributes,
-        tripIntent,
-        questionnaireAnswers,
+      // נקודת בקרה קריטית (כמו הלוגים המקבילים למעלה ב-vacation/day_trip):
+      // בלי הלוג הזה, תחנה שנפסלת בשקט (לא DB, לא AI) הופכת בעמוד
+      // התוצאות ל"לא מצאנו מקום מתאים" בלי שום עקבה לאבחון למה.
+      console.error("[auto-build] לא נמצא מועמד (לא ב-DB ולא דרך AI) - התחנה מדולגת", {
+        sessionId,
+        tripType: session.trip_type,
+        category: stop.category,
+        origin: effectiveOrigin,
+        distanceBand: answers.distanceBand,
       });
-
-      const top = ranked[0];
-      if (!top) continue;
-
-      await likeStop(supabase, user.id, stop.id, top);
-
-      excludePlaceIds.push(top.id);
-      cursor = { lat: top.latitude, lng: top.longitude };
-
-      // Area Experience: אם התחנה שנבחרה היא אזור חוויה שלם (למשל "נווה צדק"),
-      // התחנות הבאות לא אמורות להיבחר מתוכו - הן כבר "בפנים" את החוויה הזו.
-      // מרחיבים משמעותית את המרחק המינימלי הבא, כדי לא לבחור עוד תחנה
-      // שנמצאת בתוך אותו אזור ממש.
-      if (top.isAreaExperience) {
-        excludePlaceIds.push(
-          ...(await getPlaceIdsWithinRadius(supabase, cursor, 0.8, excludePlaceIds))
-        );
-      }
     }
 
     const itinerary = await finalizeItinerary(

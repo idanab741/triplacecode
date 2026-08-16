@@ -30,9 +30,13 @@ function NatureTripResultContent() {
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
   const [editingTime, setEditingTime] = useState(false);
-  const [swapError, setSwapError] = useState<string | null>(null);
 
   const [justShared, setJustShared] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   async function handleDeleteStop(stopId: string) {
     if (!sessionId || !session?.final_itinerary) return;
@@ -55,29 +59,6 @@ function NatureTripResultContent() {
       // עדכון אופטימי כבר קרה - לא הופכים אותו אם השרת נכשל בשקט, רק לא מסנכרנים חזרה
     }
   }
-
-  async function handleShareTrip() {
-    setJustShared(true);
-    setTimeout(() => setJustShared(false), 1500);
-
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const text = `יום הטבע שלי מוכן! תראו את המסלול: ${url}`;
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
-        return;
-      } catch {
-        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
-      }
-    }
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-  }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
 
   function handleDragEnd(event: DragEndEvent) {
     const itinerary = session?.final_itinerary;
@@ -103,6 +84,24 @@ function NatureTripResultContent() {
         body: JSON.stringify({ itinerary: updatedItinerary }),
       }).catch(() => {});
     }
+  }
+
+  async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `יום הטבע שלי מוכן! תראו את המסלול: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   useEffect(() => {
@@ -282,11 +281,10 @@ function NatureTripResultContent() {
           }))}
         />
 
+        {/* גרירה+מחיקה רק כשיש יותר מ-2 תחנות; "שינוי עם TRIPPY" תמיד זמין;
+            לחיצה על התמונה/טקסט מנווטת לעמוד האטרקציה המלא (/place/[id]). */}
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <SortableContext
-            items={itinerary.stops.map((s) => s.stopId)}
-            strategy={verticalListSortingStrategy}
-          >
+          <SortableContext items={itinerary.stops.map((s) => s.stopId)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
               {itinerary.stops.map((stop) => (
                 <div key={stop.stopId} className="flex flex-col gap-1">
@@ -296,18 +294,16 @@ function NatureTripResultContent() {
                   <SortableStopCard
                     stop={stop}
                     sessionId={sessionId}
-                    onItineraryUpdate={(updated) =>
-                      setSession((s) => (s ? { ...s, final_itinerary: updated } : s))
-                    }
-                    onDelete={() => handleDeleteStop(stop.stopId)}
+                    onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
+                    draggable={itinerary.stops.length > 2}
+                    onDelete={itinerary.stops.length > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                    placeHref={`/place/${stop.placeId}?from=ai`}
                   />
                 </div>
               ))}
             </div>
           </SortableContext>
         </DndContext>
-
-        {swapError && <p className="text-center text-sm text-danger">{swapError}</p>}
 
         {itinerary.events.length > 0 && (
           <div className="flex flex-col gap-2">

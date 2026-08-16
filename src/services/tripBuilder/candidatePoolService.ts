@@ -7,6 +7,7 @@ import {
   kmToDegreesLat,
   kmToDegreesLng,
 } from "./geo";
+import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES } from "@/constants/placeCategories";
 
 interface FetchCandidatePoolParams {
   category: string;
@@ -83,12 +84,24 @@ async function queryPool(
   const latDelta = kmToDegreesLat(radiusKm);
   const lngDelta = kmToDegreesLng(radiusKm, params.origin.lat);
 
-let query = supabase
+  // הגנת רשת-ביטחון: לצד ההתאמה הראשית לפי trip_type_tags, מקבלים גם
+  // מקום שתויג נכון ב"קטגוריה ראשית" (place.category, 5 הערכים שנבחרים
+  // באדמין) גם אם ה-trip_type_tags שלו ריק/לא מדויק. בלי זה, מקום אמיתי
+  // שנוסף ותויג רק בקטגוריה הראשית (למשל "מסעדות") נעלם בשקט מהחיפוש -
+  // בדיוק המצב שקרה בפועל. trip_type_tags נשאר מקור-האמת העיקרי (מדויק
+  // יותר, כי הוא מזהה ~20 תת-סוגים), הקטגוריה הראשית היא רק גיבוי גס.
+  const fallbackCategories = TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES[params.category] ?? [];
+  const categoryFilter =
+    fallbackCategories.length > 0
+      ? `trip_type_tags.ov.{${params.category}},category.in.(${fallbackCategories.join(",")})`
+      : `trip_type_tags.ov.{${params.category}}`;
+
+  let query = supabase
     .from("places")
     .select(
       "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
     )
-    .overlaps("trip_type_tags", [params.category])
+    .or(categoryFilter)
     .gte("latitude", params.origin.lat - latDelta)
     .lte("latitude", params.origin.lat + latDelta)
     .gte("longitude", params.origin.lng - lngDelta)

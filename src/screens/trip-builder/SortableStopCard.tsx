@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { useDndContext } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -12,8 +13,18 @@ interface SortableStopCardProps {
   sessionId: string | null;
   onItineraryUpdate: (itinerary: FinalItinerary) => void;
   /** אם לא מוגדר (undefined) - הכרטיס לא ניתן למחיקה בסוויפ (למשל תחנות
-   *  סינתטיות כמו נחיתה/מלון, שאין להן שורה אמיתית למחוק). */
+   *  סינתטיות כמו נחיתה/מלון, שאין להן שורה אמיתית למחוק, או מסלול עם
+   *  2 תחנות או פחות - ר' הערה ב-draggable למטה). */
   onDelete?: () => void;
+  /** ברירת מחדל true. false מסתיר לגמרי את ידית הגרירה (⠿) - משמש
+   *  למסלולים עם 2 תחנות או פחות, שם לגרירה/סידור מחדש אין משמעות
+   *  אמיתית (אין לאן לסדר מחדש). "שינוי עם TRIPPY" תמיד נשאר זמין בלי
+   *  קשר לזה - זו נקודת הכניסה לעריכה בכל מקרה, לא רק סידור/מחיקה. */
+  draggable?: boolean;
+  /** אם סופק - כל אזור התמונה+טקסט (לא ידית הגרירה/כפתור TRIPPY) הופך
+   *  לקישור לעמוד האטרקציה המלא (/place/[id]). אופציונלי כדי לא לשבור
+   *  שימושים קיימים בלי צורך אמיתי בניווט. */
+  placeHref?: string;
 }
 
 const SWIPE_REVEAL_PX = 84;
@@ -23,8 +34,15 @@ function priceLevelSymbols(level: number | null): string | null {
   return "₪".repeat(Math.max(1, level + 1));
 }
 
-/** כרטיס תחנה נקי ומעוצב, ניתן לגרירה, עם נקודת כניסה אחת בלבד (TRIPPY) לשינויים. */
-export function SortableStopCard({ stop, sessionId, onItineraryUpdate, onDelete }: SortableStopCardProps) {
+/** כרטיס תחנה נקי ומעוצב, ניתן לגרירה (כשמתאים), עם נקודת כניסה אחת בלבד (TRIPPY) לשינויים. */
+export function SortableStopCard({
+  stop,
+  sessionId,
+  onItineraryUpdate,
+  onDelete,
+  draggable = true,
+  placeHref,
+}: SortableStopCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stop.stopId });
   // active !== null כשאיזשהו כרטיס (לא בהכרח זה) נמצא כרגע באמצע גרירת-סידור.
   // בלי הבדיקה הזו, כשגוררים כרטיס אחד ו"עוברים" מעל כרטיסים אחרים, תנועת
@@ -190,38 +208,68 @@ export function SortableStopCard({ stop, sessionId, onItineraryUpdate, onDelete 
         className="relative overflow-hidden rounded-2xl bg-white shadow-soft"
       >
         <div className="flex gap-3 p-3">
-          {stop.imageUrls[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={stop.imageUrls[0]} alt={stop.name} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+          {placeHref ? (
+            <Link href={placeHref} className="flex min-w-0 flex-1 gap-3">
+              {stop.imageUrls[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={stop.imageUrls[0]} alt={stop.name} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="h-24 w-24 shrink-0 rounded-xl bg-bg-secondary" />
+              )}
+
+              <div className="flex min-w-0 flex-1 flex-col justify-center">
+                <p className="truncate text-[15px] font-semibold text-ink">{stop.name}</p>
+
+                {stop.shortDescription && (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">{stop.shortDescription}</p>
+                )}
+
+                <div className="mt-auto flex items-center gap-3 pt-1.5 text-xs text-ink-secondary">
+                  {stop.rating != null && <span>⭐ {stop.rating}</span>}
+                  {price && <span className="text-ink-secondary/80">{price}</span>}
+                </div>
+              </div>
+            </Link>
           ) : (
-            <div className="h-24 w-24 shrink-0 rounded-xl bg-bg-secondary" />
+            <>
+              {stop.imageUrls[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={stop.imageUrls[0]} alt={stop.name} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+              ) : (
+                <div className="h-24 w-24 shrink-0 rounded-xl bg-bg-secondary" />
+              )}
+
+              <div className="flex min-w-0 flex-1 flex-col justify-center">
+                <p className="truncate text-[15px] font-semibold text-ink">{stop.name}</p>
+
+                {stop.shortDescription && (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">{stop.shortDescription}</p>
+                )}
+
+                <div className="mt-auto flex items-center gap-3 pt-1.5 text-xs text-ink-secondary">
+                  {stop.rating != null && <span>⭐ {stop.rating}</span>}
+                  {price && <span className="text-ink-secondary/80">{price}</span>}
+                </div>
+              </div>
+            </>
           )}
 
-          <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <p className="truncate text-[15px] font-semibold text-ink">{stop.name}</p>
-
-            {stop.shortDescription && (
-              <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">{stop.shortDescription}</p>
-            )}
-
-            <div className="mt-auto flex items-center gap-3 pt-1.5 text-xs text-ink-secondary">
-              {stop.rating != null && <span>⭐ {stop.rating}</span>}
-              {price && <span className="text-ink-secondary/80">{price}</span>}
-            </div>
-          </div>
-
           {/* ידית גרירה - מעל התמונה, לא מתנגשת עם דבר. data-no-swipe אומר
-              למנגנון הסוויפ להתעלם לגמרי מנגיעות שמתחילות כאן. */}
-          <button
-            type="button"
-            {...attributes}
-            {...listeners}
-            data-no-swipe
-            className="absolute right-4 top-4 flex h-6 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-full bg-white/90 text-sm text-ink-secondary/60 shadow-sm backdrop-blur active:cursor-grabbing"
-            aria-label="גרור לשינוי סדר"
-          >
-            ⠿
-          </button>
+              למנגנון הסוויפ להתעלם לגמרי מנגיעות שמתחילות כאן. מוצגת רק
+              כש-draggable=true (למסלולים עם יותר מ-2 תחנות) - לגרירה של
+              תחנה יחידה/זוגית אין משמעות אמיתית. */}
+          {draggable && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              data-no-swipe
+              className="absolute right-4 top-4 flex h-6 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-full bg-white/90 text-sm text-ink-secondary/60 shadow-sm backdrop-blur active:cursor-grabbing"
+              aria-label="גרור לשינוי סדר"
+            >
+              ⠿
+            </button>
+          )}
 
           {/* TRIPPY - נקודת הכניסה היחידה לשינוי התחנה. מוסתר כשהתיבה כבר פתוחה, כדי לא להתנגש איתה */}
           {!instructOpen && (
