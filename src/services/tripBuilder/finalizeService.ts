@@ -131,40 +131,51 @@ const warnings: string[] = [];
 // בקרת איכות אחרונה - רק למסלולים ארוכים יותר, שבהם הסיכון לחוסר איזון גבוה יותר.
   // זהו כלי ניטור פנימי בלבד - הבעיות נרשמות ביומן (Vercel logs) לצורך מעקב איכות,
   // ולא מוצגות למשתמש כאזהרה. משתמש שרואה "רשימת תלונות" על הטיול שלו זו חוויה גרועה.
+  //
+  // תיקון מהירות: בכוונה **לא** ממתינים (await) לקריאת ה-Claude הזו - התוצאה
+  // שלה היא ללוג פנימי בלבד ולעולם לא משפיעה על ה-itinerary שמוחזר למשתמש,
+  // אין שום סיבה שהמשתמש יחכה עוד קריאת Claude מלאה (3-15+ שניות) רק כדי
+  // שנרשום אזהרת ניטור. רץ ברקע, לא חוסם את התשובה.
   if ((durationBand === "half_day" || durationBand === "full_day") && finalStops.length > 0) {
-    const issues = await reviewItinerary({ stops: finalStops, tripIntent });
-    if (issues.length > 0) {
-      console.warn("[Quality Check] נמצאו בעיות איכות במסלול", {
-        sessionId,
-        issues,
+    reviewItinerary({ stops: finalStops, tripIntent })
+      .then((issues) => {
+        if (issues.length > 0) {
+          console.warn("[Quality Check] נמצאו בעיות איכות במסלול", {
+            sessionId,
+            issues,
+          });
+        }
+      })
+      .catch(() => {
+        // כלי ניטור פנימי בלבד - כשל כאן לא אמור להפריע לכלום
       });
-    }
   }
 
-  // תיאורים אישיים - Claude מייצר תיאור לכל תחנה על סמך ידע כללי + הבקשה של
-  // המשתמש, לא רק על סמך short_description שיכול להיות ריק/גנרי ב-DB.
-  // *** במסלולים גדולים (חופשה רב-ימית, 15+ תחנות) - מדלגים על הקריאה הזו
-  // לגמרי. היא קריאת AI *שלישית* ברצף (אחרי "כוונת הטיול" ובניית המסלול
-  // עצמה), ויכולה לקחת עד 20-40 שניות בטיול ארוך - וזו בדיוק הסיבה
-  // שהמסלול מסומן "מוכן" כל כך מאוחר. ה-reason שכבר נוצר בשלב הדירוג/בחירת
-  // התחנות (משפט שמסביר למה המקום מתאים) הוא כבר תיאור סביר - לא "ריק". ***
+  // תיאורים אישיים - Claude כותב תיאור *רק* לתחנות שבאמת אין להן תיאור
+  // אמיתי כבר (short_description ריק). קודם זה נקרא לכל התחנות ותמיד
+  // דרס את מה שהיה שם - כולל תיאורים מדויקים שאדמין כתב וניפה בעצמו.
+  // "השתמש בידע הכללי שלך, לא רק בתיאור מה-DB" גרם בפועל להמצאות: מקום
+  // שהאדמין תייג ותיאר במדויק כ"מסעדת אוכל רחוב/פלאפל" יצא בתוצאה עם
+  // תיאור שממציא "עגלת קפה" - עובדה שלא נתמכת בשום נתון אמיתי על המקום.
+  // אין שום סיבה שתיאור אמיתי וקיים "יתחרה" מול ניחוש כללי של Claude.
   const MAX_STOPS_FOR_AI_DESCRIPTIONS = 15;
-  if (finalStops.length > 0 && finalStops.length <= MAX_STOPS_FOR_AI_DESCRIPTIONS) {
-    const descriptions = await generatePersonalizedDescriptions(finalStops, freeText ?? "", tripIntent);
-    for (const stop of finalStops) {
+  const stopsNeedingDescription = finalStops.filter((s) => !s.shortDescription);
+  if (stopsNeedingDescription.length > 0 && stopsNeedingDescription.length <= MAX_STOPS_FOR_AI_DESCRIPTIONS) {
+    const descriptions = await generatePersonalizedDescriptions(stopsNeedingDescription, freeText ?? "", tripIntent);
+    for (const stop of stopsNeedingDescription) {
       const generated = descriptions.get(stop.stopId);
       if (generated) {
         stop.shortDescription = generated;
-      } else if (!stop.shortDescription && stop.reason) {
+      } else if (stop.reason) {
         // גיבוי: אם יצירת התיאור נכשלה/נקטעה לתחנה הזו ספציפית - עדיף
         // להציג את ה-reason (כבר קיים, נוצר בשלב הבחירה) מאשר תחנה בלי
         // שום תיאור בכלל.
         stop.shortDescription = stop.reason;
       }
     }
-  } else if (finalStops.length > MAX_STOPS_FOR_AI_DESCRIPTIONS) {
-    for (const stop of finalStops) {
-      if (!stop.shortDescription && stop.reason) {
+  } else if (stopsNeedingDescription.length > MAX_STOPS_FOR_AI_DESCRIPTIONS) {
+    for (const stop of stopsNeedingDescription) {
+      if (stop.reason) {
         stop.shortDescription = stop.reason;
       }
     }

@@ -40,6 +40,13 @@ interface Place {
   seasons: string[];
   suitable_child_ages: string[];
   budget_tier: string | null;
+  /** ר' ההערה המורחבת ב-aiPlaceInsertionService.ts (AI_TRIP_BUILDER_SOURCE) -
+   *  "ai_trip_builder" מסמן שורה שנוצרה אוטומטית מ-AI בבניית טיול, לא
+   *  תוכן שנבדק/נאצר ע"י אדמין - גם אם היא "אמיתית" (מאומתת מול Google
+   *  בזמן היצירה). מוצג כאן כדי שיהיה אפשר לזהות/לסנן חזותית, במיוחד
+   *  אחרי שהתגלה שכמה מקומות "מוזרים" באדמין הגיעו בדיוק מהמקור הזה. */
+  source: string | null;
+  created_at: string;
 }
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
@@ -439,6 +446,29 @@ export default function AdminPlacesPage() {
     { key: "category", header: "קטגוריה", sortValue: (p) => p.category, render: (p) => getCategoryLabel(p.category) },
     { key: "city", header: "עיר", sortValue: (p) => p.city ?? "", render: (p) => p.city ?? "—" },
     { key: "rating", header: "דירוג", sortValue: (p) => p.rating ?? 0, render: (p) => (p.rating ? `⭐ ${p.rating}` : "—"), align: "right" },
+    {
+      // עמודה חדשה: מזהה חזותית למקומות שנוצרו אוטומטית ע"י AI בבניית
+      // טיול (לא נבדקו/נאצרו ע"י אדמין) - ר' ההערה המורחבת ב-
+      // aiPlaceInsertionService.ts. חשוב במיוחד עכשיו: חיפוש "מהמאגר
+      // שלנו" בפועל (fetchCandidatePool) כבר מסנן את אלה החוצה - העמודה
+      // הזו רק כדי שגם באדמין אפשר יהיה *לראות* מי מהם, למקרה שרוצים
+      // בכל זאת לבדוק/למחוק ידנית.
+      key: "source",
+      header: "מקור",
+      sortValue: (p) => p.source ?? "",
+      render: (p) =>
+        p.source === "ai_trip_builder" ? (
+          <Badge tone="warning">נוצר ע"י AI (לא נבדק)</Badge>
+        ) : (
+          <span style={{ color: "var(--admin-ink-faint)" }}>{p.source ?? "—"}</span>
+        ),
+    },
+    {
+      key: "created_at",
+      header: "נוסף בתאריך",
+      sortValue: (p) => new Date(p.created_at).getTime(),
+      render: (p) => new Date(p.created_at).toLocaleDateString("he-IL"),
+    },
     {
       key: "tags",
       header: "תיוג",

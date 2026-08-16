@@ -8,6 +8,7 @@ import {
   kmToDegreesLng,
 } from "./geo";
 import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES } from "@/constants/placeCategories";
+import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 
 interface FetchCandidatePoolParams {
   category: string;
@@ -45,6 +46,7 @@ interface PlaceRow {
   suitable_child_ages: string[] | null;
   budget_tier: string | null;
   is_area_experience: boolean | null;
+  tags: string[] | null;
 }
 
 /**
@@ -86,21 +88,56 @@ async function queryPool(
 
   // הגנת רשת-ביטחון: לצד ההתאמה הראשית לפי trip_type_tags, מקבלים גם
   // מקום שתויג נכון ב"קטגוריה ראשית" (place.category, 5 הערכים שנבחרים
-  // באדמין) גם אם ה-trip_type_tags שלו ריק/לא מדויק. בלי זה, מקום אמיתי
-  // שנוסף ותויג רק בקטגוריה הראשית (למשל "מסעדות") נעלם בשקט מהחיפוש -
-  // בדיוק המצב שקרה בפועל. trip_type_tags נשאר מקור-האמת העיקרי (מדויק
-  // יותר, כי הוא מזהה ~20 תת-סוגים), הקטגוריה הראשית היא רק גיבוי גס.
+  // באדמין) גם אם ה-trip_type_tags שלו **ריק לגמרי** - בלי זה, מקום אמיתי
+  // שנוסף ותויג רק בקטגוריה הראשית (למשל "מסעדות") נעלם בשקט מהחיפוש.
+  //
+  // תיקון קריטי: בעבר הגיבוי הזה חל גם על מקומות עם trip_type_tags לא-ריק
+  // אבל *שונה* - למשל חוף ים שכן תויג במדויק trip_type_tags=["beaches_pools"]
+  // אבל category="nature" (קטגוריה ראשית רחבה). חיפוש ל"nature_trails"
+  // (מסלול טבע) היה "תופס" את החוף הזה כי category="nature" נמצא ברשימת
+  // הגיבוי ל-nature_trails - למרות שה-trip_type_tags המדויק שלו כבר אומר
+  // בבירור שהוא חוף, לא מסלול. זו הסיבה שחיפוש "מסלול טבע עם תצפית" החזיר
+  // חופים בפועל. עכשיו הגיבוי לפי קטגוריה ראשית חל **רק** על מקומות
+  // שה-trip_type_tags שלהם ריק לגמרי (לא תויגו כלל) - לא דורס תיוג מדויק
+  // וקיים שכבר אומר משהו אחר. trip_type_tags נשאר מקור-האמת העיקרי.
   const fallbackCategories = TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES[params.category] ?? [];
   const categoryFilter =
     fallbackCategories.length > 0
-      ? `trip_type_tags.ov.{${params.category}},category.in.(${fallbackCategories.join(",")})`
+      ? `trip_type_tags.ov.{${params.category}},and(category.in.(${fallbackCategories.join(",")}),trip_type_tags.eq.{})`
       : `trip_type_tags.ov.{${params.category}}`;
 
   let query = supabase
     .from("places")
     .select(
-      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
+      // "tags" נוסף כאן: השדה החופשי שבו נשמרים כל התיוגים העדינים
+      // שהאדמין קבע ידנית לכל מקום (PLACE_TYPE_TAGS/TRIPMATCH_TAGS/
+      // DNA_TAGS, ר' constants/placeTagOptions.ts) - למשל ההבדל בין
+      // "עגלת קפה" ל"בית קפה יושב", או סגנון מדויק של אטרקציה. עד עכשיו
+      // השדה הזה נשמר ב-DB אבל **מעולם לא נשלף כאן ולא הועבר לדירוג**
+      // (rankingService.ts) - כל התיוג העדין שהושקעה בו הלך לאיבוד
+      // בפועל; הדירוג הכיר רק category/trip_type_tags הגסים.
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience,tags"
     )
+    // קריטי: זה בדיוק החיפוש ש"מהמאגר שלנו" אמור להתכוון אליו - תוכן
+    // שאדמין בפועל אצר/בדק (כולל מה שהוגש דרך Discovery ואומת ידנית),
+    // לא כל שורה שיש לה מזהה בטבלת places. בלעדי הסינון הזה, מקום
+    // שנוצר פעם אחת ע"י AI (aiPlaceInsertionService.ts, למשל כשהמאגר
+    // באמת היה ריק) הופך אוטומטית ל"מהמאגר שלנו" בכל חיפוש עתידי - לולאה
+    // שבה AI "מזהם" את המאגר בשקט, ומחיקה ידנית באדמין לא תמיד מספיקה
+    // כי אין דרך להבדיל בעין בין תוכן אמיתי לתוכן שנוצר אוטומטית.
+    // *** התגלית האמיתית: מיגרציה 0032 (re_archive_everything.sql) סימנה
+    // בעבר is_legacy=true על **כל** שורה קיימת בטבלת places, בכוונה -
+    // כדי שעמוד האדמין /admin/places (שכברירת מחדל מציג רק is_legacy=false,
+    // ר' app/api/admin/places/route.ts) "יתחיל נקי" מהרגע ההוא. עמוד
+    // האדמין באמת מתנהג ככה - אבל fetchCandidatePool כאן **מעולם לא**
+    // כיבד את אותה חלוקה: הוא חיפש בין כל השורות בטבלה, כולל כל מה
+    // שסומן is_legacy=true והפך בלתי-נראה לגמרי באדמין. זו הייתה הסיבה
+    // האמיתית ש"המאגר שלנו" בבנייה בפועל החזיר מקומות (למשל "ראש
+    // ציפור") שהאדמין לא הצליח למצוא בחיפוש בעמוד שלו בכלל - הם באמת
+    // בטבלה, אבל מסומנים legacy ולכן מוסתרים שם. עכשיו שני המקומות
+    // מסתכלים בדיוק על אותה הגדרה של "המאגר שלנו". ***
+    .eq("is_legacy", false)
+    .neq("source", AI_TRIP_BUILDER_SOURCE)
     .or(categoryFilter)
     .gte("latitude", params.origin.lat - latDelta)
     .lte("latitude", params.origin.lat + latDelta)
@@ -167,9 +204,10 @@ async function queryPool(
         cuisineTags: row.cuisine_tags ?? [],
         kosher: row.kosher,
         accessible: row.accessible,
-suitableChildAges: row.suitable_child_ages ?? [],
+        suitableChildAges: row.suitable_child_ages ?? [],
         budgetTier: row.budget_tier,
         isAreaExperience: row.is_area_experience ?? false,
+        tags: row.tags ?? [],
       } satisfies CandidatePlace;
     })
     .filter((candidate) => candidate.distanceKm <= radiusKm)

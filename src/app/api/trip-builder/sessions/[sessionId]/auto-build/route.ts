@@ -24,6 +24,7 @@ import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import { saveTripIntent } from "@/services/tripBuilder/sessionService";
 import { normalizeAnswers, decideCategoryPlan } from "@/services/tripBuilder/categoryPlanService";
 import { saveCategoryPlan } from "@/services/tripBuilder/sessionService";
+import { saveFinalItinerary } from "@/services/tripBuilder/sessionService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { describeWeatherCode } from "@/utils/weatherCodes";
 import { generateDayTripPlaces } from "@/services/tripBuilder/dayTripAttractionListService";
@@ -85,16 +86,28 @@ export async function POST(
     const rules = getTripTypeRules(session.trip_type);
     const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
 
-    // "חיי לילה ובילויים", "דייט רומנטי" ו"טיול בטבע" (ובעתיד סוגי טיול
-    // נוספים שיאמצו את אותו דפוס): ה-POST שיצר את ה-session החזיר תשובה
-    // מיד בלי שום תחנות (כדי לא לחסום את הניווט למסך הטעינה בקריאת
-    // Claude) - אם עדיין אין תוכנית בכלל (stops ריק), בונים אותה כאן,
-    // אחרי שהמשתמש כבר במסך הטעינה. Claude עדיין רץ במלואו (לא מדלגים
-    // עליו) - רק לא לפני הניווט.
+    // "חיי לילה ובילויים", "דייט רומנטי", "טיול בטבע" ו"טיול יומי": ה-POST
+    // שיצר את ה-session החזיר תשובה מיד בלי שום תחנות (כדי לא לחסום את
+    // הניווט למסך הטעינה בקריאת Claude) - אם עדיין אין תוכנית בכלל (stops
+    // ריק), בונים אותה כאן, אחרי שהמשתמש כבר במסך הטעינה. Claude עדיין
+    // רץ במלואו (לא מדלגים עליו) - רק לא לפני הניווט.
+    //
+    // תיקון קריטי: קודם חשבתי (בטעות!) שטיול בטבע/יומי לא צריכים בכלל
+    // את ה-category_plan/stops - טעות. הענף הייעודי למטה
+    // (session.trip_type === "day_trip" || "nature_trip") כן משתמש
+    // ב-pendingStops בפועל - הוא ממיר כל "תחנה מתוכננת" (עם role/category/
+    // note) ל"סלוט" ששולח ל-Claude דרך generateDayTripPlaces({ slots: ... }).
+    // כשהסרתי את בניית התוכנית, pendingStops תמיד היה ריק - ולכן
+    // generateDayTripPlaces קיבל slots: [] וקיבל אין שום מקומות ליצור,
+    // מה שגרם ל"generateDayTripPlaces החזיר 0 מקומות" -> ולידציה נכשלת ->
+    // 500 -> ה-session נשאר תקוע לנצח ב-status="building". התוכנית כן
+    // חיונית לכל 4 סוגי הטיול האלה - רק **מתי** מחשבים אותה זה מה שהשתנה
+    // (בתוך auto-build, לא חוסם את ה-POST המקורי).
     if (
       (session.trip_type === "nightlife" ||
         session.trip_type === "romantic_date" ||
-        session.trip_type === "nature_trip") &&
+        session.trip_type === "nature_trip" ||
+        session.trip_type === "day_trip") &&
       stops.length === 0
     ) {
       try {
@@ -116,8 +129,26 @@ export async function POST(
           tripIntent,
         });
         stops = await saveCategoryPlan(supabase, sessionId, plan);
+        // נקודת אבחון קריטית: בלי הלוג הזה, אי אפשר להבדיל בין "התוכנית
+        // עצמה יצאה ריקה" (Claude/הפולבאק לא הצליחו לייצר אף תחנה מתוכננת)
+        // לבין "התוכנית תקינה אבל generateDayTripPlaces נכשל בשלב הבא" -
+        // שני תרחישים שונים לגמרי עם תיקונים שונים לגמרי.
+        console.error("[auto-build] תוכנית נבנתה", {
+          sessionId,
+          tripType: session.trip_type,
+          planLength: plan.length,
+          // מציג את הקטגוריה/role שנבחרו בפועל לכל תחנה מתוכננת - קריטי
+          // כדי להבדיל בין "התוכנית עצמה בחרה קטגוריה לא נכונה" (למשל
+          // "beaches_pools" כשהמשתמש ביקש "מסלול טבע") לבין "התוכנית
+          // תקינה אבל החיפוש/הדירוג בהמשך הביא תוצאה לא מתאימה מהקטגוריה
+          // הנכונה". בלי זה, כל "המסלול לא מתאים" נשאר ניחוש בין שתי
+          // סיבות שונות לגמרי עם תיקונים שונים לגמרי.
+          planCategories: plan.map((p) => ({ category: p.category, role: p.role, note: p.note ?? null })),
+          openAreaChoice: tripIntent?.openAreaChoice ?? null,
+          requestedArea: tripIntent?.requestedArea ?? null,
+        });
       } catch (err) {
-        console.error("[auto-build] בניית תוכנית נכשלה (חיי לילה/דייט רומנטי/טיול בטבע)", err);
+        console.error("[auto-build] בניית תוכנית נכשלה", { sessionId, tripType: session.trip_type, err });
       }
     }
 
@@ -477,21 +508,80 @@ export async function POST(
       if (answers.distanceBand) questionnaireSummaryParts.push(`מרחק מבוקש: ${answers.distanceBand}`);
       const questionnaireSummary = questionnaireSummaryParts.length ? questionnaireSummaryParts.join(". ") : null;
 
-      const resolvedPlaces = await generateDayTripPlaces({
-        areaLabel,
-        areaOrigin: searchOrigin,
-        maxDistanceKm,
-        targetDistanceKm,
-        slots: pendingStops.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role, note: stop.note })),
-        interestLabels,
-        freeText: answers.freeText,
-        budgetLabel: remainingBudgetLabel,
-        travelDnaSummary: dnaSummary,
-        hardDifficultyConstraint,
-        questionnaireSummary,
+      // תיקון לפי בקשה מפורשת: קודם מנסים למלא כל תחנה מהמאגר הפנימי
+      // (ADMIN PLACES) - בדיוק כמו שכבר נעשה למסעדות/חיי לילה/דייט רומנטי.
+      // Claude (generateDayTripPlaces) הוא **רק** גיבוי לתחנות שהמאגר לא
+      // הצליח למלא - לא הנתיב הראשי יותר. לפני התיקון הזה, טיול יומי/טבע
+      // דילגו על המאגר הפנימי לגמרי ותמיד השתמשו ב-AI, גם כשהיו מקומות
+      // מתאימים וממותגים אצלנו כבר.
+      let dbCursor = searchOrigin;
+      const remainingSlots: typeof pendingStops = [];
+      for (const stop of pendingStops) {
+        const pool = await fetchCandidatePool(supabase, {
+          category: stop.category,
+          origin: dbCursor,
+          distanceBand: answers.distanceBand,
+          maxDistanceKm,
+          maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+          excludePlaceIds,
+          requireKosher: dna?.kosher === true,
+          requireAccessible: dna?.accessibility === true,
+        });
+
+        if (pool.length === 0) {
+          remainingSlots.push(stop);
+          continue;
+        }
+
+        const ranked = await rankCandidates({
+          dna,
+          candidates: pool,
+          freeText: stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText,
+          remainingBudgetLabel,
+          rankingPromptRules: rules.rankingPromptRules,
+          attributeScoreMap,
+          learnedAttributes,
+          tripIntent,
+          questionnaireAnswers: undefined,
+        });
+
+        const top = ranked[0];
+        if (!top) {
+          remainingSlots.push(stop);
+          continue;
+        }
+
+        await likeStop(supabase, user.id, stop.id, top);
+        excludePlaceIds.push(top.id);
+        dbCursor = { lat: top.latitude, lng: top.longitude };
+      }
+
+      console.error("[auto-build] מילוי מהמאגר הפנימי לפני AI", {
+        sessionId,
+        tripType: session.trip_type,
+        totalSlots: pendingStops.length,
+        filledFromDb: pendingStops.length - remainingSlots.length,
+        remainingForAi: remainingSlots.length,
       });
 
-      if (resolvedPlaces.length === 0) {
+      const resolvedPlaces =
+        remainingSlots.length > 0
+          ? await generateDayTripPlaces({
+              areaLabel,
+              areaOrigin: searchOrigin,
+              maxDistanceKm,
+              targetDistanceKm,
+              slots: remainingSlots.map((stop) => ({ slotId: stop.id, category: stop.category, role: stop.role, note: stop.note })),
+              interestLabels,
+              freeText: answers.freeText,
+              budgetLabel: remainingBudgetLabel,
+              travelDnaSummary: dnaSummary,
+              hardDifficultyConstraint,
+              questionnaireSummary,
+            })
+          : [];
+
+      if (remainingSlots.length > 0 && resolvedPlaces.length === 0) {
         console.error("[auto-build] generateDayTripPlaces החזיר 0 מקומות", { sessionId, areaLabel, tripType: session.trip_type });
       }
 
@@ -733,6 +823,23 @@ export async function POST(
 
     return NextResponse.json({ itinerary });
   } catch (error) {
+    // רשת ביטחון קריטית: בלי זה, כל שגיאה כאן (כולל "המסלול שנבנה ריק" -
+    // 0 תחנות תקינות, למשל כשה-AI לא הצליח למצוא מקום מתאים אמיתי) הייתה
+    // משאירה את ה-session תקוע לנצח ב-status="building" - הלקוח ממשיך
+    // לבצע polling בלי סוף, בלי שום דרך לצאת מהמצב הזה. במקום זאת,
+    // מסמנים "completed" עם מסלול ריק - בדיוק המצב שהעמודים כבר יודעים
+    // להציג בצורה מכובדת ("לא נבחרו מספיק תחנות"), ולא מסך תקוע/שגיאה.
+    try {
+      await saveFinalItinerary(supabase, sessionId, { stops: [], events: [], totalEtaMinutes: 0, warnings: [] });
+    } catch {
+      // אם גם השמירה הזו נכשלת - אין מה לעשות מעבר לזה כאן, ה-error
+      // המקורי כבר מתועד למטה.
+    }
+    console.error("[auto-build] נכשל, ה-session סומן completed עם מסלול ריק כדי לא להישאר תקוע", {
+      sessionId,
+      tripType: session.trip_type,
+      error,
+    });
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";
     return NextResponse.json({ error: message }, { status: 500 });
   }

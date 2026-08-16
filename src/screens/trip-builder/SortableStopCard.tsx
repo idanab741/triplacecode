@@ -56,9 +56,9 @@ export function SortableStopCard({
   const [instructLoading, setInstructLoading] = useState(false);
   const [instructError, setInstructError] = useState<string | null>(null);
 
-  // מצב הסוויפ - "כמה נגרר כרגע ימינה" (0 עד +SWIPE_REVEAL_PX) ואם הפאנל
-  // פתוח (חשוף) כרגע. הפאנל בצד שמאל של הכרטיס, נחשף בגרירה ימינה - זו
-  // התנועה הטבעית ב-RTL (בניגוד ל-LTR שבו גוררים שמאלה).
+  // מצב הסוויפ - "כמה נגרר כרגע שמאלה" (0 עד +SWIPE_REVEAL_PX) ואם הפאנל
+  // פתוח (חשוף) כרגע. הפאנל בצד ימין של הכרטיס, נחשף בגרירה שמאלה - עקבי
+  // עם המחיקה בשאר העמודים באפליקציה (ר' SwipeToDeleteRow.tsx).
   const [swipeX, setSwipeX] = useState(0);
   const [swipeOpen, setSwipeOpen] = useState(false);
   const swipeStartX = useRef<number | null>(null);
@@ -97,7 +97,7 @@ export function SortableStopCard({
     // תנועה אנכית - משאירים לגלילה הרגילה של הדף, לא נוגעים בכלום
     if (swipeDirection.current !== "horizontal") return;
 
-    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current + deltaX));
+    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
     setSwipeX(next);
   }
 
@@ -173,13 +173,15 @@ export function SortableStopCard({
   };
 
   return (
-    <div ref={setNodeRef} style={dndStyle} className="relative overflow-hidden rounded-2xl">
-      {/* פאנל המחיקה - נחשף כשגוררים (סוויפ) את הכרטיס שמאלה, כמו בהודעות SMS.
-          מוצג ב-DOM **רק** כשבאמת יש סוויפ פעיל/פתוח - לא תמיד מתחת לכרטיס. */}
+    <div ref={setNodeRef} style={dndStyle} className="relative overflow-hidden rounded-card">
+      {/* פאנל המחיקה - נחשף כשגוררים (סוויפ) את הכרטיס שמאלה, בדיוק כמו
+          המחיקה בשאר העמודים באפליקציה (SwipeToDeleteRow.tsx) - בצד ימין
+          של הכרטיס. מוצג ב-DOM **רק** כשבאמת יש סוויפ פעיל/פתוח - לא תמיד
+          מתחת לכרטיס. */}
       {onDelete && (swipeX !== 0 || swipeOpen) && (
         <div
           className="absolute inset-y-0 flex items-stretch"
-          style={{ width: SWIPE_REVEAL_PX, left: 0 }}
+          style={{ width: SWIPE_REVEAL_PX, right: 0 }}
         >
           <button
             type="button"
@@ -196,29 +198,31 @@ export function SortableStopCard({
         </div>
       )}
 
-      {/* תוכן הכרטיס בפועל (הבלוק הלבן) - מקבל רק את הטרנספורם של הסוויפ
-          (translateX, לחשיפת פאנל המחיקה) - נפרד לגמרי מהטרנספורם של
-          dnd-kit שעל העטיפה החיצונית. */}
+      {/* תוכן הכרטיס בפועל - מקבל רק את הטרנספורם של הסוויפ (translateX
+          שלילי, לחשיפת פאנל המחיקה בצד ימין) - נפרד לגמרי מהטרנספורם של
+          dnd-kit שעל העטיפה החיצונית. עיצוב הרקע/הצבעים זהה לכרטיס
+          האטרקציה בעמוד "הטיולים שלי" (bg-bg-secondary/rounded-card),
+          לפי בקשה מפורשת - לא הלבן/צל הקודם. */}
       <div
-        style={{ transform: swipeX !== 0 ? `translateX(${swipeX}px)` : undefined, touchAction: "pan-y" }}
+        style={{ transform: swipeX !== 0 ? `translateX(${-swipeX}px)` : undefined, touchAction: "pan-y" }}
         onPointerDown={handleSwipePointerDown}
         onPointerMove={handleSwipePointerMove}
         onPointerUp={handleSwipePointerUp}
         onPointerCancel={handleSwipePointerUp}
-        className="relative overflow-hidden rounded-2xl bg-white shadow-soft"
+        className="relative overflow-hidden rounded-card bg-bg-secondary"
       >
         <div className="flex gap-3 p-3">
           {placeHref ? (
             <Link href={placeHref} className="flex min-w-0 flex-1 gap-3">
               {stop.imageUrls[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={stop.imageUrls[0]} alt={stop.name} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+                <img src={stop.imageUrls[0]} alt={stop.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
               ) : (
-                <div className="h-24 w-24 shrink-0 rounded-xl bg-bg-secondary" />
+                <div className="h-20 w-24 shrink-0 rounded-xl bg-bg-secondary" />
               )}
 
               <div className="flex min-w-0 flex-1 flex-col justify-center">
-                <p className="truncate text-[15px] font-semibold text-ink">{stop.name}</p>
+                <p className="truncate text-[15px] font-bold text-ink">{stop.name}</p>
 
                 {stop.shortDescription && (
                   <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">{stop.shortDescription}</p>
@@ -234,13 +238,13 @@ export function SortableStopCard({
             <>
               {stop.imageUrls[0] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={stop.imageUrls[0]} alt={stop.name} className="h-24 w-24 shrink-0 rounded-xl object-cover" />
+                <img src={stop.imageUrls[0]} alt={stop.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
               ) : (
-                <div className="h-24 w-24 shrink-0 rounded-xl bg-bg-secondary" />
+                <div className="h-20 w-24 shrink-0 rounded-xl bg-bg-secondary" />
               )}
 
               <div className="flex min-w-0 flex-1 flex-col justify-center">
-                <p className="truncate text-[15px] font-semibold text-ink">{stop.name}</p>
+                <p className="truncate text-[15px] font-bold text-ink">{stop.name}</p>
 
                 {stop.shortDescription && (
                   <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary">{stop.shortDescription}</p>
@@ -286,7 +290,7 @@ export function SortableStopCard({
         </div>
 
         {instructOpen && (
-          <div className="flex items-center gap-2 border-t border-ink-secondary/10 bg-bg-secondary/40 p-2.5">
+          <div className="flex items-center gap-2 border-t border-ink-secondary/10 bg-white/70 p-2.5">
             <button
               type="button"
               onClick={() => setInstructOpen(false)}
@@ -295,19 +299,11 @@ export function SortableStopCard({
             >
               ✕
             </button>
-            <button
-              type="button"
-              onClick={() => submitInstruction("תחליף את התחנה הזו במשהו אחר")}
-              disabled={instructLoading}
-              className="shrink-0 rounded-pill border border-accent/30 bg-white px-2.5 py-2 text-[11px] font-medium text-accent disabled:opacity-50 whitespace-nowrap"
-            >
-              🔄 {instructLoading ? "מחליף..." : "החלף"}
-            </button>
             <input
               type="text"
               value={instructText}
               onChange={(e) => setInstructText(e.target.value)}
-              placeholder='או כתבו בדיוק מה תרצו לשנות...'
+              placeholder="כתבו מה תרצו לשנות..."
               className="min-w-0 flex-1 rounded-pill border border-ink-secondary/20 bg-white px-3 py-2 text-xs text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
             />
             <button

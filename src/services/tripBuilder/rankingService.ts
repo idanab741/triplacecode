@@ -32,6 +32,22 @@ export async function rankCandidates(
     return [];
   }
 
+  // אופטימיזציה: כשיש מועמד יחיד, אין בכלל מה "לדרג" - קריאת Claude
+  // שלמה כדי לבחור בין אפשרות אחת לעצמה היא בזבוז זמן טהור (וזו בדיוק
+  // הסיבה לחלק ניכר מ"לוקח יותר מדי זמן" - בטיול יומי עם 3-4 תחנות,
+  // רוב הקטגוריות במאגר מחזירות בפועל התאמה יחידה או שתיים).
+  if (params.candidates.length === 1) {
+    const only = params.candidates[0];
+    return [
+      {
+        ...only,
+        score: 100,
+        reason: params.freeText ? `המקום היחיד שנמצא במאגר שמתאים ל"${params.freeText}"` : "המקום היחיד שנמצא במאגר בקטגוריה הזו",
+        source: "fallback" as const,
+      },
+    ];
+  }
+
   // לא מדרגים לפי מרחק אלא רק לפי דירוג מינימלי
   const reasonablyRated = params.candidates.filter(
     (candidate) => (candidate.rating ?? 3.5) >= 3.5
@@ -86,6 +102,11 @@ const candidatesPayload = params.candidates.map((candidate) => ({
     category: getCategoryLabel(candidate.category),
     subcategory_tags: candidate.tripTypeTags,
     cuisine_tags: candidate.cuisineTags,
+    // תיוגים עדינים שאדמין קבע ידנית לכל מקום (PLACE_TYPE_TAGS/
+    // TRIPMATCH_TAGS/DNA_TAGS) - למשל ההבדל בין "עגלת קפה" ל"בית קפה
+    // יושב", או סגנון מדויק של אטרקציה. עד עכשיו זה נשמר ב-DB אבל
+    // מעולם לא הגיע לפרומפט הזה - הדירוג "לא ידע" שהתיוג הזה קיים בכלל.
+    detailed_tags: (candidate.tags ?? []).length > 0 ? candidate.tags!.map(getCategoryLabel) : undefined,
     description: candidate.shortDescription,
     distance_km: Math.round(candidate.distanceKm * 10) / 10,
     price_level: candidate.priceLevel,
@@ -103,6 +124,13 @@ const prompt = `${params.rankingPromptRules}
 שתויגו מראש, לא ניחוש. תמיד תבדוק אותם לפני שאתה קובע התאמה. אם ה-subcategory_tags של
 מקום כן תואמים את מה שהמשתמש ביקש (למשל "נגישות לעגלה" כשהמשתמש ביקש עגלה, או תג שמרמז
 על טבע/נוף) - ציין את זה במפורש ב-reason, זה הבסיס האמין ביותר להתאמה.
+
+בנוסף, חלק מהמועמדים כוללים detailed_tags - תיוג עדין ומדויק במיוחד שאדמין קבע ידנית
+לכל מקום (למשל ההבדל בין "עגלת קפה" ל"בית קפה יושב", או סגנון מדויק של אטרקציה/מסלול).
+כשקיים - זה המקור **המדויק ביותר** לזיהוי סוג המקום בפועל, מדויק יותר מ-category/
+subcategory_tags הכלליים. אם המלל החופשי ביקש משהו ספציפי (למשל "עגלת קפה", לא בית קפה
+כללי) - חפש קודם כל התאמה ב-detailed_tags, לא רק ב-category הגס. מועמד עם detailed_tags
+שתואמים במדויק עדיף על מועמד "כללי" מאותה קטגוריה, גם אם דירוג הכוכבים שלו נמוך יותר.
 
 אם לתחנה מסוימת חסר תיאור (description=null) וגם אין לה subcategory_tags רלוונטיים -
 אסור לך לטעון "התאמה מדויקת" או "תואם בדיוק". במקרה כזה נסח את ה-reason בזהירות ("יתכן ש...",

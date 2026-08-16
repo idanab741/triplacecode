@@ -101,18 +101,22 @@ export async function POST(request: Request) {
     // decideCategoryPlan (כולל תוכנית + trip intent) רץ בתוך auto-build
     // עצמו, אחרי שהמשתמש כבר במסך הטעינה, ולא לפני. כך גם המהירות
     // משתפרת משמעותית וגם הדיוק (Claude) נשאר מלא בעינו.
-    if (tripType === "nightlife" || tripType === "romantic_date") {
-      return NextResponse.json({
-        session: { ...session, category_plan: [], status: "building", trip_intent: null },
-        stops: [],
-      });
-    }
-
-    // "טיול בטבע": אותה סיבה בדיוק כמו חיי לילה/דייט רומנטי - התוכנית
-    // תלויה בסוגי הטבע שנבחרו ורמת הקושי, Claude נחוץ לדיוק. אותו פתרון:
-    // מחזירים session מיד בלי תחנות, ובונים את התוכנית בפועל בתוך
-    // auto-build אחרי שהמשתמש כבר במסך הטעינה (שכבר קיים ותקין כאן).
-    if (tripType === "nature_trip") {
+    // "חיי לילה ובילויים", "דייט רומנטי", "טיול בטבע" ו"טיול יומי": כאן
+    // התוכנית תלויה בבחירות המשתמש (בר/מועדון/הופעה, עם מי הדייט, סוגי
+    // טבע/עניין וכו') ובמלל החופשי - Claude נחוץ לדיוק, ובנוסף (לטיול
+    // בטבע/יומי במיוחד) הענף הייעודי ב-auto-build ממש **תלוי** בתוכנית
+    // הזו (ר' ההערה המורחבת שם) - היא לא אופציונלית. הפתרון: לא מוותרים
+    // על Claude בכלל, רק לא **חוסמים** את הניווט למסך הטעינה בשבילו.
+    // מחזירים תשובה מיד עם session בלי שום תחנות - decideCategoryPlan
+    // (כולל תוכנית + trip intent) רץ בתוך auto-build עצמו, אחרי שהמשתמש
+    // כבר במסך הטעינה, ולא לפני. כך גם המהירות משתפרת משמעותית וגם
+    // הדיוק (Claude) נשאר מלא בעינו.
+    if (
+      tripType === "nightlife" ||
+      tripType === "romantic_date" ||
+      tripType === "nature_trip" ||
+      tripType === "day_trip"
+    ) {
       return NextResponse.json({
         session: { ...session, category_plan: [], status: "building", trip_intent: null },
         stops: [],

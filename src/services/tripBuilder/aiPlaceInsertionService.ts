@@ -2,6 +2,13 @@ import type { CandidatePlace } from "./types";
 import { createAdminClient } from "@/services/supabase/admin";
 import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES, isValidPlaceCategory } from "@/constants/placeCategories";
 
+/** ערך ה-source (עמודה קיימת בטבלת places, ברירת מחדל "google_places")
+ *  שמסמן במפורש "נוצר אוטומטית ע"י AI בבניית טיול, לא נבדק/נאצר ע"י
+ *  אדמין" - כדי שאפשר יהיה לסנן/לזהות את זה בנפרד. משותף בין
+ *  aiPlaceInsertionService.ts (שכותב אותו) ל-candidatePoolService.ts
+ *  (שמסנן אותו החוצה כשמחפשים "מהמאגר שלנו"). */
+export const AI_TRIP_BUILDER_SOURCE = "ai_trip_builder";
+
 /**
  * הופך המלצת AI (עם ID זמני "ai-...") למקום אמיתי בטבלת places, ומחזיר
  * את המועמד עם ה-ID האמיתי מה-DB. נדרש כי finalizeItinerary עושה JOIN
@@ -60,6 +67,16 @@ export async function ensurePlaceExists(
       suitable_child_ages: candidate.suitableChildAges,
       budget_tier: candidate.budgetTier,
       is_area_experience: candidate.isAreaExperience,
+      // קריטי: מסמן את השורה כ"נוצרה אוטומטית ע"י AI בבניית טיול", לא
+      // כתוכן מאומת/נבדק ע"י אדמין - גם אם היא "אמיתית" (מאומתת מול
+      // Google Places בזמן היצירה). בלי הסימון הזה, בפעם הבאה שמישהו
+      // מחפש "מהמאגר שלנו" (fetchCandidatePool, ר' candidatePoolService.ts)
+      // השורה הזו הייתה חוזרת כאילו היא תוכן אדמין לגיטימי - יוצר לולאה:
+      // AI יוצר מקום גרוע פעם אחת -> הוא נכנס ל-DB -> מהרגע הזה הוא
+      // "המאגר שלנו" גם בבדיקות הבאות, גם אחרי שהאדמין חושב שהוא מחק
+      // הכול (כי חיפוש רגיל באדמין לא מסנן/מדגיש לפי המקור). ר' השימוש
+      // ב-.neq("source", AI_TRIP_BUILDER_SOURCE) ב-candidatePoolService.ts.
+      source: AI_TRIP_BUILDER_SOURCE,
     })
     .select("id")
     .single();
