@@ -14,12 +14,13 @@ interface SortableStopCardProps {
   onItineraryUpdate: (itinerary: FinalItinerary) => void;
   /** אם לא מוגדר (undefined) - הכרטיס לא ניתן למחיקה בסוויפ (למשל תחנות
    *  סינתטיות כמו נחיתה/מלון, שאין להן שורה אמיתית למחוק, או מסלול עם
-   *  2 תחנות או פחות - ר' הערה ב-draggable למטה). */
+   *  תחנה בודדת - ר' הערה ב-draggable למטה). */
   onDelete?: () => void;
   /** ברירת מחדל true. false מסתיר לגמרי את ידית הגרירה (⠿) - משמש
-   *  למסלולים עם 2 תחנות או פחות, שם לגרירה/סידור מחדש אין משמעות
-   *  אמיתית (אין לאן לסדר מחדש). "שינוי עם TRIPPY" תמיד נשאר זמין בלי
-   *  קשר לזה - זו נקודת הכניסה לעריכה בכל מקרה, לא רק סידור/מחיקה. */
+   *  למסלולים עם תחנה בודדת, שם לגרירה/סידור מחדש אין משמעות אמיתית
+   *  (אין לאן לסדר מחדש). גרירה+מחיקה זמינות החל מ-2 תחנות ומעלה, לפי
+   *  בקשה מפורשת. "שינוי עם TRIPPY" תמיד נשאר זמין בלי קשר לזה - זו
+   *  נקודת הכניסה לעריכה בכל מקרה, לא רק סידור/מחיקה. */
   draggable?: boolean;
   /** אם סופק - כל אזור התמונה+טקסט (לא ידית הגרירה/כפתור TRIPPY) הופך
    *  לקישור לעמוד האטרקציה המלא (/place/[id]). אופציונלי כדי לא לשבור
@@ -28,6 +29,9 @@ interface SortableStopCardProps {
 }
 
 const SWIPE_REVEAL_PX = 84;
+// פס אדום קבוע ותמיד גלוי בקצה, גם במנוחה - עקבי עם שאר הכרטיסים
+// באפליקציה (עמוד "הטיולים שלי", עמודי tripmatch) - עובי 3px בכולם.
+const REST_PEEK_PX = 3;
 
 function priceLevelSymbols(level: number | null): string | null {
   if (level == null) return null;
@@ -59,7 +63,7 @@ export function SortableStopCard({
   // מצב הסוויפ - "כמה נגרר כרגע שמאלה" (0 עד +SWIPE_REVEAL_PX) ואם הפאנל
   // פתוח (חשוף) כרגע. הפאנל בצד ימין של הכרטיס, נחשף בגרירה שמאלה - עקבי
   // עם המחיקה בשאר העמודים באפליקציה (ר' SwipeToDeleteRow.tsx).
-  const [swipeX, setSwipeX] = useState(0);
+  const [swipeX, setSwipeX] = useState(onDelete ? REST_PEEK_PX : 0);
   const [swipeOpen, setSwipeOpen] = useState(false);
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
@@ -74,7 +78,7 @@ export function SortableStopCard({
     if ((e.target as HTMLElement).closest("[data-no-swipe]")) return;
     swipeStartX.current = e.clientX;
     swipeStartY.current = e.clientY;
-    swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : 0;
+    swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX;
     swipeDirection.current = null;
     // בכוונה **לא** לוכדים את הסמן (setPointerCapture) כאן עדיין - רק ברגע
     // שמזהים תנועה אופקית ברורה. תפיסה מוקדמת מדי היא מה שחסם את הגלילה.
@@ -97,7 +101,7 @@ export function SortableStopCard({
     // תנועה אנכית - משאירים לגלילה הרגילה של הדף, לא נוגעים בכלום
     if (swipeDirection.current !== "horizontal") return;
 
-    const next = Math.max(0, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
+    const next = Math.max(REST_PEEK_PX, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
     setSwipeX(next);
   }
 
@@ -113,12 +117,12 @@ export function SortableStopCard({
     // באמצע, בדיוק כמו הודעות SMS
     const shouldOpen = swipeX > SWIPE_REVEAL_PX / 2;
     setSwipeOpen(shouldOpen);
-    setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : 0);
+    setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX);
   }
 
   function handleConfirmDelete() {
     setSwipeOpen(false);
-    setSwipeX(0);
+    setSwipeX(REST_PEEK_PX);
     onDelete?.();
   }
 
@@ -129,9 +133,9 @@ export function SortableStopCard({
       swipeStartX.current = null;
       swipeStartY.current = null;
       swipeDirection.current = null;
-      setSwipeX(0);
+      setSwipeX(onDelete ? REST_PEEK_PX : 0);
     }
-  }, [isAnyDragActive, swipeOpen]);
+  }, [isAnyDragActive, swipeOpen, onDelete]);
 
   async function submitInstruction(text: string) {
     if (!sessionId || !text.trim() || instructLoading) return;
@@ -176,9 +180,10 @@ export function SortableStopCard({
     <div ref={setNodeRef} style={dndStyle} className="relative overflow-hidden rounded-card">
       {/* פאנל המחיקה - נחשף כשגוררים (סוויפ) את הכרטיס שמאלה, בדיוק כמו
           המחיקה בשאר העמודים באפליקציה (SwipeToDeleteRow.tsx) - בצד ימין
-          של הכרטיס. מוצג ב-DOM **רק** כשבאמת יש סוויפ פעיל/פתוח - לא תמיד
-          מתחת לכרטיס. */}
-      {onDelete && (swipeX !== 0 || swipeOpen) && (
+          של הכרטיס. מוצג תמיד כש-onDelete קיים (לא רק תוך כדי סוויפ) -
+          כדי שפס ה"הצצה" הקבוע (REST_PEEK_PX) יהיה גלוי גם במנוחה, לא
+          רק כשגוררים בפועל. */}
+      {onDelete && (
         <div
           className="absolute inset-y-0 flex items-stretch"
           style={{ width: SWIPE_REVEAL_PX, right: 0 }}

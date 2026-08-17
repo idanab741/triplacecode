@@ -9,11 +9,10 @@ interface SwipeToDeleteRowProps {
 }
 
 const SWIPE_REVEAL_PX = 76;
-// *** פס אדום קבוע וברור בקצה (לא רק חשיפה מלאה תוך כדי גרירה) - כדי
-// שברור מיד, בלי צורך לגרור בכלל, שיש כאן פעולת מחיקה. לפני זה זה היה
-// לגמרי מוסתר במנוחה (swipeX=0), וכל מה שנראה היה "פס דק בטעות" (עיגול
-// פינות/עיגול סאב-פיקסל) - לא עיצוב מכוון. עכשיו זה עבה ומכוון.
-const REST_PEEK_PX = 6;
+// פס אדום קבוע ותמיד גלוי בקצה, גם במנוחה - לפי בקשה מפורשת, אחיד בכל
+// מקום באפליקציה בעובי 3px (היה 6px, הצטמצם כדי להיות עקבי עם שאר
+// הכרטיסים - עמודי המסלול, "הטיולים שלי", tripmatch - כולם באותו עובי).
+const REST_PEEK_PX = 3;
 
 export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDeleteRowProps) {
   const [swipeX, setSwipeX] = useState(REST_PEEK_PX);

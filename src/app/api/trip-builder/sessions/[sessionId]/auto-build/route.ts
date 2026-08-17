@@ -310,18 +310,6 @@ export async function POST(
       }
       const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
 
-      const stopsByDay = new Map<number, TripBuilderStop[]>();
-      for (const stop of pendingStops) {
-        const day = stop.day_index ?? 1;
-        if (!stopsByDay.has(day)) stopsByDay.set(day, []);
-        stopsByDay.get(day)!.push(stop);
-      }
-
-      const daySpecs: VacationDaySpec[] = Array.from(stopsByDay.entries()).map(([day, dayStops]) => {
-        const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
-        return { day, totalFood, totalAttractions: dayStops.length - totalFood };
-      });
-
       // רדיוס תקין סביב מרכז היעד: אם המשתמש/AI כבר קבע רדיוס אזור מפורש
       // (requestedAreaRadiusKm) - נותנים מרווח פי 2 ממנו (יעד יכול להתפרס
       // מעבר למרכז המדויק); אחרת ברירת מחדל של עיר גדולה + פרברים.
@@ -332,6 +320,79 @@ export async function POST(
         : session.trip_type === "weekend"
           ? distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
           : 60;
+
+      // תיקון לפי בקשה מפורשת: קודם מנסים למלא כל תחנה מהמאגר הפנימי
+      // (ADMIN PLACES) - בדיוק כמו שכבר נעשה לטיול יומי/טבע/מסעדות/חיי
+      // לילה/דייט רומנטי. יש גם תוכן מחו"ל במאגר (לא רק ישראל), אז זה
+      // רלוונטי גם לחופשה בחו"ל, לא רק לסופ"ש. Claude (generateVacationItinerary)
+      // הוא **רק** גיבוי לתחנות שהמאגר לא הצליח למלא - לא הנתיב הראשי יותר.
+      // בניגוד לטיול יומי (שם לכל סלוט יש origin/cursor זז) - כאן כל התחנות
+      // (בכל הימים) מחפשות סביב אותה נקודת מוצא אחת (מרכז היעד, searchOrigin) -
+      // תואם בדיוק למה ש-generateVacationItinerary כבר עושה (destinationOrigin
+      // יחיד לכל הימים), לא רדיוס נודד בין תחנות כמו בטיול יומי.
+      const excludePlaceIdsForVacation = [...excludePlaceIds];
+      const remainingStops: TripBuilderStop[] = [];
+      for (const stop of pendingStops) {
+        const pool = await fetchCandidatePool(supabase, {
+          category: stop.category,
+          origin: searchOrigin,
+          distanceBand: "5h", // לא בשימוש בפועל - maxDistanceKm המפורש למטה גובר תמיד
+          maxDistanceKm: destinationMaxDistanceKm,
+          maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+          excludePlaceIds: excludePlaceIdsForVacation,
+          requireKosher: dna?.kosher === true,
+          requireAccessible: dna?.accessibility === true,
+        });
+
+        if (pool.length === 0) {
+          remainingStops.push(stop);
+          continue;
+        }
+
+        const ranked = await rankCandidates({
+          dna,
+          candidates: pool,
+          freeText: stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText,
+          remainingBudgetLabel,
+          rankingPromptRules: rules.rankingPromptRules,
+          attributeScoreMap,
+          learnedAttributes,
+          tripIntent,
+          questionnaireAnswers: undefined,
+        });
+
+        const top = ranked[0];
+        if (!top) {
+          remainingStops.push(stop);
+          continue;
+        }
+
+        await likeStop(supabase, user.id, stop.id, top);
+        excludePlaceIdsForVacation.push(top.id);
+      }
+
+      console.error("[auto-build] מילוי מהמאגר הפנימי לפני AI (חופשה/סופ\"ש)", {
+        sessionId,
+        tripType: session.trip_type,
+        totalSlots: pendingStops.length,
+        filledFromDb: pendingStops.length - remainingStops.length,
+        remainingForAi: remainingStops.length,
+      });
+
+      // מכאן והלאה - כל ה"תחנות" (stopsByDay/daySpecs) הן רק מה שנשאר,
+      // כלומר מה שהמאגר לא הצליח למלא. אם הכול התמלא מהמאגר - remainingStops
+      // ריק, ו-generateVacationItinerary פשוט לא ייקרא בכלל (allSuggestions=[]).
+      const remainingStopsByDay = new Map<number, TripBuilderStop[]>();
+      for (const stop of remainingStops) {
+        const day = stop.day_index ?? 1;
+        if (!remainingStopsByDay.has(day)) remainingStopsByDay.set(day, []);
+        remainingStopsByDay.get(day)!.push(stop);
+      }
+
+      const daySpecs: VacationDaySpec[] = Array.from(remainingStopsByDay.entries()).map(([day, dayStops]) => {
+        const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
+        return { day, totalFood, totalAttractions: dayStops.length - totalFood };
+      });
 
       // "כוונת הטיול" (tripIntent) - אם עדיין לא חושבה ב-session creation (הנתיב
       // המהיר של "חופשה בחו\"ל" מדלג עליה שם בכוונה) - מחשבים אותה *במקביל*
@@ -356,16 +417,18 @@ export async function POST(
           })();
 
       const [allSuggestions, computedTripIntent] = await Promise.all([
-        generateVacationItinerary({
-          destination: destinationName,
-          destinationOrigin: searchOrigin,
-          maxDistanceKm: destinationMaxDistanceKm,
-          days: daySpecs,
-          vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
-          freeText: answers.freeText,
-          budgetLabel: remainingBudgetLabel,
-          travelDnaSummary: dnaSummary,
-        }),
+        daySpecs.length > 0
+          ? generateVacationItinerary({
+              destination: destinationName,
+              destinationOrigin: searchOrigin,
+              maxDistanceKm: destinationMaxDistanceKm,
+              days: daySpecs,
+              vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
+              freeText: answers.freeText,
+              budgetLabel: remainingBudgetLabel,
+              travelDnaSummary: dnaSummary,
+            })
+          : Promise.resolve([]),
         tripIntentPromise,
       ]);
       tripIntent = computedTripIntent;
@@ -399,7 +462,7 @@ export async function POST(
       // תלוי בסדר (usedSuggestionIds/leftover pool) ולא ניתן להריץ במקביל.
       const assignments: { stopId: string; suggestion: (typeof allSuggestions)[number] }[] = [];
 
-      for (const [day, dayStops] of stopsByDay.entries()) {
+      for (const [day, dayStops] of remainingStopsByDay.entries()) {
         const daySuggestions = allSuggestions.filter((s) => s.day === day);
         const foodSuggestions = daySuggestions.filter((s) => s.role === "food" || s.role === "coffee_dessert");
         const attractionSuggestions = daySuggestions.filter((s) => s.role === "attraction");

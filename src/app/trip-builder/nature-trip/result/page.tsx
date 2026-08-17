@@ -295,8 +295,8 @@ function NatureTripResultContent() {
                     stop={stop}
                     sessionId={sessionId}
                     onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                    draggable={itinerary.stops.length > 2}
-                    onDelete={itinerary.stops.length > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                    draggable={itinerary.stops.length >= 2}
+                    onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
                     placeHref={`/place/${stop.placeId}?from=ai`}
                   />
                 </div>

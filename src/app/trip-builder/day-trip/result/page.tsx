@@ -317,8 +317,8 @@ function DayTripResultContent() {
                     // במסלול עם תחנה אחת/שתיים אין משמעות אמיתית (אין
                     // לאן לסדר מחדש, ומחיקה עלולה להשאיר מסלול ריק).
                     // "שינוי עם TRIPPY" נשאר תמיד זמין - זו לא ר' לגרירה.
-                    draggable={itinerary.stops.length > 2}
-                    onDelete={itinerary.stops.length > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                    draggable={itinerary.stops.length >= 2}
+                    onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
                     placeHref={`/place/${stop.placeId}?from=ai`}
                   />
                 </div>

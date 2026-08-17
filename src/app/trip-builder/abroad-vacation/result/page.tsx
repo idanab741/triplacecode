@@ -619,8 +619,8 @@ function AbroadVacationResultContent() {
                           stop={stop}
                           sessionId={sessionId}
                           onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                          draggable={totalRealStopsCount > 2}
-                          onDelete={totalRealStopsCount > 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                          draggable={totalRealStopsCount >= 2}
+                          onDelete={totalRealStopsCount >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
                           placeHref={`/place/${stop.placeId}?from=ai`}
                         />
                       </div>
