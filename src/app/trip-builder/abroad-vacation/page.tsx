@@ -306,6 +306,23 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
+  // בקשה מפורשת ("אני רוצה שיופיע כבר עם כל ההעדפות של המשתמש שמסומנות") -
+  // כשמגיעים לשלב "מה אתם אוהבים לעשות" - ממלאים מראש מה-Travel DNA
+  // הקיים, כברירת מחדל "לחוצה" בלבד - עדיין ניתן לשינוי חופשי מיד. לא
+  // דורס בחירה שהמשתמש כבר עשה בעצמו (tempTypes לא ריק).
+  useEffect(() => {
+    if (stage !== "vacationTypes" || tempTypes.length > 0) return;
+    fetch("/api/trip-builder/vacation-type-defaults")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.vacationTypes) && data.vacationTypes.length > 0) {
+          setTempTypes((current) => (current.length === 0 ? data.vacationTypes : current));
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
   const multiDestDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   function updateDestinationAt(index: number, value: string) {
@@ -406,6 +423,19 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
         const next = { ...current, destination: null, destinations: extracted.destinations, surpriseMe: false };
         setForm(next);
         addUser(extracted.destinations.join("، "), "destination");
+        advance("companions", next);
+        return;
+      }
+      // בקשה מפורשת ("במידה ולא כתוב - יש להחשיב ישר כתפתיעו אותי"):
+      // אם המלל החופשי כן פורש (extracted קיים) אבל לא הזכיר יעד ספציפי
+      // בכלל - לא שואלים שוב, ממשיכים ישר עם "תפתיעו אותי" בדיוק כמו
+      // ב"אמשיך לבד" (confirmFreeIntentAlone). רק ליעד יחיד - אם travelStyle
+      // הוא multi_destination בלי יעדים שחולצו, עדיין שואלים (אין "תפתיעו
+      // אותי" מרובה-יעדים מוגדר כאן).
+      if (current.travelStyle === "single_destination") {
+        const next = { ...current, destination: null, destinations: [], surpriseMe: true };
+        setForm(next);
+        addUser("תפתיעו אותי 🎁", "destination");
         advance("companions", next);
         return;
       }

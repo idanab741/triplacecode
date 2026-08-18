@@ -104,14 +104,25 @@ ${candidateList}
 }`;
 }
 
-/** מוודא שיעד מוצע תואם *בדיוק* יעד קיים ברשימת ה-admin - אותה הגנה כמו pickSurpriseDestination. */
+/**
+ * מוודא שיעד מוצע תואם *בדיוק* יעד קיים ברשימת ה-admin - אותה הגנה כמו
+ * pickSurpriseDestination.
+ *
+ * תיקון באג אמיתי (בקשה מפורשת - "למה זה לא מזהה את היעד, כתבתי אתונה
+ * במפורש!"): הפרומפט מציג לClaude את הרשימה בפורמט "עיר, מדינה" (ר'
+ * candidateList למעלה) ומבקש ממנו להעתיק בדיוק את אותו פורמט - אבל
+ * הפונקציה הזו השוותה מול c.name **בלבד** (בלי המדינה). "אתונה, יוון"
+ * (בדיוק מה שClaude התבקש להחזיר) לעולם לא היה שווה ל-"אתונה" (c.name
+ * לבדו) - אז יעד שחולץ נכון לגמרי נדחה תמיד כ"לא ברשימה". עכשיו משווים
+ * מול אותו פורמט משולב בדיוק שהוצג לClaude.
+ */
 function validateDestinationName(name: unknown, candidates: DestinationCandidate[]): string | null {
   if (typeof name !== "string" || !name.trim()) return null;
   const normalized = name.trim().toLowerCase();
-  const match = candidates.find((c) => c.name.trim().toLowerCase() === normalized);
+  const match = candidates.find((c) => `${c.name}, ${c.country}`.trim().toLowerCase() === normalized);
   // מחזירים את השם *כפי שהוא שמור אצלנו* (לא כפי שקלוד כתב אותו) - כדי
   // שהתאמות מאוחרות יותר בקוד (autocomplete, geocoding) יעבדו על ערך עקבי.
-  return match ? match.name : null;
+  return match ? `${match.name}, ${match.country}` : null;
 }
 
 /**
