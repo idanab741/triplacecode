@@ -16,6 +16,7 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -202,22 +203,21 @@ function DayTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // בקשה מפורשת ("שוב החזיר את המשחק!") - טיול יומי לא אמור להראות
-      // מסך משחק מלא בכלל, בדיוק כמו חופשה בחו"ל. זו רשת ביטחון בלבד -
-      // ורק אם עדיין אין שום תוכן מוכן להציג (בקשה מפורשת - תוכן קיים
-      // תמיד מוצג מיד, בלי קשר ל-status). התשאול (polling, כל 2.5
-      // שניות, כבר קיים למעלה) ימשיך וידליק את התוצאה האמיתית ברגע
-      // שהיא מוכנה, בלי שהמשתמש יצטרך לעשות כלום.
+      // בקשה מפורשת - אותו סגנון טעינה בדיוק כמו בכל שאר סוגי הטיולים
+      // (חופשה בחו"ל, סופ"ש, דייט רומנטי, חיי לילה) - מסך LoadingGame עם
+      // המשחק והשלבים המתחלפים, לא ספינר גנרי שלא קשור לשום מסך אחר
+      // באפליקציה. התשאול (polling, כל 2.5 שניות, כבר קיים למעלה) ימשיך
+      // וידליק את התוצאה האמיתית ברגע שהיא מוכנה, בלי שהמשתמש יצטרך
+      // לעשות כלום.
       return (
-        <Screen>
-          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="relative h-16 w-16">
-              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
-            </div>
-            <p className="text-base font-semibold text-ink">רגע, עוד רגע והטיול מוכן...</p>
-            <p className="text-sm text-ink-secondary">זה לוקח קצת יותר זמן מהרגיל - כבר כמעט שם</p>
-          </div>
-        </Screen>
+        <LoadingGame
+          statusText="רגע, עוד רגע והטיול מוכן..."
+          steps={[
+            "📍 מוצאים את התחנות הכי מתאימות בשבילכם",
+            "☕ מתאימים הפסקת קפה או אוכל בדרך",
+            "🗺️ מסדרים את המסלול בסדר הכי נוח",
+          ]}
+        />
       );
     }
     return (

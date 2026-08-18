@@ -862,7 +862,7 @@ return m.role === "assistant" ? (
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
           <div className="flex flex-col gap-2">
-            <p className="text-center text-sm text-ink-secondary">רגע, בונים לכם את הטיול...</p>
+            <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>
             {pendingSessionId && (
               <RuntrippyPromptBubble
                 onClick={() => {

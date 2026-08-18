@@ -148,26 +148,40 @@ if (tripType === "nightlife") {
   return answers as DayTripAnswers;
 }
 
-/** לכל durationBand בטיול יומי - טווח מותר של תחנות attraction (כלל ברזל,
- *  לא הצעה): 1-2 שעות = בדיוק 1, חצי יום = 2-3, יום שלם = 3-4. אוכף
- *  מקסימום קשיח בקוד; אם Claude הציע פחות מהמינימום זה נשאר כפי שהוא
- *  (עדיף פחות תחנות איכותיות מלמלא בכוח תחנה לא מתאימה). */
-const DAY_TRIP_ATTRACTION_MAX: Record<string, number> = {
-  "1-2h": 1,
-  half_day: 3,
-  full_day: 4,
-};
+/**
+ * סופרת כמה פעמים כל role מופיע במערך התפקידים של durationRules - אלה
+ * המספרים ה"רשמיים" של הטיול (למשל 1-2 שעות בטיול יומי = בדיוק attraction
+ * אחת + coffee_dessert אחד, לא שתיים). משמשות כתקרה קשיחה על תוכנית ה-AI.
+ */
+function roleCountsFromDurationRoles(roles: StopRole[]): Partial<Record<StopRole, number>> {
+  const counts: Partial<Record<StopRole, number>> = {};
+  for (const role of roles) {
+    counts[role] = (counts[role] ?? 0) + 1;
+  }
+  return counts;
+}
 
-/** טיול בטבע - פחות אטרקציות מטיול יומי רגיל (מסלולי הליכה לוקחים יותר
- *  זמן לכל אחד) - אותם מספרים כבר משמשים כברירת המחדל הדטרמיניסטית
- *  (NATURE_TRIP_DURATION_RULES), עכשיו גם כתקרה קשיחה כשClaude בונה את
- *  התוכנית. */
-const NATURE_TRIP_ATTRACTION_MAX: Record<string, number> = {
-  "1-2h": 1,
-  half_day: 2,
-  full_day: 3,
-  custom: 2,
-};
+/**
+ * אוכפת בקוד (לא רק בפרומפט) שתוכנית ה-AI לא תחרוג ממספר התחנות המותר לכל
+ * role, לפי durationBand הנוכחי - אחרת Claude יכול "לסטות" ולהחזיר, למשל,
+ * שתי תחנות coffee_dessert (שתי עגלות קפה) במקום attraction אחת + קפה אחד.
+ * אם Claude הציע פחות מהמותר זה נשאר כפי שהוא (עדיף פחות תחנות איכותיות
+ * מלמלא בכוח תחנה לא מתאימה).
+ */
+function capPlanByDurationRules(
+  plan: CategoryPlanItem[],
+  durationRules: Record<string, { roles: StopRole[] }>,
+  durationBand: string
+): CategoryPlanItem[] {
+  const durationRoles = durationRules[durationBand]?.roles ?? durationRules.full_day?.roles ?? [];
+  const maxByRole = roleCountsFromDurationRoles(durationRoles);
+
+  let result = plan;
+  for (const role of Object.keys(maxByRole) as StopRole[]) {
+    result = capRoleCount(result, role, maxByRole[role]!);
+  }
+  return result;
+}
 
 /** קובע את רשימת הקטגוריות/תפקידים למסלול - קריאת Claude אחת, עם fallback דטרמיניסטי. */
 export async function decideCategoryPlan(params: DecideCategoryPlanParams): Promise<CategoryPlanItem[]> {
@@ -182,16 +196,12 @@ export async function decideCategoryPlan(params: DecideCategoryPlanParams): Prom
     if (params.tripType === "nightlife") {
       return capRoleCount(aiPlan, "attraction", 1);
     }
-    // כלל ברזל לטיול יומי - ר' DAY_TRIP_ATTRACTION_MAX.
-    if (params.tripType === "day_trip") {
-      const durationBand = normalizedAnswers.durationBand;
-      const max = DAY_TRIP_ATTRACTION_MAX[durationBand] ?? DAY_TRIP_ATTRACTION_MAX.full_day;
-      return capRoleCount(aiPlan, "attraction", max);
-    }
-    if (params.tripType === "nature_trip") {
-      const durationBand = normalizedAnswers.durationBand;
-      const max = NATURE_TRIP_ATTRACTION_MAX[durationBand] ?? NATURE_TRIP_ATTRACTION_MAX.full_day;
-      return capRoleCount(aiPlan, "attraction", max);
+    // כלל ברזל לטיול יומי ולטיול בטבע - תקרה על **כל** role (לא רק
+    // attraction), לפי המספרים שכבר מוגדרים ב-durationRules. זה מונע מצב
+    // שבו Claude מחזיר, למשל, שתי תחנות coffee_dessert (שתי עגלות קפה)
+    // ברצף במקום attraction אחת + קפה אחד.
+    if (params.tripType === "day_trip" || params.tripType === "nature_trip") {
+      return capPlanByDurationRules(aiPlan, rules.durationRules, normalizedAnswers.durationBand);
     }
     return aiPlan;
   }

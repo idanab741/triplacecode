@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -185,19 +186,19 @@ function NatureTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // אותה רשת ביטחון בדיוק כמו day-trip/result/page.tsx - לא מסך משחק,
-      // ורק אם עדיין אין שום תוכן להציג (בקשה מפורשת - תוכן קיים תמיד
-      // מוצג מיד, בלי קשר ל-status).
+      // אותו סגנון טעינה בדיוק כמו בכל שאר סוגי הטיולים (חופשה בחו"ל,
+      // סופ"ש, דייט רומנטי, חיי לילה) - מסך LoadingGame עם המשחק והשלבים
+      // המתחלפים, לא ספינר גנרי שלא קשור לשום מסך אחר באפליקציה. תוכן קיים
+      // תמיד מוצג מיד, בלי קשר ל-status.
       return (
-        <Screen>
-          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="relative h-16 w-16">
-              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
-            </div>
-            <p className="text-base font-semibold text-ink">רגע, עוד רגע ויום הטבע מוכן...</p>
-            <p className="text-sm text-ink-secondary">זה לוקח קצת יותר זמן מהרגיל - כבר כמעט שם</p>
-          </div>
-        </Screen>
+        <LoadingGame
+          statusText="רגע, עוד רגע ויום הטבע מוכן..."
+          steps={[
+            "🌳 מוצאים מסלולים ופינות טבע מתאימות",
+            "🥾 מתאימים את רמת הקושי לבקשה שלכם",
+            "🗺️ מסדרים את המסלול בסדר הכי נוח",
+          ]}
+        />
       );
     }
     return (
