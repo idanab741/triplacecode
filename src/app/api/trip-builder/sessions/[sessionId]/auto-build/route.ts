@@ -715,6 +715,14 @@ export async function POST(
         });
         await supabase.from("trip_builder_sessions").update({ vacation_context: vacationContext }).eq("id", sessionId);
 
+        // תיקון באג אמיתי (נמצא בלוגים בפועל): trip_builder_stops.slot_index
+        // ייחודי לכל ה-session (constraint DB: trip_builder_stops_session_id_slot_index_key),
+        // לא רק בתוך אותו יום. קודם העברתי startOrder=0 קבוע לכל יום "רגיל" -
+        // זה התנגש עם slot_index שכבר תפוס (יום 1/יום אחרון, ובין ימים
+        // "רגילים" זה עם זה). עכשיו שומרים מונה רץ אחד שממשיך מהערך הגבוה
+        // ביותר שכבר קיים ב-session.
+        let nextSlotOrder = Math.max(0, ...pendingStops.map((s) => s.slot_index + 1));
+
         // ימים "רגילים" (לא 1, לא אחרון) - job נפרד לכל יום, ברצף: Blueprint
         // (AI, עד 5 שניות עם fallback דטרמיניסטי) → תרגום ל-slots בפועל →
         // מילוי מהמאגר → שמירה חלקית. כל יום שמופיע כאן "נדלק" בעמוד
@@ -726,7 +734,8 @@ export async function POST(
           const blueprint = await generateDayBlueprint(vacationContext, day, previousDayTitles);
           previousDayTitles.push(blueprint.title);
 
-          const dayPlan = categoryPlanForDay(blueprint, day, 0, includesNightlife);
+          const dayPlan = categoryPlanForDay(blueprint, day, nextSlotOrder, includesNightlife);
+          nextSlotOrder += dayPlan.length;
           const dayStops = await appendDayStops(supabase, sessionId, dayPlan);
           await fillStopsFromPoolThenAi(dayStops);
 
