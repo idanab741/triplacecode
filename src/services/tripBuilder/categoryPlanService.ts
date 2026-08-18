@@ -494,13 +494,15 @@ export function buildMultiDayVacationPlan(answers: {
     }
 
     if (isLastDay) {
-      // יום עזיבה - בקשה מפורשת ומדויקת ("לא להתפזר"): בדיוק ארוחת בוקר
-      // (בית קפה) + אטרקציה אחת נוספת - לא נוסחת "חצי מהכמות הרגילה"
-      // (שיכלה להחזיר יותר משתי תחנות בקצב "מתוכנן"). אחרי זה - רק
-      // צ'ק-אאוט מהמלון וטיסת חזרה (כרטיסי תצוגה מלאכותיים, לא תחנות
-      // place - ר' injectLogisticsStops בעמוד התוצאה).
+      // יום עזיבה - בקשה מפורשת ומדויקת ("לא להתפזר" + "אטרקציה קלילה
+      // ולא מורכבת מידי, כמו סיבוב בשדרה המרכזית"): בדיוק ארוחת בוקר
+      // (בית קפה) + אטרקציה אחת קלילה - לא מהקטגוריות הרגילות שנבחרו
+      // בשאלון (nextCategory) שיכולות להחזיר מוזיאון גדול/פארק אתגר.
+      // parks_gardens/viewpoints/shopping הן קטגוריות "קלות" מטבען -
+      // הליכה, לא מסלול מאומץ. אחרי זה - רק צ'ק-אאוט מהמלון וטיסת חזרה
+      // (כרטיסי תצוגה מלאכותיים, לא תחנות place - ר' injectLogisticsStops).
       plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
-      plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
+      plan.push({ category: "parks_gardens", role: "attraction", order: order++, day });
       continue;
     }
 

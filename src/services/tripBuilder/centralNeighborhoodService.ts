@@ -23,48 +23,50 @@ interface FindCentralNeighborhoodParams {
  * מאתר את "השכונה המרכזית" של יעד חופשה בחו"ל - לכרטיס יום 1 (ר'
  * injectLogisticsStops) ולעיגון רדיוס חיפוש מסעדת יום 1.
  *
- * בקשה מפורשת ("למה זה דרך גוגל, יש לך במאגר שלנו!!"): המקור הראשי הוא
- * עכשיו המאגר הפנימי (places) - מחפשים את המקום המדורג הכי גבוה שאדמין
- * כבר תייג כאתר-חובה/מורשת/תרבות/תצפית קרוב למרכז היעד, ומשתמשים בשם
- * ובתמונה **שלו** (לא שם שכונה כללי שה-AI ממציא). Google/Claude משמשים
- * רק כגיבוי אם אין שום מועמד מתאים אצלנו ביעד הזה בכלל - עדיף תוצאה
- * חיצונית אחת מאשר שום כרטיס יום 1.
+ * בקשה מפורשת ("אין שום מושג שכונה - בשביל זה יש את השילוב של קלוד עם
+ * ADMIN PLACES, זה התפקיד שלו"): אין ישות "שכונה" נפרדת במאגר - אז לא
+ * שולפים סתם את המקום המדורג הכי גבוה ומשתמשים בשם העסק שלו כאילו הוא
+ * שם שכונה (זו הייתה בדיוק הבעיה - "שטרופי", מסעדה, הוצג כ"שכונה").
+ * במקום זה: שולפים כמה מקומות אמיתיים ומדורגים גבוה מהמאגר שלנו קרוב
+ * למרכז היעד, ו-Claude (עם הידע הכללי שלו על גיאוגרפיה) מזהה את שם
+ * השכונה/האזור שהם נמצאים בו בפועל - ובוחר **אחד מהם, בדיוק כפי שנמסר,
+ * לא מומצא** בתור נקודת העוגן (לקואורדינטות אמיתיות מהמאגר שלנו, לא
+ * מ-Google). כך גם השם מבוסס-ידע וגם המיקום מאומת מהמאגר.
  */
 export async function findCentralNeighborhood(
   supabase: SupabaseClient,
   params: FindCentralNeighborhoodParams
 ): Promise<CentralNeighborhoodInfo | null> {
-  const fromOurDb = await findFromOurDatabase(supabase, params.origin, params.radiusKm);
-  if (fromOurDb) return fromOurDb;
+  const candidates = await fetchNeighborhoodCandidates(supabase, params.origin, params.radiusKm);
+  if (candidates.length === 0) {
+    logAiError("אין שום מקום מהמאגר שלנו קרוב ליעד - נופלים לגיבוי גוגל/Claude", {
+      destination: params.destination,
+    });
+    return findViaGoogleFallback(params.destination);
+  }
 
-  logAiError("אין מועמד מתאים במאגר שלנו לשכונה המרכזית - נופלים לגיבוי גוגל/Claude", {
-    destination: params.destination,
-  });
-  return findViaGoogleFallback(params.destination);
+  const identified = await identifyNeighborhoodFromCandidates(params.destination, candidates);
+  if (identified) return identified;
+
+  // Claude נכשל/לא זיהה - במקום לוותר, פשוט לוקחים את המועמד המדורג
+  // הכי גבוה (עדיין מהמאגר שלנו, רק בלי שם-שכונה "אמיתי" - בשם המקום עצמו).
+  const top = candidates[0];
+  return { name: top.name, coords: { lat: top.latitude, lng: top.longitude }, imageUrl: top.image_urls?.[0] ?? null };
 }
 
 interface NeighborhoodCandidateRow {
   name: string;
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number;
+  longitude: number;
   rating: number | null;
   image_urls: string[] | null;
 }
 
-/** תגיות שסביר שמייצגות "מקום מרכזי/מוכר להסתובב בו" - לא כל אטרקציה גנרית. */
-const NEIGHBORHOOD_CANDIDATE_TAGS = [
-  "must_see_landmarks",
-  "heritage",
-  "culture_museums",
-  "viewpoints",
-  "general_attractions",
-];
-
-async function findFromOurDatabase(
+async function fetchNeighborhoodCandidates(
   supabase: SupabaseClient,
   origin: LatLng,
   radiusKm: number
-): Promise<CentralNeighborhoodInfo | null> {
+): Promise<NeighborhoodCandidateRow[]> {
   const latDelta = kmToDegreesLat(radiusKm);
   const lngDelta = kmToDegreesLng(radiusKm, origin.lat);
 
@@ -73,33 +75,73 @@ async function findFromOurDatabase(
     .select("name,latitude,longitude,rating,image_urls")
     .eq("is_legacy", false)
     .neq("category", "nightlife")
-    .overlaps("trip_type_tags", NEIGHBORHOOD_CANDIDATE_TAGS)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
     .gte("latitude", origin.lat - latDelta)
     .lte("latitude", origin.lat + latDelta)
     .gte("longitude", origin.lng - lngDelta)
     .lte("longitude", origin.lng + lngDelta)
     .order("rating", { ascending: false, nullsFirst: false })
-    .limit(5);
+    .limit(10);
 
-  if (error || !data || data.length === 0) return null;
+  if (error || !data) return [];
 
-  const rows = data as NeighborhoodCandidateRow[];
-  const withCoords = rows.filter((r) => r.latitude != null && r.longitude != null);
-  if (withCoords.length === 0) return null;
+  return (data as NeighborhoodCandidateRow[]).filter(
+    (r) => haversineDistanceKm(origin, { lat: r.latitude, lng: r.longitude }) <= radiusKm
+  );
+}
 
-  // רשת ביטחון אחרונה על מרחק בפועל (ה-bounding box למעלה מרובע, לא עיגול).
-  const nearest = withCoords
-    .map((r) => ({ row: r, distanceKm: haversineDistanceKm(origin, { lat: r.latitude!, lng: r.longitude! }) }))
-    .filter((r) => r.distanceKm <= radiusKm)
-    .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+/**
+ * נותנת ל-Claude רשימת מקומות אמיתיים מהמאגר שלנו (שם + קטגוריה גסה
+ * לפי הדירוג, לא צריך יותר מזה) ומבקשת: (א) שם השכונה/האזור המוכר
+ * שהם נמצאים בו, (ב) לבחור **אחד מהם, בדיוק באותו איות** כעוגן. אם
+ * הבחירה לא תואמת אף מועמד בדיוק - נכשל (לא מנחשים/מתקנים שם).
+ */
+async function identifyNeighborhoodFromCandidates(
+  destination: string,
+  candidates: NeighborhoodCandidateRow[]
+): Promise<CentralNeighborhoodInfo | null> {
+  const namesList = candidates.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
 
-  if (!nearest) return null;
+  const prompt = `הנה רשימת מקומות אמיתיים (ממאגר תיירות מאומת) שנמצאים קרוב למרכז היעד "${destination}":
+${namesList}
 
-  return {
-    name: nearest.row.name,
-    coords: { lat: nearest.row.latitude!, lng: nearest.row.longitude! },
-    imageUrl: nearest.row.image_urls?.[0] ?? null,
-  };
+על סמך הידע הכללי שלך על ${destination} - באיזו שכונה/אזור מוכר ותיירותי רוב המקומות האלה נמצאים?
+בחר גם אחד מהמקומות ברשימה (בדיוק כפי שהוא כתוב למעלה, בלי לשנות אף אות) כדי לשמש נקודת עוגן לשכונה הזו.
+
+השב אך ורק במבנה JSON, בלי שום טקסט נוסף:
+{"neighborhoodName": "שם השכונה", "anchorPlaceName": "העתקה מדויקת של שם אחד מהרשימה למעלה"}`;
+
+  const { text, error } = await callClaude(prompt, 300);
+  if (error || !text) return null;
+
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]) as { neighborhoodName?: string; anchorPlaceName?: string };
+    if (!parsed.neighborhoodName || !parsed.anchorPlaceName) return null;
+
+    const anchor = candidates.find((c) => c.name === parsed.anchorPlaceName);
+    if (!anchor) {
+      logAiError("Claude בחר עוגן שלא קיים ברשימה שנמסרה לו - לא ממציאים קואורדינטות", {
+        destination,
+        chosen: parsed.anchorPlaceName,
+      });
+      return null;
+    }
+
+    return {
+      name: parsed.neighborhoodName.trim(),
+      coords: { lat: anchor.latitude, lng: anchor.longitude },
+      imageUrl: anchor.image_urls?.[0] ?? null,
+    };
+  } catch (parseError) {
+    logAiError("כשל בפענוח זיהוי השכונה", {
+      message: parseError instanceof Error ? parseError.message : String(parseError),
+      destination,
+    });
+    return null;
+  }
 }
 
 async function findViaGoogleFallback(destination: string): Promise<CentralNeighborhoodInfo | null> {
