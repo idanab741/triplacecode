@@ -7,6 +7,10 @@ interface DateRangePickerProps {
   startDate: string;
   endDate: string;
   onChange: (startDate: string, endDate: string) => void;
+  /** בקשה מפורשת: "לא אפשר יום אחד בחו"ל" - ברירת מחדל 2 (טווח מינימלי
+   *  יום הלוך + יום חזור). ניתן להעביר 1 למקומות אחרים שבאמת מאפשרים
+   *  יום בודד (הקומפוננטה משותפת). */
+  minDays?: number;
 }
 
 const HEBREW_MONTHS = [
@@ -25,7 +29,7 @@ function formatDisplay(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
-export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+export function DateRangePicker({ startDate, endDate, onChange, minDays = 2 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(() => {
     const base = startDate ? new Date(startDate) : new Date();
@@ -57,15 +61,23 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
       // התחלת בחירה חדשה
       setTempStart(iso);
       setTempEnd("");
-    } else if (iso < tempStart) {
-      // נלחץ תאריך מוקדם מההתחלה - הופך להיות ההתחלה החדשה
+      return;
+    }
+
+    if (iso <= tempStart) {
+      // נלחץ תאריך מוקדם מההתחלה (או אותו יום - בקשה מפורשת: "לא אפשר
+      // יום אחד") - הופך להיות ההתחלה החדשה, לא מסיים את הבחירה.
       setTempStart(iso);
       setTempEnd("");
-    } else {
-      setTempEnd(iso);
-      onChange(tempStart, iso);
-      setOpen(false);
+      return;
     }
+
+    const daySpan = Math.round((day.getTime() - new Date(tempStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (daySpan < minDays) return; // עדיין קצר מדי - לא מקבלים כתאריך סיום
+
+    setTempEnd(iso);
+    onChange(tempStart, iso);
+    setOpen(false);
   }
 
   function isInRange(day: Date): boolean {
@@ -100,14 +112,15 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
       </button>
 
       {open && (
-        <div className="absolute inset-x-0 top-full z-20 mt-2 rounded-card bg-white p-4 shadow-lg">
+        <div className="absolute inset-x-0 top-full z-20 mt-2 max-h-[70vh] overflow-y-auto rounded-card bg-white p-4 shadow-lg">
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
               onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
               className="rounded-full p-1.5 text-ink-secondary hover:bg-bg-secondary"
+              aria-label="לחודש הקודם"
             >
-              ›
+              ‹
             </button>
             <p className="text-sm font-semibold text-ink">
               {HEBREW_MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
@@ -116,8 +129,9 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
               type="button"
               onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
               className="rounded-full p-1.5 text-ink-secondary hover:bg-bg-secondary"
+              aria-label="לחודש הבא"
             >
-              ‹
+              ›
             </button>
           </div>
 
@@ -128,26 +142,33 @@ export function DateRangePicker({ startDate, endDate, onChange }: DateRangePicke
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {daysInMonth(viewMonth).map((day, i) =>
-              day ? (
+            {daysInMonth(viewMonth).map((day, i) => {
+              if (!day) return <span key={i} />;
+              const isPast = (() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return day < today;
+              })();
+              return (
                 <button
                   key={i}
                   type="button"
+                  disabled={isPast}
                   onClick={() => handleDayClick(day)}
                   className={`aspect-square rounded-full text-sm transition ${
-                    isEdge(day)
-                      ? "bg-accent text-white font-semibold"
-                      : isInRange(day)
-                      ? "bg-accent/15 text-ink"
-                      : "text-ink hover:bg-bg-secondary"
+                    isPast
+                      ? "cursor-not-allowed text-ink-secondary/30"
+                      : isEdge(day)
+                        ? "bg-accent text-white font-semibold"
+                        : isInRange(day)
+                          ? "bg-accent/15 text-ink"
+                          : "text-ink hover:bg-bg-secondary"
                   }`}
                 >
                   {day.getDate()}
                 </button>
-              ) : (
-                <span key={i} />
-              )
-            )}
+              );
+            })}
           </div>
 
           <p className="mt-3 text-center text-xs text-ink-secondary">

@@ -117,12 +117,21 @@ function AbroadVacationResultContent() {
     // גרירה בין ימים: קודם היה DndContext נפרד לכל יום, כך שלא ניתן היה
     // בכלל לגרור תחנה מיום אחד לתוך יום אחר. עכשיו יש הקשר גרירה אחד משותף
     // לכל הימים - וכשתחנה "נוחתת" בין תחנות של יום אחר, מעדכנים את היום שלה
-    // בפועל לפי השכנות החדשות (מעדיפים את היום של התחנה שלפניה; אם היא
-    // ראשונה ברשימה - את היום של התחנה שאחריה).
+    // בפועל לפי השכנות החדשות.
     const movedStop = reordered[newIndex];
     const prevStop = reordered[newIndex - 1];
     const nextStop = reordered[newIndex + 1];
-    const inferredDay = prevStop?.dayIndex ?? nextStop?.dayIndex ?? movedStop.dayIndex;
+
+    // תיקון באג אמיתי (בקשה מפורשת - "גוררים להתחלת היום, הוא מעביר יום
+    // אחורה"): בגבול בין ימים (השכן הקודם שייך ליום X-1, השכן הבא שייך
+    // ליום X) - גרירה "לתחילת יום X" (ממש לפני התחנה הראשונה שלו) הייתה
+    // מעדיפה תמיד את יום השכן הקודם (X-1), דוחפת את התחנה אחורה בטעות.
+    // עכשיו: בגבול בין ימים ספציפית, מעדיפים את יום השכן הבא - זה בדיוק
+    // "תחילת היום" שאליו גוררים, לא סוף היום הקודם.
+    const inferredDay =
+      prevStop && nextStop && prevStop.dayIndex !== nextStop.dayIndex
+        ? nextStop.dayIndex
+        : (prevStop?.dayIndex ?? nextStop?.dayIndex ?? movedStop.dayIndex);
     if (inferredDay != null && inferredDay !== movedStop.dayIndex) {
       reordered[newIndex] = { ...movedStop, dayIndex: inferredDay };
     }

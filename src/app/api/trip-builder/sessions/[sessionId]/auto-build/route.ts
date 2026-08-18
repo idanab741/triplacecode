@@ -480,6 +480,15 @@ export async function POST(
             const mustSee = mustSeePlaces[mustSeeCursor];
             if (!excludePlaceIdsForVacation.includes(mustSee.id)) {
               await likeStop(supabase, userId, stop.id, mustSee);
+              // תיקון באג אמיתי (בקשה מפורשת - "התגית של היום לא רלוונטית
+              // לאטרקציות שמופיעות!"): אתר-חובה תופס סלוט בלי קשר לקטגוריה
+              // שתוכננה לו במקור (למשל "חופי ים" שClaude תכנן, אבל בפועל
+              // האקרופוליס נכנס לשם) - אם לא מעדכנים את category בפועל,
+              // deriveDayTitles (finalizeService.ts) ממשיך לגזור את כותרת
+              // היום מהקטגוריה המתוכננת-אבל-לא-אמיתית, במקום ממה שבאמת נבחר.
+              if (mustSee.tripTypeTags?.[0]) {
+                await supabase.from("trip_builder_stops").update({ category: mustSee.tripTypeTags[0] }).eq("id", stop.id);
+              }
               excludePlaceIdsForVacation.push(mustSee.id);
               dayCursors.set(day, { lat: mustSee.latitude, lng: mustSee.longitude });
               mustSeeCursor += 1;
