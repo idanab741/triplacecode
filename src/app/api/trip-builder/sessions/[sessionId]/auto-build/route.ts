@@ -365,7 +365,8 @@ export async function POST(
           `חובה: נוסעים עם ילדים בגילאי ${ageLabels.join(", ")} - כל מקום מוצע חייב להתאים לגילאים האלה (בטיחות, שעות, עניין), לא רק מקומות למבוגרים`
         );
       }
-      const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
+      // dnaSummaryParts כבר נאסף למעלה - dnaSummary עצמו לא נחוץ יותר כאן
+      // אחרי הסרת ה-AI fallback (בקשה מפורשת - "רק במאגר!!!").
 
       // רדיוס תקין סביב מרכז היעד: אם המשתמש/AI כבר קבע רדיוס אזור מפורש
       // (requestedAreaRadiusKm) - נותנים מרווח פי 2 ממנו (יעד יכול להתפרס
@@ -378,41 +379,48 @@ export async function POST(
           ? distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
           : 60;
 
-      // בקשה מפורשת: אתרי "חובה" מובהקים ליעד (למשל מגדל אייפל + שייט
-      // בסיין לפריז) חייבים להיכנס למסלול כשקיימים אצלנו במאגר - לא
-      // "אולי ייבחרו" דרך הדירוג הרגיל. Claude מציע שמות (בלי שום קריאת
-      // Google), ומחפשים כל שם **רק** במאגר שלנו; שם שלא נמצא נשמט בשקט
-      // (לא מומצא/מאומת דרך Google). קריאת AI אחת נוספת כאן - עלות זמן
-      // קטנה (כמה שניות) מול הערך של לא לפספס את הסמלים המובהקים.
-      //
       // בקשה מפורשת נוספת ("חסר לי הקוליזיאום, הוותיקן, המדרגות
       // הספרדיות!"): התקרה נגזרת מאורך הטיול בפועל, לא מספר קבוע - יעד
       // עשיר כמו רומא לטיול 5 ימים צריך יותר מ-6 הצעות.
+      //
+      // תיקון ביצועים (בקשה מפורשת - "המשחק קפץ רגע לפני שהמסלול היה
+      // מוכן"): שרשרת "אתרי חובה" (Claude + חיפוש/יצירה) ושרשרת "השכונה
+      // המרכזית" (DB + Claude) בלתי-תלויות זו בזו לגמרי - היו רצות
+      // ברצף, כל אחת כמה שניות, מה שדחף את יום 1 קרוב מדי לתקרת ההמתנה
+      // בצ'אט. עכשיו רצות במקביל.
       const vacationDatesForMustSee = answers as unknown as { startDate?: string; endDate?: string };
       const estimatedNumDays = countDays(vacationDatesForMustSee.startDate ?? "", vacationDatesForMustSee.endDate ?? "");
-      const mustSeeNames = await suggestMustSeeLandmarks({
-        destination: destinationName,
-        vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
-        freeText: answers.freeText,
-        maxCount: estimatedNumDays * 2,
-      });
-      // סדר העדיפות של Claude (השם הראשון = הכי מובהק/מתאים לטיול הזה)
-      // נשמר - זה מה שקובע אילו אתרי חובה "זוכים" למקום כשיש יותר אתרי
-      // חובה שנמצאו מאשר סלוטים פנויים בטיול קצר (מצמצמים, לא מרחיבים ימים).
-      const mustSeePlaces = await findMustSeePlaces(supabase, mustSeeNames, searchOrigin, destinationMaxDistanceKm, destinationName);
 
-      // בקשה מפורשת: השכונה המרכזית של היעד - לכרטיס התצוגה של יום 1
-      // (ר' centralNeighborhoodService.ts) וגם לעיגון רדיוס חיפוש מסעדת
-      // יום 1 (עד 1 ק"מ מהשכונה, לא מהמלון ולא ממרכז היעד הכללי). רק
-      // בחופשה בחו"ל - לסופ"ש אין כרטיס כזה בעמוד התוצאה שלו.
-      const centralNeighborhood =
+      const [mustSeePlaces, centralNeighborhood] = await Promise.all([
+        (async () => {
+          // בקשה מפורשת: אתרי "חובה" מובהקים ליעד (למשל מגדל אייפל + שייט
+          // בסיין לפריז) חייבים להיכנס למסלול כשקיימים אצלנו במאגר - לא
+          // "אולי ייבחרו" דרך הדירוג הרגיל. Claude מציע שמות (בלי שום
+          // קריאת Google), ומחפשים כל שם **רק** במאגר שלנו; שם שלא נמצא
+          // נשמט בשקט (לא מומצא/מאומת דרך Google).
+          // סדר העדיפות של Claude (השם הראשון = הכי מובהק/מתאים לטיול
+          // הזה) נשמר - זה מה שקובע אילו אתרי חובה "זוכים" למקום כשיש
+          // יותר אתרי חובה שנמצאו מאשר סלוטים פנויים בטיול קצר.
+          const mustSeeNames = await suggestMustSeeLandmarks({
+            destination: destinationName,
+            vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
+            freeText: answers.freeText,
+            maxCount: estimatedNumDays * 2,
+          });
+          return findMustSeePlaces(supabase, mustSeeNames, searchOrigin, destinationMaxDistanceKm, destinationName);
+        })(),
+        // בקשה מפורשת: השכונה המרכזית של היעד - לכרטיס התצוגה של יום 1
+        // (ר' centralNeighborhoodService.ts) וגם לעיגון רדיוס חיפוש
+        // מסעדת יום 1 (עד 1 ק"מ מהשכונה, לא מהמלון ולא ממרכז היעד
+        // הכללי). רק בחופשה בחו"ל - לסופ"ש אין כרטיס כזה.
         session.trip_type === "abroad_vacation"
-          ? await findCentralNeighborhood(supabase, {
+          ? findCentralNeighborhood(supabase, {
               destination: destinationName,
               origin: searchOrigin,
               radiusKm: destinationMaxDistanceKm,
             })
-          : null;
+          : Promise.resolve(null),
+      ]);
       if (session.trip_type === "abroad_vacation" && !centralNeighborhood) {
         logAiError("לא אותרה שכונה מרכזית ליום 1 - מסעדת יום 1 תיפול חזרה לרדיוס הרגיל של היעד", {
           sessionId,
@@ -571,84 +579,22 @@ export async function POST(
           remainingForAi: remainingStops.length,
         });
 
-        // מכאן והלאה - כל ה"תחנות" (stopsByDay/daySpecs) הן רק מה שנשאר,
-        // כלומר מה שהמאגר לא הצליח למלא. אם הכול התמלא מהמאגר - remainingStops
-        // ריק, ו-generateVacationItinerary פשוט לא נקרא בכלל.
-        if (remainingStops.length === 0) return;
-
-        const remainingStopsByDay = new Map<number, TripBuilderStop[]>();
-        for (const stop of remainingStops) {
-          const day = stop.day_index ?? 1;
-          if (!remainingStopsByDay.has(day)) remainingStopsByDay.set(day, []);
-          remainingStopsByDay.get(day)!.push(stop);
-        }
-
-        const daySpecs: VacationDaySpec[] = Array.from(remainingStopsByDay.entries()).map(([day, dayStops]) => {
-          const totalFood = dayStops.filter((s) => s.role === "food" || s.role === "coffee_dessert").length;
-          return { day, totalFood, totalAttractions: dayStops.length - totalFood };
-        });
-
-        const allSuggestions = await generateVacationItinerary({
-          destination: destinationName,
-          destinationOrigin: searchOrigin,
-          maxDistanceKm: destinationMaxDistanceKm,
-          days: daySpecs,
-          vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
-          freeText: answers.freeText,
-          budgetLabel: remainingBudgetLabel,
-          travelDnaSummary: dnaSummary,
-        });
-
-        if (allSuggestions.length === 0) {
-          // נקודת בקרה קריטית: אם הגענו לפה עם רשימה ריקה, ימים אלה יגיעו
-          // לעמוד התוצאות בלי אף תחנה נוספת, בלי שום שגיאת HTTP בדרך - כי
-          // שום דבר לא "נכשל" ברמת ה-response, פשוט לא נבחרו מקומות.
-          console.error("[auto-build] generateVacationItinerary החזיר 0 מקומות", {
+        // בקשה מפורשת וחוזרת ("רק במאגר!!! עם 1254 האטרקציות שיש לנו!! לא
+        // משהו אחר!") - אחרי שהמקרה של "משרד נדל'ן" הופיע כתחנה (AI
+        // שהמציא תוכן לא רלוונטי כי חיפוש המאגר לא מצא כלום), מסירים את
+        // ה-AI fallback הזה **לגמרי**. אם המאגר (כולל הרדיוס הרחב יותר,
+        // ר' fetchCandidatePool למעלה) לא הצליח למלא תחנה - היא פשוט
+        // נשמטת מהמסלול, לא מומצאת. עדיף יום עם קצת פחות תחנות מאשר תחנה
+        // לא רלוונטית/לא אמיתית. הערה: זה שונה במפורש מ-must-see landmarks
+        // (findMustSeePlaces) - שם יצירה דרך Google עדיין קורית, כי היא
+        // מאמתת מקום אמיתי מ-Google Places, לא ממציאה תוכן כמו כאן.
+        if (remainingStops.length > 0) {
+          console.error("[auto-build] תחנות נשמטו - לא נמצאו במאגר (בלי AI fallback, לפי בקשה מפורשת)", {
             sessionId,
-            destinationName,
-            daySpecs,
+            skippedCount: remainingStops.length,
+            skipped: remainingStops.map((s) => ({ day: s.day_index, role: s.role, category: s.category })),
           });
         }
-
-        // הקצאה לפי יום, עם "רשת ביטחון": אם Claude תייג יום לא נכון או החזיר
-        // פחות פריטים מהמבוקש ליום מסוים, לא משאירים את התחנה ריקה בשקט -
-        // שואבים תחנה פנויה מה"עודף" הכללי (מיום אחר, אותו role) לפני שמוותרים.
-        const usedSuggestionIds = new Set<string>();
-        const leftoverByRole = (role: "food" | "attraction") =>
-          allSuggestions.filter(
-            (s) =>
-              !usedSuggestionIds.has(s.id) &&
-              (role === "food" ? s.role === "food" || s.role === "coffee_dessert" : s.role === "attraction")
-          );
-
-        const assignments: { stopId: string; suggestion: (typeof allSuggestions)[number] }[] = [];
-
-        for (const [day, dayStops] of remainingStopsByDay.entries()) {
-          const daySuggestions = allSuggestions.filter((s) => s.day === day);
-          const foodSuggestions = daySuggestions.filter((s) => s.role === "food" || s.role === "coffee_dessert");
-          const attractionSuggestions = daySuggestions.filter((s) => s.role === "attraction");
-          let foodCursor = 0;
-          let attractionCursor = 0;
-
-          for (const stop of dayStops) {
-            const isFoodRole = stop.role === "food" || stop.role === "coffee_dessert";
-            let suggestion = isFoodRole ? foodSuggestions[foodCursor++] : attractionSuggestions[attractionCursor++];
-            if (!suggestion) {
-              suggestion = leftoverByRole(isFoodRole ? "food" : "attraction")[0];
-            }
-            if (!suggestion) continue;
-            usedSuggestionIds.add(suggestion.id);
-            assignments.push({ stopId: stop.id, suggestion });
-          }
-        }
-
-        // כל השמירות בפועל (DB insert/update) **במקביל**, לא אחת-אחת.
-        await Promise.all(
-          assignments.map(async ({ stopId, suggestion }) => {
-            const realPlace = await ensurePlaceExists(suggestion, destinationName);
-            await likeStop(supabase, userId, stopId, realPlace);
-          })
-        );
       }
 
       // "כוונת הטיול" (tripIntent) - מחשבים במקביל למילוי יום 1 (לא ברצף

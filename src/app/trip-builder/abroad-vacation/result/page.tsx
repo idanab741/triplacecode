@@ -692,13 +692,25 @@ function AbroadVacationResultContent() {
                               אישור
                             </button>
                           </div>
-                        ) : (
+                        ) : stopTimeOverrides[stop.stopId] !== undefined ? (
                           <button
                             type="button"
                             onClick={() => setEditingStopId(stop.stopId)}
                             className="w-fit pr-1 text-sm font-bold text-accent"
                           >
                             🕐 {minutesToTimeLabel(displayMinutes)}
+                          </button>
+                        ) : (
+                          // בקשה מפורשת ("תעיף לגמרי את השעות!!! כפתור למילוי עצמי") -
+                          // בלי override ידני, לא מציגים שעה מחושבת אוטומטית בכלל
+                          // (המשתמש כבר לא סומך עליה) - רק כפתור עדין להוספה, למי
+                          // שכן רוצה לקבוע שעה בעצמו לתחנה הזו.
+                          <button
+                            type="button"
+                            onClick={() => setEditingStopId(stop.stopId)}
+                            className="w-fit rounded-pill border border-dashed border-ink-secondary/30 px-2 py-0.5 text-xs text-ink-secondary"
+                          >
+                            + הוסף שעה
                           </button>
                         )}
                         <SortableStopCard

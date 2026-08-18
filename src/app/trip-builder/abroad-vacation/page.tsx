@@ -886,7 +886,7 @@ function confirmBooked() {
     try {
       const sessionId = await createSessionAndStartBuild(answers);
 
-      const MAX_WAIT_MS = 15000;
+      const MAX_WAIT_MS = 20000;
       const POLL_INTERVAL_MS = 1200;
       const startedAt = Date.now();
       while (Date.now() - startedAt < MAX_WAIT_MS) {

@@ -76,14 +76,31 @@ function fallbackBlueprint(context: VacationContext): DayBlueprint {
   };
 }
 
+/** בקשה מפורשת ("ביקשתי במלל החופשי גם בטן גב - אז צריך חופים!!"):
+ *  focusCategories היה מוגבל אך ורק לסוגי החופשה שסומנו בשאלון - Claude
+ *  לא יכול היה להציע "חופים" בגלל מלל חופשי, גם אם זה בדיוק מה שהמשתמש
+ *  ביקש שם, כי האפשרויות שהוא קיבל כלל לא כללו את זה. עכשיו: אם המלל
+ *  החופשי מרמז במפורש על מנוחה/חוף/ים - "relax" (חוף/בריכה) נוסף
+ *  לרשימת האפשרויות, גם אם לא סומן בשאלון. */
+function detectImpliedVacationTypesFromFreeText(freeText: string): string[] {
+  const relaxKeywords = ["בטן גב", "רגיעה", "להירגע", "לנוח", "מנוחה", "חוף", "חופים", "ים", "relax", "beach"];
+  const implied: string[] = [];
+  if (relaxKeywords.some((kw) => freeText.includes(kw))) implied.push("relax");
+  return implied;
+}
+
 function buildPrompt(context: VacationContext, dayNumber: number, previousDayTitles: string[]): string {
-  const vacationTypeLabels = context.trip.vacationTypes.map(getVacationTypeLabel).join(", ") || "כל סוג";
+  const impliedVacationTypes = detectImpliedVacationTypesFromFreeText(context.trip.freeText).filter(
+    (t) => !context.trip.vacationTypes.includes(t)
+  );
+  const effectiveVacationTypes = [...context.trip.vacationTypes, ...impliedVacationTypes];
+  const vacationTypeLabels = effectiveVacationTypes.map(getVacationTypeLabel).join(", ") || "כל סוג";
   // מפתחות גולמיים (לא תוויות בעברית!) - categoryPlanForDay ממפה
   // focusCategories חזרה לקטגוריה בפועל דרך VACATION_TYPE_TO_CATEGORY,
   // שמפתחותיו הם הערכים הגולמיים האלה (למשל "culture", לא "תרבות").
   const focusCategoryOptions =
-    context.trip.vacationTypes.length > 0
-      ? context.trip.vacationTypes.map((v) => `${v} (${getVacationTypeLabel(v)})`).join(", ")
+    effectiveVacationTypes.length > 0
+      ? effectiveVacationTypes.map((v) => `${v} (${getVacationTypeLabel(v)})`).join(", ")
       : "attractions (אטרקציות כלליות)";
   const previousTitlesText =
     previousDayTitles.length > 0 ? previousDayTitles.map((t, i) => `יום ${i + 1}: ${t}`).join("\n") : "(אין ימים קודמים)";
