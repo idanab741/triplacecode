@@ -77,6 +77,86 @@ export async function fetchCandidatePool(
   return pool;
 }
 
+interface FetchNightlifeCandidatePoolParams {
+  origin: LatLng;
+  radiusKm: number;
+  excludePlaceIds: string[];
+}
+
+/**
+ * שולף מועמדי "חיי לילה" לחופשה בחו"ל - בכוונה **לא** עובר דרך
+ * fetchCandidatePool/trip_type_tags הרגיל: "חיי לילה" הוא אחד מ-5 הערכים
+ * החוקיים היחידים של השדה הראשי `places.category` (ר' constants/placeCategories.ts),
+ * לא trip_type_tag - ולכן זו שאילתה נפרדת שמסננת ישירות לפי category="nightlife".
+ * זה בדיוק מה שהאדמין מתייג בפועל כשהוא מסמן מקום כ"חיי לילה" (בר קוקטיילים,
+ * מועדון, הופעה חיה וכו' - ר' PLACE_TYPE_TAGS בהתאמה, אבל הקטגוריה הראשית
+ * שקובעת את הסינון כאן היא רק category, לא ה-tags העדינים).
+ */
+export async function fetchNightlifeCandidatePool(
+  supabase: SupabaseClient,
+  params: FetchNightlifeCandidatePoolParams
+): Promise<CandidatePlace[]> {
+  const latDelta = kmToDegreesLat(params.radiusKm);
+  const lngDelta = kmToDegreesLng(params.radiusKm, params.origin.lat);
+
+  let query = supabase
+    .from("places")
+    .select(
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience,tags"
+    )
+    .eq("is_legacy", false)
+    .neq("source", AI_TRIP_BUILDER_SOURCE)
+    .eq("category", "nightlife")
+    .gte("latitude", params.origin.lat - latDelta)
+    .lte("latitude", params.origin.lat + latDelta)
+    .gte("longitude", params.origin.lng - lngDelta)
+    .lte("longitude", params.origin.lng + lngDelta);
+
+  if (params.excludePlaceIds.length > 0) {
+    query = query.not("id", "in", `(${params.excludePlaceIds.join(",")})`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[NightlifeCandidatePool Error]", { message: error.message, details: error.details });
+    return [];
+  }
+
+  const rows = (data ?? []) as PlaceRow[];
+
+  return rows
+    .filter((row) => row.latitude != null && row.longitude != null)
+    .map((row) => {
+      const distanceKm = haversineDistanceKm(params.origin, { lat: row.latitude!, lng: row.longitude! });
+      return {
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        subcategory: row.subcategory,
+        shortDescription: row.short_description,
+        imageUrls: row.image_urls ?? [],
+        rating: row.rating,
+        ratingCount: row.rating_count,
+        priceLevel: row.price_level,
+        estimatedVisitMinutes: row.estimated_visit_minutes,
+        latitude: row.latitude!,
+        longitude: row.longitude!,
+        distanceKm,
+        etaMinutes: estimateTravelMinutes(distanceKm, "drive"),
+        tripTypeTags: row.trip_type_tags ?? [],
+        cuisineTags: row.cuisine_tags ?? [],
+        kosher: row.kosher,
+        accessible: row.accessible,
+        suitableChildAges: row.suitable_child_ages ?? [],
+        budgetTier: row.budget_tier,
+        isAreaExperience: row.is_area_experience ?? false,
+        tags: row.tags ?? [],
+      } satisfies CandidatePlace;
+    })
+    .filter((candidate) => candidate.distanceKm <= params.radiusKm)
+    .sort(() => Math.random() - 0.5);
+}
+
 async function queryPool(
   supabase: SupabaseClient,
   params: FetchCandidatePoolParams,
@@ -136,6 +216,16 @@ async function queryPool(
     // ציפור") שהאדמין לא הצליח למצוא בחיפוש בעמוד שלו בכלל - הם באמת
     // בטבלה, אבל מסומנים legacy ולכן מוסתרים שם. עכשיו שני המקומות
     // מסתכלים בדיוק על אותה הגדרה של "המאגר שלנו". ***
+    //
+    // תיקון קריטי נוסף (בקשה מפורשת - "בר ומסיבה ב-12 בצהריים?! זה לא
+    // תקין"): מקומות עם category="nightlife" נפסלים כאן במפורש. בלי זה,
+    // הם דולפים לחיפושי attraction/food רגילים דרך "רשת הביטחון" למעלה
+    // (fallbackCategories - CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS ממפה
+    // nightlife גם ל-attractions_activities/wineries_dining) - בדיוק מה
+    // שהחזיר ברים/מועדונים באמצע היום כ"אטרקציה" רגילה. יש להם עכשיו
+    // מנגנון ייעודי נפרד (fetchNightlifeCandidatePool, role="nightlife",
+    // מקובע בסוף היום אחרי 19:00) - אסור להם להופיע בשום חיפוש אחר.
+    .neq("category", "nightlife")
     .eq("is_legacy", false)
     .neq("source", AI_TRIP_BUILDER_SOURCE)
     .or(categoryFilter)

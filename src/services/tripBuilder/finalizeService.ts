@@ -1,9 +1,10 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
-import { saveFinalItinerary } from "./sessionService";
+import { saveFinalItinerary, savePartialItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
 import { validateFinalItinerary } from "./validationService";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
 import type { FinalItinerary, FinalItineraryEvent, FinalItineraryStop, LatLng, TripBuilderStop } from "./types";
@@ -43,7 +44,12 @@ export async function finalizeItinerary(
   budgetBand: string,
   durationBand?: string,
   tripIntent?: TripIntent | null,
-  freeText?: string
+  freeText?: string,
+  /** בקשה מפורשת (ארכיטקטורת "יום 1 תוך 10-15 שניות + סקלטון לשאר
+   *  הימים"): false עבור שמירת יום 1 בלבד באמצע בנייה מרובת-ימים - לא
+   *  נוגע ב-status (נשאר "building"). ברירת המחדל true שומרת על ההתנהגות
+   *  המקורית (המסלול המלא, status="completed") לכל שאר הקוראים. */
+  isFinal: boolean = true
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -98,6 +104,12 @@ let cursor = origin;
     const etaMinutes = estimateTravelMinutes(distanceKm, "drive");
     cumulativeMinutes += etaMinutes;
 
+    // תחנת חיי לילה לא נפתחת לפני 19:00 - אם היום עדיין "מוקדם" בשלב הזה,
+    // מקפיצים את הזמן המצטבר קדימה עד השעה הזו (ולא אחורה - אף פעם לא מוקדם יותר).
+    if (stop.category === "nightlife" && cumulativeMinutes < NIGHTLIFE_MIN_OFFSET_MINUTES) {
+      cumulativeMinutes = NIGHTLIFE_MIN_OFFSET_MINUTES;
+    }
+
 finalStops.push({
         stopId: stop.id,
         placeId: stop.place!.id,
@@ -121,6 +133,13 @@ finalStops.push({
     cumulativeCost += estimateCostFromPriceLevel(stop.place!.price_level);
     cursor = placeLatLng;
   }
+
+  // Time Engine - דרישה קשיחה: המשתמש רואה אך ורק שעות עגולות (09:00,
+  // 10:00...) - לעולם לא 09:23/14:45. החישוב המדויק-לדקה למעלה משמש רק
+  // לקביעת הסדר/המרחק היחסי בין תחנות - עכשיו מיישרים כל תחנה לשעה
+  // עגולה הכי קרובה, עם ערבות שהיא תמיד מאוחרת מהתחנה הקודמת (לא שתי
+  // תחנות על אותה שעה) ולעולם לא מוקדמת ממנה.
+  alignStopTimesToWholeHours(finalStops);
 
 const warnings: string[] = [];
   const maxBudget = BUDGET_BAND_MAX_TOTAL[budgetBand];
@@ -199,11 +218,94 @@ const warnings: string[] = [];
     events: [],
     totalEtaMinutes: cumulativeMinutes,
     warnings,
+    dayTitles: deriveDayTitles(finalStops),
   };
 
-  await saveFinalItinerary(supabase, sessionId, itinerary);
+  if (isFinal) {
+    await saveFinalItinerary(supabase, sessionId, itinerary);
+  } else {
+    await savePartialItinerary(supabase, sessionId, itinerary);
+  }
   return itinerary;
 }
+
+/**
+ * Time Engine (בקשה מפורשת, "Requirement קשיח"): מיישר את arrivalOffsetMinutes
+ * של כל תחנה לכפולה שלמה של 60 - כדי שהתצוגה בפרונט (dayStartMinutes[day]
+ * + arrivalOffsetMinutes, ר' עמוד התוצאה) תמיד תצא שעה עגולה. עובד לפי
+ * יום (מתאפס בכל day_index חדש, בהתאם לסדר ה-stops שכבר ממוין לפי יום).
+ * מעגל לשעה הכי קרובה (לא תמיד כלפי מעלה) כדי שהתחנה הראשונה של היום
+ * תרד בד"כ קרוב ל-09:00 ולא תמיד תזנק ל-10:00 סתם כי הייתה נסיעה קצרה.
+ * אוכפת עלייה חדה (לא פוחתת, לא כפולה) - שתי תחנות לא יכולות לצאת
+ * באותה שעה בדיוק. חיי לילה (category="nightlife") כבר מובטחת ≥19:00
+ * ע"י NIGHTLIFE_MIN_OFFSET_MINUTES למעלה (כפולה של 60 מלכתחילה) ולכן לא
+ * כפופה לתקרת יום רגיל - יכולה להמשיך אחרי 21:00 (סעיף 32 במסמך).
+ */
+function alignStopTimesToWholeHours(stops: FinalItineraryStop[]): void {
+  const DEFAULT_DAY_END_HOUR_SLOT = 12; // 09:00 + 12h = 21:00, חלון היום הרגיל
+  let currentDay: number | null | undefined;
+  let lastHourSlot = -1;
+
+  for (const stop of stops) {
+    if (stop.dayIndex !== currentDay) {
+      currentDay = stop.dayIndex;
+      lastHourSlot = -1;
+    }
+
+    let hourSlot = Math.round(stop.arrivalOffsetMinutes / 60);
+    if (hourSlot < 0) hourSlot = 0;
+    if (hourSlot <= lastHourSlot) hourSlot = lastHourSlot + 1;
+    if (stop.category !== "nightlife" && hourSlot > DEFAULT_DAY_END_HOUR_SLOT) {
+      hourSlot = DEFAULT_DAY_END_HOUR_SLOT;
+    }
+
+    stop.arrivalOffsetMinutes = hourSlot * 60;
+    lastHourSlot = hourSlot;
+  }
+}
+
+/**
+ * בקשה מפורשת (סעיף 46 במסמך): כותרת קצרה וטבעית לכל יום - "נחיתה
+ * והיכרות", "יום קלאסי", "בוקר אחרון" וכו'. בכוונה **דטרמיניסטי, בלי
+ * קריאת AI נוספת** (סעיף 35: קוד עושה מה שקוד יכול לעשות מהר) - נגזר
+ * מהקטגוריות שבפועל כבר נבחרו לתחנות ה"אטרקציה" של אותו יום, לא ניחוש.
+ * יום 1 ויום אחרון הם מקרה קבוע ונפרד (מותאם ללוגיסטיקת נחיתה/עזיבה).
+ */
+function deriveDayTitles(stops: FinalItineraryStop[]): Record<string, string> {
+  const dayNumbers = Array.from(new Set(stops.map((s) => s.dayIndex).filter((d): d is number => d != null))).sort(
+    (a, b) => a - b
+  );
+  if (dayNumbers.length === 0) return {};
+
+  const lastDay = dayNumbers[dayNumbers.length - 1];
+  const titles: Record<string, string> = {};
+  const NON_ATTRACTION_CATEGORIES = new Set(["wineries_dining", "coffee_carts_cafes", "nightlife"]);
+
+  for (const day of dayNumbers) {
+    const dayStops = stops.filter((s) => s.dayIndex === day);
+    const hasNightlife = dayStops.some((s) => s.category === "nightlife");
+
+    if (day === 1) {
+      titles[String(day)] = hasNightlife ? "נחיתה, היכרות וערב ראשון" : "נחיתה והיכרות";
+      continue;
+    }
+    if (day === lastDay && dayNumbers.length > 1) {
+      titles[String(day)] = "בוקר אחרון";
+      continue;
+    }
+
+    const attractionLabels = dayStops
+      .filter((s) => s.category && !NON_ATTRACTION_CATEGORIES.has(s.category))
+      .map((s) => getCategoryLabel(s.category))
+      .filter((label, idx, arr) => label && arr.indexOf(label) === idx);
+
+    const baseLabel = attractionLabels.slice(0, 2).join(" ו");
+    titles[String(day)] = baseLabel ? (hasNightlife ? `${baseLabel} ובילויים` : baseLabel) : hasNightlife ? "יום בילויים" : `יום ${day}`;
+  }
+
+  return titles;
+}
+
 
 /**
  * מתחילה מהתחנה **הראשונה בתוכנית המקורית** (כפי ש-Claude קבע לפי סדר
@@ -244,24 +346,35 @@ function orderByNearestNeighbor(stops: LikedStopWithPlace[], _origin: LatLng): L
   return ordered;
 }
 
-/** כמו orderByNearestNeighbor, אבל שומר על קיבוץ לפי יום - לא מערבב תחנות מימים שונים. */
-function orderByDayThenNearestNeighbor(stops: LikedStopWithPlace[], origin: LatLng): LikedStopWithPlace[] {
+/**
+ * שומר על הסדר המתוכנן בפועל (slot_index, כבר ממוין כך מהשאילתה למעלה) -
+ * לא nearest-neighbor גיאוגרפי. תיקון קריטי (בקשה מפורשת - "למה יש 3
+ * רופטופים ברצף?"): הגרסה הקודמת מיינה כל יום מחדש לפי קרבה גיאוגרפית
+ * גרידא, מה שדרס לגמרי את דפוס האינטרליבינג (מסעדה-אטרקציה-מסעדה...,
+ * ר' interleaveDayRoles) - כמה מועמדי "food" מאותו סגנון (רופטופים) שהיו
+ * קרובים גיאוגרפית "נדבקו" ברצף במקום להתפזר בין אטרקציות. שומרים על
+ * הסדר המתוכנן, לא מערבבים בין ימים. תחנת חיי-לילה (role="nightlife")
+ * כבר מקבלת מלכתחילה את ה-slot_index הגבוה ביותר ביום שלה
+ * (buildMultiDayVacationPlan) - כלומר היא כבר אחרונה בלי טיפול מיוחד כאן.
+ */
+function orderByDayThenNearestNeighbor(stops: LikedStopWithPlace[], _origin: LatLng): LikedStopWithPlace[] {
   const days = Array.from(new Set(stops.map((s) => s.day_index ?? 0))).sort((a, b) => a - b);
   const ordered: LikedStopWithPlace[] = [];
-  let cursor = origin;
 
   for (const day of days) {
-    const dayStops = stops.filter((s) => (s.day_index ?? 0) === day);
-    const orderedDay = orderByNearestNeighbor(dayStops, cursor);
-    ordered.push(...orderedDay);
-    if (orderedDay.length > 0) {
-      const last = orderedDay[orderedDay.length - 1];
-      cursor = { lat: last.place!.latitude!, lng: last.place!.longitude! };
-    }
+    ordered.push(...stops.filter((s) => (s.day_index ?? 0) === day));
   }
 
   return ordered;
 }
+
+/** תואם את ברירת המחדל הקיימת בעמוד התוצאה (dayStartMinutes[day] ?? 9*60) -
+ *  היום "מתחיל" ב-09:00 אלא אם המשתמש שינה ידנית. */
+const ASSUMED_DAY_START_HOUR = 9;
+/** בקשה מפורשת: תחנת חיי לילה - אף פעם לא לפני 19:00, אבל יכולה בהחלט
+ *  להיות מאוחרת יותר אם היום כבר התארך טבעית מעבר לזה. */
+const NIGHTLIFE_MIN_HOUR = 19;
+const NIGHTLIFE_MIN_OFFSET_MINUTES = (NIGHTLIFE_MIN_HOUR - ASSUMED_DAY_START_HOUR) * 60;
 
 /**
  * אירועים ופסטיבלים אמיתיים בסביבה (Ticketmaster) - מוצגים כהמלצה משלימה

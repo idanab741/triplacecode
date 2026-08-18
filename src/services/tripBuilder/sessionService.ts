@@ -103,6 +103,35 @@ export async function saveCategoryPlan(
   return (data as TripBuilderStop[]).sort((a, b) => a.slot_index - b.slot_index);
 }
 
+/**
+ * בקשה מפורשת (Vacation Blueprint - ר' dayBlueprintService.ts) - מוסיפה
+ * שורות trip_builder_stops ליום אחד שנבנה **דינמית תוך כדי auto-build**
+ * (לא בשלב יצירת ה-session), בלי לדרוס את category_plan/status על
+ * ה-session (בניגוד ל-saveCategoryPlan הרגיל) - כי זה כבר נעשה פעם אחת
+ * ביצירת ה-session ליום 1/יום אחרון, ואין צורך לשכתב אותו לכל יום.
+ */
+export async function appendDayStops(
+  supabase: SupabaseClient,
+  sessionId: string,
+  dayPlan: CategoryPlanItem[]
+): Promise<TripBuilderStop[]> {
+  const rows = dayPlan.map((item) => ({
+    session_id: sessionId,
+    category: item.category,
+    role: item.role,
+    slot_index: item.order,
+    day_index: item.day ?? null,
+    note: item.note ?? null,
+  }));
+
+  const { data, error } = await supabase.from("trip_builder_stops").insert(rows).select("*");
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "יצירת תחנות היום נכשלה");
+  }
+  return (data as TripBuilderStop[]).sort((a, b) => a.slot_index - b.slot_index);
+}
+
 export async function updateSessionStatus(
   supabase: SupabaseClient,
   sessionId: string,
@@ -128,6 +157,24 @@ export async function saveFinalItinerary(
   await supabase
     .from("trip_builder_sessions")
     .update({ final_itinerary: itinerary, status: "completed" })
+    .eq("id", sessionId);
+}
+
+/**
+ * שמירה חלקית (למשל: יום 1 בלבד מוכן, שאר הימים עדיין בבנייה באותה
+ * קריאת auto-build) - בכוונה **לא** נוגעת ב-status: הוא נשאר "building"
+ * עד לקריאה הסופית (saveFinalItinerary, בסוף הבנייה כולה). זה בדיוק מה
+ * שמאפשר לעמוד התוצאה להבחין בין "יש כבר טיול חלקי להציג, עם סקלטון
+ * לימים שעוד לא הגיעו" לבין "המסלול המלא סופי, אפשר להפסיק לתשאל".
+ */
+export async function savePartialItinerary(
+  supabase: SupabaseClient,
+  sessionId: string,
+  itinerary: FinalItinerary
+): Promise<void> {
+  await supabase
+    .from("trip_builder_sessions")
+    .update({ final_itinerary: itinerary })
     .eq("id", sessionId);
 }
 

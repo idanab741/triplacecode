@@ -9,7 +9,11 @@
 
 export type SessionStatus = "questionnaire" | "planning" | "building" | "completed" | "abandoned";
 
-export type StopRole = "attraction" | "food" | "coffee_dessert" | "viewpoint" | "bar" | "spa";
+/** "nightlife" נוסף רק לתפקידי-סלוט של חופשה בחו"ל (buildMultiDayVacationPlan,
+ *  דטרמיניסטי לגמרי, בלי AI) - תחנת חיי לילה מקובעת בסוף היום, שנשלפת
+ *  מ-fetchNightlifeCandidatePool (סינון category="nightlife" ישיר,
+ *  לא trip_type_tags) ולא דרך fetchCandidatePool הרגיל. */
+export type StopRole = "attraction" | "food" | "coffee_dessert" | "viewpoint" | "bar" | "spa" | "nightlife";
 
 export type StopStatus = "pending" | "liked" | "rejected" | "skipped";
 
@@ -29,8 +33,65 @@ export interface TripBuilderSession {
   category_plan: CategoryPlanItem[];
   final_itinerary: FinalItinerary | null;
   trip_intent: import("./tripIntentService").TripIntent | null;
+  /** בקשה מפורשת - Context Engine (VacationContext) לחופשה בחו"ל: מאוחד
+   *  פעם אחת בתחילת auto-build (ר' vacationContext.ts), ומועבר (לא נבנה
+   *  מחדש) לכל קריאת Blueprint של כל יום. עמודה נפרדת בכוונה מ-answers -
+   *  answers הוא "מה שהמשתמש ענה" גולמי, זה "מה שהמערכת חישבה מזה". */
+  vacation_context?: VacationContext | null;
   created_at: string;
   updated_at: string;
+}
+
+/** בקשה מפורשת (Context Engine, MASTER PROMPT סעיף 9) - אובייקט מאוחד
+ *  אחד שכל שכבת התכנון (בעיקר generateDayBlueprint) מקבלת, במקום לאסוף
+ *  שוב DNA/טיסות/מלון בכל קריאה בנפרד. נבנה פעם אחת ב-buildVacationContext. */
+export interface VacationContext {
+  user: {
+    interests: string[];
+    kosher: boolean;
+    accessibility: boolean;
+  };
+  trip: {
+    destination: string;
+    startDate: string;
+    endDate: string;
+    numDays: number;
+    travelers: number;
+    hasChildren: boolean;
+    budgetBand: string;
+    pace: string;
+    vacationTypes: string[];
+    freeText: string;
+  };
+  logistics: {
+    hasFlights: boolean;
+    hasHotel: boolean;
+    hotelName: string | null;
+  };
+  destination: {
+    centralNeighborhoodName: string | null;
+  };
+  live: {
+    weatherSummary: string | null;
+  };
+}
+
+/**
+ * בקשה מפורשת - הפלט היחיד של קריאת ה-AI המרכזית לכל יום "רגיל" (לא
+ * יום 1, לא יום אחרון - אלה נשארים דטרמיניסטיים לגמרי, בלי Blueprint).
+ * בכוונה **לא** מכיל שום שם מקום ספציפי - רק אסטרטגיה ברמת-על. הבחירה
+ * בפועל של המקומות נשארת אצל fetchCandidatePool/rankCandidatesFast, לא
+ * אצל ה-AI. ר' dayBlueprintService.ts.
+ */
+export interface DayBlueprint {
+  /** כותרת קצרה וטבעית ליום, למשל "דובאי הקלאסית" - משמשת גם כ-dayTitle בתוצאה הסופית. */
+  title: string;
+  /** כמה תחנות "אטרקציה" ביום הזה - סטייה אמיתית מהתבנית הקבועה (2-4). */
+  attractionsCount: number;
+  /** true = מסעדת צהריים בנוסף לערב (כמו התבנית הקבועה); false = יום קליל יותר, ארוחה אחת בלבד. */
+  includeSecondFoodStop: boolean;
+  /** 1-2 קטגוריות מתוך vacationTypes שהיום הזה מתמקד בהן - קוד ממפה אותן ל-trip_type_tags בפועל. */
+  focusCategories: string[];
 }
 
 export interface TripBuilderStop {
@@ -113,7 +174,7 @@ export interface FinalItineraryStop {
   dayIndex: number | null;
   /** ×¡×•×’ ×ª×—× ×” ×ž×™×•×—×“×ª (× ×—×™×ª×”/×¦'×§-××™×Ÿ/×¦'×§-×××•×˜/×˜×™×¡×ª ×—×–×¨×”) - null ×œ×ª×—× ×” ×¨×’×™×œ×”. ×ž×©×ž×©
    *  ×œ×ª×¦×•×’×” ×‘×œ×‘×“, ×œ× × ×©×œ×£ ×ž-DB/AI. */
-  specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | null;
+  specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | "neighborhood" | null;
   /** ×§×™×©×•×¨ ×œ×”×–×ž× ×ª × ×¡×™×¢×” (Google Maps directions - ×”×ž×©×ª×ž×© ×‘×•×—×¨ ×©× ××•×‘×¨/×ž×•× ×™×ª/
    *  ×ª×—×‘×•×¨×” ×¦×™×‘×•×¨×™×ª) - ×¨×§ ×œ×ª×—× ×•×ª ×œ×•×’×™×¡×˜×™×§×” (× ×—×™×ª×”/×˜×™×¡×ª ×—×–×¨×”). null/undefined ×œ×ª×—× ×” ×¨×’×™×œ×”. */
   directionsUrl?: string | null;
@@ -133,6 +194,11 @@ export interface FinalItinerary {
   events: FinalItineraryEvent[];
   totalEtaMinutes: number;
   warnings: string[];
+  /** בקשה מפורשת - כותרת קצרה וטבעית לכל יום (למשל "נחיתה והיכרות",
+   *  "דובאי הקלאסית") - נגזרת דטרמיניסטית מתוך הקטגוריות שבפועל נבחרו
+   *  ליום הזה (ר' deriveDayTitle ב-finalizeService.ts), לא קריאת AI
+   *  נוספת. מפתח = מספר היום כמחרוזת (JSON keys הם תמיד string). */
+  dayTitles?: Record<string, string>;
 }
 
 export type CompanionType = "couple" | "family" | "friends" | "solo" | "with_pet";

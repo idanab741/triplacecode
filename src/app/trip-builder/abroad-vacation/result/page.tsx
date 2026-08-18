@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Screen } from "@/components/ui";
+import { Screen, Skeleton } from "@/components/ui";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -41,6 +41,11 @@ function AbroadVacationResultContent() {
   const [justShared, setJustShared] = useState(false);
   const [logisticsImages, setLogisticsImages] = useState<Record<string, string | null>>({});
   const [airportInfo, setAirportInfo] = useState<{
+    name: string;
+    coords: { lat: number; lng: number };
+    imageUrl: string | null;
+  } | null>(null);
+  const [neighborhoodInfo, setNeighborhoodInfo] = useState<{
     name: string;
     coords: { lat: number; lng: number };
     imageUrl: string | null;
@@ -254,6 +259,20 @@ function AbroadVacationResultContent() {
         })
         .catch(() => {});
     }
+    if (destination && neighborhoodInfo === null) {
+      fetch(`/api/places/central-neighborhood?destination=${encodeURIComponent(destination)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.neighborhood) {
+            setNeighborhoodInfo({
+              name: data.neighborhood.name,
+              coords: data.neighborhood.coords,
+              imageUrl: data.neighborhood.imageUrl,
+            });
+          }
+        })
+        .catch(() => {});
+    }
     if (hotel?.name && logisticsImages["hotel"] === undefined) {
       fetch(`/api/places/photo-search?q=${encodeURIComponent(`${hotel.name} ${hotel.address}`)}`)
         .then((res) => res.json())
@@ -279,22 +298,25 @@ function AbroadVacationResultContent() {
     );
   }
 
-  if (session.status !== "completed") {
-    return (
-      <LoadingGame
-        statusText="רגע, בונים לכם את החופשה..."
-        steps={[
-          "🌍 מוצאים את היעד המושלם בשבילכם",
-          "🏛️ בוחרים אטרקציות ופינות מיוחדות",
-          "🍽️ מתאימים מסעדות וברים לכל יום",
-          "🗺️ בונים מסלול לפי אזורים וזמני נסיעה",
-          "⏱️ מסדרים הכל לפי שעות פתיחה וקצב הטיול",
-        ]}
-      />
-    );
-  }
-
+  // בקשה מפורשת וחד-משמעית: "10-15 שניות ליעד+יום 1, ואז סקלטון לכל
+  // כרטיסייה של שאר הימים" - לא מסך LoadingGame מלא-מסך שחוסם הכל עד
+  // ש-status="completed". ברגע שיש כבר itinerary חלקי (יום 1, נשמר עם
+  // isFinal=false ב-auto-build) - עוברים לתצוגת הטיול הרגילה מיד, גם אם
+  // status עדיין "building"; שאר הימים מוצגים כסקלטון (ר' renderDayTab/
+  // הרשימה למטה) עד שהם מגיעים באותו polling הקיים.
   if (!itinerary || itinerary.stops.length === 0) {
+    if (session.status !== "completed") {
+      return (
+        <LoadingGame
+          statusText="רגע, בונים לכם את היעד ואת יום 1..."
+          steps={[
+            "🌍 מוצאים את היעד המושלם בשבילכם",
+            "🏛️ בוחרים אטרקציות ופינות מיוחדות ליום הראשון",
+            "🍽️ מתאימים מסעדה קרובה לשכונה המרכזית",
+          ]}
+        />
+      );
+    }
     return (
       <Screen>
         <div className="pt-10 text-center text-ink-secondary">
@@ -315,7 +337,13 @@ function AbroadVacationResultContent() {
     hotels?: { name: string; address: string }[];
   };
 
-  const dayGroups = injectLogisticsStops(groupStopsByDay(itinerary.stops), answersTyped, logisticsImages, airportInfo);
+  const dayGroups = injectLogisticsStops(
+    groupStopsByDay(itinerary.stops),
+    answersTyped,
+    logisticsImages,
+    airportInfo,
+    neighborhoodInfo
+  );
   const hasHotel = Boolean(answersTyped.hotels?.[0]?.name);
 
   const visibleDayGroups = dayGroups.filter(
@@ -331,6 +359,24 @@ function AbroadVacationResultContent() {
     const stopDay = (s as unknown as { dayIndex: number | null }).dayIndex ?? 1;
     return stopDay === activeDayFilter;
   });
+
+  // ימים שעדיין לא הגיעו (לא קיימים ב-dayGroups) - מוצגים כטאב+כרטיסי
+  // סקלטון, כל עוד הבנייה עדיין רצה (status!=="completed"). מספר הימים
+  // הכולל נגזר מטווח התאריכים שהמשתמש בחר - אותו חישוב בדיוק כמו
+  // countDays ב-categoryPlanService.ts (כולל ברירת המחדל של 5 ימים).
+  const expectedTotalDays = (() => {
+    if (!answersTyped.startDate || !answersTyped.endDate) return dayGroups.length || 5;
+    const start = new Date(answersTyped.startDate);
+    const end = new Date(answersTyped.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return dayGroups.length || 5;
+    const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, days);
+  })();
+  const readyDayNumbers = new Set(dayGroups.map((g) => g.day));
+  const pendingDayNumbers =
+    session.status === "completed"
+      ? []
+      : Array.from({ length: expectedTotalDays }, (_, i) => i + 1).filter((d) => !readyDayNumbers.has(d));
 
   return (
     <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
@@ -451,6 +497,17 @@ function AbroadVacationResultContent() {
               )}
             </button>
           ))}
+          {/* ימים שעדיין בבנייה - טאב סקלטון פועם, לא לחיץ (עדיין אין
+              מה להציג עבורם) - זה בדיוק הסקלטון-לכל-כרטיסייה שהוזכר. */}
+          {pendingDayNumbers.map((day) => (
+            <div
+              key={`pending-${day}`}
+              className="flex shrink-0 flex-col items-center gap-1 rounded-card bg-white px-4 py-2 shadow-soft opacity-60"
+            >
+              <span className="text-xs font-bold text-ink-secondary">יום {day}</span>
+              <Skeleton className="h-2 w-10" />
+            </div>
+          ))}
         </div>
 
         <ResultMap
@@ -531,10 +588,15 @@ function AbroadVacationResultContent() {
             {visibleDayGroups.map(({ day, stops: dayStops }) => (
               <div key={day} id={`day-${day}`} className="flex flex-col gap-3 scroll-mt-4">
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-ink">יום {day}</h2>
-                    {answersTyped.startDate && (
-                      <span className="text-xs text-ink-secondary">{formatSingleDate(answersTyped.startDate, day - 1)}</span>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-ink">יום {day}</h2>
+                      {answersTyped.startDate && (
+                        <span className="text-xs text-ink-secondary">{formatSingleDate(answersTyped.startDate, day - 1)}</span>
+                      )}
+                    </div>
+                    {itinerary.dayTitles?.[String(day)] && (
+                      <span className="text-xs font-medium text-accent">{itinerary.dayTitles[String(day)]}</span>
                     )}
                   </div>
                   {editingTime === day ? (
@@ -632,6 +694,30 @@ function AbroadVacationResultContent() {
           </SortableContext>
         </DndContext>
 
+        {/* ימים שעדיין בבנייה ברקע (ר' pendingDayNumbers למעלה) - כרטיסי
+            סקלטון פועמים לכל יום, לא רשימה ריקה/ספינר כללי. נעלם מעצמו
+            ברגע שהיום הזה מגיע ב-polling (session.final_itinerary מתעדכן). */}
+        {activeDayFilter === "all" &&
+          pendingDayNumbers.map((day) => (
+            <div key={`pending-day-${day}`} className="flex flex-col gap-3 pt-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-ink-secondary">יום {day}</h2>
+                <span className="text-xs text-ink-secondary">בבנייה...</span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-card bg-white p-3 shadow-soft">
+                    <Skeleton className="h-20 w-20 shrink-0" />
+                    <div className="flex flex-1 flex-col gap-2">
+                      <Skeleton className="h-3 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
         <AddToCalendarButton sessionId={sessionId} date={resolveTripCalendarDate(session?.answers)} />
       </div>
       <MainBottomNav active="home" />
@@ -677,7 +763,7 @@ function makeSyntheticStop(
   id: string,
   name: string,
   description: string,
-  specialType: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight",
+  specialType: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | "neighborhood",
   offsetMinutes: number,
   imageUrl?: string | null,
   directionsUrl?: string | null
@@ -720,7 +806,8 @@ function injectLogisticsStops(
     hotels?: { name: string; address: string }[];
   },
   images: Record<string, string | null>,
-  airportInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null
+  airportInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null,
+  neighborhoodInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null
 ): { day: number; stops: FinalItinerary["stops"] }[] {
   if (dayGroups.length === 0) return dayGroups;
 
@@ -759,6 +846,21 @@ function injectLogisticsStops(
         "hotel_checkin",
         -30,
         images.hotel
+      )
+    );
+  }
+  // בקשה מפורשת: כרטיס "השכונה המרכזית" של היעד - תמיד אחרי שדה
+  // התעופה/המלון, ולפני התחנות האמיתיות (ארוחת יום 1 וכו') - זה כרטיס
+  // תצוגה בלבד, לא תחנת place מהמאגר (ר' centralNeighborhoodService.ts).
+  if (neighborhoodInfo) {
+    firstDayExtras.push(
+      makeSyntheticStop(
+        "synthetic-neighborhood",
+        neighborhoodInfo.name,
+        "סיבוב חופשי בשכונה המרכזית והתוססת של היעד",
+        "neighborhood",
+        -15,
+        neighborhoodInfo.imageUrl
       )
     );
   }

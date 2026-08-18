@@ -2,7 +2,7 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
-import type { CategoryPlanItem, DayTripAnswers, RestaurantAnswers, StopRole, TripType } from "./types";
+import type { CategoryPlanItem, DayBlueprint, DayTripAnswers, RestaurantAnswers, StopRole, TripType } from "./types";
 import { getTripTypeRules } from "./rules";
 import type { TripIntent } from "./tripIntentService";
 import { NIGHTLIFE_VENUE_TYPE_TO_CATEGORY } from "@/locales/he/nightlife";
@@ -406,7 +406,6 @@ export async function decideNextStop(params: DecideNextStopParams): Promise<{ ca
   const notUsed = pool.find((c) => !params.usedCategories.includes(c));
   return { category: notUsed ?? pool[0], role: "attraction" };
 }
-import { VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
 
 /**
  * מחשב כמה ימים יש בין שני תאריכים (כולל שני הקצוות).
@@ -419,7 +418,7 @@ import { VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
  * בוולידציה עם "המסלול שנבנה ריק". כשאין תאריך בכלל, נופלים לברירת מחדל
  * סבירה לחופשה (5 ימים) במקום להשאיר את המשתמש בלי מסלול.
  */
-function countDays(startDate: string, endDate: string): number {
+export function countDays(startDate: string, endDate: string): number {
   const DEFAULT_TRIP_DAYS = 5;
   if (!startDate || !endDate) return DEFAULT_TRIP_DAYS;
 
@@ -434,51 +433,23 @@ function countDays(startDate: string, endDate: string): number {
 }
 
 /**
- * מסדר את תפקידי התחנות של יום (attraction/food) לפי הדפוס שהתבקש
- * במפורש: אף פעם לא שתי מסעדות ברצף, עם פיזור אחיד ככל האפשר של
- * האטרקציות בין עוגני המסעדה - למשל ליום "עמוס" עם 3 מסעדות ו-3
- * אטרקציות: מסעדה-אטרקציה-אטרקציה-מסעדה-אטרקציה-מסעדה - במקום כל
- * האטרקציות ברצף ואז כל המסעדות ברצף (זה מה שיצר את ה"בליל").
- */
-function interleaveDayRoles(attractionsCount: number, foodCount: number): Array<"attraction" | "food"> {
-  if (foodCount === 0) return Array(attractionsCount).fill("attraction");
-  if (attractionsCount === 0) return Array(foodCount).fill("food");
-
-  // המסעדות הן העוגנים שפותחים (ואם יש יותר מאחת - גם סוגרים) את היום;
-  // האטרקציות מתחלקות ל-(foodCount - 1) "רווחים" שביניהן בצורה הכי
-  // שווה שאפשר (Math.floor/עודף לסירוגין). אם יש מסעדה אחת בלבד, כל
-  // האטרקציות באות אחריה.
-  const gaps = Math.max(1, foodCount - 1);
-  const base = Math.floor(attractionsCount / gaps);
-  const remainder = attractionsCount % gaps;
-  const roles: Array<"attraction" | "food"> = [];
-  for (let g = 0; g < gaps; g++) {
-    roles.push("food");
-    const countHere = base + (g < remainder ? 1 : 0);
-    for (let i = 0; i < countHere; i++) roles.push("attraction");
-  }
-  if (foodCount > gaps) roles.push("food"); // המסעדה האחרונה, אחרי כל הרווחים
-  return roles;
-}
-
-/**
- * בונה תוכנית קטגוריות מרובת-ימים לחופשה בחו"ל - דטרמיניסטי (בלי AI), לפי
- * קצב הטיול (VACATION_PACE_DAILY_COUNTS) וסוגי החופשה שנבחרו. סדר
- * התפקידים בתוך כל יום עובר דרך interleaveDayRoles (ר' למעלה) - לא כל
- * האטרקציות ואז כל המסעדות. יום ראשון הוא מקרה קבוע ונפרד לגמרי (ר'
- * למטה); יום אחרון (אם הוא לא גם הראשון) עדיין מקבל כמות מופחתת, בהתאם
- * למסמך האפיון.
+ * בונה תוכנית קטגוריות מרובת-ימים לחופשה בחו"ל - דטרמיניסטי (בלי AI).
+ * בקשה מפורשת: תבנית קבועה לכל יום "רגיל" (לא תלויה בקצב שנבחר יותר) -
+ * ר' ההערה בלולאה למטה. יום ראשון הוא מקרה קבוע ונפרד לגמרי; יום אחרון
+ * (אם הוא לא גם הראשון) הוא בדיוק ארוחת בוקר + אטרקציה אחת, לא נוסחה
+ * יחסית לקצב.
  */
 export function buildMultiDayVacationPlan(answers: {
   startDate: string;
   endDate: string;
   pace: string;
   vacationTypes: string[];
+  /** ברירת מחדל "abroad_vacation" - סופ"ש ממשיך עם הדפוס הישן ליום 1
+   *  (attraction+food), כי אין לו כרטיס שכונה מרכזית/שדה תעופה בעמוד
+   *  התוצאה שלו. נשאר אופציונלי כדי לא לשבור קריאות קיימות. */
+  tripType?: "abroad_vacation" | "weekend";
 }): CategoryPlanItem[] {
   const numDays = countDays(answers.startDate, answers.endDate);
-  const counts =
-    VACATION_PACE_DAILY_COUNTS[answers.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ??
-    VACATION_PACE_DAILY_COUNTS.balanced;
 
   const categoryPool =
     answers.vacationTypes.length > 0
@@ -496,31 +467,110 @@ export function buildMultiDayVacationPlan(answers: {
   }
 
   for (let day = 1; day <= numDays; day++) {
+    const isLastDay = day === numDays;
+
+    if (day === 1 && answers.tripType !== "weekend") {
+      // יום הגעה בחופשה בחו"ל - בקשה מפורשת: בלי attraction מהמאגר בכלל.
+      // "השכונה המרכזית" היא כרטיס תצוגה מלאכותי (findCentralNeighborhood +
+      // injectLogisticsStops בעמוד התוצאה), לא תחנת place - בדיוק כמו
+      // שדה התעופה ושורת המלון. נשארת רק ארוחת ערב אחת, שבהמשך
+      // (auto-build/route.ts) תחפש ברדיוס עד 1 ק"מ מהשכונה המרכזית -
+      // לא מהמלון ולא ממרכז היעד הכללי.
+      //
+      // בקשה מפורשת (סעיף 34 במסמך, "Nightlife אינו חייב להיות בכל
+      // ערב"): בלי חיי לילה ביום ההגעה בכלל, גם אם סומן - אחרי טיסה
+      // ויום נחיתה, לא בונים ערב יציאה. חיי לילה מופיע בימים ה"רגילים"
+      // שבין ההגעה לעזיבה, לא בקצוות.
+      plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+      continue;
+    }
+
     if (day === 1) {
-      // יום הגעה - בקשה מפורשת: בלי קשר לקצב שנבחר, רק תחנה אחת ("סיבוב
-      // בשכונה המרכזית של העיר") ואחריה ארוחת ערב אחת באותו אזור - בסדר
-      // הזה (סיור לפני ארוחה, ולא ההפך כמו הדפוס הרגיל שפותח במסעדה).
-      // הגעה בשדה התעופה ושורת המלון עצמן אינן "תחנת place" מהמאגר - הן
-      // מוצגות בנפרד בעמוד התוצאה מתוך תשובות הטיסה/המלון, לא כאן.
+      // סופ"ש - דפוס ישן ללא שינוי (יש לו attraction אמיתי מהמאגר ביום 1).
+      // גם כאן בלי חיי לילה ביום ההגעה, מאותה סיבה בדיוק.
       plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
       plan.push({ category: "wineries_dining", role: "food", order: order++, day });
       continue;
     }
 
-    // יום עזיבה (אם הוא לא גם יום 1) - מחצית מהכמות הרגילה, לפחות תחנה
-    // אחת מכל סוג, בהתאם לשעת הטיסה.
-    const isLastDay = day === numDays;
-    const attractionsCount = isLastDay ? Math.max(1, Math.floor(counts.attractions / 2)) : counts.attractions;
-    const foodCount = isLastDay ? Math.max(1, Math.floor(counts.food / 2)) : counts.food;
-
-    for (const role of interleaveDayRoles(attractionsCount, foodCount)) {
-      plan.push({
-        category: role === "food" ? "wineries_dining" : nextCategory(),
-        role,
-        order: order++,
-        day,
-      });
+    if (isLastDay) {
+      // יום עזיבה - בקשה מפורשת ומדויקת ("לא להתפזר"): בדיוק ארוחת בוקר
+      // (בית קפה) + אטרקציה אחת נוספת - לא נוסחת "חצי מהכמות הרגילה"
+      // (שיכלה להחזיר יותר משתי תחנות בקצב "מתוכנן"). אחרי זה - רק
+      // צ'ק-אאוט מהמלון וטיסת חזרה (כרטיסי תצוגה מלאכותיים, לא תחנות
+      // place - ר' injectLogisticsStops בעמוד התוצאה).
+      plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
+      plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
+      continue;
     }
+
+    // בקשה מפורשת (Context Engine + Vacation Blueprint) - ימים "רגילים"
+    // (לא 1, לא אחרון) לא נבנים כאן בכלל יותר. הם נבנים דינמית בתוך
+    // auto-build/route.ts: קריאת generateDayBlueprint (AI, אסטרטגיה
+    // ברמת-על בלבד) ואז categoryPlanForDay (למטה, קוד דטרמיניסטי) הופכת
+    // אותה לרשימת slots בפועל, ליום הזה בלבד, ברגע שמגיעים אליו - לא
+    // מראש לכל הטיול. כך יש שמירה הדרגתית אמיתית יום-אחרי-יום, לא רק
+    // "יום 1 ואז הכל".
+  }
+
+  return plan;
+}
+
+/**
+ * הופכת DayBlueprint (אסטרטגיה ברמת-על מ-generateDayBlueprint - כותרת,
+ * עוצמה, קטגוריות מיקוד) לרשימת slots בפועל ליום "רגיל" אחד. הסדר עצמו
+ * נשאר קוד דטרמיניסטי לגמרי (קפה תמיד ראשון, מסעדות במקום הנכון, חיי
+ * לילה תמיד אחרון) - רק ה*תוכן* (כמה אטרקציות, אילו קטגוריות, אם יש
+ * ארוחת צהריים) מגיע מה-Blueprint. בדיוק לפי ההחלטה: AI קובע אסטרטגיה,
+ * לא בוחר מקומות (זה עדיין fetchCandidatePool/rankCandidatesFast).
+ */
+export function categoryPlanForDay(
+  blueprint: DayBlueprint,
+  day: number,
+  startOrder: number,
+  includesNightlife: boolean
+): CategoryPlanItem[] {
+  const plan: CategoryPlanItem[] = [];
+  let order = startOrder;
+
+  const focusCategoryPool =
+    blueprint.focusCategories.length > 0
+      ? blueprint.focusCategories.map((t) => VACATION_TYPE_TO_CATEGORY[t] ?? "attractions_activities")
+      : ["attractions_activities"];
+  let focusCursor = 0;
+  function nextFocusCategory(): string {
+    const category = focusCategoryPool[focusCursor % focusCategoryPool.length];
+    focusCursor += 1;
+    return category;
+  }
+
+  // בוקר - קפה תמיד ראשון, בלי קשר לעוצמה שה-Blueprint בחר (בקשה
+  // מפורשת קודמת, לא תלויה ביום "קליל"/"עמוס").
+  plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
+
+  const attractionsCount = Math.max(1, blueprint.attractionsCount);
+  if (blueprint.includeSecondFoodStop) {
+    // ארוחת צהריים באמצע - חצי מהאטרקציות לפניה, חצי אחריה, עד לערב.
+    const beforeLunch = Math.ceil(attractionsCount / 2);
+    const afterLunch = attractionsCount - beforeLunch;
+    for (let i = 0; i < beforeLunch; i++) {
+      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
+    }
+    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+    for (let i = 0; i < afterLunch; i++) {
+      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
+    }
+    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+  } else {
+    // יום קליל יותר - כל האטרקציות לפני ארוחת ערב אחת יחידה.
+    for (let i = 0; i < attractionsCount; i++) {
+      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
+    }
+    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+  }
+
+  if (includesNightlife) {
+    plan.push({ category: "nightlife", role: "nightlife", order: order++, day });
   }
 
   return plan;

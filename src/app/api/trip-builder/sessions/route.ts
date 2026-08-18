@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         endDate: vacationLikeAnswers.endDate,
         pace: vacationLikeAnswers.pace,
         vacationTypes: vacationLikeAnswers.vacationTypes ?? vacationLikeAnswers.weekendStyles ?? [],
+        tripType,
       });
       const stops = await saveCategoryPlan(supabase, session.id, plan);
 

@@ -190,6 +190,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   const idRef = useRef(0);
   const startedRef = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runtrippyTriggeredRef = useRef(false);
 
   function nextId() {
     idRef.current += 1;
@@ -210,9 +211,15 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
 
   /**
    * מוצג בסוף השאלון (במקום לבנות ישר): הודעת בוט "בונים עבורך את המסלול
-   * המושלם" ואז בועת runtrippy עם הלוגו הדופק - הכל בתוך הצ'אט. בניית
-   * הטיול בפועל (buildTripDirectly) לא קורית אוטומטית - רק בלחיצה על
-   * הבועה (ר' handleRuntrippyClick), ששולפת את pendingBuildAnswersRef.
+   * המושלם" ואז בועת runtrippy עם הלוגו הדופק - הכל בתוך הצ'אט.
+   *
+   * בקשה מפורשת וחד-משמעית: לחיצה ידנית על הבועה = מעבר מיידי למסך
+   * הבנייה/המשחק (handleRuntrippyClick, ללא שינוי). **בלי** לחיצה - לא
+   * עוברים למסך הבנייה בכלל: נשארים כאן בצ'אט, בונים ברקע, ועוברים ישר
+   * לעמוד המוכן ברגע שהמסלול מוכן (או אחרי תקרה בטיחותית של 15 שניות) -
+   * ר' autoBuildAndWaitThenNavigate. בעבר זה "דימה" לחיצה על הבועה אחרי
+   * השהיה קצרה - זו הייתה טעות: זה בדיוק העביר למסך הטעינה/המשחק בלי
+   * שהמשתמש לחץ, מה שהמשתמש לא רצה.
    */
   function promptBuildTrip(next: AbroadVacationAnswers) {
     pendingBuildAnswersRef.current = next;
@@ -225,12 +232,15 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
       setTimeout(() => {
         setTyping(false);
         addRuntrippyPrompt();
+        autoBuildAndWaitThenNavigate(next);
       }, 700);
     }, 550);
   }
 
   function handleRuntrippyClick() {
+    if (runtrippyTriggeredRef.current) return;
     if (!pendingBuildAnswersRef.current) return;
+    runtrippyTriggeredRef.current = true;
     buildTripDirectly(pendingBuildAnswersRef.current);
   }
 
@@ -813,39 +823,90 @@ function confirmBooked() {
     closeEdit();
   }
 
-  /** אחרי "משהו נוסף שתרצו להוסיף" עוברים ישירות לבניית המסלול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
+  /** אחרי "משהו נוסף שתרצו להוסיף" עוברים ישירות לבניית המסלול דרך triplace - בלי מסך בחירה triplace/tripmatch.
+   *  לחיצה ידנית על בועת runtrippy (handleRuntrippyClick) - התנהגות מקורית, בלי שינוי: מעבר מיידי
+   *  למסך ההמתנה/המשחק, לא ממתינים לשום דבר קודם. */
   async function buildTripDirectly(answers: AbroadVacationAnswers) {
     if (!user) {
       router.push("/auth");
       return;
     }
-    // מציגים את מסך ההמתנה מיד בלחיצה - לא ממתינים לשום קריאת רשת קודם
-    // (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה". נקודת
-    // הכניסה היחידה לכאן היא כבר לחיצה על בועת ה-runtrippy בצ'אט
-    // (ר' promptBuildTrip/handleRuntrippyClick), אז אפשר לעבור ישר למסך
-    // המשחק בלי מסך ביניים נוסף.
     setSubmitting(true);
     setLocationError(null);
     try {
-      const origin = await getCurrentPosition();
-      const response = await fetch("/api/trip-builder/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripType: "abroad_vacation", answers, origin }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "יצירת החופשה נכשלה");
-
-      const sessionId = data.session.id;
-      // הבנייה בפועל (auto-build - הקריאה הכבדה שבוחרת את כל התחנות) *לא*
-      // ממתינים לה כאן: מפעילים אותה ברקע וממשיכים ישר לעמוד התוצאה, שהוא
-      // זה שמתשאל את ה-session שוב ושוב עד שהיא מסתיימת. כך המשתמש עובר
-      // מיד למסך ההמתנה במקום להיתקע כאן, וה"תנועה" מרגישה מיידית.
-      fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
+      const sessionId = await createSessionAndStartBuild(answers);
       router.push(`/trip-builder/abroad-vacation/result?sessionId=${sessionId}`);
     } catch (error) {
       setLocationError(error instanceof Error ? error.message : "לא הצלחנו לבנות את החופשה. נסו שוב.");
       setSubmitting(false);
+    }
+  }
+
+  /**
+   * יוצר session ומפעיל auto-build ברקע - לוגיקה משותפת לשני נתיבי הבנייה
+   * (לחיצה ידנית / אוטומטי-בלי-לחיצה). לא מנווט בעצמו - זו אחריות הקורא.
+   */
+  async function createSessionAndStartBuild(answers: AbroadVacationAnswers): Promise<string> {
+    const origin = await getCurrentPosition();
+    const response = await fetch("/api/trip-builder/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tripType: "abroad_vacation", answers, origin }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "יצירת החופשה נכשלה");
+
+    const sessionId = data.session.id;
+    // הבנייה בפועל (auto-build) לא ממתינים לה כאן - מפעילים ברקע.
+    fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
+    return sessionId;
+  }
+
+  /**
+   * בקשה מפורשת וחד-משמעית: "רק לחיצה על הלוגו מעבירה למסך הבנייה. אם
+   * לא לוחצים - נשארים בעמוד הזה (הצ'אט) עד שהמסלול מוכן בפועל, תוך
+   * 10-15 שניות, ואז עוברים ישר לעמוד המוכן - לא למסך טעינה/משחק."
+   *
+   * בשונה מ-buildTripDirectly (שמנווט מיד למסך ההמתנה) - זו לא "לחיצה
+   * מדומה" על הבועה: יוצרים session ומפעילים auto-build ברקע, ואז
+   * מתשאלים כאן, בתוך הצ'אט, את אותו endpoint שעמוד התוצאה כבר משתמש בו
+   * (GET /api/trip-builder/sessions?sessionId=) - בלי לנווט בכלל. הניווט
+   * קורה ברגע שיש **יום 1 מוכן** (לא ה-status="completed" של כל הטיול -
+   * טיול רב-ימים באמת יכול לקחת יותר מ-15 שניות במלואו, וזו בדיוק הייתה
+   * הטעות הקודמת: חיכינו לסיום המלא, כמעט תמיד הגענו לתקרה הבטיחותית,
+   * ונחתנו בעמוד תוצאה שעדיין status="building"). עמוד התוצאה עצמו כבר
+   * יודע להציג יום 1 + סקלטון לשאר הימים ברגע שיש itinerary חלקי, בלי
+   * קשר ל-status - אז מספיק לחכות כאן ליום 1 בלבד.
+   */
+  async function autoBuildAndWaitThenNavigate(answers: AbroadVacationAnswers) {
+    if (runtrippyTriggeredRef.current) return; // כבר נלחץ ידנית - לא כופלים session
+    if (!user) return; // לא מפנים ל-/auth בכפייה - ממתינים ללחיצה הידנית של המשתמש
+    runtrippyTriggeredRef.current = true;
+    setLocationError(null);
+    try {
+      const sessionId = await createSessionAndStartBuild(answers);
+
+      const MAX_WAIT_MS = 15000;
+      const POLL_INTERVAL_MS = 1200;
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        try {
+          const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
+          const pollData = await pollRes.json();
+          const session = pollData?.session;
+          const hasAnyStops = (session?.final_itinerary?.stops?.length ?? 0) > 0;
+          if (session?.status === "completed" || hasAnyStops) break;
+        } catch {
+          // שגיאת רשת חד-פעמית בתשאול - ממשיכים לנסות, לא עוצרים
+        }
+      }
+
+      router.push(`/trip-builder/abroad-vacation/result?sessionId=${sessionId}`);
+    } catch (error) {
+      // מאפשרים ניסיון נוסף (למשל לחיצה ידנית על הבועה) אם ההרשמה הראשונית נכשלה
+      runtrippyTriggeredRef.current = false;
+      setLocationError(error instanceof Error ? error.message : "לא הצלחנו לבנות את החופשה. נסו שוב.");
     }
   }
 

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callClaude, logAiError } from "@/services/ai/claudeService";
 import { haversineDistanceKm } from "./geo";
+import { createAdminClient } from "@/services/supabase/admin";
+import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 import type { CandidatePlace, LatLng } from "./types";
 
 interface MustSeeParams {
@@ -72,7 +74,8 @@ export async function findMustSeePlaces(
   supabase: SupabaseClient,
   rawNames: string[],
   origin: LatLng,
-  maxDistanceKm: number
+  maxDistanceKm: number,
+  destination: string
 ): Promise<CandidatePlace[]> {
   const results: CandidatePlace[] = [];
   const usedIds = new Set<string>();
@@ -102,34 +105,145 @@ export async function findMustSeePlaces(
       return distanceKm <= maxDistanceKm;
     });
 
-    if (!withinRange) continue;
-    usedIds.add(withinRange.id as string);
+    if (withinRange) {
+      usedIds.add(withinRange.id as string);
+      results.push({
+        id: withinRange.id,
+        name: withinRange.name,
+        category: withinRange.category,
+        subcategory: withinRange.subcategory,
+        shortDescription: withinRange.short_description,
+        imageUrls: withinRange.image_urls ?? [],
+        rating: withinRange.rating,
+        ratingCount: withinRange.rating_count,
+        priceLevel: withinRange.price_level,
+        estimatedVisitMinutes: withinRange.estimated_visit_minutes,
+        latitude: withinRange.latitude,
+        longitude: withinRange.longitude,
+        distanceKm: haversineDistanceKm(origin, { lat: withinRange.latitude, lng: withinRange.longitude }),
+        etaMinutes: 0,
+        tripTypeTags: withinRange.trip_type_tags ?? [],
+        cuisineTags: withinRange.cuisine_tags ?? [],
+        kosher: withinRange.kosher,
+        accessible: withinRange.accessible,
+        suitableChildAges: withinRange.suitable_child_ages ?? [],
+        budgetTier: withinRange.budget_tier,
+        isAreaExperience: withinRange.is_area_experience ?? false,
+        reason: "אתר חובה מובהק ביעד",
+        source: "fallback",
+      });
+      continue;
+    }
 
-    results.push({
-      id: withinRange.id,
-      name: withinRange.name,
-      category: withinRange.category,
-      subcategory: withinRange.subcategory,
-      shortDescription: withinRange.short_description,
-      imageUrls: withinRange.image_urls ?? [],
-      rating: withinRange.rating,
-      ratingCount: withinRange.rating_count,
-      priceLevel: withinRange.price_level,
-      estimatedVisitMinutes: withinRange.estimated_visit_minutes,
-      latitude: withinRange.latitude,
-      longitude: withinRange.longitude,
-      distanceKm: haversineDistanceKm(origin, { lat: withinRange.latitude, lng: withinRange.longitude }),
-      etaMinutes: 0,
-      tripTypeTags: withinRange.trip_type_tags ?? [],
-      cuisineTags: withinRange.cuisine_tags ?? [],
-      kosher: withinRange.kosher,
-      accessible: withinRange.accessible,
-      suitableChildAges: withinRange.suitable_child_ages ?? [],
-      budgetTier: withinRange.budget_tier,
-      isAreaExperience: withinRange.is_area_experience ?? false,
-      reason: "אתר חובה מובהק ביעד",
-      source: "fallback",
-    });
+    // בקשה מפורשת: "חייבות להופיע אטרקציות חובה!" - אם אתר החובה לא קיים
+    // אצלנו במאגר, לא משמיטים אותו בשקט. מאמתים אותו מול Google Places
+    // (שם אמיתי, קואורדינטות, דירוג, תמונה) ושומרים כשורה חדשה - מסומן
+    // AI_TRIP_BUILDER_SOURCE (לא "תוכן אדמין", בדיוק כמו כל מקום אחר
+    // שה-AI יוצר בבניית טיול, ר' aiPlaceInsertionService.ts) כדי שלא
+    // "יזהם" בשקט חיפושים עתידיים של "המאגר שלנו".
+    const created = await createMustSeePlaceViaGoogle(normalizedName, destination, origin, maxDistanceKm);
+    if (!created || usedIds.has(created.id)) continue;
+    usedIds.add(created.id);
+    results.push(created);
   }
   return results;
+}
+
+interface GooglePlaceTextSearchResult {
+  place_id?: string;
+  name?: string;
+  rating?: number;
+  user_ratings_total?: number;
+  geometry?: { location?: { lat: number; lng: number } };
+  photos?: { photo_reference?: string }[];
+}
+
+/**
+ * מאמת אתר-חובה מול Google Places Text Search (שם + קואורדינטות + דירוג +
+ * תמונה אמיתיים - לא ניחוש), ושומר אותו כשורה חדשה בטבלת places אם הוא
+ * בטווח הסביר מהיעד. בלי מפתח API מוגדר - מוותרים בשקט (לא עוצרים בנייה).
+ */
+async function createMustSeePlaceViaGoogle(
+  name: string,
+  destination: string,
+  origin: LatLng,
+  maxDistanceKm: number
+): Promise<CandidatePlace | null> {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const query = `${name} ${destination}`;
+    const url =
+      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}` +
+      `&location=${origin.lat},${origin.lng}&radius=${Math.round(maxDistanceKm * 1000)}&key=${apiKey}&language=he`;
+
+    const response = await fetch(url);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const top = (data?.results?.[0] ?? null) as GooglePlaceTextSearchResult | null;
+    const location = top?.geometry?.location;
+    if (!top?.name || !location) return null;
+
+    const distanceKm = haversineDistanceKm(origin, { lat: location.lat, lng: location.lng });
+    if (distanceKm > maxDistanceKm) return null;
+
+    const photoRef = top.photos?.[0]?.photo_reference;
+    const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
+
+    const supabaseAdmin = createAdminClient();
+    const { data: inserted, error } = await supabaseAdmin
+      .from("places")
+      .insert({
+        name: top.name,
+        city: destination,
+        category: "attractions",
+        short_description: null,
+        image_urls: imageUrls,
+        rating: top.rating ?? null,
+        rating_count: top.user_ratings_total ?? null,
+        latitude: location.lat,
+        longitude: location.lng,
+        trip_type_tags: ["must_see_landmarks"],
+        source: AI_TRIP_BUILDER_SOURCE,
+      })
+      .select("id")
+      .single();
+
+    if (error || !inserted) return null;
+
+    return {
+      id: inserted.id as string,
+      name: top.name,
+      category: "attractions",
+      subcategory: null,
+      shortDescription: null,
+      imageUrls,
+      rating: top.rating ?? null,
+      ratingCount: top.user_ratings_total ?? null,
+      priceLevel: null,
+      estimatedVisitMinutes: null,
+      latitude: location.lat,
+      longitude: location.lng,
+      distanceKm,
+      etaMinutes: 0,
+      tripTypeTags: ["must_see_landmarks"],
+      cuisineTags: [],
+      kosher: null,
+      accessible: null,
+      suitableChildAges: [],
+      budgetTier: null,
+      isAreaExperience: false,
+      reason: "אתר חובה מובהק ביעד (אומת מול Google, לא היה עדיין במאגר שלנו)",
+      source: "fallback",
+    };
+  } catch (error) {
+    logAiError("יצירת אתר חובה דרך Google נכשלה", {
+      message: error instanceof Error ? error.message : String(error),
+      name,
+      destination,
+    });
+    return null;
+  }
 }
