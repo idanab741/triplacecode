@@ -1,4 +1,16 @@
 import { NextResponse } from "next/server";
+
+/**
+ * בקשה מפורשת ("יש workers?"): אין - כל auto-build רץ בתוך קריאת HTTP
+ * אחת ארוכה (לא תור/worker אמיתי). ברירת המחדל של Vercel ל-serverless
+ * function (בד"כ 10 שניות ב-Hobby) קצרה מדי לבנייה הזו - במיוחד עכשיו
+ * שנוספה לולאת Blueprint (AI) לכל יום. אם ה-function נהרגת באמצע, ימים
+ * שעוד לא נשמרו נשארים בסקלטון לנצח (שום דבר לא ממשיך לעדכן אותם). זה
+ * מרים את התקרה ל-5 דקות - עדיין דורש תוכנית Vercel שתומכת בזה (Pro
+ * ומעלה; ב-Hobby התקרה בפועל 60 שניות גם עם ההגדרה הזו).
+ */
+export const maxDuration = 300;
+
 import { createClient } from "@/services/supabase/server";
 import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getAttributeScoreMap, summarizeTopAttributes } from "@/services/travelDna/attributeLearningService";
@@ -431,6 +443,10 @@ export async function POST(
       if (centralNeighborhood) {
         dayCursors.set(1, centralNeighborhood.coords);
       }
+      // TypeScript לא שומר על הצרות הטיפוס (user לא null, בדיקה למעלה בקובץ)
+      // בתוך פונקציה מקוננת (closure) שמוגדרת ונקראת בהמשך - מגבלה ידועה,
+      // לא באג אמיתי. משתנה עזר פשוט פותר את זה.
+      const userId = user.id;
 
       /**
        * ממלאת קבוצת תחנות נתונה (יום 1 לבד, או שאר הימים יחד) - קודם
@@ -453,7 +469,7 @@ export async function POST(
           if (stop.role === "attraction" && mustSeeCursor < mustSeePlaces.length) {
             const mustSee = mustSeePlaces[mustSeeCursor];
             if (!excludePlaceIdsForVacation.includes(mustSee.id)) {
-              await likeStop(supabase, user.id, stop.id, mustSee);
+              await likeStop(supabase, userId, stop.id, mustSee);
               excludePlaceIdsForVacation.push(mustSee.id);
               dayCursors.set(day, { lat: mustSee.latitude, lng: mustSee.longitude });
               mustSeeCursor += 1;
@@ -480,7 +496,7 @@ export async function POST(
             if (!topNightlife) {
               continue; // אין מקום חיי-לילה מתאים ביעד הזה - לא remainingStops (אין AI fallback לזה)
             }
-            await likeStop(supabase, user.id, stop.id, topNightlife);
+            await likeStop(supabase, userId, stop.id, topNightlife);
             excludePlaceIdsForVacation.push(topNightlife.id);
             dayCursors.set(day, { lat: topNightlife.latitude, lng: topNightlife.longitude });
             continue;
@@ -541,7 +557,7 @@ export async function POST(
           }
           dayCursors.set(day, { lat: top.latitude, lng: top.longitude });
 
-          await likeStop(supabase, user.id, stop.id, top);
+          await likeStop(supabase, userId, stop.id, top);
           excludePlaceIdsForVacation.push(top.id);
         }
 
@@ -628,7 +644,7 @@ export async function POST(
         await Promise.all(
           assignments.map(async ({ stopId, suggestion }) => {
             const realPlace = await ensurePlaceExists(suggestion, destinationName);
-            await likeStop(supabase, user.id, stopId, realPlace);
+            await likeStop(supabase, userId, stopId, realPlace);
           })
         );
       }
