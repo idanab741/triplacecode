@@ -14,7 +14,6 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
-import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { NatureTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
@@ -30,6 +29,23 @@ function NatureTripResultContent() {
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
   const [editingTime, setEditingTime] = useState(false);
+  // בקשה מפורשת ("ולמה לא הורדת את השעון? סימון אוטומטי כמו בחופשה
+  // בחו"ל!") - אותו דפוס בדיוק כמו day-trip/result/page.tsx: בלי override
+  // ידני, לא מציגים שעה מחושבת אוטומטית - רק כפתור "+ הוסף שעה" עדין.
+  const [stopTimeOverrides, setStopTimeOverrides] = useState<Record<string, number>>({});
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+
+  function handleStopTimeChange(stopId: string, minutes: number) {
+    setStopTimeOverrides((prev) => ({ ...prev, [stopId]: minutes }));
+    const itinerary = session?.final_itinerary;
+    if (sessionId && itinerary) {
+      fetch(`/api/trip-builder/sessions/${sessionId}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary }),
+      }).catch(() => {});
+    }
+  }
 
   const [justShared, setJustShared] = useState(false);
 
@@ -167,22 +183,23 @@ function NatureTripResultContent() {
     );
   }
 
-  if (session.status !== "completed") {
-    return (
-      <LoadingGame
-        statusText="רגע, בונים לכם את יום הטבע..."
-        steps={[
-          "🌿 מחפשים את פינות הטבע הכי מיוחדות",
-          "🥾 מתאימים את המסלול לרמת הקושי שבחרתם",
-          "💧 בודקים מעיינות, תצפיות ונקודות עניין",
-          "☕ מוסיפים עצירת קפה או אוכל בשעה הנכונה",
-          "🗺️ בונים מסלול רציף וקרוב לבית",
-        ]}
-      />
-    );
-  }
-
   if (!itinerary || itinerary.stops.length === 0) {
+    if (session.status !== "completed") {
+      // אותה רשת ביטחון בדיוק כמו day-trip/result/page.tsx - לא מסך משחק,
+      // ורק אם עדיין אין שום תוכן להציג (בקשה מפורשת - תוכן קיים תמיד
+      // מוצג מיד, בלי קשר ל-status).
+      return (
+        <Screen>
+          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
+            </div>
+            <p className="text-base font-semibold text-ink">רגע, עוד רגע ויום הטבע מוכן...</p>
+            <p className="text-sm text-ink-secondary">זה לוקח קצת יותר זמן מהרגיל - כבר כמעט שם</p>
+          </div>
+        </Screen>
+      );
+    }
     return (
       <Screen>
         <div className="pt-10 text-center text-ink-secondary">
@@ -286,21 +303,59 @@ function NatureTripResultContent() {
         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <SortableContext items={itinerary.stops.map((s) => s.stopId)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-3">
-              {itinerary.stops.map((stop) => (
-                <div key={stop.stopId} className="flex flex-col gap-1">
-                  <p className="pr-1 text-sm font-bold text-accent">
-                    🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
-                  </p>
-                  <SortableStopCard
-                    stop={stop}
-                    sessionId={sessionId}
-                    onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                    draggable={itinerary.stops.length >= 2}
-                    onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
-                    placeHref={`/place/${stop.placeId}?from=ai`}
-                  />
-                </div>
-              ))}
+              {itinerary.stops.map((stop) => {
+                const defaultMinutes = startMinutes + stop.arrivalOffsetMinutes;
+                const displayMinutes = stopTimeOverrides[stop.stopId] ?? defaultMinutes;
+                return (
+                  <div key={stop.stopId} className="flex flex-col gap-1">
+                    {editingStopId === stop.stopId ? (
+                      <div className="flex w-fit items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={minutesToTimeLabel(displayMinutes)}
+                          onChange={(e) => {
+                            const [h, m] = e.target.value.split(":").map(Number);
+                            if (!isNaN(h) && !isNaN(m)) handleStopTimeChange(stop.stopId, h * 60 + m);
+                          }}
+                          autoFocus
+                          className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1 text-sm font-bold text-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingStopId(null)}
+                          className="rounded-pill bg-accent px-2 py-1 text-[10px] font-semibold text-white"
+                        >
+                          אישור
+                        </button>
+                      </div>
+                    ) : stopTimeOverrides[stop.stopId] !== undefined ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingStopId(stop.stopId)}
+                        className="w-fit pr-1 text-sm font-bold text-accent"
+                      >
+                        🕐 {minutesToTimeLabel(displayMinutes)}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditingStopId(stop.stopId)}
+                        className="w-fit rounded-pill border border-dashed border-ink-secondary/30 px-2 py-0.5 text-xs text-ink-secondary"
+                      >
+                        + הוסף שעה
+                      </button>
+                    )}
+                    <SortableStopCard
+                      stop={stop}
+                      sessionId={sessionId}
+                      onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
+                      draggable={itinerary.stops.length >= 2}
+                      onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                      placeHref={`/place/${stop.placeId}?from=ai`}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>

@@ -12,6 +12,7 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
+import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
@@ -127,6 +128,9 @@ export default function NatureTripQuestionnairePage() {
   const [showBuildChoice, setShowBuildChoice] = useState(false);
   const [waitingForBuild, setWaitingForBuild] = useState(false);
   const buildTriggeredRef = useRef(false);
+  // תיקון באג אמיתי - היה useRef (לא מרנדר מחדש כשמתעדכן, ר' אותה הערה
+  // בטיול יומי) - עכשיו state אמיתי.
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
 
   const step = NATURE_TRIP_QUESTIONS[stepIndex];
   const isLastStep = stepIndex === NATURE_TRIP_QUESTIONS.length - 1;
@@ -592,6 +596,7 @@ export default function NatureTripQuestionnairePage() {
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
 
       const sessionId = data.session.id;
+      setPendingSessionId(sessionId);
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
 
       const MAX_WAIT_MS = 20000;
@@ -875,7 +880,7 @@ export default function NatureTripQuestionnairePage() {
               />
             )}
 
-            {step.type === "text" && !showBuildChoice && (
+            {step.type === "text" && !showBuildChoice && !typing && !waitingForBuild && (
               <textarea
                 value={tempText}
                 onChange={(e) => setTempText(e.target.value)}
@@ -912,9 +917,15 @@ export default function NatureTripQuestionnairePage() {
         {/* בקשה מפורשת ("10-15 שניות, עם הטעינה שלנו, לא המשחק") - נשארים
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
-          <div className="flex flex-col items-center gap-2 py-4">
-            <TypingIndicator />
-            <p className="text-sm text-ink-secondary">רגע, בונים לכם את יום הטבע...</p>
+          <div className="flex flex-col gap-2">
+            <p className="text-center text-sm text-ink-secondary">רגע, בונים לכם את יום הטבע...</p>
+            {pendingSessionId && (
+              <RuntrippyPromptBubble
+                onClick={() => {
+                  router.push(`/trip-builder/nature-trip/result?sessionId=${pendingSessionId}`);
+                }}
+              />
+            )}
           </div>
         )}
 

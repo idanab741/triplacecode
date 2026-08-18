@@ -13,8 +13,10 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
+import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
+import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
@@ -126,6 +128,12 @@ const bottomRef = useRef<HTMLDivElement>(null);
   const [showBuildChoice, setShowBuildChoice] = useState(false);
   const [waitingForBuild, setWaitingForBuild] = useState(false);
   const buildTriggeredRef = useRef(false);
+  // תיקון באג אמיתי ("צריך שיהיה את הבועה בצ'אט... למה זה נעלם?") - זה
+  // היה useRef, לא useState: קריאה ל-ref.current ישירות ב-JSX לא גורמת
+  // ל-re-render כשהוא מתעדכן, כך שה-JSX תמיד "ראה" את הערך הראשוני (null) -
+  // הבועה נראתה כאילו לא עושה כלום בלחיצה (או פשוט "נעלמה" מבחינה
+  // פונקציונלית). state אמיתי מבטיח שה-UI יתעדכן ברגע שה-session נוצר.
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
 
 
   const step = DAY_TRIP_QUESTIONS[stepIndex];
@@ -563,6 +571,7 @@ if (key === "companions" && editStep.type === "companions") {
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
 
       const sessionId = data.session.id;
+      setPendingSessionId(sessionId);
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
 
       const MAX_WAIT_MS = 20000;
@@ -816,7 +825,7 @@ return m.role === "assistant" ? (
               <AnswerOptions options={step.options} onSelect={handleSingleSelect} />
             )}
 
-            {step.type === "text" && !showBuildChoice && (
+            {step.type === "text" && !showBuildChoice && !typing && !waitingForBuild && (
               <textarea
                 value={tempText}
                 onChange={(e) => setTempText(e.target.value)}
@@ -853,9 +862,15 @@ return m.role === "assistant" ? (
         {/* בקשה מפורשת ("10-15 שניות, עם הטעינה שלנו, לא המשחק") - נשארים
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
-          <div className="flex flex-col items-center gap-2 py-4">
-            <TypingIndicator />
-            <p className="text-sm text-ink-secondary">רגע, בונים לכם את הטיול...</p>
+          <div className="flex flex-col gap-2">
+            <p className="text-center text-sm text-ink-secondary">רגע, בונים לכם את הטיול...</p>
+            {pendingSessionId && (
+              <RuntrippyPromptBubble
+                onClick={() => {
+                  router.push(`/trip-builder/day-trip/result?sessionId=${pendingSessionId}`);
+                }}
+              />
+            )}
           </div>
         )}
 

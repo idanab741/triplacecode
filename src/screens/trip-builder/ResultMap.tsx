@@ -52,17 +52,24 @@ function createNumberedIcon(index: number, color: string): L.DivIcon {
   });
 }
 
-/** מתאים אוטומטית את הזום/מרכז המפה כך שכל התחנות יהיו בתוך התצוגה. */
+/** מתאים אוטומטית את הזום/מרכז המפה כך שכל התחנות יהיו בתוך התצוגה.
+ *  תיקון קריסה אמיתית ("Cannot read properties of undefined (reading
+ *  '_leaflet_pos')") - זו תקלה מוכרת ב-react-leaflet: setView/fitBounds
+ *  עם אנימציה (ברירת המחדל) יכולים לנסות לעדכן מיקום של סמן (DOM node)
+ *  שכבר הוסר באמצע המעבר - קורה הרבה יותר בקלות ב-dev (React Strict Mode
+ *  מפעיל אפקטים פעמיים), אבל יכול לקרות גם כשה-stops מתעדכנים מהר
+ *  (polling/גרירה). animate: false מדלג לגמרי על שכבת האנימציה של
+ *  Leaflet, כך שאין מה שיתלוי במיקום DOM שכבר לא קיים. */
 function FitBounds({ stops }: { stops: MapStop[] }) {
   const map = useMap();
   useEffect(() => {
     if (stops.length === 0) return;
     if (stops.length === 1) {
-      map.setView([stops[0].latitude, stops[0].longitude], 15);
+      map.setView([stops[0].latitude, stops[0].longitude], 15, { animate: false });
       return;
     }
     const bounds = L.latLngBounds(stops.map((s) => [s.latitude, s.longitude]));
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16, animate: false });
   }, [stops, map]);
   return null;
 }

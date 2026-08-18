@@ -16,7 +16,6 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
-import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -29,6 +28,23 @@ function DayTripResultContent() {
   const [session, setSession] = useState<TripBuilderSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manualStartMinutes, setManualStartMinutes] = useState<number | null>(null);
+  // בקשה מפורשת ("למה לא הורדת את השעון? סימון אוטומטי כמו בחופשה בחו"ל") -
+  // אותו דפוס בדיוק כמו עמוד התוצאה של חופשה בחו"ל: בלי override ידני,
+  // לא מציגים שעה מחושבת אוטומטית בכלל - רק כפתור "+ הוסף שעה".
+  const [stopTimeOverrides, setStopTimeOverrides] = useState<Record<string, number>>({});
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+
+  function handleStopTimeChange(stopId: string, minutes: number) {
+    setStopTimeOverrides((prev) => ({ ...prev, [stopId]: minutes }));
+    const itinerary = session?.final_itinerary;
+    if (sessionId && itinerary) {
+      fetch(`/api/trip-builder/sessions/${sessionId}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary }),
+      }).catch(() => {});
+    }
+  }
   const [editingTime, setEditingTime] = useState(false);
   const [justShared, setJustShared] = useState(false);
   const [swappingStopId, setSwappingStopId] = useState<string | null>(null);
@@ -184,22 +200,26 @@ function DayTripResultContent() {
     );
   }
 
-  if (session.status !== "completed") {
-    return (
-      <LoadingGame
-        statusText="רגע, בונים לכם את הטיול..."
-        steps={[
-          "🔍 מחפשים את המקומות הכי מתאימים לכם",
-          "🎯 בוחרים אטרקציות לפי התחומים שבחרתם",
-          "🍽️ מוצאים מקום אוכל בשעה הנכונה",
-          "🗺️ בונים מסלול רציף וקרוב לבית",
-          "⏱️ מתאימים הכל לזמן ולתקציב שבחרתם",
-        ]}
-      />
-    );
-  }
-
   if (!itinerary || itinerary.stops.length === 0) {
+    if (session.status !== "completed") {
+      // בקשה מפורשת ("שוב החזיר את המשחק!") - טיול יומי לא אמור להראות
+      // מסך משחק מלא בכלל, בדיוק כמו חופשה בחו"ל. זו רשת ביטחון בלבד -
+      // ורק אם עדיין אין שום תוכן מוכן להציג (בקשה מפורשת - תוכן קיים
+      // תמיד מוצג מיד, בלי קשר ל-status). התשאול (polling, כל 2.5
+      // שניות, כבר קיים למעלה) ימשיך וידליק את התוצאה האמיתית ברגע
+      // שהיא מוכנה, בלי שהמשתמש יצטרך לעשות כלום.
+      return (
+        <Screen>
+          <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-accent/20 border-t-accent" />
+            </div>
+            <p className="text-base font-semibold text-ink">רגע, עוד רגע והטיול מוכן...</p>
+            <p className="text-sm text-ink-secondary">זה לוקח קצת יותר זמן מהרגיל - כבר כמעט שם</p>
+          </div>
+        </Screen>
+      );
+    }
     return (
       <Screen>
         <div className="pt-10 text-center text-ink-secondary">
@@ -302,12 +322,49 @@ function DayTripResultContent() {
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-3">
-              {itinerary.stops.map((stop) => (
-                <div key={stop.stopId} className="flex flex-col gap-1">
-                  <p className="pr-1 text-sm font-bold text-accent">
-                    🕐 {minutesToTimeLabel(startMinutes + stop.arrivalOffsetMinutes)}
-                  </p>
-                  <SortableStopCard
+              {itinerary.stops.map((stop) => {
+                const defaultMinutes = startMinutes + stop.arrivalOffsetMinutes;
+                const displayMinutes = stopTimeOverrides[stop.stopId] ?? defaultMinutes;
+                return (
+                  <div key={stop.stopId} className="flex flex-col gap-1">
+                    {editingStopId === stop.stopId ? (
+                      <div className="flex w-fit items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={minutesToTimeLabel(displayMinutes)}
+                          onChange={(e) => {
+                            const [h, m] = e.target.value.split(":").map(Number);
+                            if (!isNaN(h) && !isNaN(m)) handleStopTimeChange(stop.stopId, h * 60 + m);
+                          }}
+                          autoFocus
+                          className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1 text-sm font-bold text-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingStopId(null)}
+                          className="rounded-pill bg-accent px-2 py-1 text-[10px] font-semibold text-white"
+                        >
+                          אישור
+                        </button>
+                      </div>
+                    ) : stopTimeOverrides[stop.stopId] !== undefined ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditingStopId(stop.stopId)}
+                        className="w-fit pr-1 text-sm font-bold text-accent"
+                      >
+                        🕐 {minutesToTimeLabel(displayMinutes)}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditingStopId(stop.stopId)}
+                        className="w-fit rounded-pill border border-dashed border-ink-secondary/30 px-2 py-0.5 text-xs text-ink-secondary"
+                      >
+                        + הוסף שעה
+                      </button>
+                    )}
+                    <SortableStopCard
                     stop={stop}
                     sessionId={sessionId}
                     onItineraryUpdate={(updated) =>
@@ -321,8 +378,9 @@ function DayTripResultContent() {
                     onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
                     placeHref={`/place/${stop.placeId}?from=ai`}
                   />
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
