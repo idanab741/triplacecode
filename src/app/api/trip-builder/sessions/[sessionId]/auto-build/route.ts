@@ -389,10 +389,7 @@ export async function POST(
       // הספרדיות!"): התקרה נגזרת מאורך הטיול בפועל, לא מספר קבוע - יעד
       // עשיר כמו רומא לטיול 5 ימים צריך יותר מ-6 הצעות.
       const vacationDatesForMustSee = answers as unknown as { startDate?: string; endDate?: string };
-      const estimatedNumDays =
-        vacationDatesForMustSee.startDate && vacationDatesForMustSee.endDate
-          ? countDays(vacationDatesForMustSee.startDate, vacationDatesForMustSee.endDate)
-          : 3;
+      const estimatedNumDays = countDays(vacationDatesForMustSee.startDate ?? "", vacationDatesForMustSee.endDate ?? "");
       const mustSeeNames = await suggestMustSeeLandmarks({
         destination: destinationName,
         vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
@@ -708,9 +705,17 @@ export async function POST(
       // Context Engine - נבנה פעם אחת כאן (אחרי שיש כבר destinationName/
       // centralNeighborhood/searchOrigin), נשמר על ה-session, ומועבר
       // (לא נבנה מחדש) לכל קריאת Blueprint של יום למטה.
+      //
+      // תיקון באג אמיתי (נמצא בלוג בפועל - startDate/endDate ריקים!):
+      // countDays כבר כולל ברירת מחדל חכמה (5 ימים) כשהתאריכים ריקים/לא
+      // תקינים - זו בדיוק הפונקציה ש-sessions/route.ts כבר משתמש בה
+      // ליצירת יום 1/יום אחרון. הגרסה הקודמת כאן עקפה את ברירת המחדל הזו
+      // עם תנאי משלה שהחזירה 1 במקום זאת - מה שגרם לחוסר-התאמה בין מספר
+      // הימים שבאמת נבנה (5, מה-session) למספר שה-Blueprint loop ראה (1) -
+      // וזו הסיבה שהלולאה דילגה על עצמה לגמרי. עכשיו קוראים ל-countDays
+      // ישירות, בלי שכבת "תיקון" משלי - מבטיח התאמה מלאה בין שני המקומות.
       const vacationDates = answers as unknown as { startDate?: string; endDate?: string };
-      const numDays =
-        vacationDates.startDate && vacationDates.endDate ? countDays(vacationDates.startDate, vacationDates.endDate) : 1;
+      const numDays = countDays(vacationDates.startDate ?? "", vacationDates.endDate ?? "");
       const includesNightlife = vacationTypeValues.includes("nightlife");
 
       // לוג אבחון זמני (בקשה מפורשת - "זה נעלם שוב, למה?") - כדי לדעת
