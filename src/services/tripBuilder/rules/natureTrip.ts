@@ -2,7 +2,24 @@ import type { StopRole, TripBuilderStep } from "../types";
 import { COMPANION_OPTIONS, CHILD_AGE_OPTIONS, TIMING_OPTIONS, DISTANCE_STEPS, BUDGET_STEPS } from "@/locales/he/tripBuilder";
 import { NATURE_TYPE_OPTIONS, DIFFICULTY_OPTIONS, NATURE_DURATION_OPTIONS } from "@/locales/he/natureTrip";
 
+// בקשה מפורשת - אותו סדר בדיוק כמו טיול יומי: "מתי יוצאים" ראשון, מלל
+// חופשי שני (מיד אחריו), ואז שאר השאלות (שיכולות לדלג על עצמן אם המלל
+// כיסה אותן - ר' page.tsx).
 export const NATURE_TRIP_QUESTIONS: TripBuilderStep[] = [
+  {
+    type: "date",
+    key: "timing",
+    title: "מתי יוצאים?",
+    options: TIMING_OPTIONS,
+    otherDateKey: "otherDate",
+    otherDateTriggerValue: "other_date",
+  },
+  {
+    type: "text",
+    key: "freeText",
+    title: "ספרו לנו על הטיול שאתם מדמיינים",
+    placeholder: "לדוגמה: חייבים מים לשחייה, רוצים מסלול מוצל, מחפשים פנינה נסתרת...",
+  },
   {
     type: "companions",
     key: "companions",
@@ -12,14 +29,6 @@ export const NATURE_TRIP_QUESTIONS: TripBuilderStep[] = [
     childAgeTitle: "גילאי הילדים",
     childAgeOptions: CHILD_AGE_OPTIONS,
     childAgeTriggerValue: "family",
-  },
-  {
-    type: "date",
-    key: "timing",
-    title: "מתי יוצאים?",
-    options: TIMING_OPTIONS,
-    otherDateKey: "otherDate",
-    otherDateTriggerValue: "other_date",
   },
   {
     type: "slider",
@@ -52,12 +61,6 @@ export const NATURE_TRIP_QUESTIONS: TripBuilderStep[] = [
     key: "durationBand",
     title: "כמה זמן הטיול?",
     options: NATURE_DURATION_OPTIONS,
-  },
-  {
-    type: "text",
-    key: "freeText",
-    title: "משהו נוסף שתרצו להוסיף?",
-    placeholder: "לדוגמה: חייבים מים לשחייה, רוצים מסלול מוצל, מחפשים פנינה נסתרת...",
   },
 ];
 
