@@ -16,7 +16,6 @@ import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
-import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
