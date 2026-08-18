@@ -1,4 +1,4 @@
-import { geocodePlaceNameNear } from "./geocodingService";
+﻿import { geocodePlaceNameNear } from "./geocodingService";
 import { findPlaceStatusAndPhoto } from "./placePhotoService";
 import { findExistingPlace } from "./aiPlaceInsertionService";
 import { logAiError } from "@/services/ai/claudeService";
@@ -98,19 +98,32 @@ export async function resolveAiSuggestedPlace(
       ? { lat: photoResult.latitude, lng: photoResult.longitude }
       : null;
 
+  // קריטי: אם Places Text Search כן מצא מקום אמיתי בשם הזה, אבל הוא רחוק
+  // מדי - זה כמעט תמיד סימן שהשם קיים במקום אחר לגמרי (למשל "גן לאומי
+  // מגדל צדק" ליד ראש העין, כשמחפשים ליד "מגדל" בכנרת), לא שהחיפוש
+  // "פספס" מיקום קרוב. בעבר קוד קפץ כאן ל-geocodePlaceNameNear עם אותו
+  // שם בדיוק - אבל Geocoding API עושה התאמה חלקית/מטושטשת, ויכול "לתפוס"
+  // רק את חלק השם שהוא כן מזהה (כאן "מגדל") ולהחזיר קואורדינטות קרובות
+  // לאזור בלי קשר בכלל למקום שגוגל אימת. זה יצר בפועל תחנות עם שם/תמונה/
+  // דירוג אמיתיים (מהמקום הרחוק שנמצא) אבל קואורדינטות שגויות (מהניחוש
+  // המטושטש) - נעצו על המפה במקום שהמקום בכלל לא נמצא בו. לכן: אם Places
+  // כבר מצא ואימת מקום בשם הזה והוא רחוק מדי - פוסלים לגמרי, לא מנחשים
+  // מיקום חלופי לאותו שם.
   if (coords) {
     const distanceKm = haversineDistanceKm(areaOrigin, coords);
     if (distanceKm > maxDistanceKm) {
-      logAiError("מיקום מ-Places Text Search רחוק מדי מהיעד - נופל ל-Geocoding כגיבוי", {
+      logAiError("מקום אומת ב-Places Text Search אבל רחוק מדי מהיעד - נפסל (לא ננחש מיקום חלופי לאותו שם)", {
         name: item.name,
         distanceKm: Math.round(distanceKm),
         maxDistanceKm,
       });
-      coords = null;
+      return null;
     }
-  }
-
-  if (!coords) {
+  } else {
+    // Places לא החזיר קואורדינטות בכלל (לא רק "רחוק מדי") - כאן, ורק כאן,
+    // הגיבוי ל-Geocoding עדיין הגיוני: אין לנו שום מיקום מאומת להשוות
+    // אליו מרחק, אז ניסיון גיאוקודינג נפרד הוא תוספת מידע, לא ניחוש
+    // שסותר מיקום שכבר אומת.
     coords = await geocodePlaceNameNear(`${item.name}, ${areaLabel}`, areaOrigin, maxDistanceKm);
   }
 
