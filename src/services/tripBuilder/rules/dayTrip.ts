@@ -9,7 +9,25 @@ import {
   DURATION_OPTIONS,
 } from "@/locales/he/tripBuilder";
 
+// בקשה מפורשת: סדר חדש - "מתי יוצאים" ראשון, מלל חופשי שני (מיד אחריו),
+// ואז שאר השאלות (שיכולות לדלג על עצמן אם המלל כיסה אותן - ר' page.tsx).
+// בעבר freeText היה השאלה האחרונה - עבר לכאן כדי לאפשר את אותה
+// ארכיטקטורת חילוץ+דילוג שכבר קיימת בחופשה בחו"ל.
 export const DAY_TRIP_QUESTIONS: TripBuilderStep[] = [
+  {
+    type: "date",
+    key: "timing",
+    title: "מתי יוצאים?",
+    options: TIMING_OPTIONS,
+    otherDateKey: "otherDate",
+    otherDateTriggerValue: "other_date",
+  },
+  {
+    type: "text",
+    key: "freeText",
+    title: "ספרו לנו על הטיול שאתם מדמיינים",
+    placeholder: 'לדוגמה: לא אוהבים ללכת הרבה, רוצים לראות שקיעה...',
+  },
   {
     type: "companions",
     key: "companions",
@@ -19,14 +37,6 @@ export const DAY_TRIP_QUESTIONS: TripBuilderStep[] = [
     childAgeTitle: "גילאי הילדים",
     childAgeOptions: CHILD_AGE_OPTIONS,
     childAgeTriggerValue: "family",
-  },
-  {
-    type: "date",
-    key: "timing",
-    title: "מתי יוצאים?",
-    options: TIMING_OPTIONS,
-    otherDateKey: "otherDate",
-    otherDateTriggerValue: "other_date",
   },
   {
     type: "slider",
@@ -51,12 +61,6 @@ export const DAY_TRIP_QUESTIONS: TripBuilderStep[] = [
     key: "durationBand",
     title: "כמה זמן הטיול?",
     options: DURATION_OPTIONS,
-  },
-  {
-    type: "text",
-    key: "freeText",
-    title: "משהו נוסף שתרצו להוסיף?",
-    placeholder: 'לדוגמה: לא אוהבים ללכת הרבה, רוצים לראות שקיעה...',
   },
 ];
 

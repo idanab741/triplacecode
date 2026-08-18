@@ -6,6 +6,7 @@ import { Button, ChipGroup, Field, Screen, Slider } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { DAY_TRIP_QUESTIONS } from "@/services/tripBuilder/rules/dayTrip";
+import type { ExtractedDayTripIntent } from "@/services/tripBuilder/dayTripIntentExtractionService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
 import { TripBuilderHeader } from "@/screens/trip-builder/chat/TripBuilderHeader";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
@@ -13,7 +14,6 @@ import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { TypingIndicator } from "@/screens/trip-builder/chat/TypingIndicator";
 import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import Image from "next/image";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
@@ -120,6 +120,12 @@ const [tempCompanion, setTempCompanion] = useState<string | null>(null);
 const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
   const startedRef = useRef(false);
+  // בקשה מפורשת - אותה ארכיטקטורה בדיוק כמו חופשה בחו"ל: מלל חופשי
+  // מיד אחרי "מתי יוצאים", חילוץ תשובות, ואז "בואו נבנה יחד"/"אמשיך לבד".
+  const extractedIntentRef = useRef<ExtractedDayTripIntent | null>(null);
+  const [showBuildChoice, setShowBuildChoice] = useState(false);
+  const [waitingForBuild, setWaitingForBuild] = useState(false);
+  const buildTriggeredRef = useRef(false);
 
 
   const step = DAY_TRIP_QUESTIONS[stepIndex];
@@ -185,7 +191,7 @@ function resetTempAnswerState() {
 function goToNextStep() {
     resetTempAnswerState();
     if (isLastStep) {
-      buildTripDirectly(form);
+      createSessionAndWaitThenNavigate(form);
       return;
     }
     setTyping(true);
@@ -384,28 +390,168 @@ if (key === "companions" && editStep.type === "companions") {
     closeEdit();
   }
 
-function confirmFreeText() {
+/**
+   * בקשה מפורשת - המלל החופשי כבר לא בונה ישר (הוא כבר לא השאלה
+   * האחרונה) - הוא מפעיל חילוץ (כמו parse-intent בחופשה בחו"ל) ואז מציג
+   * שתי אפשרויות: "בואו נבנה יחד" (ממשיך לשאול את מה שלא כוסה) או
+   * "אמשיך לבד" (בונה ישר לפי DNA/גנרי).
+   */
+  async function confirmFreeText() {
     const finalForm = { ...form, freeText: tempText };
     setForm(finalForm);
     addUser(tempText || "—", "freeText");
     resetTempAnswerState();
-    // freeText הוא תמיד השאלה האחרונה ב-DAY_TRIP_QUESTIONS - עוברים ישירות
-    // לבנייה עם הטופס המעודכן, בלי לעבור דרך goToNextStep (שסומך על ה-state
-    // הכללי `form`, שעדיין לא מעודכן באותו tick בגלל batching של React).
-    buildTripDirectly(finalForm);
+    setTyping(true);
+    extractedIntentRef.current = await fetchExtractedDayTripIntent(tempText);
+    setTyping(false);
+    setShowBuildChoice(true);
+  }
+
+  async function fetchExtractedDayTripIntent(freeText: string): Promise<ExtractedDayTripIntent | null> {
+    try {
+      const res = await fetch("/api/trip-builder/day-trip/parse-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeText }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.extracted as ExtractedDayTripIntent) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * "בואו נבנה יחד" - ממשיך משאלת freeText (index 1) קדימה, ומדלג
+   * אוטומטית (עם בועת משתמש, בדיוק כאילו נענתה) על כל שאלה שכבר כוסתה
+   * בחילוץ - עד לשאלה הראשונה שלא כוסתה, שם עוצר ומציג אותה אינטראקטיבית.
+   * אם הכל כוסה - עובר ישר לבנייה.
+   */
+  function confirmBuildTogether() {
+    setShowBuildChoice(false);
+    addUser("בואו נבנה יחד", "freeText");
+    advanceDayTrip(2, form);
+  }
+
+  function advanceDayTrip(fromIndex: number, current: DayTripAnswers) {
+    const extracted = extractedIntentRef.current;
+    let idx = fromIndex;
+    let workingForm = current;
+
+    while (extracted && idx < DAY_TRIP_QUESTIONS.length) {
+      const s = DAY_TRIP_QUESTIONS[idx];
+
+      if (s.type === "companions" && extracted.companions) {
+        workingForm = { ...workingForm, companions: extracted.companions, hasPet: extracted.hasPet };
+        const label = labelFor(s.options, extracted.companions);
+        addUser(extracted.hasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
+        if (extracted.companions === s.childAgeTriggerValue) {
+          if (extracted.childAgeBands.length > 0) {
+            workingForm = { ...workingForm, childAgeBands: extracted.childAgeBands as DayTripAnswers["childAgeBands"] };
+            addUser(labelsFor(s.childAgeOptions, extracted.childAgeBands).join("، "), "childAgeBands");
+          } else {
+            // גילאי ילדים לא חולצו מהמלל - חייבים לשאול את זה אינטראקטיבית.
+            setForm(workingForm);
+            setStepIndex(idx);
+            setAwaitingChildAges(true);
+            setTyping(true);
+            setTimeout(() => {
+              setTyping(false);
+              addBot(s.childAgeTitle, "childAgeBands");
+            }, 500);
+            return;
+          }
+        }
+        idx += 1;
+        continue;
+      }
+
+      if (s.type === "slider" && s.key === "distanceBand" && extracted.distanceBand) {
+        workingForm = { ...workingForm, distanceBand: extracted.distanceBand as DayTripAnswers["distanceBand"] };
+        addUser(labelFor(s.steps, extracted.distanceBand), "distanceBand");
+        idx += 1;
+        continue;
+      }
+
+      if (s.type === "slider" && s.key === "budgetBand" && extracted.budgetBand) {
+        workingForm = { ...workingForm, budgetBand: extracted.budgetBand as DayTripAnswers["budgetBand"] };
+        addUser(labelFor(s.steps, extracted.budgetBand), "budgetBand");
+        idx += 1;
+        continue;
+      }
+
+      if (s.type === "multi-emoji" && extracted.interests.length > 0) {
+        workingForm = { ...workingForm, interests: extracted.interests as DayTripAnswers["interests"] };
+        addUser(labelsFor(s.options, extracted.interests).join("، "), "interests");
+        idx += 1;
+        continue;
+      }
+
+      if (s.type === "single" && s.key === "durationBand" && extracted.durationBand) {
+        workingForm = { ...workingForm, durationBand: extracted.durationBand as DayTripAnswers["durationBand"] };
+        addUser(labelFor(s.options, extracted.durationBand), "durationBand");
+        idx += 1;
+        continue;
+      }
+
+      break; // השאלה הזו לא כוסתה בחילוץ - עוצרים כאן
+    }
+
+    setForm(workingForm);
+
+    if (idx >= DAY_TRIP_QUESTIONS.length) {
+      createSessionAndWaitThenNavigate(workingForm);
+      return;
+    }
+
+    resetTempAnswerState();
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      setStepIndex(idx);
+    }, 500);
+  }
+
+  /**
+   * "אמשיך לבד" - בונה ישר, עם interests מה-DNA (אם קיים) או ברירות
+   * המחדל הגנריות לכל שאר השדות - בלי לשאול שום שאלה נוספת.
+   */
+  async function confirmBuildAlone() {
+    setShowBuildChoice(false);
+    addUser("אמשיך לבד", "freeText");
+    setTyping(true);
+    let finalForm = form;
+    try {
+      const res = await fetch("/api/trip-builder/day-trip/dna-defaults");
+      const data = await res.json();
+      if (Array.isArray(data.interests) && data.interests.length > 0) {
+        finalForm = { ...finalForm, interests: data.interests };
+      }
+    } catch {
+      // נכשל - ממשיכים עם ברירות המחדל הגנריות הרגילות (DEFAULT_ANSWERS), לא חוסם
+    }
+    setForm(finalForm);
+    setTyping(false);
+    createSessionAndWaitThenNavigate(finalForm);
   }
 
   // ---------- שליחה סופית ----------
 
-  /** אחרי השאלה האחרונה עוברים ישירות לבניית הטיול דרך triplace - בלי מסך בחירה triplace/tripmatch. */
-  async function buildTripDirectly(answers: DayTripAnswers) {
+  /**
+   * בקשה מפורשת (בדיוק כמו חופשה בחו"ל) - לא קופצים למסך המשחק (LoadingGame)
+   * אוטומטית: נשארים כאן בצ'אט, בונים ברקע, ומתשאלים עד שהמסלול מוכן (או
+   * עד תקרה בטיחותית של 20 שניות) - ואז עוברים ישר לעמוד המוכן.
+   */
+  async function createSessionAndWaitThenNavigate(answers: DayTripAnswers) {
     if (!user) {
       router.push("/auth");
       return;
     }
-    // מציגים את מסך ההמתנה (עם המשחק) מיד - לא ממתינים לשום קריאת רשת קודם.
-    setSubmitting(true);
+    if (buildTriggeredRef.current) return;
+    buildTriggeredRef.current = true;
     setLocationError(null);
+    setWaitingForBuild(true);
     try {
       const origin = await getCurrentPosition();
       const response = await fetch("/api/trip-builder/sessions", {
@@ -417,21 +563,35 @@ function confirmFreeText() {
       if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
 
       const sessionId = data.session.id;
-      // בניית המסלול בפועל (auto-build) רצה ברקע - לא ממתינים לה כאן, כדי
-      // שהניווט לעמוד התוצאה יקרה מיד. עמוד התוצאה מתשאל את ה-session שוב
-      // ושוב עד שהיא מסתיימת (בדיוק כמו בחופשה בחו"ל).
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
+
+      const MAX_WAIT_MS = 20000;
+      const POLL_INTERVAL_MS = 1200;
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        try {
+          const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
+          const pollData = await pollRes.json();
+          const s = pollData?.session;
+          const hasStops = (s?.final_itinerary?.stops?.length ?? 0) > 0;
+          if (s?.status === "completed" || hasStops) break;
+        } catch {
+          // שגיאת רשת חד-פעמית בתשאול - ממשיכים לנסות
+        }
+      }
       router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
     } catch (error) {
+      buildTriggeredRef.current = false;
+      setWaitingForBuild(false);
       setLocationError(
         error instanceof Error ? error.message : "לא הצלחנו לבנות את הטיול. יש לאשר גישה למיקום ולנסות שוב."
       );
-      setSubmitting(false);
     }
   }
 
   function getFooterAction(): { label: string; onClick: () => void; disabled?: boolean } | null {
-    if (typing || submitting) return null;
+    if (typing || submitting || showBuildChoice || waitingForBuild) return null;
     if (step.type === "companions" && awaitingChildAges) {
       return { label: "המשך", onClick: confirmChildAges };
     }
@@ -656,7 +816,7 @@ return m.role === "assistant" ? (
               <AnswerOptions options={step.options} onSelect={handleSingleSelect} />
             )}
 
-            {step.type === "text" && (
+            {step.type === "text" && !showBuildChoice && (
               <textarea
                 value={tempText}
                 onChange={(e) => setTempText(e.target.value)}
@@ -668,22 +828,40 @@ return m.role === "assistant" ? (
           </div>
         )}
 
-{submitting && (
-          <LoadingGame
-            statusText="רגע, בונים לכם את הטיול..."
-            steps={[
-              "🔍 מחפשים את המקומות הכי מתאימים לכם",
-              "🎯 בוחרים אטרקציות לפי התחומים שבחרתם",
-              "🍽️ מוצאים מקום אוכל בשעה הנכונה",
-              "🗺️ בונים מסלול רציף וקרוב לבית",
-              "⏱️ מתאימים הכל לזמן ולתקציב שבחרתם",
-            ]}
-          />
+        {/* בקשה מפורשת - בדיוק כמו חופשה בחו"ל: אחרי המלל החופשי, שתי
+            אפשרויות - להמשיך לענות על מה שלא כוסה, או לבנות ישר. */}
+        {showBuildChoice && (
+          <div className="flex flex-col gap-2 px-1">
+            <button
+              type="button"
+              onClick={confirmBuildTogether}
+              className="w-full rounded-pill py-3 text-sm font-semibold text-white"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              בואו נבנה יחד
+            </button>
+            <button
+              type="button"
+              onClick={confirmBuildAlone}
+              className="w-full rounded-pill border border-accent/30 bg-accent/5 py-3 text-sm font-semibold text-accent"
+            >
+              אמשיך לבד
+            </button>
+          </div>
+        )}
+
+        {/* בקשה מפורשת ("10-15 שניות, עם הטעינה שלנו, לא המשחק") - נשארים
+            כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
+        {waitingForBuild && (
+          <div className="flex flex-col items-center gap-2 py-4">
+            <TypingIndicator />
+            <p className="text-sm text-ink-secondary">רגע, בונים לכם את הטיול...</p>
+          </div>
         )}
 
 {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
- {!editingFieldKey && !submitting && footerAction && (
+ {!editingFieldKey && !submitting && !showBuildChoice && !waitingForBuild && footerAction && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
