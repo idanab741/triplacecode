@@ -337,12 +337,34 @@ function AbroadVacationResultContent() {
     hotels?: { name: string; address: string }[];
   };
 
+  // ימים שעדיין לא הגיעו (לא קיימים ב-dayGroups עדיין) - מוצגים כטאב+כרטיסי
+  // סקלטון, כל עוד הבנייה עדיין רצה. מספר הימים הכולל נגזר מטווח
+  // התאריכים - אותו חישוב בדיוק כמו countDays ב-categoryPlanService.ts
+  // (כולל ברירת המחדל הקבועה של 5 ימים).
+  //
+  // תיקון באג אמיתי (בקשה מפורשת - "אין את עמודי הטעינה!"): הגרסה
+  // הקודמת נפלה חזרה ל-dayGroups.length כשהתאריכים ריקים/לא תקינים - זה
+  // בדיוק ה"יעד" שגדל אוטומטית ככל שעוד ימים מגיעים, כך ש-pendingDayNumbers
+  // תמיד יצא ריק (0 ימים "חסרים" ביחס ל"יעד" שכל הזמן שווה למה שכבר יש) -
+  // הסקלטון פשוט לא יכול היה להופיע אף פעם. עכשיו נופל ל-5 קבוע, בדיוק
+  // כמו הבקאנד (countDays), כדי ששני הצדדים תמיד יסכימו על "כמה ימים
+  // בסך הכל" - לא תלוי כמה כבר נטען עד כה.
+  const expectedTotalDays = (() => {
+    if (!answersTyped.startDate || !answersTyped.endDate) return 5;
+    const start = new Date(answersTyped.startDate);
+    const end = new Date(answersTyped.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 5;
+    const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, days);
+  })();
+
   const dayGroups = injectLogisticsStops(
     groupStopsByDay(itinerary.stops),
     answersTyped,
     logisticsImages,
     airportInfo,
-    neighborhoodInfo
+    neighborhoodInfo,
+    expectedTotalDays
   );
   const hasHotel = Boolean(answersTyped.hotels?.[0]?.name);
 
@@ -360,18 +382,6 @@ function AbroadVacationResultContent() {
     return stopDay === activeDayFilter;
   });
 
-  // ימים שעדיין לא הגיעו (לא קיימים ב-dayGroups) - מוצגים כטאב+כרטיסי
-  // סקלטון, כל עוד הבנייה עדיין רצה (status!=="completed"). מספר הימים
-  // הכולל נגזר מטווח התאריכים שהמשתמש בחר - אותו חישוב בדיוק כמו
-  // countDays ב-categoryPlanService.ts (כולל ברירת המחדל של 5 ימים).
-  const expectedTotalDays = (() => {
-    if (!answersTyped.startDate || !answersTyped.endDate) return dayGroups.length || 5;
-    const start = new Date(answersTyped.startDate);
-    const end = new Date(answersTyped.endDate);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return dayGroups.length || 5;
-    const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    return Math.max(1, days);
-  })();
   const readyDayNumbers = new Set(dayGroups.map((g) => g.day));
   const pendingDayNumbers =
     session.status === "completed"
@@ -435,6 +445,20 @@ function AbroadVacationResultContent() {
             )}
           </p>
         </div>
+
+        {/* בקשה מפורשת ("תעשה שגיאות גלויות באפליקציה") - כל אזהרה שנאספה
+            בזמן הבנייה (כמו יום שנכשל) מוצגת כאן ישירות, בלי צורך בגישה
+            לטרמינל/לוגי שרת בכלל. */}
+        {itinerary.warnings.length > 0 && (
+          <div className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-bold">שימו לב:</p>
+            <ul className="mt-1 list-inside list-disc space-y-1">
+              {itinerary.warnings.map((warning, i) => (
+                <li key={i}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* הזמנת טיסה ומלון - placeholder בלבד לעכשיו, הפיצ'ר בפועל ייבנה בהמשך.
             עיצוב: הגרדיאנט של המותג עצמו (אותו אחד כמו כפתור "שמור חופשה") -
@@ -807,7 +831,8 @@ function injectLogisticsStops(
   },
   images: Record<string, string | null>,
   airportInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null,
-  neighborhoodInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null
+  neighborhoodInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null,
+  expectedTotalDays: number
 ): { day: number; stops: FinalItinerary["stops"] }[] {
   if (dayGroups.length === 0) return dayGroups;
 
@@ -901,10 +926,20 @@ function injectLogisticsStops(
     )
   );
 
+  // בקשה מפורשת (באג אמיתי, נמצא בצילום מסך): "השדה תעופה ביום האחרון
+  // מופיע יחד עם היום הראשון" - כי dayGroups[dayGroups.length-1] היה
+  // day1 עצמו כל עוד ימים 2+ עוד לא הגיעו מה-polling (day1 היה גם
+  // "ראשון" וגם "אחרון" זמנית ברשימה שכבר נטענה) - מה שהזריק את כרטיס
+  // הטיסה חזרה + הצ'ק-אאוט לתוך יום 1 בטעות. עכשיו בודקים שהיום שכן
+  // נטען הוא **באמת** היום האחרון הצפוי של הטיול (day === expectedTotalDays) -
+  // אם לא, לא מזריקים את הכרטיסים האלה בכלל; הם יופיעו ברגע שהיום האחרון
+  // האמיתי יגיע דרך אותו polling שכבר קיים.
+  const lastDayHasArrived = lastDay.day === expectedTotalDays;
+
   const isSameDay = firstDay.day === lastDay.day;
   const updatedLastDay = isSameDay
-    ? { ...updatedFirstDay, stops: [...updatedFirstDay.stops, ...lastDayExtras] }
-    : { ...lastDay, stops: [...lastDay.stops, ...lastDayExtras] };
+    ? { ...updatedFirstDay, stops: lastDayHasArrived ? [...updatedFirstDay.stops, ...lastDayExtras] : updatedFirstDay.stops }
+    : { ...lastDay, stops: lastDayHasArrived ? [...lastDay.stops, ...lastDayExtras] : lastDay.stops };
 
   if (isSameDay) return [updatedLastDay, ...dayGroups.slice(1)];
 

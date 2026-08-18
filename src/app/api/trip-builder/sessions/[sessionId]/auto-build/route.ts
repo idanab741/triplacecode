@@ -729,6 +729,16 @@ export async function POST(
         willRunBlueprintLoop: numDays > 2,
       });
 
+      // בקשה מפורשת ("תעשה שגיאות גלויות באפליקציה") - כל תקלה בבניית יום
+      // "רגיל" נאספת כאן, ומוזרקת ל-warnings של המסלול הסופי (finalizeItinerary
+      // extraWarnings) - נראה בעמוד התוצאה עצמו, בלי צורך בטרמינל בכלל.
+      const dayBuildWarnings: string[] = [];
+      if (numDays <= 2) {
+        dayBuildWarnings.push(
+          `לא נבנו ימים "רגילים" - numDays חושב כ-${numDays} (startDate="${vacationDates.startDate}", endDate="${vacationDates.endDate}")`
+        );
+      }
+
       if (numDays > 2) {
         const contextWeatherSummary = await getWeatherSummary(origin.lat, origin.lng);
         const vacationContext = buildVacationContext({
@@ -781,12 +791,15 @@ export async function POST(
             // בקשה מפורשת - יום בודד שנכשל לא אמור "לבלוע" בשקט את כל
             // שאר הימים (לפני התיקון הזה, שגיאה כאן הייתה קופצת ישר
             // ל-catch הכללי של כל ה-route ומדלגת על יום 5 + שאר הימים).
-            // רושמים את השגיאה המדויקת וממשיכים ליום הבא.
+            // רושמים את השגיאה המדויקת - גם ללוג, גם לרשימה שתופיע
+            // בפועל למשתמש בעמוד התוצאה (warnings) - וממשיכים ליום הבא.
+            const dayErrorMessage = dayError instanceof Error ? dayError.message : String(dayError);
             console.error("[auto-build] יום Blueprint בודד נכשל - ממשיכים לימים הבאים", {
               sessionId,
               day,
-              message: dayError instanceof Error ? dayError.message : String(dayError),
+              message: dayErrorMessage,
             });
+            dayBuildWarnings.push(`יום ${day} נכשל בבנייה: ${dayErrorMessage}`);
           }
         }
       }
@@ -800,7 +813,9 @@ export async function POST(
         answers.budgetBand,
         answers.durationBand,
         tripIntent,
-        answers.freeText
+        answers.freeText,
+        true,
+        dayBuildWarnings
       );
       return NextResponse.json({ itinerary });
     }

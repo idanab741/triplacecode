@@ -49,7 +49,12 @@ export async function finalizeItinerary(
    *  הימים"): false עבור שמירת יום 1 בלבד באמצע בנייה מרובת-ימים - לא
    *  נוגע ב-status (נשאר "building"). ברירת המחדל true שומרת על ההתנהגות
    *  המקורית (המסלול המלא, status="completed") לכל שאר הקוראים. */
-  isFinal: boolean = true
+  isFinal: boolean = true,
+  /** בקשה מפורשת ("תעשה שגיאות גלויות באפליקציה, לא רק בלוג של השרת") -
+   *  אזהרות נוספות (למשל "יום 3 נכשל בבנייה: ...") שמוזרקות ישירות
+   *  ל-warnings של המסלול הסופי - נראה בפועל בעמוד התוצאה, בלי צורך
+   *  בגישה לטרמינל/לוגים בכלל. */
+  extraWarnings: string[] = []
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -218,7 +223,7 @@ const warnings: string[] = [];
     stops: finalStops,
     events: [],
     totalEtaMinutes: cumulativeMinutes,
-    warnings,
+    warnings: [...warnings, ...extraWarnings],
     dayTitles: deriveDayTitles(finalStops),
   };
 
