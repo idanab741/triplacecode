@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
-import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
+import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -186,20 +186,11 @@ function NatureTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // אותו סגנון טעינה בדיוק כמו בכל שאר סוגי הטיולים (חופשה בחו"ל,
-      // סופ"ש, דייט רומנטי, חיי לילה) - מסך LoadingGame עם המשחק והשלבים
-      // המתחלפים, לא ספינר גנרי שלא קשור לשום מסך אחר באפליקציה. תוכן קיים
-      // תמיד מוצג מיד, בלי קשר ל-status.
-      return (
-        <LoadingGame
-          statusText="רגע, עוד רגע ויום הטבע מוכן..."
-          steps={[
-            "🌳 מוצאים מסלולים ופינות טבע מתאימות",
-            "🥾 מתאימים את רמת הקושי לבקשה שלכם",
-            "🗺️ מסדרים את המסלול בסדר הכי נוח",
-          ]}
-        />
-      );
+      // בקשה מפורשת ("שוב החזיר את המשחק בכוח!") - אסור שמסך המשחק
+      // האינטראקטיבי (LoadingGame) יופיע אוטומטית - הוא מוצג רק אם המשתמש
+      // עצמו לחץ על בועת ה-runtrippy בצ'אט. כאן - רשת ביטחון בלבד, עיצוב
+      // על-מותגי (לוגו runtrippy דופק) בלי שום אינטראקציה נכפית.
+      return <BuildingTripIntro />;
     }
     return (
       <Screen>

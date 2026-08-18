@@ -16,7 +16,7 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
-import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
+import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -203,22 +203,14 @@ function DayTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // בקשה מפורשת - אותו סגנון טעינה בדיוק כמו בכל שאר סוגי הטיולים
-      // (חופשה בחו"ל, סופ"ש, דייט רומנטי, חיי לילה) - מסך LoadingGame עם
-      // המשחק והשלבים המתחלפים, לא ספינר גנרי שלא קשור לשום מסך אחר
-      // באפליקציה. התשאול (polling, כל 2.5 שניות, כבר קיים למעלה) ימשיך
-      // וידליק את התוצאה האמיתית ברגע שהיא מוכנה, בלי שהמשתמש יצטרך
-      // לעשות כלום.
-      return (
-        <LoadingGame
-          statusText="רגע, עוד רגע והטיול מוכן..."
-          steps={[
-            "📍 מוצאים את התחנות הכי מתאימות בשבילכם",
-            "☕ מתאימים הפסקת קפה או אוכל בדרך",
-            "🗺️ מסדרים את המסלול בסדר הכי נוח",
-          ]}
-        />
-      );
+      // בקשה מפורשת ("שוב החזיר את המשחק בכוח!") - טיול יומי אסור שיציג את
+      // מסך המשחק האינטראקטיבי (LoadingGame) באופן אוטומטי - המשחק מוצג
+      // רק אם המשתמש עצמו לחץ על בועת ה-runtrippy בצ'אט (וגם אז זה קורה
+      // בעמוד ה-build, לא כאן). כאן - רשת ביטחון בלבד, עיצוב על-מותגי
+      // (לוגו runtrippy דופק) בלי שום אינטראקציה נכפית. התשאול (polling,
+      // כל 2.5 שניות, כבר קיים למעלה) ימשיך וידליק את התוצאה האמיתית ברגע
+      // שהיא מוכנה, בלי שהמשתמש יצטרך לעשות כלום.
+      return <BuildingTripIntro />;
     }
     return (
       <Screen>
