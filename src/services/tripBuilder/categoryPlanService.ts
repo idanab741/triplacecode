@@ -434,9 +434,40 @@ function countDays(startDate: string, endDate: string): number {
 }
 
 /**
+ * מסדר את תפקידי התחנות של יום (attraction/food) לפי הדפוס שהתבקש
+ * במפורש: אף פעם לא שתי מסעדות ברצף, עם פיזור אחיד ככל האפשר של
+ * האטרקציות בין עוגני המסעדה - למשל ליום "עמוס" עם 3 מסעדות ו-3
+ * אטרקציות: מסעדה-אטרקציה-אטרקציה-מסעדה-אטרקציה-מסעדה - במקום כל
+ * האטרקציות ברצף ואז כל המסעדות ברצף (זה מה שיצר את ה"בליל").
+ */
+function interleaveDayRoles(attractionsCount: number, foodCount: number): Array<"attraction" | "food"> {
+  if (foodCount === 0) return Array(attractionsCount).fill("attraction");
+  if (attractionsCount === 0) return Array(foodCount).fill("food");
+
+  // המסעדות הן העוגנים שפותחים (ואם יש יותר מאחת - גם סוגרים) את היום;
+  // האטרקציות מתחלקות ל-(foodCount - 1) "רווחים" שביניהן בצורה הכי
+  // שווה שאפשר (Math.floor/עודף לסירוגין). אם יש מסעדה אחת בלבד, כל
+  // האטרקציות באות אחריה.
+  const gaps = Math.max(1, foodCount - 1);
+  const base = Math.floor(attractionsCount / gaps);
+  const remainder = attractionsCount % gaps;
+  const roles: Array<"attraction" | "food"> = [];
+  for (let g = 0; g < gaps; g++) {
+    roles.push("food");
+    const countHere = base + (g < remainder ? 1 : 0);
+    for (let i = 0; i < countHere; i++) roles.push("attraction");
+  }
+  if (foodCount > gaps) roles.push("food"); // המסעדה האחרונה, אחרי כל הרווחים
+  return roles;
+}
+
+/**
  * בונה תוכנית קטגוריות מרובת-ימים לחופשה בחו"ל - דטרמיניסטי (בלי AI), לפי
- * קצב הטיול (VACATION_PACE_DAILY_COUNTS) וסוגי החופשה שנבחרו. יום ראשון
- * ואחרון (הגעה/עזיבה) מקבלים כמות מופחתת, בהתאם למסמך האפיון.
+ * קצב הטיול (VACATION_PACE_DAILY_COUNTS) וסוגי החופשה שנבחרו. סדר
+ * התפקידים בתוך כל יום עובר דרך interleaveDayRoles (ר' למעלה) - לא כל
+ * האטרקציות ואז כל המסעדות. יום ראשון הוא מקרה קבוע ונפרד לגמרי (ר'
+ * למטה); יום אחרון (אם הוא לא גם הראשון) עדיין מקבל כמות מופחתת, בהתאם
+ * למסמך האפיון.
  */
 export function buildMultiDayVacationPlan(answers: {
   startDate: string;
@@ -465,16 +496,30 @@ export function buildMultiDayVacationPlan(answers: {
   }
 
   for (let day = 1; day <= numDays; day++) {
-    const isEdgeDay = day === 1 || day === numDays;
-    // יום הגעה/עזיבה - מחצית מהכמות הרגילה, לפחות תחנה אחת מכל סוג
-    const attractionsCount = isEdgeDay ? Math.max(1, Math.floor(counts.attractions / 2)) : counts.attractions;
-    const foodCount = isEdgeDay ? Math.max(1, Math.floor(counts.food / 2)) : counts.food;
-
-    for (let i = 0; i < attractionsCount; i++) {
+    if (day === 1) {
+      // יום הגעה - בקשה מפורשת: בלי קשר לקצב שנבחר, רק תחנה אחת ("סיבוב
+      // בשכונה המרכזית של העיר") ואחריה ארוחת ערב אחת באותו אזור - בסדר
+      // הזה (סיור לפני ארוחה, ולא ההפך כמו הדפוס הרגיל שפותח במסעדה).
+      // הגעה בשדה התעופה ושורת המלון עצמן אינן "תחנת place" מהמאגר - הן
+      // מוצגות בנפרד בעמוד התוצאה מתוך תשובות הטיסה/המלון, לא כאן.
       plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
-    }
-    for (let i = 0; i < foodCount; i++) {
       plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+      continue;
+    }
+
+    // יום עזיבה (אם הוא לא גם יום 1) - מחצית מהכמות הרגילה, לפחות תחנה
+    // אחת מכל סוג, בהתאם לשעת הטיסה.
+    const isLastDay = day === numDays;
+    const attractionsCount = isLastDay ? Math.max(1, Math.floor(counts.attractions / 2)) : counts.attractions;
+    const foodCount = isLastDay ? Math.max(1, Math.floor(counts.food / 2)) : counts.food;
+
+    for (const role of interleaveDayRoles(attractionsCount, foodCount)) {
+      plan.push({
+        category: role === "food" ? "wineries_dining" : nextCategory(),
+        role,
+        order: order++,
+        day,
+      });
     }
   }
 
