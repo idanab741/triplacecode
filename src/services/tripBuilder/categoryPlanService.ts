@@ -408,12 +408,28 @@ export async function decideNextStop(params: DecideNextStopParams): Promise<{ ca
 }
 import { VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
 
-/** מחשב כמה ימים יש בין שני תאריכים (כולל שני הקצוות). */
+/**
+ * מחשב כמה ימים יש בין שני תאריכים (כולל שני הקצוות).
+ *
+ * תיקון: מאז שנוספה האפשרות "אין לי עוד תאריך" בשאלון, startDate/endDate
+ * יכולים להגיע כמחרוזת ריקה (או תאריך לא תקין). `new Date("")` מחזיר
+ * Invalid Date, וכל החישוב (Math.round על NaN, +1) היה מחזיר NaN בשקט -
+ * ואז `for (day=1; day<=NaN; ...)` פשוט לא רץ אף פעם אחת, כך שהתוכנית
+ * יצאה ריקה לגמרי (0 slots) בלי שום הודעת שגיאה, עד שהמסלול נכשל
+ * בוולידציה עם "המסלול שנבנה ריק". כשאין תאריך בכלל, נופלים לברירת מחדל
+ * סבירה לחופשה (5 ימים) במקום להשאיר את המשתמש בלי מסלול.
+ */
 function countDays(startDate: string, endDate: string): number {
+  const DEFAULT_TRIP_DAYS = 5;
+  if (!startDate || !endDate) return DEFAULT_TRIP_DAYS;
+
   const start = new Date(startDate);
   const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return DEFAULT_TRIP_DAYS;
+
   const diffMs = end.getTime() - start.getTime();
   const days = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  if (Number.isNaN(days)) return DEFAULT_TRIP_DAYS;
   return Math.max(1, days);
 }
 

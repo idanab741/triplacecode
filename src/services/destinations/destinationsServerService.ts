@@ -51,7 +51,13 @@ const MIN_PLACES_PER_DESTINATION = 20;
  * יעד עם פחות מ-MIN_PLACES_PER_DESTINATION מקומות בפועל לא נכלל - "יעד"
  * עם אטרקציה בודדת לא מספיק מוכן כדי להפתיע אליו משתמש.
  */
-export async function getDestinationCandidates(): Promise<DestinationCandidate[]> {
+/**
+ * הליבה המשותפת - שולפת ומקבצת את כל היעדים מטבלת `places` (בלי סינון
+ * MIN_PLACES_PER_DESTINATION), כדי ששני הצרכנים למטה (getDestinationCandidates
+ * ל"תפתיעו אותי", ו-findAdminDestinationByName ליעד מפורש) יעבדו על אותו
+ * מקור נתונים בדיוק בלי לשכפל את קריאת ה-DB/הקיבוץ.
+ */
+async function computeAllDestinationCandidates(): Promise<DestinationCandidate[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("places")
@@ -90,13 +96,52 @@ export async function getDestinationCandidates(): Promise<DestinationCandidate[]
     }
   }
 
-  return Array.from(grouped.values())
-    .filter((g) => g.count >= MIN_PLACES_PER_DESTINATION)
-    .map((g) => ({
-      name: g.name,
-      country: g.country,
-      latitude: g.latSum / g.count,
-      longitude: g.lngSum / g.count,
-      placeCount: g.count,
-    }));
+  return Array.from(grouped.values()).map((g) => ({
+    name: g.name,
+    country: g.country,
+    latitude: g.latSum / g.count,
+    longitude: g.lngSum / g.count,
+    placeCount: g.count,
+  }));
+}
+
+export async function getDestinationCandidates(): Promise<DestinationCandidate[]> {
+  const all = await computeAllDestinationCandidates();
+  return all.filter((g) => g.placeCount >= MIN_PLACES_PER_DESTINATION);
+}
+
+/**
+ * תיקון (בקשה מפורשת - "רק דרך תיקיית ה-ADMIN שלנו, אף פעם לא גוגל"):
+ * כשהמשתמש כבר ציין יעד מפורש (בין אם בחר אותו מהאוטוקומפליט, ובין אם
+ * הוא חולץ מהמלל החופשי ב"בואו נבנה יחד") - מוצאים את הקואורדינטות שלו
+ * **אך ורק** מתוך טבלת `places` שלנו (בדיוק אותו מקור נתונים כמו "תפתיעו
+ * אותי"), ולעולם לא דרך Google Geocoding. אם קריאה ל-Google נכשלת (למשל
+ * בגלל קוואטה) התהליך הישן היה ממשיך "בשקט" עם מיקום שגוי/ברירת מחדל,
+ * וזה מה שגרם ל"לא נבחרו מספיק תחנות" - הפונקציה הזו מסירה את התלות
+ * הזו לגמרי מהזרימה הזו.
+ *
+ * בשונה מ-getDestinationCandidates (שמוגבל ל-MIN_PLACES_PER_DESTINATION,
+ * כי שם מציעים יעד *אקראי* וצריך ערובת איכות) - כאן אין סף מינימום: אם
+ * המשתמש ביקש יעד ספציפי וכתוב אצלנו, גם עם מעט מקומות, נשתמש בו.
+ */
+export async function findAdminDestinationByName(query: string): Promise<DestinationCandidate | null> {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+
+  // "רומא, איטליה" -> משתמשים רק בחלק העיר (לפני הפסיק הראשון) להתאמה,
+  // כי זה מה שבפועל שמור ב-places.city.
+  const cityPart = trimmed.split(",")[0].trim();
+  const normalize = (v: string) => v.trim().toLowerCase();
+  const target = normalize(cityPart);
+  if (!target) return null;
+
+  const candidates = await computeAllDestinationCandidates();
+
+  const exact = candidates.find((c) => normalize(c.name) === target);
+  if (exact) return exact;
+
+  const partial = candidates.find(
+    (c) => normalize(c.name).includes(target) || target.includes(normalize(c.name))
+  );
+  return partial ?? null;
 }

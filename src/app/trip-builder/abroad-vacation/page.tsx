@@ -8,6 +8,7 @@ import { Screen, ChipGroup, Field, Slider } from "@/components/ui";
 import { DateRangePicker } from "@/screens/trip-builder/chat/DateRangePicker";
 import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
+import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
 import {
   VACATION_COMPANION_OPTIONS,
   VACATION_CHILD_AGE_OPTIONS,
@@ -135,6 +136,9 @@ export default function AbroadVacationQuestionnairePage() {
   const [typing, setTyping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // מסך הביניים "בונים עבורך את הטיול המושלם!" (עם הלוגו הדופק) - מוצג
+  // לזמן קצוב מיד כשמתחילים לבנות, ואז מפנה מקום למסך המשחק (LoadingGame).
+  const [preBuildIntro, setPreBuildIntro] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // temp state per stage
@@ -245,6 +249,20 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     }, 300);
     return () => clearTimeout(timeout);
   }, [editTempDestinationInput]);
+
+  // אם הגענו לשלב היעד (יעד יחיד) אחרי "בואו נבנה יחד" והיה כבר יעד ברור
+  // במלל החופשי (extractedIntentRef) - ממלאים אותו מראש בתיבה במקום
+  // להשאיר אותה ריקה, גם אם ה-advance האוטומטי לא דילג על השלב הזה
+  // מסיבה כלשהי (למשל travelStyle לא חולץ וחייב אישור ידני קודם).
+  useEffect(() => {
+    if (stage === "destination" && form.travelStyle === "single_destination") {
+      const extractedDestination = extractedIntentRef.current?.destination;
+      if (extractedDestination && !destinationInput) {
+        setDestinationInput(extractedDestination);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
 
   const multiDestDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
@@ -497,6 +515,15 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     goTo("freeIntent");
   }
 
+  /** "אין לי עוד תאריך" - כמו chooseSurpriseMe, מאשר מיד בלי לעבור דרך כפתור "המשך". */
+  function confirmNoDate() {
+    setTempStartDate("");
+    setTempEndDate("");
+    setForm((f) => ({ ...f, startDate: "", endDate: "" }));
+    addUser("אין לי עוד תאריך", "dates");
+    goTo("freeIntent");
+  }
+
 function confirmBooked() {
     if (!tempBooked) return;
     const booked = tempBooked === "yes";
@@ -654,6 +681,12 @@ function confirmBooked() {
     closeEdit();
   }
 
+  function chooseEditNoDate() {
+    setForm((f) => ({ ...f, startDate: "", endDate: "" }));
+    updateMessageLabel("אין לי עוד תאריך");
+    closeEdit();
+  }
+
   function updateEditDestinationAt(index: number, value: string) {
     setEditTempDestinations((list) => {
       const copy = [...list];
@@ -752,9 +785,14 @@ function confirmBooked() {
       router.push("/auth");
       return;
     }
-    // מציגים את מסך ההמתנה (עם המשחק) מיד בלחיצה - לא ממתינים לשום קריאת
-    // רשת קודם (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה".
+    // מציגים את מסך ההמתנה מיד בלחיצה - לא ממתינים לשום קריאת רשת קודם
+    // (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה". קודם עולה
+    // מסך ביניים קצר ("בונים עבורך את הטיול המושלם!" עם הלוגו הדופק),
+    // ורק אחריו עובר למסך המשחק (LoadingGame) - שניהם רצים במקביל לקריאות
+    // הרשת בפועל, שממשיכות ברקע בלי קשר לתזמון המסכים.
     setSubmitting(true);
+    setPreBuildIntro(true);
+    setTimeout(() => setPreBuildIntro(false), 2200);
     setLocationError(null);
     try {
       const origin = await getCurrentPosition();
@@ -817,14 +855,23 @@ function confirmBooked() {
               )}
 
               {editingStage === "dates" && (
-                <DateRangePicker
-                  startDate={editTempStartDate}
-                  endDate={editTempEndDate}
-                  onChange={(start, end) => {
-                    setEditTempStartDate(start);
-                    setEditTempEndDate(end);
-                  }}
-                />
+                <div className="flex flex-col gap-3">
+                  <DateRangePicker
+                    startDate={editTempStartDate}
+                    endDate={editTempEndDate}
+                    onChange={(start, end) => {
+                      setEditTempStartDate(start);
+                      setEditTempEndDate(end);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={chooseEditNoDate}
+                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                  >
+                    אין לי עוד תאריך
+                  </button>
+                </div>
               )}
 
               {editingStage === "bookedQuestion" && (
@@ -1019,14 +1066,23 @@ function confirmBooked() {
             )}
 
             {stage === "dates" && (
-              <DateRangePicker
-                startDate={tempStartDate}
-                endDate={tempEndDate}
-                onChange={(start, end) => {
-                  setTempStartDate(start);
-                  setTempEndDate(end);
-                }}
-              />
+              <div className="flex flex-col gap-3">
+                <DateRangePicker
+                  startDate={tempStartDate}
+                  endDate={tempEndDate}
+                  onChange={(start, end) => {
+                    setTempStartDate(start);
+                    setTempEndDate(end);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={confirmNoDate}
+                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                >
+                  אין לי עוד תאריך
+                </button>
+              </div>
             )}
 
             {stage === "bookedQuestion" && (
@@ -1193,13 +1249,17 @@ function confirmBooked() {
                     </div>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={chooseSurpriseMe}
-                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
-                >
-                  🎁 תפתיעו אותי
-                </button>
+                {/* אם כבר יש יעד ברור מהמלל החופשי - אין טעם להציע "תפתיעו
+                    אותי", המשתמש כבר אמר לאן הוא רוצה לטוס. */}
+                {!extractedIntentRef.current?.destination && (
+                  <button
+                    type="button"
+                    onClick={chooseSurpriseMe}
+                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                  >
+                    🎁 תפתיעו אותי
+                  </button>
+                )}
               </div>
             )}
 
@@ -1274,29 +1334,27 @@ function confirmBooked() {
                   type="button"
                   onClick={confirmFreeIntentTogether}
                   disabled={!tempFreeIntent.trim() || extractingIntent}
-                  className="w-full rounded-pill py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                  className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                 >
-                  <span className="block">בואו נבנה יחד</span>
-                  <span className="block text-[11px] font-normal text-white/85">
-                    כמה שאלות קצרות שיעזרו לי לדייק את התכנון
-                  </span>
+                  בואו נבנה יחד
                 </button>
                 <button
                   type="button"
                   onClick={confirmFreeIntentAlone}
                   disabled={!tempFreeIntent.trim() || extractingIntent}
-                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2 text-sm font-semibold text-accent disabled:opacity-50"
                 >
-                  <span className="block">אמשיך לבד</span>
-                  <span className="block text-[11px] font-normal text-accent/80">תכננו לי לפי מה שכתבתי</span>
+                  אמשיך לבד
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {submitting && (
+        {submitting && preBuildIntro && <BuildingTripIntro />}
+
+        {submitting && !preBuildIntro && (
           <LoadingGame
             statusText="רגע, בונים לכם את החופשה..."
             steps={[

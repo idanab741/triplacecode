@@ -16,6 +16,8 @@ import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggesti
 import { findRequestedPlaceNear } from "@/services/tripBuilder/placeResolutionService";
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
+import { findAdminDestinationByName } from "@/services/destinations/destinationsServerService";
+import { logAiError } from "@/services/ai/claudeService";
 import { suggestMustSeeLandmarks, findMustSeePlaces } from "@/services/tripBuilder/vacationMustSeeService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
 import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services/tripBuilder/types";
@@ -221,10 +223,20 @@ export async function POST(
 
       if (vacationAnswers.destination) {
         vacationDestinationName = vacationAnswers.destination;
-        const geocoded = await geocodePlaceName(vacationAnswers.destination);
-        if (geocoded) {
-          searchOrigin = geocoded;
+        // תיקון (בקשה מפורשת - "רק דרך תיקיית האדמין שלנו, לא גוגל"):
+        // מוצאים את הקואורדינטות של היעד אך ורק מתוך טבלת ה-places שלנו
+        // (בדיוק אותו מקור כמו "תפתיעו אותי" למטה) - בלי שום קריאה
+        // ל-Google Geocoding. גם מעדכנים את השם המוצג לכתיב המדויק שקיים
+        // אצלנו באדמין, כדי שהתצוגה תמיד תואמת את מה שבאמת נבנה.
+        const matched = await findAdminDestinationByName(vacationAnswers.destination);
+        if (matched) {
+          searchOrigin = { lat: matched.latitude, lng: matched.longitude };
           requestedAreaRadiusKm = 20;
+          vacationDestinationName = `${matched.name}, ${matched.country}`;
+        } else {
+          logAiError("היעד שהוזן לא נמצא בין היעדים עם תוכן קיים באדמין (places) - לא בוצע geocoding חיצוני", {
+            destination: vacationAnswers.destination,
+          });
         }
       } else if (vacationAnswers.surpriseMe) {
         // תיקון (בקשה מפורשת): ב"אמשיך לבד" (המלל החופשי בלבד, בלי לעבור
