@@ -713,6 +713,17 @@ export async function POST(
         vacationDates.startDate && vacationDates.endDate ? countDays(vacationDates.startDate, vacationDates.endDate) : 1;
       const includesNightlife = vacationTypeValues.includes("nightlife");
 
+      // לוג אבחון זמני (בקשה מפורשת - "זה נעלם שוב, למה?") - כדי לדעת
+      // בוודאות אם הבעיה היא ש-numDays יוצא נמוך מדי, או שמשהו אחר קורה
+      // בתוך הלולאה עצמה. יישאר עד שהבאג הזה ייסגר סופית.
+      console.error("[auto-build] בדיקת numDays לפני לולאת Blueprint", {
+        sessionId,
+        startDate: vacationDates.startDate,
+        endDate: vacationDates.endDate,
+        numDays,
+        willRunBlueprintLoop: numDays > 2,
+      });
+
       if (numDays > 2) {
         const contextWeatherSummary = await getWeatherSummary(origin.lat, origin.lng);
         const vacationContext = buildVacationContext({
@@ -741,24 +752,37 @@ export async function POST(
         const previousDayTitles: string[] = [latestItinerary?.dayTitles?.["1"] ?? "נחיתה והיכרות"];
 
         for (let day = 2; day < numDays; day++) {
-          const blueprint = await generateDayBlueprint(vacationContext, day, previousDayTitles);
-          previousDayTitles.push(blueprint.title);
+          console.error("[auto-build] מתחיל יום Blueprint", { sessionId, day, numDays });
+          try {
+            const blueprint = await generateDayBlueprint(vacationContext, day, previousDayTitles);
+            previousDayTitles.push(blueprint.title);
 
-          const dayPlan = categoryPlanForDay(blueprint, day, nextSlotOrder, includesNightlife);
-          nextSlotOrder += dayPlan.length;
-          const dayStops = await appendDayStops(supabase, sessionId, dayPlan);
-          await fillStopsFromPoolThenAi(dayStops);
+            const dayPlan = categoryPlanForDay(blueprint, day, nextSlotOrder, includesNightlife);
+            nextSlotOrder += dayPlan.length;
+            const dayStops = await appendDayStops(supabase, sessionId, dayPlan);
+            await fillStopsFromPoolThenAi(dayStops);
 
-          latestItinerary = await finalizeItinerary(
-            supabase,
-            sessionId,
-            searchOrigin,
-            answers.budgetBand,
-            answers.durationBand,
-            tripIntent,
-            answers.freeText,
-            false
-          );
+            latestItinerary = await finalizeItinerary(
+              supabase,
+              sessionId,
+              searchOrigin,
+              answers.budgetBand,
+              answers.durationBand,
+              tripIntent,
+              answers.freeText,
+              false
+            );
+          } catch (dayError) {
+            // בקשה מפורשת - יום בודד שנכשל לא אמור "לבלוע" בשקט את כל
+            // שאר הימים (לפני התיקון הזה, שגיאה כאן הייתה קופצת ישר
+            // ל-catch הכללי של כל ה-route ומדלגת על יום 5 + שאר הימים).
+            // רושמים את השגיאה המדויקת וממשיכים ליום הבא.
+            console.error("[auto-build] יום Blueprint בודד נכשל - ממשיכים לימים הבאים", {
+              sessionId,
+              day,
+              message: dayError instanceof Error ? dayError.message : String(dayError),
+            });
+          }
         }
       }
 
