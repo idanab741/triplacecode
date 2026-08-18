@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -573,22 +573,43 @@ if (key === "companions" && editStep.type === "companions") {
       setPendingSessionId(sessionId);
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
 
-      const MAX_WAIT_MS = 20000;
+      // בקשה מפורשת: לא מנווטים בכוח אחרי X שניות גם אם הטיול עוד לא מוכן -
+      // זה בדיוק מה שגרם למסך הביניים הממותג (BuildingTripIntro, "רשת
+      // ביטחון" בעמוד התוצאה) לקפוץ למשתמש. נשארים כאן בצ'אט (עם הגרפיקה
+      // בבועה, ר' waitingForBuild) ומתשאלים בלי הפסקה עד שהמסלול באמת
+      // מוכן - ורק אז מנווטים. POLL_SLOW_AFTER_MS מאט את קצב התשאול אחרי
+      // המתנה ארוכה במיוחד, כדי לא להציף שרת על session שתקוע.
       const POLL_INTERVAL_MS = 1200;
+      const POLL_SLOW_AFTER_MS = 30000;
+      const POLL_INTERVAL_SLOW_MS = 4000;
+      // רשת ביטחון בלבד למקרה קיצון (למשל השרת לא זמין בכלל) - לא תקרה
+      // רגילה לניווט. אם מגיעים לזה, לא מנווטים לשום מקום - נשארים בצ'אט
+      // ומראים שגיאה עם אפשרות לנסות שוב.
+      const HARD_GIVE_UP_MS = 90000;
       const startedAt = Date.now();
-      while (Date.now() - startedAt < MAX_WAIT_MS) {
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      let gaveUp = false;
+      while (Date.now() - startedAt < HARD_GIVE_UP_MS) {
+        const elapsed = Date.now() - startedAt;
+        await new Promise((resolve) => setTimeout(resolve, elapsed > POLL_SLOW_AFTER_MS ? POLL_INTERVAL_SLOW_MS : POLL_INTERVAL_MS));
         try {
           const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
           const pollData = await pollRes.json();
           const s = pollData?.session;
           const hasStops = (s?.final_itinerary?.stops?.length ?? 0) > 0;
-          if (s?.status === "completed" || hasStops) break;
+          if (s?.status === "completed" || hasStops) {
+            router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
+            return;
+          }
         } catch {
           // שגיאת רשת חד-פעמית בתשאול - ממשיכים לנסות
         }
       }
-      router.push(`/trip-builder/day-trip/result?sessionId=${sessionId}`);
+      gaveUp = true;
+      if (gaveUp) {
+        buildTriggeredRef.current = false;
+        setWaitingForBuild(false);
+        setLocationError("זה לוקח יותר זמן מהרגיל. אפשר לנסות שוב.");
+      }
     } catch (error) {
       buildTriggeredRef.current = false;
       setWaitingForBuild(false);
@@ -862,7 +883,17 @@ return m.role === "assistant" ? (
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
           <div className="flex flex-col gap-2">
-            <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>
+            <ChatBubble>
+              <div className="flex items-center gap-3">
+                <div
+                  className="relative h-9 w-9 shrink-0"
+                  style={{ animation: "dayTripBuildingPulse 2.6s ease-in-out infinite" }}
+                >
+                  <Image src="/images/game/runtrippy-logo.png" alt="" fill className="object-contain" />
+                </div>
+                <span>רגע, בונים לכם את הטיול...</span>
+              </div>
+            </ChatBubble>
             {pendingSessionId && (
               <RuntrippyPromptBubble
                 onClick={() => {
@@ -870,6 +901,17 @@ return m.role === "assistant" ? (
                 }}
               />
             )}
+            <style jsx>{`
+              @keyframes dayTripBuildingPulse {
+                0%,
+                100% {
+                  transform: scale(0.88);
+                }
+                50% {
+                  transform: scale(1.08);
+                }
+              }
+            `}</style>
           </div>
         )}
 
