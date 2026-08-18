@@ -312,14 +312,22 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   // דורס בחירה שהמשתמש כבר עשה בעצמו (tempTypes לא ריק).
   useEffect(() => {
     if (stage !== "vacationTypes" || tempTypes.length > 0) return;
+    const fromFreeText = extractedIntentRef.current?.vacationTypes ?? [];
     fetch("/api/trip-builder/vacation-type-defaults")
       .then((res) => res.json())
       .then((data) => {
-        if (Array.isArray(data.vacationTypes) && data.vacationTypes.length > 0) {
-          setTempTypes((current) => (current.length === 0 ? data.vacationTypes : current));
+        const fromDna: string[] = Array.isArray(data.vacationTypes) ? data.vacationTypes : [];
+        const merged = Array.from(new Set([...fromFreeText, ...fromDna]));
+        if (merged.length > 0) {
+          setTempTypes((current) => (current.length === 0 ? merged : current));
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        // גם אם השליפה מה-DNA נכשלת - עדיין ממלאים לפחות ממה שחולץ מהמלל.
+        if (fromFreeText.length > 0) {
+          setTempTypes((current) => (current.length === 0 ? fromFreeText : current));
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
@@ -485,13 +493,12 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
       return;
     }
 
-    if (stage === "vacationTypes" && extracted.vacationTypes.length > 0) {
-      const next = { ...current, vacationTypes: extracted.vacationTypes };
-      setForm(next);
-      addUser(labelsFor(VACATION_TYPE_OPTIONS, extracted.vacationTypes).join("، "), "vacationTypes");
-      advance("pace", next);
-      return;
-    }
+    // בקשה מפורשת: "מה אתם אוהבים לעשות" חייבת תמיד להופיע אינטראקטיבית
+    // (עם ברירות מחדל מסומנות, ניתנות לשינוי) - לא לדלג עליה בשקט גם אם
+    // חולצו סוגי חופשה מהמלל החופשי. בשונה משאר השלבים כאן, אין דילוג
+    // אוטומטי לשלב הזה בכלל - תמיד עוברים ל-goTo הרגיל (בהמשך הפונקציה).
+    // הערכים שחולצו עדיין לא הולכים לאיבוד - הם משולבים כברירת מחדל
+    // בתוך ה-useEffect שממלא tempTypes מראש (יחד עם ה-DNA).
 
     if (stage === "pace" && extracted.pace) {
       const next = { ...current, pace: extracted.pace };
