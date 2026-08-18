@@ -549,6 +549,7 @@ export default function NatureTripQuestionnairePage() {
                             <input
                               type="date"
                               value={editTempText}
+                              min={new Date().toISOString().split("T")[0]}
                               onChange={(e) => setEditTempText(e.target.value)}
                               className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
                             />
@@ -683,6 +684,7 @@ export default function NatureTripQuestionnairePage() {
                 <input
                   type="date"
                   value={tempText}
+                  min={new Date().toISOString().split("T")[0]}
                   onChange={(e) => setTempText(e.target.value)}
                   className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
