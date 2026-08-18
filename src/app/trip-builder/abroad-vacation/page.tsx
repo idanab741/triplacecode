@@ -8,7 +8,7 @@ import { Screen, ChipGroup, Field, Slider } from "@/components/ui";
 import { DateRangePicker } from "@/screens/trip-builder/chat/DateRangePicker";
 import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
-import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
+import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import {
   VACATION_COMPANION_OPTIONS,
   VACATION_CHILD_AGE_OPTIONS,
@@ -105,7 +105,7 @@ const DEFAULT_ANSWERS: AbroadVacationAnswers = {
   freeText: "",
 };
 
-type ChatMessage = { id: number; role: "assistant" | "user" | "icon"; text: string; editStage?: Stage };
+type ChatMessage = { id: number; role: "assistant" | "user" | "icon" | "runtrippy"; text: string; editStage?: Stage };
 
 function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: string | null }) {
   const initial = name?.trim()?.[0]?.toUpperCase() ?? "👤";
@@ -136,9 +136,10 @@ export default function AbroadVacationQuestionnairePage() {
   const [typing, setTyping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // מסך הביניים "בונים עבורך את הטיול המושלם!" (עם הלוגו הדופק) - מוצג
-  // לזמן קצוב מיד כשמתחילים לבנות, ואז מפנה מקום למסך המשחק (LoadingGame).
-  const [preBuildIntro, setPreBuildIntro] = useState(false);
+  // true מהרגע שהוצגה בועת runtrippy בצ'אט ועד ללחיצה עליה - מסתיר את
+  // שאר ה-UI של השלב (כפתורי תשובה, כפתור "המשך") כדי שלא יוצג ביחד עם
+  // בועת ה-runtrippy שמחכה ללחיצה.
+  const [readyToBuild, setReadyToBuild] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // temp state per stage
@@ -149,6 +150,8 @@ export default function AbroadVacationQuestionnairePage() {
   // תוצאת החילוץ (אם "בואו נבנה יחד" נלחץ) - ref ולא state, כי היא
   // נקראת בתוך advance() בלי צורך ב-re-render כשהיא מתעדכנת בעצמה.
   const extractedIntentRef = useRef<ExtractedVacationIntent | null>(null);
+  // התשובות המלאות שממתינות ללחיצה על בועת runtrippy בצ'אט - ר' promptBuildTrip.
+  const pendingBuildAnswersRef = useRef<AbroadVacationAnswers | null>(null);
   const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [tempChildAges, setTempChildAges] = useState<string[]>([]);
   const [tempStartDate, setTempStartDate] = useState("");
@@ -200,6 +203,35 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   }
   function addIconBadge(label: string) {
     setMessages((m) => [...m, { id: nextId(), role: "icon", text: label }]);
+  }
+  function addRuntrippyPrompt() {
+    setMessages((m) => [...m, { id: nextId(), role: "runtrippy", text: "" }]);
+  }
+
+  /**
+   * מוצג בסוף השאלון (במקום לבנות ישר): הודעת בוט "בונים עבורך את המסלול
+   * המושלם" ואז בועת runtrippy עם הלוגו הדופק - הכל בתוך הצ'אט. בניית
+   * הטיול בפועל (buildTripDirectly) לא קורית אוטומטית - רק בלחיצה על
+   * הבועה (ר' handleRuntrippyClick), ששולפת את pendingBuildAnswersRef.
+   */
+  function promptBuildTrip(next: AbroadVacationAnswers) {
+    pendingBuildAnswersRef.current = next;
+    setReadyToBuild(true);
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      addBot("בונים עבורך את המסלול המושלם!");
+      setTyping(true);
+      setTimeout(() => {
+        setTyping(false);
+        addRuntrippyPrompt();
+      }, 700);
+    }, 550);
+  }
+
+  function handleRuntrippyClick() {
+    if (!pendingBuildAnswersRef.current) return;
+    buildTripDirectly(pendingBuildAnswersRef.current);
   }
 
   useEffect(() => {
@@ -426,8 +458,9 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
       setForm(next);
       addUser(labelFor(VACATION_PACE_OPTIONS, extracted.pace), "pace");
       // pace הוא השלב האחרון בשרשרת (אחריו היה freeText, שהוסר) - אם גם
-      // הוא כוסה בחילוץ, אין עוד מה לשאול; בונים ישר את הטיול.
-      buildTripDirectly(next);
+      // הוא כוסה בחילוץ, מציגים את הודעת "בונים..." + בועת runtrippy
+      // בצ'אט, ומחכים ללחיצה לפני שבונים בפועל.
+      promptBuildTrip(next);
       return;
     }
 
@@ -490,7 +523,7 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
       next = { ...next, destination: null, destinations: [], surpriseMe: true };
     }
     setForm(next);
-    buildTripDirectly(next);
+    promptBuildTrip(next);
   }
 
   function confirmCompanions() {
@@ -612,8 +645,9 @@ function confirmBooked() {
     setForm(next);
     addUser(labelFor(VACATION_PACE_OPTIONS, tempPace), "pace");
     // pace הוא השלב האחרון (השלב הישן "משהו נוסף שתרצו להוסיף" הוסר -
-    // המלל החופשי כבר נאסף מראש ב-freeIntent) - בונים ישר את הטיול.
-    buildTripDirectly(next);
+    // המלל החופשי כבר נאסף מראש ב-freeIntent) - מציגים הודעת "בונים..."
+    // + בועת runtrippy בצ'אט, ובונים בפועל רק בלחיצה עליה.
+    promptBuildTrip(next);
   }
 
   function confirmTravelStyle() {
@@ -786,13 +820,11 @@ function confirmBooked() {
       return;
     }
     // מציגים את מסך ההמתנה מיד בלחיצה - לא ממתינים לשום קריאת רשת קודם
-    // (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה". קודם עולה
-    // מסך ביניים קצר ("בונים עבורך את הטיול המושלם!" עם הלוגו הדופק),
-    // ורק אחריו עובר למסך המשחק (LoadingGame) - שניהם רצים במקביל לקריאות
-    // הרשת בפועל, שממשיכות ברקע בלי קשר לתזמון המסכים.
+    // (מיקום/יצירת session) כדי שלא יהיה רגע של "כלום לא קורה". נקודת
+    // הכניסה היחידה לכאן היא כבר לחיצה על בועת ה-runtrippy בצ'אט
+    // (ר' promptBuildTrip/handleRuntrippyClick), אז אפשר לעבור ישר למסך
+    // המשחק בלי מסך ביניים נוסף.
     setSubmitting(true);
-    setPreBuildIntro(true);
-    setTimeout(() => setPreBuildIntro(false), 2200);
     setLocationError(null);
     try {
       const origin = await getCurrentPosition();
@@ -827,6 +859,8 @@ function confirmBooked() {
         {messages.map((m) =>
           m.role === "assistant" ? (
             <ChatBubble key={m.id}>{m.text}</ChatBubble>
+          ) : m.role === "runtrippy" ? (
+            <RuntrippyPromptBubble key={m.id} onClick={handleRuntrippyClick} />
           ) : m.role === "icon" ? (
             <div key={m.id} className="flex items-end justify-end gap-2">
               <div
@@ -1055,7 +1089,7 @@ function confirmBooked() {
 
         {typing && <TypingIndicator />}
 
-        {!typing && !submitting && (
+        {!typing && !submitting && !readyToBuild && (
           <div className="mt-1">
             {stage === "companions" && (
               <AnswerOptions options={VACATION_COMPANION_OPTIONS} selected={tempCompanion} onSelect={setTempCompanion} />
@@ -1352,9 +1386,7 @@ function confirmBooked() {
           </div>
         )}
 
-        {submitting && preBuildIntro && <BuildingTripIntro />}
-
-        {submitting && !preBuildIntro && (
+        {submitting && (
           <LoadingGame
             statusText="רגע, בונים לכם את החופשה..."
             steps={[
@@ -1371,7 +1403,7 @@ function confirmBooked() {
 
         {/* freeIntent לא משתמש בכפתור הגנרי הזה בכלל - יש לו שני כפתורים
             משלו (בואו נבנה יחד / אמשיך לבד) בתוך הבלוק של השלב עצמו. */}
-        {!submitting && !typing && stage !== "freeIntent" && (
+        {!submitting && !typing && !readyToBuild && stage !== "freeIntent" && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
