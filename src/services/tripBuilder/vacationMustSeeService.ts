@@ -30,17 +30,16 @@ interface MustSeeParams {
 export async function suggestMustSeeLandmarks(params: MustSeeParams): Promise<string[]> {
   const count = Math.max(3, Math.min(15, params.maxCount));
   const prompt = `אתה מומחה טיולים עולמי. עבור היעד "${params.destination}", תן רשימה של עד
-${count} מהאתרים/החוויות ה"מובהקים" ביותר - הסמלים המוכרים והמפורסמים ביותר
-של היעד הזה, שכל מבקר ראשון-פעם צריך לשקול לכלול בטיול (למשל בפריז: מגדל
-אייפל, שייט בנהר הסיין; ברומא: הקולוסאום, מזרקת טרווי, הוותיקן, הקפלה
-הסיסטינית, המדרגות הספרדיות). אם ליעד יש פחות מ-${count} אתרים מובהקים
-אמיתיים - אל תמלא במכסה בכוח, תן רק את מה שבאמת ראוי.
+${count} מהאתרים/הסמלים ה"מובהקים" ביותר של היעד - האתרים המוכרים והמפורסמים
+ביותר, בעלי ערך תיירותי-תרבותי-היסטורי מובהק, שכל מבקר ראשון-פעם צריך לשקול
+לכלול בטיול (למשל בפריז: מגדל אייפל, קתדרלת נוטרדאם; ברומא: הקולוסאום,
+מזרקת טרווי, הוותיקן, הקפלה הסיסטינית, המדרגות הספרדיות). אם ליעד יש פחות
+מ-${count} אתרים מובהקים אמיתיים - אל תמלא במכסה בכוח, תן רק את מה שבאמת ראוי.
 
-חשוב - התאמה לאופי הטיול הספציפי: אם ההקשר הבא מרמז על אופי מסוים, תן עדיפות
-לאתרים/חוויות שמתאימים לו במיוחד, לא רק לרשימת "חובה" גנרית. לדוגמה: אם ההקשר
-רומנטי (בן/בת זוג, ירח דבש, המילה "רומנטי") - העדף חוויות רומנטיות מובהקות
-(שייט זוגי, נקודת תצפית לשקיעה) על פני אתרים כלליים גדולים (מוזיאון ענק,
-קניון). אם ההקשר משפחתי עם ילדים קטנים - העדף אתרים שמתאימים לגיל.
+חשוב - זו רשימת "אתרי חובה" בלבד, לא חוויות/עסקים ספציפיים: אל תציע חברות
+סיור פרטיות, מסעדות, ברים, שייטים מסחריים, או "חוויה רומנטית/משפחתית" כלליים -
+גם אם אופי הטיול רומנטי/משפחתי. אלה יטופלו בנפרד, דרך דירוג המקומות הרגיל
+לפי העדפות המשתמש - כאן רק אתרים/סמלים איקוניים אמיתיים של היעד עצמו.
 
 סוג חופשה: ${params.vacationTypeLabels.join(", ") || "כל סוג"}
 בקשה חופשית מהמשתמש: ${JSON.stringify(params.freeText || null)}
@@ -90,34 +89,41 @@ export async function findMustSeePlaces(
 ): Promise<CandidatePlace[]> {
   const results: CandidatePlace[] = [];
   const usedIds = new Set<string>();
+  // בקשה מפורשת ("אני וידאתי שהכל שם, איך הוא מחפש?") - מפרידים בבירור
+  // בין "נמצא אצלנו במאגר" ל"נוצר הרגע דרך Google" - הלוג הקודם דחס את
+  // שני המקורות תחת אותה תווית מטעה ("נמצא במאגר"), מה שגרם לזה להיראות
+  // כאילו המאגר מכיל דברים שהוא בכלל לא - בעוד שהם רק נוצרו כרגע.
+  const foundInOurDb: string[] = [];
+  const createdViaGoogle: string[] = [];
 
   for (const name of rawNames) {
     const normalizedName = name.trim();
     if (!normalizedName) continue;
 
-    // לא מסננים לפי city בשאילתה עצמה (חסין לפורמט "עיר"/"עיר, מדינה"/
-    // שפה) - שולפים כמה התאמות שם ומסננים לפי מרחק אמיתי מהיעד ב-JS,
-    // בדיוק כמו שאר קוד בניית הטיול עובד עם מרחקים (לא שמות ערים).
-    const { data } = await supabase
-      .from("places")
-      .select(
-        "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
-      )
-      .eq("is_legacy", false)
-      .ilike("name", `%${normalizedName}%`)
-      .not("latitude", "is", null)
-      .not("longitude", "is", null)
-      .order("rating", { ascending: false, nullsFirst: false })
-      .limit(10);
+    // התאמה ראשונה: המחרוזת השלמה שClaude הציע.
+    let withinRange = await searchByIlike(supabase, normalizedName, origin, maxDistanceKm, usedIds);
 
-    const withinRange = (data ?? []).find((row) => {
-      if (usedIds.has(row.id as string)) return false;
-      const distanceKm = haversineDistanceKm(origin, { lat: row.latitude as number, lng: row.longitude as number });
-      return distanceKm <= maxDistanceKm;
-    });
+    // בקשה מפורשת ("וידאתי שהכל שם, אולי יש פספוס בחיפוש"): Claude לפעמים
+    // מציע כמה אתרים במחרוזת אחת ("הוותיקן והקפלה הסיסטינית", "Castle
+    // District & Fisherman's Bastion") - אם במאגר הם רשומות נפרדות, אף
+    // שם לא מכיל את המחרוזת המשולבת כתת-מחרוזת, וההתאמה נכשלת גם אם כל
+    // חלק בנפרד קיים אצלנו בוודאות. אם ההתאמה המלאה נכשלה - מפרקים לפי
+    // מפרידים נפוצים (ו-/and/&/פסיקים/סוגריים) ומנסים כל חלק משמעותי בנפרד.
+    if (!withinRange) {
+      const fragments = normalizedName
+        .split(/\s+(?:ו-|ו|and|&)\s+|[(),]/i)
+        .map((f) => f.trim())
+        .filter((f) => f.length >= 3);
+
+      for (const fragment of fragments) {
+        withinRange = await searchByIlike(supabase, fragment, origin, maxDistanceKm, usedIds);
+        if (withinRange) break;
+      }
+    }
 
     if (withinRange) {
       usedIds.add(withinRange.id as string);
+      foundInOurDb.push(withinRange.name as string);
       results.push({
         id: withinRange.id,
         name: withinRange.name,
@@ -155,9 +161,43 @@ export async function findMustSeePlaces(
     const created = await createMustSeePlaceViaGoogle(normalizedName, destination, origin, maxDistanceKm);
     if (!created || usedIds.has(created.id)) continue;
     usedIds.add(created.id);
+    createdViaGoogle.push(created.name);
     results.push(created);
   }
+
+  logAiError("אתרי חובה - מקור אמיתי לכל תוצאה (לא מדווח יותר תחת תווית אחת מטעה)", {
+    destination,
+    foundInOurDb,
+    createdViaGoogle,
+  });
+
   return results;
+}
+
+async function searchByIlike(
+  supabase: SupabaseClient,
+  searchTerm: string,
+  origin: LatLng,
+  maxDistanceKm: number,
+  usedIds: Set<string>
+) {
+  const { data } = await supabase
+    .from("places")
+    .select(
+      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience"
+    )
+    .eq("is_legacy", false)
+    .ilike("name", `%${searchTerm}%`)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    .order("rating", { ascending: false, nullsFirst: false })
+    .limit(10);
+
+  return (data ?? []).find((row) => {
+    if (usedIds.has(row.id as string)) return false;
+    const distanceKm = haversineDistanceKm(origin, { lat: row.latitude as number, lng: row.longitude as number });
+    return distanceKm <= maxDistanceKm;
+  });
 }
 
 interface GooglePlaceTextSearchResult {

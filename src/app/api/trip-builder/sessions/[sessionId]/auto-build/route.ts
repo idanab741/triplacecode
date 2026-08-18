@@ -419,13 +419,8 @@ export async function POST(
           destinationName,
         });
       }
-      console.error("[auto-build] אתרי חובה שנמצאו במאגר", {
-        sessionId,
-        destinationName,
-        suggested: mustSeeNames,
-        foundInDb: mustSeePlaces.map((p) => p.name),
-      });
-
+      // (המקור המדויק לכל תוצאה - מהמאגר שלנו מול נוצר דרך Google -
+      // כבר נרשם בלוג בתוך findMustSeePlaces עצמו, ר' vacationMustSeeService.ts)
       // תיקון לפי בקשה מפורשת: קודם מנסים למלא כל תחנה מהמאגר הפנימי
       // (ADMIN PLACES) - בדיוק כמו שכבר נעשה לטיול יומי/טבע/מסעדות/חיי
       // לילה/דייט רומנטי. יש גם תוכן מחו"ל במאגר (לא רק ישראל), אז זה
