@@ -4,7 +4,7 @@ import { getTravelDna } from "@/services/travelDna/travelDnaService";
 import { getAttributeScoreMap, summarizeTopAttributes } from "@/services/travelDna/attributeLearningService";
 import { getSessionWithStops } from "@/services/tripBuilder/sessionService";
 import { fetchCandidatePool } from "@/services/tripBuilder/candidatePoolService";
-import { rankCandidates } from "@/services/tripBuilder/rankingService";
+import { rankCandidates, rankCandidatesFast } from "@/services/tripBuilder/rankingService";
 import { likeStop } from "@/services/tripBuilder/swipeService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel, MAX_STOP_DISTANCE_KM } from "@/services/tripBuilder/rules/dayTrip";
@@ -16,6 +16,7 @@ import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggesti
 import { findRequestedPlaceNear } from "@/services/tripBuilder/placeResolutionService";
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
+import { suggestMustSeeLandmarks, findMustSeePlaces } from "@/services/tripBuilder/vacationMustSeeService";
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
 import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
@@ -226,11 +227,36 @@ export async function POST(
           requestedAreaRadiusKm = 20;
         }
       } else if (vacationAnswers.surpriseMe) {
+        // תיקון (בקשה מפורשת): ב"אמשיך לבד" (המלל החופשי בלבד, בלי לעבור
+        // את שאר השאלון) vacationTypes/budgetPerPerson/travelStyle נשארים
+        // בברירת המחדל - הם *לא* משקפים בחירה אמיתית של המשתמש. הפרופיל
+        // האישי (Travel DNA - תחומי עניין, כשרות, נגישות, מה שנלמד
+        // מהתנהגות) הוא לעומת זאת אות אמיתי תמיד, גם כשהמשתמש דילג על
+        // השאלון. מעבירים אותו עכשיו ל-pickSurpriseDestination כדי שהוא
+        // ישקול קודם כל את הפרופיל האישי + המלל החופשי - לא רק את שדות
+        // ברירת המחדל של השאלון.
+        const dnaSummaryPartsForDestination: string[] = [];
+        if (dna) {
+          if (dna.interests?.length) dnaSummaryPartsForDestination.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
+          if (dna.preferred_categories?.length)
+            dnaSummaryPartsForDestination.push(`קטגוריות מועדפות (מהתנהגות): ${dna.preferred_categories.map(getCategoryLabel).join(", ")}`);
+          if (dna.culinary_styles?.length) dnaSummaryPartsForDestination.push(`סגנונות אוכל מועדפים: ${dna.culinary_styles.join(", ")}`);
+          if (dna.dietary_restrictions?.length)
+            dnaSummaryPartsForDestination.push(`הגבלות תזונתיות: ${dna.dietary_restrictions.join(", ")}`);
+          if (dna.kosher) dnaSummaryPartsForDestination.push("חובה: כשרות");
+          if (dna.accessibility) dnaSummaryPartsForDestination.push("חובה: נגישות");
+          if (dna.vacation_preferences?.length) dnaSummaryPartsForDestination.push(`העדפות חופשה: ${dna.vacation_preferences.join(", ")}`);
+        }
+        if (learnedAttributes.liked.length) dnaSummaryPartsForDestination.push(`נלמד מהתנהגות שאהב: ${learnedAttributes.liked.join(", ")}`);
+        if (learnedAttributes.disliked.length) dnaSummaryPartsForDestination.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
+        const dnaSummaryForDestination = dnaSummaryPartsForDestination.length ? dnaSummaryPartsForDestination.join(". ") : null;
+
         const chosen = await pickSurpriseDestination({
           vacationTypeLabels: (vacationAnswers.vacationTypes ?? []).map(getVacationTypeLabel),
           freeText: answers.freeText,
           budgetLabel: remainingBudgetLabel,
           travelStyle: vacationAnswers.travelStyle ?? "single_destination",
+          travelDnaSummary: dnaSummaryForDestination,
         });
         if (chosen) {
           vacationDestinationName = `${chosen.city}, ${chosen.country}`;
@@ -321,6 +347,29 @@ export async function POST(
           ? distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
           : 60;
 
+      // בקשה מפורשת: אתרי "חובה" מובהקים ליעד (למשל מגדל אייפל + שייט
+      // בסיין לפריז) חייבים להיכנס למסלול כשקיימים אצלנו במאגר - לא
+      // "אולי ייבחרו" דרך הדירוג הרגיל. Claude מציע שמות (בלי שום קריאת
+      // Google), ומחפשים כל שם **רק** במאגר שלנו; שם שלא נמצא נשמט בשקט
+      // (לא מומצא/מאומת דרך Google). קריאת AI אחת נוספת כאן - עלות זמן
+      // קטנה (כמה שניות) מול הערך של לא לפספס את הסמלים המובהקים.
+      const mustSeeNames = await suggestMustSeeLandmarks({
+        destination: destinationName,
+        vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
+        freeText: answers.freeText,
+      });
+      // סדר העדיפות של Claude (השם הראשון = הכי מובהק/מתאים לטיול הזה)
+      // נשמר - זה מה שקובע אילו אתרי חובה "זוכים" למקום כשיש יותר אתרי
+      // חובה שנמצאו מאשר סלוטים פנויים בטיול קצר (מצמצמים, לא מרחיבים ימים).
+      const mustSeePlaces = await findMustSeePlaces(supabase, mustSeeNames, searchOrigin, destinationMaxDistanceKm);
+      console.error("[auto-build] אתרי חובה שנמצאו במאגר", {
+        sessionId,
+        destinationName,
+        suggested: mustSeeNames,
+        foundInDb: mustSeePlaces.map((p) => p.name),
+      });
+      let mustSeeCursor = 0;
+
       // תיקון לפי בקשה מפורשת: קודם מנסים למלא כל תחנה מהמאגר הפנימי
       // (ADMIN PLACES) - בדיוק כמו שכבר נעשה לטיול יומי/טבע/מסעדות/חיי
       // לילה/דייט רומנטי. יש גם תוכן מחו"ל במאגר (לא רק ישראל), אז זה
@@ -333,6 +382,20 @@ export async function POST(
       const excludePlaceIdsForVacation = [...excludePlaceIds];
       const remainingStops: TripBuilderStop[] = [];
       for (const stop of pendingStops) {
+        // אתרי חובה תופסים סלוטים מסוג "attraction" קודם לכל דבר אחר -
+        // כל עוד יש עוד אתר חובה שלא נוצל, הוא זוכה לסלוט הבא, בלי לעבור
+        // דרך fetchCandidatePool/rankCandidatesFast הרגילים בכלל.
+        if (stop.role === "attraction" && mustSeeCursor < mustSeePlaces.length) {
+          const mustSee = mustSeePlaces[mustSeeCursor];
+          if (!excludePlaceIdsForVacation.includes(mustSee.id)) {
+            await likeStop(supabase, user.id, stop.id, mustSee);
+            excludePlaceIdsForVacation.push(mustSee.id);
+            mustSeeCursor += 1;
+            continue;
+          }
+          mustSeeCursor += 1;
+        }
+
         const pool = await fetchCandidatePool(supabase, {
           category: stop.category,
           origin: searchOrigin,
@@ -349,17 +412,16 @@ export async function POST(
           continue;
         }
 
-        const ranked = await rankCandidates({
-          dna,
-          candidates: pool,
-          freeText: stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText,
-          remainingBudgetLabel,
-          rankingPromptRules: rules.rankingPromptRules,
-          attributeScoreMap,
-          learnedAttributes,
-          tripIntent,
-          questionnaireAnswers: undefined,
-        });
+        // תיקון ביצועים (בקשה מפורשת - "יש הכל אצלי באדמין, למה AI לכל
+        // תחנה?"): טיול חו"ל/סופ"ש יכול להיות 20-40 תחנות - קריאת
+        // rankCandidates (עם Claude) לכל תחנה בנפרד, ברצף, הייתה בפועל
+        // הגורם המרכזי לזמן ההמתנה (עשרות שניות, לפעמים דקות). המאגר
+        // כבר admin-curated ומתויג (rating, tags) - דירוג דטרמיניסטי
+        // מהיר (rankCandidatesFast, בלי שום קריאת AI) מספיק כדי לבחור
+        // את המקום הכי מתאים מתוך המועמדים, בלי "לחשוב" עם Claude על
+        // כל תחנה. אותה לוגיקת דירוג בדיוק שכבר משמשת כ-fallback הרגיל
+        // כשקריאת Claude נכשלת - רק בלי לנסות את קריאת ה-AI קודם בכלל.
+        const ranked = rankCandidatesFast(pool, dna, stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText, attributeScoreMap);
 
         const top = ranked[0];
         if (!top) {
@@ -370,6 +432,7 @@ export async function POST(
         await likeStop(supabase, user.id, stop.id, top);
         excludePlaceIdsForVacation.push(top.id);
       }
+
 
       console.error("[auto-build] מילוי מהמאגר הפנימי לפני AI (חופשה/סופ\"ש)", {
         sessionId,
@@ -577,14 +640,25 @@ export async function POST(
       // הצליח למלא - לא הנתיב הראשי יותר. לפני התיקון הזה, טיול יומי/טבע
       // דילגו על המאגר הפנימי לגמרי ותמיד השתמשו ב-AI, גם כשהיו מקומות
       // מתאימים וממותגים אצלנו כבר.
+      // *** תיקון לפי בקשה מפורשת: "עד 3 ק"מ מרחק ממקום למקום". דבר חשוב:
+      // dbCursor כן זז לתחנה הקודמת (לא נשאר קבוע על searchOrigin) - אבל
+      // עד עכשיו החיפוש עדיין השתמש ב-maxDistanceKm המלא (רדיוס *כל היום*
+      // מהבית, יכול להיות עשרות ק"מ) לכל תחנה, גם תחנות 2+. כלומר התחנה
+      // הראשונה יכולה להיות בקצה אחד של הרדיוס והשנייה בקצה הנגדי -
+      // רחוקות זו מזו בעשרות ק"מ, גם ששתיהן בנפרד "בטווח" מהבית. עכשיו
+      // רק התחנה *הראשונה* מחפשת בכל רדיוס היום; מהתחנה השנייה והלאה,
+      // החיפוש מוגבל ל-MAX_INTER_STOP_DISTANCE_KM מהתחנה הקודמת בפועל -
+      // לא מהבית - כדי שהמסלול יהיה רציף וקרוב פיזית, לא מפוזר.
+      const MAX_INTER_STOP_DISTANCE_KM = 3;
       let dbCursor = searchOrigin;
       const remainingSlots: typeof pendingStops = [];
-      for (const stop of pendingStops) {
+      for (let stopIndex = 0; stopIndex < pendingStops.length; stopIndex++) {
+        const stop = pendingStops[stopIndex];
         const pool = await fetchCandidatePool(supabase, {
           category: stop.category,
           origin: dbCursor,
           distanceBand: answers.distanceBand,
-          maxDistanceKm,
+          maxDistanceKm: stopIndex === 0 ? maxDistanceKm : MAX_INTER_STOP_DISTANCE_KM,
           maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
           excludePlaceIds,
           requireKosher: dna?.kosher === true,

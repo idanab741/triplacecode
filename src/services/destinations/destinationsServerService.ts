@@ -16,3 +16,87 @@ export async function getDestinationById(id: string): Promise<Destination | null
   const { data } = await supabase.from("destinations").select("*").eq("id", id).maybeSingle();
   return data;
 }
+
+export interface DestinationCandidate {
+  name: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+  /** כמה מקומות/אטרקציות אמיתיים קיימים ביעד הזה ב-DB - ר' הערה למטה. */
+  placeCount: number;
+}
+
+/** מתחת לסף הזה, "יעד" לא נחשב מספיק מוכן כדי להפתיע אליו משתמש.
+ *  תיקון (בקשה מפורשת - "יש הכל אצלי באדמין"): הסף הוגדל משמעותית
+ *  (מ-3 ל-20) - לא רק "יש כמה מקומות", אלא מספיק כדי שטיול חו"ל שלם
+ *  (בדרך כלל 15-40 תחנות לאורך כמה ימים) יתמלא **כולו** מהמאגר הפנימי,
+ *  בלי בכלל להגיע לגיבוי ה-AI האיטי (generateVacationItinerary, שממציא
+ *  מקומות ומאמת אותם מול Google - שניות ארוכות לכל תהליך). ככל שהסף
+ *  גבוה יותר, "תפתיעו אותי" בוחר רק יעדים שכבר מכוסים היטב באדמין. */
+const MIN_PLACES_PER_DESTINATION = 20;
+
+/**
+ * תיקון (audit): במקור הפונקציה הזו שאבה מטבלת `destinations` (רשימת
+ * 221 שמות ערים "יבשה", בלי שום קשר לשאלה האם יש להן בפועל תוכן מוכן -
+ * ר' migration 0021/0023). זה *לא* מה שהתבקש: מקור האמת הנכון הוא
+ * טבלת `places` - בדיוק מה שעמוד האדמין "ניהול יעדים ואטרקציות"
+ * (`/admin/content-dashboard`, ר' navConfig.ts) מציג בפועל (הוא קורא
+ * מ-`/api/admin/places`, שמחזיר את טבלת `places`). לכל שורה שם יש עמודת
+ * `city`+`country` - אלה ה"יעדים" האמיתיים שיש להם כבר אטרקציות/מקומות
+ * מוכנים בפועל, לא רק שם עיר ברשימה.
+ *
+ * מקבצים לפי city+country (מנורמל - trim+lowercase להשוואה, אבל השם
+ * המוצג הוא הכתיב המקורי הראשון שנמצא), עם קואורדינטת "מרכז" ממוצעת של
+ * כל המקומות בעיר (כדי שתהיה נקודת התחלה סבירה לחיפוש/מרחקים בהמשך).
+ * יעד עם פחות מ-MIN_PLACES_PER_DESTINATION מקומות בפועל לא נכלל - "יעד"
+ * עם אטרקציה בודדת לא מספיק מוכן כדי להפתיע אליו משתמש.
+ */
+export async function getDestinationCandidates(): Promise<DestinationCandidate[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("places")
+    .select("city, country, latitude, longitude")
+    .eq("is_legacy", false)
+    .not("city", "is", null)
+    .not("country", "is", null)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    // תיקון: בלי range מפורש, ה-client מגביל בשקט ל-1000 שורות ברירת
+    // מחדל - על טבלת places גדולה זה חותך מועמדים שרירותית בלי אזהרה.
+    // אותו טווח בדיוק כמו /api/admin/places (GET) - "כל המקומות" בפועל.
+    .range(0, 4999);
+
+  interface Accumulator {
+    name: string;
+    country: string;
+    latSum: number;
+    lngSum: number;
+    count: number;
+  }
+  const grouped = new Map<string, Accumulator>();
+
+  for (const row of data ?? []) {
+    const city = (row.city as string).trim();
+    const country = (row.country as string).trim();
+    if (!city || !country) continue;
+    const key = `${city.toLowerCase()}__${country.toLowerCase()}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.latSum += row.latitude as number;
+      existing.lngSum += row.longitude as number;
+      existing.count += 1;
+    } else {
+      grouped.set(key, { name: city, country, latSum: row.latitude as number, lngSum: row.longitude as number, count: 1 });
+    }
+  }
+
+  return Array.from(grouped.values())
+    .filter((g) => g.count >= MIN_PLACES_PER_DESTINATION)
+    .map((g) => ({
+      name: g.name,
+      country: g.country,
+      latitude: g.latSum / g.count,
+      longitude: g.lngSum / g.count,
+      placeCount: g.count,
+    }));
+}

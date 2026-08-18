@@ -17,6 +17,13 @@ export const CUISINE_TAGS = [
   { key: "pizza", label: "🍕 פיצה" }, { key: "brunch", label: "🥐 בראנץ'" },
   { key: "cafe", label: "☕ בית קפה" }, { key: "chef_restaurant", label: "👨‍🍳 מסעדת שף" },
   { key: "desserts", label: "🍰 מתוקים" },
+  // נוסף: היה חסר לגמרי מהרשימה הזו (בניגוד ל-CULINARY_STYLES בהתאמה
+  // האישית וב-CUISINE_OPTIONS בצ'אט של מסעדות/קפה, ששתיהן כבר כוללות
+  // אותו) - כלומר מקום לא היה יכול להיות מתויג "אוכל מקומי" באדמין בכלל,
+  // גם אם זה בדיוק מה שהוא. שאר ההבדלים בין הרשימות (bbq/meat_bbq,
+  // brunch/breakfast_brunch וכו') הם רק הבדלי שם-מפתח פנימי, לא תוכן
+  // חסר - כבר מתורגמים נכון בשני הכיוונים ב-utils/categoryLabels.ts.
+  { key: "local_food", label: "🍲 אוכל מקומי" },
   // אפשרות נוספת, בנוסף לכל מה שיש למעלה: מסעדה כשרה - זה השדה היחיד ברשימה
   // הזו שגם קובע (בתוספת עדכון בטופס עצמו) את kosher=true על המקום, שהוא
   // השדה שנאכף באופן מחייב במאגר המועמדים - ר' candidatePoolService.ts.
@@ -38,6 +45,10 @@ export const PLACE_TYPE_TAGS = [
   { key: "kids_family", label: "👨‍👩‍👧‍👦 ילדים ומשפחות" }, { key: "art_galleries", label: "🎨 אמנות" },
   { key: "photo_spots", label: "📸 צילום" }, { key: "must_see_landmarks", label: "🗽 אתר חובה" },
   // מסעדות (חלק מהן חופפות ל-cuisine, אך משמשות גם כתיוג "סוג מקום" - למשל רופטופ/מסיבות שהן מסעדה+חיי לילה גם יחד)
+  // נוסף: "מסעדות" הכללי - היה קיים רק ברשימה אחרת לגמרי (TRIPMATCH_TAGS
+  // למטה), לא כאן. בלעדיו, לא הייתה כאן שום דרך לתייג מקום "סתם מסעדה"
+  // (לא רופטופ/יוקרה/אוכל רחוב ספציפית) - רק תת-סוגים ספציפיים.
+  { key: "restaurants", label: "🍽️ מסעדות" },
   { key: "rooftop", label: "🏙️ רופטופ" }, { key: "party_venue", label: "🎉 אירוע/מסיבה" },
   { key: "fine_dining", label: "🍷 מסעדת יוקרה" }, { key: "street_food", label: "🌭 אוכל רחוב" },
   // חיי לילה

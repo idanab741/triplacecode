@@ -13,19 +13,59 @@ const SWIPE_REVEAL_PX = 76;
 // מקום באפליקציה בעובי 3px (היה 6px, הצטמצם כדי להיות עקבי עם שאר
 // הכרטיסים - עמודי המסלול, "הטיולים שלי", tripmatch - כולם באותו עובי).
 const REST_PEEK_PX = 3;
+// "dead zone" קטן כדי שרעד טבעי של האצבע בתחילת מגע לא יגרום לזיהוי
+// כיוון שגוי, עקבי עם אותו הרעיון ב-SwipeUpToDeleteCard.tsx.
+const DIRECTION_DEAD_ZONE_PX = 6;
+const SNAP_TRANSITION = "transform 0.2s ease-out";
 
 export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDeleteRowProps) {
-  const [swipeX, setSwipeX] = useState(REST_PEEK_PX);
+  // תיקון ביצועים (audit gesture pipeline): קודם swipeX היה React state
+  // שמתעדכן בכל pointermove -> re-render בכל פריים של הגרירה. עכשיו זה
+  // ref בלבד; ה-DOM מתעדכן ישירות דרך transform, וה-React state
+  // (swipeOpen) משמש רק למצב הסופי: פתוח/סגור.
   const [swipeOpen, setSwipeOpen] = useState(false);
+
+  const swipeX = useRef(REST_PEEK_PX);
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
   const swipeStartOffset = useRef(REST_PEEK_PX);
   const swipeDirection = useRef<"horizontal" | "vertical" | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const rafId = useRef<number | null>(null);
+  const pendingX = useRef<number | null>(null);
+
+  function applyTransform(x: number, withTransition: boolean) {
+    const el = trackRef.current;
+    if (!el) return;
+    el.style.transition = withTransition ? SNAP_TRANSITION : "none";
+    el.style.transform = `translateX(${-x}px)`;
+  }
+
+  // מיישרים את עדכוני ה-DOM לפריים הבא (rAF), עקבי עם SwipeUpToDeleteCard.
+  function scheduleTransform(x: number) {
+    pendingX.current = x;
+    if (rafId.current != null) return;
+    rafId.current = requestAnimationFrame(() => {
+      rafId.current = null;
+      if (pendingX.current != null) applyTransform(pendingX.current, false);
+    });
+  }
+
+  function cancelScheduledTransform() {
+    if (rafId.current != null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
+  }
+
+  useEffect(() => cancelScheduledTransform, []);
 
   useEffect(() => {
+    cancelScheduledTransform();
+    swipeX.current = REST_PEEK_PX;
     setSwipeOpen(false);
-    setSwipeX(REST_PEEK_PX);
+    applyTransform(REST_PEEK_PX, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -33,7 +73,6 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     swipeStartY.current = e.clientY;
     swipeStartOffset.current = swipeOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX;
     swipeDirection.current = null;
-    trackRef.current?.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -42,13 +81,22 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     const deltaY = e.clientY - swipeStartY.current;
 
     if (swipeDirection.current == null) {
-      if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+      if (Math.abs(deltaX) < DIRECTION_DEAD_ZONE_PX && Math.abs(deltaY) < DIRECTION_DEAD_ZONE_PX) return;
       swipeDirection.current = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+      if (swipeDirection.current === "horizontal") {
+        // תיקון עקביות (audit §7): קודם ה-pointer capture בקומפוננטה הזו
+        // היה קורה מיד ב-pointerdown, בלי קשר לכיוון שהתגלה בסוף - לא
+        // עקבי עם SwipeUpToDeleteCard, ששם הקאפצ'ר תמיד חיכה לנעילת
+        // כיוון. עכשיו שני הרכיבים עוקבים אחרי אותו pipeline:
+        // pointerdown -> direction detection -> gesture lock -> pointer capture -> drag.
+        trackRef.current?.setPointerCapture(e.pointerId);
+      }
     }
     if (swipeDirection.current !== "horizontal") return;
 
     const next = Math.max(REST_PEEK_PX, Math.min(SWIPE_REVEAL_PX, swipeStartOffset.current - deltaX));
-    setSwipeX(next);
+    swipeX.current = next;
+    scheduleTransform(next);
   }
 
   function handlePointerUp() {
@@ -59,9 +107,13 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
     swipeDirection.current = null;
     if (!wasHorizontal) return;
 
-    const shouldOpen = swipeX > SWIPE_REVEAL_PX / 2;
+    cancelScheduledTransform();
+
+    const shouldOpen = swipeX.current > SWIPE_REVEAL_PX / 2;
+    const target = shouldOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX;
+    swipeX.current = target;
+    applyTransform(target, true);
     setSwipeOpen(shouldOpen);
-    setSwipeX(shouldOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX);
   }
 
   return (
@@ -71,8 +123,9 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
           type="button"
           onClick={() => {
             onDelete();
+            swipeX.current = REST_PEEK_PX;
             setSwipeOpen(false);
-            setSwipeX(REST_PEEK_PX);
+            applyTransform(REST_PEEK_PX, true);
           }}
           aria-label="מחיקה"
           className="flex flex-1 items-center justify-center bg-danger text-white"
@@ -90,8 +143,8 @@ export function SwipeToDeleteRow({ onDelete, children, resetKey }: SwipeToDelete
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         style={{
-          transform: `translateX(${-swipeX}px)`,
-          transition: swipeX === REST_PEEK_PX || swipeX === SWIPE_REVEAL_PX ? "transform 0.2s ease-out" : "none",
+          transform: `translateX(${-(swipeOpen ? SWIPE_REVEAL_PX : REST_PEEK_PX)}px)`,
+          transition: SNAP_TRANSITION,
         }}
         className="relative touch-pan-y bg-bg"
       >

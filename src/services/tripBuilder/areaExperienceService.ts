@@ -3,6 +3,8 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { findPlacePhotoReference } from "./placePhotoService";
 import type { CandidatePlace, LatLng } from "./types";
+import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
+import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES, isValidPlaceCategory } from "@/constants/placeCategories";
 
 interface GetOrCreateParams {
   areaName: string;
@@ -87,6 +89,21 @@ async function saveAsPlace(
   const photoRef = await findPlacePhotoReference(`${params.areaName} ישראל`);
   const imageUrls = photoRef ? [`/api/places/photo?ref=${encodeURIComponent(photoRef)}`] : [];
 
+  // תיקון קריטי: זו הייתה נתיב שני, נפרד לגמרי, ליצירת מקומות אוטומטית
+  // מ-AI (בנוסף ל-aiPlaceInsertionService.ts) - ולא היו לו שתי ההגנות
+  // שכבר הוספנו שם:
+  // 1. category כאן היה נשמר בתור הערך העדין (params.category, למשל
+  //    "nature_trails") ישירות לשדה category הראשי (5 הערכים בלבד מותרים
+  //    שם באמת) - בדיוק אותו באג שכבר תיקנו ב-aiPlaceInsertionService.
+  // 2. לא היה שום סימון source - כלומר "חוויית אזור" שה-AI המציא (בלי שום
+  //    אימות מול Google בכלל - אין כאן אפילו בדיקת קיום!) הייתה נראית
+  //    זהה לחלוטין לתוכן אדמין אמיתי בחיפושים עתידיים "מהמאגר שלנו" -
+  //    זו בדיוק הסיבה ש"הכרמל" (בלי דירוג, בלי תמונה אמיתית) הופיע כאילו
+  //    היה במאגר, בלי שום קשר לתוכן שבאדמין בכלל.
+  const mainCategory = isValidPlaceCategory(params.category)
+    ? params.category
+    : TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES[params.category]?.[0] ?? "attractions";
+
   const { data, error } = await supabase
     .from("places")
     .insert({
@@ -94,11 +111,12 @@ async function saveAsPlace(
       short_description: generated.description,
       latitude: params.coords.lat,
       longitude: params.coords.lng,
-      category: params.category,
+      category: mainCategory,
       trip_type_tags: [params.category],
       is_area_experience: true,
       estimated_visit_minutes: generated.visitMinutes,
       image_urls: imageUrls,
+      source: AI_TRIP_BUILDER_SOURCE,
     })
     .select("id,name,short_description,latitude,longitude,estimated_visit_minutes,image_urls")
     .single();

@@ -71,21 +71,47 @@ export async function rankCandidates(
     return aiRanked;
   }
 
-return params.candidates
+  return applyFallbackScoring(params.candidates, params.dna, params.freeText, params.attributeScoreMap);
+}
+
+/**
+ * תיקון ביצועים (בקשה מפורשת): גרסה מהירה, בלי שום קריאת AI, של אותה
+ * לוגיקת דירוג בדיוק (computeFallbackScore - כבר "מנוסה בקרב" כ-fallback
+ * הרגיל כשקריאת Claude נכשלת/מדלגים עליה). משמשת בלולאת "מילוי מהמאגר
+ * הפנימי" של חופשה בחו"ל/סופ"ש (auto-build/route.ts): כשיש 20-40 תחנות
+ * בטיול, קריאת rankCandidates הרגילה (עם Claude) לכל תחנה בנפרד, ברצף,
+ * הייתה הגורם המרכזי לזמן המתנה של עשרות שניות - כל תחנה עם יותר ממועמד
+ * אחד הפעילה קריאת AI נוספת. כשיש כבר מאגר admin places אמיתי ומתויג,
+ * דירוג לפי דירוג Google + התאמת מלל חופשי (בלי AI) מספיק טוב ומיידי -
+ * לא צריך "לחשוב" עם Claude על כל תחנה בנפרד כדי לבחור מקום אחד מתוך כמה.
+ */
+export function rankCandidatesFast(
+  candidates: CandidatePlace[],
+  dna: TravelDna | null,
+  freeText: string,
+  attributeScoreMap?: Map<string, number>
+): CandidatePlace[] {
+  if (candidates.length === 0) return [];
+  if (candidates.length === 1) {
+    return [{ ...candidates[0], score: 100, reason: "המקום היחיד שנמצא במאגר בקטגוריה הזו", source: "fallback" as const }];
+  }
+  return applyFallbackScoring(candidates, dna, freeText, attributeScoreMap);
+}
+
+function applyFallbackScoring(
+  candidates: CandidatePlace[],
+  dna: TravelDna | null,
+  freeText: string,
+  attributeScoreMap?: Map<string, number>
+): CandidatePlace[] {
+  return candidates
     .map((candidate) => ({
       ...candidate,
-      score: computeFallbackScore(
-        params.dna,
-        candidate,
-        params.freeText,
-        params.attributeScoreMap
-      ),
-      reason: params.freeText
-        ? `התאמה לפי "${params.freeText}", מרחק ודירוג`
-        : "התאמה בסיסית לפי מרחק ודירוג",
+      score: computeFallbackScore(dna, candidate, freeText, attributeScoreMap),
+      reason: freeText ? `התאמה לפי "${freeText}", מרחק ודירוג` : "התאמה בסיסית לפי מרחק ודירוג",
       source: "fallback" as const,
     }))
-    .sort((a, b) => ((b.score ?? 0) + Math.random() * 2) - ((a.score ?? 0) + Math.random() * 2));
+    .sort((a, b) => (b.score ?? 0) + Math.random() * 2 - ((a.score ?? 0) + Math.random() * 2));
 }
 
 async function tryClaudeRanking(

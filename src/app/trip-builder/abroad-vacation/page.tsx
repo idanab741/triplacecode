@@ -37,6 +37,7 @@ type DestinationOption = { value: string; label: string; type: "city" | "country
 
 type Stage =
   | "dates"
+  | "freeIntent"
   | "travelStyle"
   | "destination"
   | "companions"
@@ -47,11 +48,11 @@ type Stage =
   | "lodgingType"
   | "budget"
   | "vacationTypes"
-  | "pace"
-  | "freeText";
+  | "pace";
 
 const STAGE_TITLES: Record<Stage, string> = {
   dates: "מתי יוצאים?",
+  freeIntent: "ספרו לי על החופשה שאתם מדמיינים",
   travelStyle: "איך תרצו לטייל?",
   destination: "איפה החופשה הבאה שלכם?",
   companions: "עם מי אתם נוסעים?",
@@ -63,8 +64,25 @@ const STAGE_TITLES: Record<Stage, string> = {
   budget: "תקציב ליחיד",
   vacationTypes: "איזה סוג חופשה אתם מחפשים?",
   pace: "מה קצב הטיול שלכם?",
-  freeText: "משהו נוסף שתרצו להוסיף?",
 };
+
+/**
+ * שדות שאפשר לחלץ מהמלל החופשי הפתוח ("ספרו לי על החופשה שאתם
+ * מדמיינים") ולדלג עליהם בהמשך השאלון - תואם ל-ExtractedVacationIntent
+ * בצד השרת (services/tripBuilder/vacationIntentExtractionService.ts).
+ */
+interface ExtractedVacationIntent {
+  travelStyle: AbroadVacationAnswers["travelStyle"] | null;
+  destination: string | null;
+  destinations: string[];
+  companions: "couple" | "family" | "friends" | "solo" | null;
+  childAgeBands: AbroadVacationAnswers["childAgeBands"];
+  hasBookedFlightAndHotel: boolean | null;
+  lodgingType: AbroadVacationAnswers["lodgingType"];
+  budgetPerPerson: string | null;
+  vacationTypes: string[];
+  pace: AbroadVacationAnswers["pace"] | null;
+}
 
 const DEFAULT_ANSWERS: AbroadVacationAnswers = {
   companions: "couple",
@@ -120,6 +138,13 @@ export default function AbroadVacationQuestionnairePage() {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // temp state per stage
+  const [tempFreeIntent, setTempFreeIntent] = useState("");
+  // true בזמן שממתינים לקריאת ה-AI שמחלצת תשובות מהמלל החופשי (עד ~2
+  // שניות, מודל מהיר) - חוסם את שני הכפתורים כדי שלא ילחצו פעמיים.
+  const [extractingIntent, setExtractingIntent] = useState(false);
+  // תוצאת החילוץ (אם "בואו נבנה יחד" נלחץ) - ref ולא state, כי היא
+  // נקראת בתוך advance() בלי צורך ב-re-render כשהיא מתעדכנת בעצמה.
+  const extractedIntentRef = useRef<ExtractedVacationIntent | null>(null);
   const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [tempChildAges, setTempChildAges] = useState<string[]>([]);
   const [tempStartDate, setTempStartDate] = useState("");
@@ -140,9 +165,6 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   const [destinationOptionsMulti, setDestinationOptionsMulti] = useState<Record<number, DestinationOption[]>>({});
   const [tempPace, setTempPace] = useState<string | null>(null);
   const [tempTravelStyle, setTempTravelStyle] = useState<string | null>(null);
-  const [tempFreeText, setTempFreeText] = useState("");
-
-
 
   // עריכת תשובות קודמות - לוחצים על בועת המשתמש כדי לפתוח מחדש את אותה שאלה
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
@@ -284,47 +306,212 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
     }, 550);
   }
 
-  function confirmCompanions() {
-    if (!tempCompanion) return;
-    setForm((f) => ({ ...f, companions: tempCompanion as AbroadVacationAnswers["companions"] }));
-    addUser(labelFor(VACATION_COMPANION_OPTIONS, tempCompanion), "companions");
-    if (tempCompanion === "family") {
-      goTo("childAges");
-    } else {
-      goTo("bookedQuestion");
+  /**
+   * דיספצ'ר שמודע לחילוץ מהמלל החופשי (audit: "בואו נבנה יחד" - נתב את
+   * תשובת המלל החופשי שלו לשאלות הבאות, במידה והוא עונה עליהן). מקבל את
+   * השלב שהיינו הולכים אליו רגיל (goTo), ובודק: אם extractedIntentRef
+   * כבר מכסה את השלב הזה - ממלא אותו אוטומטית (setForm + בועת משתמש,
+   * בדיוק כמו אילו המשתמש ענה בעצמו), וממשיך לבדוק את השלב הבא באותה
+   * שרשרת החלטות שה-confirm* הרגילים משתמשים בה (family->childAges,
+   * hasBooked->flightsHotels/flightPreference וכו'). עוצר ופונה ל-goTo
+   * הרגיל (מציג את ה-UI האינטראקטיבי) ברגע שמגיע לשלב שלא כוסה בחילוץ,
+   * או שאין בכלל תוצאת חילוץ (extractedIntentRef.current == null - "אמשיך
+   * לבד" לא ממלא את ה-ref הזה, ו"בואו נבנה יחד" בלי חילוץ מוצלח פשוט
+   * ישאל הכל כרגיל, בלי לחסום את המשתמש).
+   */
+  function advance(stage: Stage, current: AbroadVacationAnswers) {
+    const extracted = extractedIntentRef.current;
+    if (!extracted) {
+      goTo(stage);
+      return;
+    }
+
+    if (stage === "travelStyle" && extracted.travelStyle) {
+      const next = { ...current, travelStyle: extracted.travelStyle };
+      setForm(next);
+      addUser(labelFor(TRAVEL_STYLE_OPTIONS, extracted.travelStyle), "travelStyle");
+      advance("destination", next);
+      return;
+    }
+
+    if (stage === "destination") {
+      if (current.travelStyle === "single_destination" && extracted.destination) {
+        const next = { ...current, destination: extracted.destination, destinations: [], surpriseMe: false };
+        setForm(next);
+        addUser(extracted.destination, "destination");
+        advance("companions", next);
+        return;
+      }
+      if (current.travelStyle !== "single_destination" && extracted.destinations.length > 0) {
+        const next = { ...current, destination: null, destinations: extracted.destinations, surpriseMe: false };
+        setForm(next);
+        addUser(extracted.destinations.join("، "), "destination");
+        advance("companions", next);
+        return;
+      }
+    }
+
+    if (stage === "companions" && extracted.companions) {
+      const next = { ...current, companions: extracted.companions };
+      setForm(next);
+      addUser(labelFor(VACATION_COMPANION_OPTIONS, extracted.companions), "companions");
+      advance(next.companions === "family" ? "childAges" : "bookedQuestion", next);
+      return;
+    }
+
+    if (stage === "childAges" && extracted.childAgeBands.length > 0) {
+      const next = { ...current, childAgeBands: extracted.childAgeBands };
+      setForm(next);
+      addUser(labelsFor(VACATION_CHILD_AGE_OPTIONS, extracted.childAgeBands).join("، "), "childAges");
+      advance("bookedQuestion", next);
+      return;
+    }
+
+    if (stage === "bookedQuestion" && typeof extracted.hasBookedFlightAndHotel === "boolean") {
+      const next = { ...current, hasBookedFlightAndHotel: extracted.hasBookedFlightAndHotel };
+      setForm(next);
+      addUser(extracted.hasBookedFlightAndHotel ? "כן" : "לא", "bookedQuestion");
+      advance(next.hasBookedFlightAndHotel ? "flightsHotels" : "flightPreference", next);
+      return;
+    }
+
+    // flightPreference/flightsHotels: אף פעם לא מחולצים מהמלל (פרטים
+    // לוגיסטיים ממשיים - מספר טיסה, שם מלון - שלא הגיוני "לנחש" מתיאור
+    // חופשה כללי), תמיד עוברים ל-UI האינטראקטיבי הרגיל.
+
+    if (stage === "lodgingType" && extracted.lodgingType) {
+      const next = { ...current, lodgingType: extracted.lodgingType };
+      setForm(next);
+      addUser(labelFor(LODGING_TYPE_OPTIONS, extracted.lodgingType), "lodgingType");
+      advance("budget", next);
+      return;
+    }
+
+    if (stage === "budget" && extracted.budgetPerPerson) {
+      const next = { ...current, budgetPerPerson: extracted.budgetPerPerson };
+      setForm(next);
+      addUser(labelFor(VACATION_BUDGET_STEPS, extracted.budgetPerPerson), "budget");
+      advance("vacationTypes", next);
+      return;
+    }
+
+    if (stage === "vacationTypes" && extracted.vacationTypes.length > 0) {
+      const next = { ...current, vacationTypes: extracted.vacationTypes };
+      setForm(next);
+      addUser(labelsFor(VACATION_TYPE_OPTIONS, extracted.vacationTypes).join("، "), "vacationTypes");
+      advance("pace", next);
+      return;
+    }
+
+    if (stage === "pace" && extracted.pace) {
+      const next = { ...current, pace: extracted.pace };
+      setForm(next);
+      addUser(labelFor(VACATION_PACE_OPTIONS, extracted.pace), "pace");
+      // pace הוא השלב האחרון בשרשרת (אחריו היה freeText, שהוסר) - אם גם
+      // הוא כוסה בחילוץ, אין עוד מה לשאול; בונים ישר את הטיול.
+      buildTripDirectly(next);
+      return;
+    }
+
+    goTo(stage);
+  }
+
+  /** קריאת השרת שמחלצת תשובות מהמלל החופשי - עד ~2 שניות (מודל Haiku מהיר). */
+  async function fetchExtractedIntent(freeText: string): Promise<ExtractedVacationIntent | null> {
+    try {
+      const res = await fetch("/api/trip-builder/abroad-vacation/parse-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeText }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.extracted as ExtractedVacationIntent) ?? null;
+    } catch {
+      return null;
     }
   }
 
+  async function confirmFreeIntentTogether() {
+    const text = tempFreeIntent.trim();
+    if (!text || extractingIntent) return;
+    addUser(text, "freeIntent");
+    const next = { ...form, freeText: text };
+    setForm(next);
+    setTempFreeIntent("");
+    setExtractingIntent(true);
+    setTyping(true);
+    extractedIntentRef.current = await fetchExtractedIntent(text);
+    setExtractingIntent(false);
+    setTyping(false);
+    advance("travelStyle", next);
+  }
+
+  async function confirmFreeIntentAlone() {
+    const text = tempFreeIntent.trim();
+    if (!text || extractingIntent) return;
+    addUser(text, "freeIntent");
+    let next = { ...form, freeText: text };
+    setForm(next);
+    setTempFreeIntent("");
+    setExtractingIntent(true);
+    setTyping(true);
+    const extracted = await fetchExtractedIntent(text);
+    setExtractingIntent(false);
+    setTyping(false);
+
+    // דרישה מפורשת: אם לא צוין יעד מפורש (או מפורשים) במלל - מתייחסים
+    // לזה בדיוק כמו "תפתיעו אותי" (surpriseMe), עם 100% התחשבות במלל
+    // עצמו (מועבר כ-freeText ל-pickSurpriseDestination בהמשך, ב-auto-
+    // build) - ותמיד רק מתוך יעדי ה-admin, לעולם לא יעד חיצוני/מומצא.
+    if (extracted?.destination) {
+      next = { ...next, travelStyle: "single_destination", destination: extracted.destination, destinations: [], surpriseMe: false };
+    } else if (extracted?.destinations && extracted.destinations.length > 0) {
+      next = { ...next, travelStyle: "multi_destination", destination: null, destinations: extracted.destinations, surpriseMe: false };
+    } else {
+      next = { ...next, destination: null, destinations: [], surpriseMe: true };
+    }
+    setForm(next);
+    buildTripDirectly(next);
+  }
+
+  function confirmCompanions() {
+    if (!tempCompanion) return;
+    const next = { ...form, companions: tempCompanion as AbroadVacationAnswers["companions"] };
+    setForm(next);
+    addUser(labelFor(VACATION_COMPANION_OPTIONS, tempCompanion), "companions");
+    advance(tempCompanion === "family" ? "childAges" : "bookedQuestion", next);
+  }
+
   function confirmChildAges() {
-    setForm((f) => ({ ...f, childAgeBands: tempChildAges as AbroadVacationAnswers["childAgeBands"] }));
+    const next = { ...form, childAgeBands: tempChildAges as AbroadVacationAnswers["childAgeBands"] };
+    setForm(next);
     addUser(tempChildAges.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, tempChildAges).join("، ") : "לא רלוונטי", "childAges");
-    goTo("bookedQuestion");
+    advance("bookedQuestion", next);
   }
 
   function confirmDates() {
     if (!tempStartDate || !tempEndDate) return;
     setForm((f) => ({ ...f, startDate: tempStartDate, endDate: tempEndDate }));
     addUser(`${tempStartDate} עד ${tempEndDate}`, "dates");
-    goTo("travelStyle");
+    goTo("freeIntent");
   }
 
 function confirmBooked() {
     if (!tempBooked) return;
     const booked = tempBooked === "yes";
-    setForm((f) => ({ ...f, hasBookedFlightAndHotel: booked }));
+    const next = { ...form, hasBookedFlightAndHotel: booked };
+    setForm(next);
     addUser(booked ? "כן" : "לא", "bookedQuestion");
-    if (booked) {
-      goTo("flightsHotels");
-    } else {
-      goTo("flightPreference");
-    }
+    advance(booked ? "flightsHotels" : "flightPreference", next);
   }
 
   function confirmFlightPreference() {
     if (!tempFlightPreference) return;
-    setForm((f) => ({ ...f, flightPreference: tempFlightPreference as AbroadVacationAnswers["flightPreference"] }));
+    const next = { ...form, flightPreference: tempFlightPreference as AbroadVacationAnswers["flightPreference"] };
+    setForm(next);
     addUser(labelFor(FLIGHT_PREFERENCE_OPTIONS, tempFlightPreference), "flightPreference");
-    goTo("lodgingType");
+    advance("lodgingType", next);
   }
   function addFlightHotelRow() {
     const nextIndex = tempFlights.length;
@@ -334,76 +521,80 @@ function confirmBooked() {
   }
 
   function confirmFlightsHotels() {
-    setForm((f) => ({ ...f, flights: tempFlights, hotels: tempHotels }));
+    const next = { ...form, flights: tempFlights, hotels: tempHotels };
+    setForm(next);
     addUser(
       tempHotels
         .filter((h) => h.name)
         .map((h) => h.name)
         .join("، ") || "פרטי הטיסה והמלון נקלטו"
     );
-    goTo("budget");
+    advance("budget", next);
   }
 
   function confirmLodgingType() {
     if (!tempLodging) return;
-    setForm((f) => ({ ...f, lodgingType: tempLodging as AbroadVacationAnswers["lodgingType"] }));
+    const next = { ...form, lodgingType: tempLodging as AbroadVacationAnswers["lodgingType"] };
+    setForm(next);
     addUser(labelFor(LODGING_TYPE_OPTIONS, tempLodging), "lodgingType");
-    goTo("budget");
+    advance("budget", next);
   }
 
   function confirmBudget() {
     if (!tempBudget) return;
-    setForm((f) => ({ ...f, budgetPerPerson: tempBudget }));
+    const next = { ...form, budgetPerPerson: tempBudget };
+    setForm(next);
     addUser(labelFor(VACATION_BUDGET_STEPS, tempBudget), "budget");
-    goTo("vacationTypes");
+    advance("vacationTypes", next);
   }
 
   function confirmVacationTypes() {
-    setForm((f) => ({ ...f, vacationTypes: tempTypes }));
+    const next = { ...form, vacationTypes: tempTypes };
+    setForm(next);
     addUser(tempTypes.length > 0 ? labelsFor(VACATION_TYPE_OPTIONS, tempTypes).join("، ") : "תפתיעו אותנו", "vacationTypes");
-    goTo("pace");
+    advance("pace", next);
   }
 
   function selectDestination(city: string) {
-    setForm((f) => ({ ...f, destination: city, destinations: [], surpriseMe: false }));
+    const next = { ...form, destination: city, destinations: [], surpriseMe: false };
+    setForm(next);
     addUser(city, "destination");
     setDestinationOptions([]);
-    goTo("companions");
+    advance("companions", next);
   }
 
   function chooseSurpriseMe() {
-    setForm((f) => ({ ...f, destination: null, destinations: [], surpriseMe: true }));
+    const next = { ...form, destination: null, destinations: [], surpriseMe: true };
+    setForm(next);
     addUser("תפתיעו אותי 🎁", "destination");
-    goTo("companions");
+    advance("companions", next);
   }
 
   function confirmDestinationsMulti() {
     const cities = tempDestinations.map((c) => c.trim()).filter(Boolean);
     if (cities.length === 0) return;
-    setForm((f) => ({ ...f, destination: null, destinations: cities, surpriseMe: false }));
+    const next = { ...form, destination: null, destinations: cities, surpriseMe: false };
+    setForm(next);
     addUser(cities.join("، "), "destination");
-    goTo("companions");
+    advance("companions", next);
   }
 
   function confirmPace() {
     if (!tempPace) return;
-    setForm((f) => ({ ...f, pace: tempPace as AbroadVacationAnswers["pace"] }));
+    const next = { ...form, pace: tempPace as AbroadVacationAnswers["pace"] };
+    setForm(next);
     addUser(labelFor(VACATION_PACE_OPTIONS, tempPace), "pace");
-    goTo("freeText");
+    // pace הוא השלב האחרון (השלב הישן "משהו נוסף שתרצו להוסיף" הוסר -
+    // המלל החופשי כבר נאסף מראש ב-freeIntent) - בונים ישר את הטיול.
+    buildTripDirectly(next);
   }
 
   function confirmTravelStyle() {
     if (!tempTravelStyle) return;
-    setForm((f) => ({ ...f, travelStyle: tempTravelStyle as AbroadVacationAnswers["travelStyle"] }));
+    const next = { ...form, travelStyle: tempTravelStyle as AbroadVacationAnswers["travelStyle"] };
+    setForm(next);
     addUser(labelFor(TRAVEL_STYLE_OPTIONS, tempTravelStyle), "travelStyle");
-    goTo("destination");
-  }
-
-  function confirmFreeText() {
-    const finalForm = { ...form, freeText: tempFreeText };
-    setForm(finalForm);
-    addUser(tempFreeText || "—", "freeText");
-    buildTripDirectly(finalForm);
+    advance("destination", next);
   }
 
   function openEdit(message: ChatMessage) {
@@ -429,7 +620,7 @@ function confirmBooked() {
       }
     } else if (message.editStage === "pace") setEditTempValue(form.pace);
     else if (message.editStage === "travelStyle") setEditTempValue(form.travelStyle);
-    else if (message.editStage === "freeText") setEditTempFreeText(form.freeText);
+    else if (message.editStage === "freeIntent") setEditTempFreeText(form.freeText);
   }
 
   function closeEdit() {
@@ -544,9 +735,10 @@ function confirmBooked() {
       if (!editTempValue) return;
       setForm((f) => ({ ...f, travelStyle: editTempValue as AbroadVacationAnswers["travelStyle"] }));
       updateMessageLabel(labelFor(TRAVEL_STYLE_OPTIONS, editTempValue));
-    } else if (editingStage === "freeText") {
+    } else if (editingStage === "freeIntent") {
+      if (!editTempFreeText.trim()) return;
       setForm((f) => ({ ...f, freeText: editTempFreeText }));
-      updateMessageLabel(editTempFreeText || "—");
+      updateMessageLabel(editTempFreeText);
     } else {
       return;
     }
@@ -763,11 +955,11 @@ function confirmBooked() {
                 />
               )}
 
-              {editingStage === "freeText" && (
+              {editingStage === "freeIntent" && (
                 <textarea
                   value={editTempFreeText}
                   onChange={(e) => setEditTempFreeText(e.target.value)}
-                  placeholder="לדוגמה: ירח דבש, חשוב לנו ים, יעד פחות תיירותי..."
+                  placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
                   rows={3}
                   className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
                 />
@@ -795,6 +987,7 @@ function confirmBooked() {
                       (editingStage === "budget" && !editTempValue) ||
                       (editingStage === "pace" && !editTempValue) ||
                       (editingStage === "travelStyle" && !editTempValue) ||
+                      (editingStage === "freeIntent" && !editTempFreeText.trim()) ||
                       (editingStage === "destination" && editTempDestinations.every((c) => !c.trim()))
                     }
                     className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
@@ -1067,14 +1260,38 @@ function confirmBooked() {
               <AnswerOptions options={TRAVEL_STYLE_OPTIONS} selected={tempTravelStyle} onSelect={setTempTravelStyle} />
             )}
 
-            {stage === "freeText" && (
-              <textarea
-                value={tempFreeText}
-                onChange={(e) => setTempFreeText(e.target.value)}
-                placeholder="לדוגמה: ירח דבש, חשוב לנו ים, יעד פחות תיירותי..."
-                rows={3}
-                className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
+            {stage === "freeIntent" && (
+              <div className="flex flex-col gap-3">
+                <textarea
+                  value={tempFreeIntent}
+                  onChange={(e) => setTempFreeIntent(e.target.value)}
+                  placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
+                  rows={3}
+                  disabled={extractingIntent}
+                  className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={confirmFreeIntentTogether}
+                  disabled={!tempFreeIntent.trim() || extractingIntent}
+                  className="w-full rounded-pill py-2.5 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                >
+                  <span className="block">בואו נבנה יחד</span>
+                  <span className="block text-[11px] font-normal text-white/85">
+                    כמה שאלות קצרות שיעזרו לי לדייק את התכנון
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmFreeIntentAlone}
+                  disabled={!tempFreeIntent.trim() || extractingIntent}
+                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+                >
+                  <span className="block">אמשיך לבד</span>
+                  <span className="block text-[11px] font-normal text-accent/80">תכננו לי לפי מה שכתבתי</span>
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -1094,7 +1311,9 @@ function confirmBooked() {
 
         {locationError && <p className="text-center text-sm text-danger">{locationError}</p>}
 
-        {!submitting && !typing && (
+        {/* freeIntent לא משתמש בכפתור הגנרי הזה בכלל - יש לו שני כפתורים
+            משלו (בואו נבנה יחד / אמשיך לבד) בתוך הבלוק של השלב עצמו. */}
+        {!submitting && !typing && stage !== "freeIntent" && (
           <div className="flex justify-center pt-2">
             <button
               type="button"
@@ -1110,7 +1329,6 @@ function confirmBooked() {
                 else if (stage === "vacationTypes") confirmVacationTypes();
                 else if (stage === "pace") confirmPace();
                 else if (stage === "travelStyle") confirmTravelStyle();
-                else if (stage === "freeText") confirmFreeText();
                 else if (stage === "destination" && form.travelStyle !== "single_destination") confirmDestinationsMulti();
               }}
               disabled={
