@@ -115,6 +115,7 @@ finalStops.push({
         placeId: stop.place!.id,
         name: stop.place!.name,
         category: stop.category,
+        role: stop.role,
         imageUrls: stop.place!.image_urls ?? [],
         etaMinutes,
         arrivalOffsetMinutes: cumulativeMinutes,
@@ -230,37 +231,50 @@ const warnings: string[] = [];
 }
 
 /**
- * Time Engine (בקשה מפורשת, "Requirement קשיח"): מיישר את arrivalOffsetMinutes
- * של כל תחנה לכפולה שלמה של 60 - כדי שהתצוגה בפרונט (dayStartMinutes[day]
- * + arrivalOffsetMinutes, ר' עמוד התוצאה) תמיד תצא שעה עגולה. עובד לפי
- * יום (מתאפס בכל day_index חדש, בהתאם לסדר ה-stops שכבר ממוין לפי יום).
- * מעגל לשעה הכי קרובה (לא תמיד כלפי מעלה) כדי שהתחנה הראשונה של היום
- * תרד בד"כ קרוב ל-09:00 ולא תמיד תזנק ל-10:00 סתם כי הייתה נסיעה קצרה.
- * אוכפת עלייה חדה (לא פוחתת, לא כפולה) - שתי תחנות לא יכולות לצאת
- * באותה שעה בדיוק. חיי לילה (category="nightlife") כבר מובטחת ≥19:00
- * ע"י NIGHTLIFE_MIN_OFFSET_MINUTES למעלה (כפולה של 60 מלכתחילה) ולכן לא
- * כפופה לתקרת יום רגיל - יכולה להמשיך אחרי 21:00 (סעיף 32 במסמך).
+ * Time Engine (בקשה מפורשת, "Requirement קשיח" + "למה השעה תמיד מסתיימת
+ * לא יאוחר מ-15??"): מיישר את arrivalOffsetMinutes של כל תחנה לשעה עגולה.
+ *
+ * הגרסה הקודמת רק אכפה "לפחות שעה אחת אחרי הקודמת" - וכיוון שזמני
+ * ביקור+נסיעה אמיתיים בד"כ קצרים יחסית (45-90 דקות), זה בפועל דחס כל
+ * יום לרצף של שעות רצופות בדיוק (09-10-11-12...) שנגמר אחה"צ מוקדם,
+ * במקום להיפרס לאורך יום אמיתי עד לארוחת ערב בערב. עכשיו: לכל יום
+ * (מלבד חיי-לילה, שמטופל בנפרד) - פריסה שווה על פני חלון יום ריאלי:
+ * אם יש שתי ארוחות (בוקר/צהריים בית קפה + מסעדה נוספת = יום "מלא") -
+ * עד 20:00; אחרת (יום קליל - הגעה/עזיבה) - נשאר קומפקטי בבוקר.
  */
 function alignStopTimesToWholeHours(stops: FinalItineraryStop[]): void {
-  const DEFAULT_DAY_END_HOUR_SLOT = 12; // 09:00 + 12h = 21:00, חלון היום הרגיל
-  let currentDay: number | null | undefined;
-  let lastHourSlot = -1;
+  const dayNumbers = Array.from(new Set(stops.map((s) => s.dayIndex).filter((d): d is number => d != null))).sort(
+    (a, b) => a - b
+  );
 
-  for (const stop of stops) {
-    if (stop.dayIndex !== currentDay) {
-      currentDay = stop.dayIndex;
-      lastHourSlot = -1;
+  for (const day of dayNumbers) {
+    const dayStops = stops.filter((s) => s.dayIndex === day);
+    const regularStops = dayStops.filter((s) => s.category !== "nightlife");
+    const nightlifeStops = dayStops.filter((s) => s.category === "nightlife");
+
+    if (regularStops.length === 1 && regularStops[0].role === "food") {
+      // יום הגעה - ארוחת ערב יחידה (לא בוקר/צהריים) - זו ארוחת ערב בפועל,
+      // לא ארוחת בוקר ב-09:00.
+      regularStops[0].arrivalOffsetMinutes = 11 * 60; // 20:00
+    } else if (regularStops.length > 0) {
+      const foodCount = regularStops.filter((s) => s.role === "food").length;
+      const endHourOffset = foodCount >= 2 ? 11 : Math.min(regularStops.length - 1, 3);
+      regularStops.forEach((stop, i) => {
+        const hourOffset = regularStops.length > 1 ? Math.round((i / (regularStops.length - 1)) * endHourOffset) : 0;
+        stop.arrivalOffsetMinutes = hourOffset * 60;
+      });
     }
 
-    let hourSlot = Math.round(stop.arrivalOffsetMinutes / 60);
-    if (hourSlot < 0) hourSlot = 0;
-    if (hourSlot <= lastHourSlot) hourSlot = lastHourSlot + 1;
-    if (stop.category !== "nightlife" && hourSlot > DEFAULT_DAY_END_HOUR_SLOT) {
-      hourSlot = DEFAULT_DAY_END_HOUR_SLOT;
+    // חיי לילה - תמיד אחרי כל שאר התחנות של אותו יום, לא לפני 19:00
+    // (hourOffset 10, כלומר 09:00+10h) - יכולה להיות מאוחרת יותר בהחלט.
+    if (nightlifeStops.length > 0) {
+      const lastRegularHourOffset =
+        regularStops.length > 0 ? Math.round(regularStops[regularStops.length - 1].arrivalOffsetMinutes / 60) : 0;
+      const nightlifeHourOffset = Math.max(lastRegularHourOffset + 1, 10);
+      nightlifeStops.forEach((stop) => {
+        stop.arrivalOffsetMinutes = nightlifeHourOffset * 60;
+      });
     }
-
-    stop.arrivalOffsetMinutes = hourSlot * 60;
-    lastHourSlot = hourSlot;
   }
 }
 

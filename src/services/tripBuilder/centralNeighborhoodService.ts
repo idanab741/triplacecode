@@ -19,6 +19,39 @@ interface FindCentralNeighborhoodParams {
   radiusKm: number;
 }
 
+export async function findCentralNeighborhood(
+  supabase: SupabaseClient,
+  params: FindCentralNeighborhoodParams
+): Promise<CentralNeighborhoodInfo | null> {
+  const { data: cached } = await supabase
+    .from("destination_neighborhood_cache")
+    .select("name,latitude,longitude,image_url")
+    .eq("destination", params.destination)
+    .maybeSingle();
+
+  if (cached) {
+    return { name: cached.name, coords: { lat: cached.latitude, lng: cached.longitude }, imageUrl: cached.image_url };
+  }
+
+  const fresh = await computeCentralNeighborhood(supabase, params);
+  if (fresh) {
+    // שמירה במטמון לא-חוסמת - לא רוצים לעכב את התשובה בשביל ה-insert.
+    supabase
+      .from("destination_neighborhood_cache")
+      .insert({
+        destination: params.destination,
+        name: fresh.name,
+        latitude: fresh.coords.lat,
+        longitude: fresh.coords.lng,
+        image_url: fresh.imageUrl,
+      })
+      .then(({ error }) => {
+        if (error) logAiError("שמירת השכונה המרכזית במטמון נכשלה (לא חוסם)", { destination: params.destination, message: error.message });
+      });
+  }
+  return fresh;
+}
+
 /**
  * מאתר את "השכונה המרכזית" של יעד חופשה בחו"ל - לכרטיס יום 1 (ר'
  * injectLogisticsStops) ולעיגון רדיוס חיפוש מסעדת יום 1.
@@ -32,8 +65,13 @@ interface FindCentralNeighborhoodParams {
  * השכונה/האזור שהם נמצאים בו בפועל - ובוחר **אחד מהם, בדיוק כפי שנמסר,
  * לא מומצא** בתור נקודת העוגן (לקואורדינטות אמיתיות מהמאגר שלנו, לא
  * מ-Google). כך גם השם מבוסס-ידע וגם המיקום מאומת מהמאגר.
+ *
+ * בקשה מפורשת נוספת ("למה התמונה משתנה כל פעם?! חבל על הטוקנים
+ * מגוגל!"): הפונקציה הזו לא דטרמיניסטית לגמרי (Claude) - נקראת דרך
+ * findCentralNeighborhood למעלה, שעוטפת אותה במטמון קבוע לפי יעד. זה מה
+ * שמבטיח תוצאה אחידה בכל פעם, לא רק חוסך קריאות.
  */
-export async function findCentralNeighborhood(
+async function computeCentralNeighborhood(
   supabase: SupabaseClient,
   params: FindCentralNeighborhoodParams
 ): Promise<CentralNeighborhoodInfo | null> {

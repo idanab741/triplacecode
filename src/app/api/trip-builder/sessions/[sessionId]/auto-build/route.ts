@@ -384,10 +384,20 @@ export async function POST(
       // Google), ומחפשים כל שם **רק** במאגר שלנו; שם שלא נמצא נשמט בשקט
       // (לא מומצא/מאומת דרך Google). קריאת AI אחת נוספת כאן - עלות זמן
       // קטנה (כמה שניות) מול הערך של לא לפספס את הסמלים המובהקים.
+      //
+      // בקשה מפורשת נוספת ("חסר לי הקוליזיאום, הוותיקן, המדרגות
+      // הספרדיות!"): התקרה נגזרת מאורך הטיול בפועל, לא מספר קבוע - יעד
+      // עשיר כמו רומא לטיול 5 ימים צריך יותר מ-6 הצעות.
+      const vacationDatesForMustSee = answers as unknown as { startDate?: string; endDate?: string };
+      const estimatedNumDays =
+        vacationDatesForMustSee.startDate && vacationDatesForMustSee.endDate
+          ? countDays(vacationDatesForMustSee.startDate, vacationDatesForMustSee.endDate)
+          : 3;
       const mustSeeNames = await suggestMustSeeLandmarks({
         destination: destinationName,
         vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
         freeText: answers.freeText,
+        maxCount: estimatedNumDays * 2,
       });
       // סדר העדיפות של Claude (השם הראשון = הכי מובהק/מתאים לטיול הזה)
       // נשמר - זה מה שקובע אילו אתרי חובה "זוכים" למקום כשיש יותר אתרי

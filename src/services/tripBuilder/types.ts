@@ -172,6 +172,10 @@ export interface FinalItineraryStop {
   longitude: number;
   openingHours: string[] | null;
   dayIndex: number | null;
+  /** תפקיד התחנה (attraction/food/coffee_dessert/nightlife/וכו') - נשמר
+   *  כאן (לא רק category) כדי שיישור השעות (alignStopTimesToWholeHours,
+   *  finalizeService.ts) ידע להבחין בין ארוחת בוקר/צהריים/ערב לאטרקציה. */
+  role?: string;
   /** ×¡×•×’ ×ª×—× ×” ×ž×™×•×—×“×ª (× ×—×™×ª×”/×¦'×§-××™×Ÿ/×¦'×§-×××•×˜/×˜×™×¡×ª ×—×–×¨×”) - null ×œ×ª×—× ×” ×¨×’×™×œ×”. ×ž×©×ž×©
    *  ×œ×ª×¦×•×’×” ×‘×œ×‘×“, ×œ× × ×©×œ×£ ×ž-DB/AI. */
   specialType?: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | "neighborhood" | null;

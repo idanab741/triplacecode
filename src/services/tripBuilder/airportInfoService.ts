@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { logAiError } from "@/services/ai/claudeService";
 import { geocodePlaceName } from "./geocodingService";
 import { haversineDistanceKm } from "./geo";
@@ -12,10 +13,46 @@ export interface AirportInfo {
 
 /**
  * מוצא את שדה התעופה המרכזי של יעד (למשל "אתונה" -> "נמל התעופה הבינלאומי
- * של אתונה"), כולל תמונה - קריאה אחת בלבד, שהלקוח משתמש בה גם לתצוגה וגם
- * לבניית קישור הזמנת נסיעה (Google Maps directions).
+ * של אתונה"), כולל תמונה.
+ *
+ * בקשה מפורשת ("למה צריך את גוגל בשביל זה?!"): שדה התעופה של יעד לא
+ * משתנה - אין שום סיבה לקרוא ל-Google מחדש בכל בקשה (וזה נקרא גם
+ * מה-server וגם מה-client, לאותו יעד, שוב ושוב). בודקים קודם מטמון קבוע
+ * (destination_airport_cache) - קריאה ל-Google קורית **פעם אחת בחיים**
+ * לכל יעד, לא בכל בקשה.
  */
-export async function findAirportInfo(destination: string): Promise<AirportInfo | null> {
+export async function findAirportInfo(supabase: SupabaseClient, destination: string): Promise<AirportInfo | null> {
+  const { data: cached } = await supabase
+    .from("destination_airport_cache")
+    .select("name,latitude,longitude,image_url")
+    .eq("destination", destination)
+    .maybeSingle();
+
+  if (cached) {
+    return { name: cached.name, coords: { lat: cached.latitude, lng: cached.longitude }, imageUrl: cached.image_url };
+  }
+
+  const fresh = await fetchAirportInfoFromGoogle(destination);
+  if (fresh) {
+    // שמירה במטמון לא-חוסמת - גם אם היא נכשלת, עדיין מחזירים את התוצאה
+    // הטרייה למשתמש הזה, לא רוצים לחכות ל-DB לפני שמחזירים תשובה.
+    supabase
+      .from("destination_airport_cache")
+      .insert({
+        destination,
+        name: fresh.name,
+        latitude: fresh.coords.lat,
+        longitude: fresh.coords.lng,
+        image_url: fresh.imageUrl,
+      })
+      .then(({ error }) => {
+        if (error) logAiError("שמירת שדה תעופה במטמון נכשלה (לא חוסם)", { destination, message: error.message });
+      });
+  }
+  return fresh;
+}
+
+async function fetchAirportInfoFromGoogle(destination: string): Promise<AirportInfo | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     logAiError("GOOGLE_MAPS_API_KEY אינו מוגדר - לא ניתן לאתר שדה תעופה", {});
