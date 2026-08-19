@@ -412,10 +412,28 @@ export async function POST(
       // מעבר למרכז המדויק); אחרת ברירת מחדל של עיר גדולה + פרברים.
       // סופ"ש בארץ - קנה מידה קטן בהרבה מ"עיר בחו"ל", אז ברירת המחדל
       // (בלי רדיוס מפורש) נשענת על distanceBand של המשתמש, לא על 60 ק"מ קבוע.
+      //
+      // תיקון באג קריטי אמיתי (בקשה מפורשת - "שוב מחזיר אותי לתל אביב"):
+      // distanceBand הוא "כמה רחוק מהבית מוכנים לנסוע בשביל הסופ"ש כולו"
+      // (יכול להגיע ל-150+ ק"מ) - לא "כמה רחוק מהלינה עצמה הגיוני שאתר
+      // חובה/מקום חיי-לילה יהיה". כשכבר יש dayOriginOverride (לינה שנפתרה
+      // בהצלחה), destinationMaxDistanceKm שימש בפועל כרדיוס החיפוש של
+      // findMustSeePlaces/nightlife/ה-fallback הרחב סביב searchOrigin (=
+      // מיקום הלינה) - כלומר "אתר חובה" יכול היה להימצא בכל מקום בטווח
+      // 100+ ק"מ מהלינה, כולל בחזרה בתל אביב (המרחק האמיתי מכמה אזורי
+      // לינה בצפון לתל אביב). WEEKEND_LODGING_TRIP_RADIUS_KM מגביל את זה
+      // לטווח סביר סביב הלינה עצמה - בלי לגעת בטיולים בלי לינה קבועה
+      // (שם אין "עוגן" לחשב ממנו מרחק סביר, ונשארים עם distanceBand המלא).
+      const WEEKEND_LODGING_TRIP_RADIUS_KM = 30;
       const destinationMaxDistanceKm = requestedAreaRadiusKm
         ? requestedAreaRadiusKm * 2
         : session.trip_type === "weekend"
-          ? distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
+          ? dayOriginOverride
+            ? Math.min(
+                distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand),
+                WEEKEND_LODGING_TRIP_RADIUS_KM
+              )
+            : distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
           : 60;
 
       // בקשה מפורשת נוספת ("חסר לי הקוליזיאום, הוותיקן, המדרגות

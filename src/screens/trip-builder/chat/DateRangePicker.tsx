@@ -135,7 +135,11 @@ export function DateRangePicker({ startDate, endDate, onChange, minDays = 2 }: D
       </button>
 
       {open && (
-        <BottomSheet onClose={() => setOpen(false)}>
+        // בקשה מפורשת וחד-משמעית: הבר התחתון (BottomNav, z-50 קבוע) חייב
+        // להישאר גלוי מעל הלוח שנה. ברירת המחדל של BottomSheet היא z-60
+        // (מעל הבר) - כאן, ורק כאן, נותנים לו zIndex נמוך מ-50 בכוונה,
+        // כדי שהבר התחתון יישאר מעל ה-backdrop הכהה ומעל הגיליון עצמו.
+        <BottomSheet onClose={() => setOpen(false)} zIndex={40}>
           <div className="px-4 pt-1">
             <div className="mb-3 flex items-center justify-between">
               <button

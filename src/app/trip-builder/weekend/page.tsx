@@ -639,8 +639,19 @@ export default function WeekendQuestionnairePage() {
   /**
    * בקשה מפורשת וחד-משמעית (אותו עיקרון בדיוק כמו חופשה בחו"ל): "רק
    * לחיצה על הלוגו מעבירה למסך הבנייה. אם לא לוחצים - נשארים בעמוד הזה
-   * (הצ'אט) עד שהמסלול מוכן בפועל, תוך 10-15 שניות, ואז עוברים ישר
-   * לעמוד המוכן - לא למסך טעינה/משחק."
+   * (הצ'אט) עד שהמסלול מוכן בפועל, ואז עוברים ישר לעמוד המוכן - לא למסך
+   * טעינה/משחק. או שנמצאים בצ'אט, או שנמצאים במשחק - שום מצב שלישי."
+   *
+   * תיקון באג אמיתי (בקשה מפורשת - צילום מסך של מסך טעינה שלישי שהופיע):
+   * קודם היו שני באגים שיצרו בדיוק את המצב השלישי האסור הזה: (1) התנאי
+   * לעצירת ההמתנה כלל גם hasAnyStops (מספיק תחנה אחת בודדת) - כך שההמתנה
+   * הייתה נעצרת ומנווטת לעמוד התוצאה גם כש-status עדיין "building", מה
+   * שנחת בדיוק על מסך ה"טוען" הפשוט בעמוד התוצאה. (2) MAX_WAIT_MS של
+   * 20 שניות היה קצר מדי לחלק מהבניות - כשהזמן נגמר, היה מתבצע ניווט
+   * בכל מקרה, גם בלי תוכן מוכן. עכשיו: מחכים עד ל-status==="completed"
+   * בלבד (לא מנווטים על סמך "יש כבר תחנה אחת"), עם תקרה נדיבה בהרבה
+   * כרשת ביטחון בלבד - ואם בכל זאת נחצתה (מקרה נדיר) לא מנווטים לעמוד
+   * טעינה, אלא נשארים בצ'אט עם הודעה, כדי שלעולם לא יופיע מצב שלישי.
    */
   async function autoBuildAndWaitThenNavigate(answers: WeekendAnswers) {
     if (!user) return; // לא מפנים ל-/auth בכפייה - ממתינים ללחיצה הידנית של המשתמש
@@ -649,26 +660,39 @@ export default function WeekendQuestionnairePage() {
       const sessionId = await ensureSessionCreated(answers);
       if (manualGameRequestedRef.current) return; // המשתמש כבר לחץ - buildTripDirectly מטפל בניווט
 
-      const MAX_WAIT_MS = 20000;
-      const POLL_INTERVAL_MS = 1200;
+      const MAX_WAIT_MS = 90000;
+      const POLL_INTERVAL_MS = 1000;
       const startedAt = Date.now();
+      let completed = false;
       while (Date.now() - startedAt < MAX_WAIT_MS) {
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         if (manualGameRequestedRef.current) return; // נלחץ תוך כדי ההמתנה - עוצרים כאן
         try {
           const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
           const pollData = await pollRes.json();
-          const session = pollData?.session;
-          const hasAnyStops = (session?.final_itinerary?.stops?.length ?? 0) > 0;
-          if (session?.status === "completed" || hasAnyStops) break;
+          if (pollData?.session?.status === "completed") {
+            completed = true;
+            break;
+          }
         } catch {
           // שגיאת רשת חד-פעמית בתשאול - ממשיכים לנסות, לא עוצרים
         }
       }
 
       if (manualGameRequestedRef.current || navigatedToResultRef.current) return;
-      navigatedToResultRef.current = true;
-      router.push(`/trip-builder/weekend/result?sessionId=${sessionId}`);
+
+      if (completed) {
+        navigatedToResultRef.current = true;
+        router.push(`/trip-builder/weekend/result?sessionId=${sessionId}`);
+        return;
+      }
+
+      // מקרה נדיר: הבנייה עדיין לא הסתיימה גם אחרי ההמתנה הנדיבה. לא
+      // מנווטים לעמוד תוצאה לא-מוכן (זה בדיוק מסך "המצב השלישי" האסור) -
+      // נשארים בצ'אט עם הודעה, והמשתמש עדיין יכול ללחוץ על בועת ה-runtrippy
+      // כדי לעבור למסך המשחק בכל רגע.
+      setTyping(false);
+      addBot('זה לוקח קצת יותר זמן מהרגיל... אפשר להמשיך להמתין כאן, או ללחוץ על הלוגו למעלה כדי לעבור למסך הבנייה.');
     } catch (error) {
       // מאפשרים ניסיון נוסף (למשל לחיצה ידנית על הבועה) אם ההרשמה הראשונית נכשלה
       sessionPromiseRef.current = null;
