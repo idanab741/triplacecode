@@ -76,7 +76,7 @@ interface ExtractedVacationIntent {
   travelStyle: AbroadVacationAnswers["travelStyle"] | null;
   destination: string | null;
   destinations: string[];
-  companions: "couple" | "family" | "friends" | "solo" | null;
+  companions: ("couple" | "family" | "family_no_kids" | "friends" | "solo")[];
   childAgeBands: AbroadVacationAnswers["childAgeBands"];
   hasBookedFlightAndHotel: boolean | null;
   lodgingType: AbroadVacationAnswers["lodgingType"];
@@ -86,7 +86,7 @@ interface ExtractedVacationIntent {
 }
 
 const DEFAULT_ANSWERS: AbroadVacationAnswers = {
-  companions: "couple",
+  companions: ["couple"],
   childAgeBands: [],
   startDate: "",
   endDate: "",
@@ -152,7 +152,7 @@ export default function AbroadVacationQuestionnairePage() {
   const extractedIntentRef = useRef<ExtractedVacationIntent | null>(null);
   // התשובות המלאות שממתינות ללחיצה על בועת runtrippy בצ'אט - ר' promptBuildTrip.
   const pendingBuildAnswersRef = useRef<AbroadVacationAnswers | null>(null);
-  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+  const [tempCompanions, setTempCompanions] = useState<string[]>([]);
   const [tempChildAges, setTempChildAges] = useState<string[]>([]);
   const [tempStartDate, setTempStartDate] = useState("");
   const [tempEndDate, setTempEndDate] = useState("");
@@ -449,11 +449,11 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
       }
     }
 
-    if (stage === "companions" && extracted.companions) {
+    if (stage === "companions" && extracted.companions.length > 0) {
       const next = { ...current, companions: extracted.companions };
       setForm(next);
-      addUser(labelFor(VACATION_COMPANION_OPTIONS, extracted.companions), "companions");
-      advance(next.companions === "family" ? "childAges" : "bookedQuestion", next);
+      addUser(labelsFor(VACATION_COMPANION_OPTIONS, extracted.companions).join("، "), "companions");
+      advance(next.companions.includes("family") ? "childAges" : "bookedQuestion", next);
       return;
     }
 
@@ -574,11 +574,11 @@ const [tempBooked, setTempBooked] = useState<string | null>(null);
   }
 
   function confirmCompanions() {
-    if (!tempCompanion) return;
-    const next = { ...form, companions: tempCompanion as AbroadVacationAnswers["companions"] };
+    if (tempCompanions.length === 0) return;
+    const next = { ...form, companions: tempCompanions as AbroadVacationAnswers["companions"] };
     setForm(next);
-    addUser(labelFor(VACATION_COMPANION_OPTIONS, tempCompanion), "companions");
-    advance(tempCompanion === "family" ? "childAges" : "bookedQuestion", next);
+    addUser(labelsFor(VACATION_COMPANION_OPTIONS, tempCompanions).join("، "), "companions");
+    advance(tempCompanions.includes("family") ? "childAges" : "bookedQuestion", next);
   }
 
   function confirmChildAges() {
@@ -710,7 +710,7 @@ function confirmBooked() {
     setEditingMessageId(message.id);
     setEditingStage(message.editStage);
 
-    if (message.editStage === "companions") setEditTempValue(form.companions);
+    if (message.editStage === "companions") setEditTempMultiValue(form.companions);
     else if (message.editStage === "childAges") setEditTempMultiValue(form.childAgeBands);
     else if (message.editStage === "dates") {
       setEditTempStartDate(form.startDate);
@@ -805,9 +805,9 @@ function confirmBooked() {
     if (!editingStage || editingMessageId == null) return;
 
     if (editingStage === "companions") {
-      if (!editTempValue) return;
-      setForm((f) => ({ ...f, companions: editTempValue as AbroadVacationAnswers["companions"] }));
-      updateMessageLabel(labelFor(VACATION_COMPANION_OPTIONS, editTempValue));
+      if (editTempMultiValue.length === 0) return;
+      setForm((f) => ({ ...f, companions: editTempMultiValue as AbroadVacationAnswers["companions"] }));
+      updateMessageLabel(labelsFor(VACATION_COMPANION_OPTIONS, editTempMultiValue).join("، "));
     } else if (editingStage === "childAges") {
       setForm((f) => ({ ...f, childAgeBands: editTempMultiValue as AbroadVacationAnswers["childAgeBands"] }));
       updateMessageLabel(editTempMultiValue.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, editTempMultiValue).join("، ") : "לא רלוונטי");
@@ -975,10 +975,10 @@ function confirmBooked() {
           ) : editingMessageId === m.id ? (
             <div key={m.id} className="mt-1">
               {editingStage === "companions" && (
-                <AnswerOptions
+                <ChipGroup
                   options={VACATION_COMPANION_OPTIONS}
-                  selected={editTempValue}
-                  onSelect={setEditTempValue}
+                  selected={editTempMultiValue}
+                  onChange={setEditTempMultiValue}
                 />
               )}
 
@@ -1158,7 +1158,7 @@ function confirmBooked() {
                     type="button"
                     onClick={confirmEdit}
                     disabled={
-                      (editingStage === "companions" && !editTempValue) ||
+                      (editingStage === "companions" && editTempMultiValue.length === 0) ||
                       (editingStage === "dates" && (!editTempStartDate || !editTempEndDate)) ||
                       (editingStage === "bookedQuestion" && !editTempValue) ||
                       (editingStage === "flightPreference" && !editTempValue) ||
@@ -1190,7 +1190,7 @@ function confirmBooked() {
         {!typing && !submitting && !readyToBuild && (
           <div className="mt-1">
             {stage === "companions" && (
-              <AnswerOptions options={VACATION_COMPANION_OPTIONS} selected={tempCompanion} onSelect={setTempCompanion} />
+              <ChipGroup options={VACATION_COMPANION_OPTIONS} selected={tempCompanions} onChange={setTempCompanions} />
             )}
 
             {stage === "childAges" && (
@@ -1520,7 +1520,7 @@ function confirmBooked() {
                 else if (stage === "destination" && form.travelStyle !== "single_destination") confirmDestinationsMulti();
               }}
               disabled={
-                (stage === "companions" && !tempCompanion) ||
+                (stage === "companions" && tempCompanions.length === 0) ||
                 (stage === "dates" && (!tempStartDate || !tempEndDate)) ||
 (stage === "bookedQuestion" && !tempBooked) ||
                 (stage === "flightPreference" && !tempFlightPreference) ||

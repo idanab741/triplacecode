@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ import Image from "next/image";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
-  companions: "solo",
+  companions: ["solo"],
   hasPet: false,
   childAgeBands: [],
   timing: "today",
@@ -107,7 +107,7 @@ const [submitting, setSubmitting] = useState(false);
 const [tempMulti, setTempMulti] = useState<string[]>([]);
   const [tempSlider, setTempSlider] = useState<string | null>(null);
   const [tempText, setTempText] = useState("");
-const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+const [tempCompanions, setTempCompanions] = useState<string[]>([]);
   const [tempHasPet, setTempHasPet] = useState(false);
 
   const [editingFieldKey, setEditingFieldKey] = useState<EditableFieldKey | null>(null);
@@ -116,7 +116,7 @@ const [tempCompanion, setTempCompanion] = useState<string | null>(null);
   const [editTempSlider, setEditTempSlider] = useState<string | null>(null);
   const [editTempMulti, setEditTempMulti] = useState<string[]>([]);
   const [editTempText, setEditTempText] = useState("");
-  const [editTempCompanion, setEditTempCompanion] = useState<string | null>(null);
+  const [editTempCompanions, setEditTempCompanions] = useState<string[]>([]);
   const [editTempHasPet, setEditTempHasPet] = useState(false);
 const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -189,7 +189,7 @@ function resetTempAnswerState() {
     setTempMulti([]);
     setTempSlider(null);
     setTempText("");
-    setTempCompanion(null);
+    setTempCompanions([]);
     setTempHasPet(false);
     setAwaitingChildAges(false);
     setAwaitingOtherDate(false);
@@ -218,23 +218,19 @@ function goToNextStep() {
 
   // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
-function handleCompanionsSelect(value: string) {
-    setTempCompanion(value);
-  }
-
   function togglePet() {
     setTempHasPet((v) => !v);
   }
 
   function confirmCompanions() {
-    if (step.type !== "companions" || !tempCompanion) return;
-    updateField("companions", tempCompanion as DayTripAnswers["companions"]);
+    if (step.type !== "companions" || tempCompanions.length === 0) return;
+    updateField("companions", tempCompanions as DayTripAnswers["companions"]);
     updateField("hasPet", tempHasPet);
 
-const label = labelFor(step.options, tempCompanion);
+const label = labelsFor(step.options, tempCompanions).join("، ");
     addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
 
-    if (tempCompanion === step.childAgeTriggerValue) {
+    if (tempCompanions.includes(step.childAgeTriggerValue)) {
       setAwaitingChildAges(true);
       setTyping(true);
       setTimeout(() => {
@@ -316,7 +312,7 @@ if (step.type !== "single") return;
     setEditingMessageId(message.id);
 
 if (key === "companions") {
-      setEditTempCompanion(form.companions);
+      setEditTempCompanions(form.companions);
       setEditTempHasPet(form.hasPet);
     } else if (key === "childAgeBands" || key === "interests") {
       setEditTempMulti(key === "childAgeBands" ? form.childAgeBands : form.interests);
@@ -339,7 +335,7 @@ if (key === "companions") {
     setEditTempSlider(null);
     setEditTempMulti([]);
     setEditTempText("");
-    setEditTempCompanion(null);
+    setEditTempCompanions([]);
     setEditTempHasPet(false);
   }
 
@@ -352,14 +348,14 @@ const key = editingFieldKey;
     let newLabel = "";
 
 if (key === "companions" && editStep.type === "companions") {
-      if (!editTempCompanion) return;
-      updateField("companions", editTempCompanion as DayTripAnswers["companions"]);
+      if (editTempCompanions.length === 0) return;
+      updateField("companions", editTempCompanions as DayTripAnswers["companions"]);
       updateField("hasPet", editTempHasPet);
-      const label = labelFor(editStep.options, editTempCompanion);
+      const label = labelsFor(editStep.options, editTempCompanions).join("، ");
       newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
 
-      // אם עברו מ"משפחה עם ילדים" לאופציה אחרת - שאלת/תשובת הגילאים כבר לא רלוונטית, מוחקים אותה
-      if (editTempCompanion !== editStep.childAgeTriggerValue) {
+      // אם הוציאו את "משפחה עם ילדים" מהבחירה - שאלת/תשובת הגילאים כבר לא רלוונטית, מוחקים אותה
+      if (!editTempCompanions.includes(editStep.childAgeTriggerValue)) {
         updateField("childAgeBands", [] as DayTripAnswers["childAgeBands"]);
         setMessages((msgs) => msgs.filter((m) => m.fieldKey !== "childAgeBands"));
       }
@@ -449,11 +445,11 @@ if (key === "companions" && editStep.type === "companions") {
     while (extracted && idx < DAY_TRIP_QUESTIONS.length) {
       const s = DAY_TRIP_QUESTIONS[idx];
 
-      if (s.type === "companions" && extracted.companions) {
+      if (s.type === "companions" && extracted.companions.length > 0) {
         workingForm = { ...workingForm, companions: extracted.companions, hasPet: extracted.hasPet };
-        const label = labelFor(s.options, extracted.companions);
+        const label = labelsFor(s.options, extracted.companions).join("، ");
         addUser(extracted.hasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
-        if (extracted.companions === s.childAgeTriggerValue) {
+        if (extracted.companions.includes(s.childAgeTriggerValue as DayTripAnswers["companions"][number])) {
           if (extracted.childAgeBands.length > 0) {
             workingForm = { ...workingForm, childAgeBands: extracted.childAgeBands as DayTripAnswers["childAgeBands"] };
             addUser(labelsFor(s.childAgeOptions, extracted.childAgeBands).join("، "), "childAgeBands");
@@ -625,7 +621,7 @@ if (key === "companions" && editStep.type === "companions") {
       return { label: "המשך", onClick: confirmChildAges };
     }
     if (step.type === "companions" && !awaitingChildAges) {
-      return { label: "המשך", onClick: confirmCompanions, disabled: !tempCompanion };
+      return { label: "המשך", onClick: confirmCompanions, disabled: tempCompanions.length === 0 };
     }
     if (step.type === "date" && awaitingOtherDate) {
       return { label: "המשך", onClick: confirmOtherDate, disabled: !tempText };
@@ -667,7 +663,7 @@ const footerAction = getFooterAction();
                     if (!editStep || editStep.type !== "companions") return null;
                     return (
                       <div className="flex flex-col gap-3">
-                        <AnswerOptions options={editStep.options} selected={editTempCompanion} onSelect={setEditTempCompanion} />
+                        <ChipGroup options={editStep.options} selected={editTempCompanions} onChange={setEditTempCompanions} />
                         <button
                           type="button"
                           onClick={() => setEditTempHasPet((v) => !v)}
@@ -793,7 +789,7 @@ return m.role === "assistant" ? (
        <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
-                <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
+                <ChipGroup options={step.options} selected={tempCompanions} onChange={setTempCompanions} />
                 <button
                   type="button"
                   onClick={togglePet}
@@ -883,17 +879,7 @@ return m.role === "assistant" ? (
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
           <div className="flex flex-col gap-2">
-            <ChatBubble>
-              <div className="flex items-center gap-3">
-                <div
-                  className="relative h-9 w-9 shrink-0"
-                  style={{ animation: "dayTripBuildingPulse 2.6s ease-in-out infinite" }}
-                >
-                  <Image src="/images/game/runtrippy-logo.png" alt="" fill className="object-contain" />
-                </div>
-                <span>רגע, בונים לכם את הטיול...</span>
-              </div>
-            </ChatBubble>
+            <ChatBubble>רגע, בונים לכם את הטיול...</ChatBubble>
             {pendingSessionId && (
               <RuntrippyPromptBubble
                 onClick={() => {
@@ -901,17 +887,6 @@ return m.role === "assistant" ? (
                 }}
               />
             )}
-            <style jsx>{`
-              @keyframes dayTripBuildingPulse {
-                0%,
-                100% {
-                  transform: scale(0.88);
-                }
-                50% {
-                  transform: scale(1.08);
-                }
-              }
-            `}</style>
           </div>
         )}
 

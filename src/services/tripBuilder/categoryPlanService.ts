@@ -31,7 +31,7 @@ export function normalizeAnswers(
     const restaurantAnswers = answers as RestaurantAnswers;
     return {
       ...restaurantAnswers,
-      companions: "couple",
+      companions: ["couple"],
       hasPet: false,
       childAgeBands: [],
       interests: restaurantAnswers.cuisine,
@@ -42,7 +42,7 @@ if (tripType === "romantic_date") {
     const dateAnswers = answers as import("./types").RomanticDateAnswers;
     return {
       ...dateAnswers,
-      companions: "couple",
+      companions: ["couple"],
       hasPet: false,
       childAgeBands: [],
       interests: dateAnswers.dateType,
@@ -59,7 +59,7 @@ if (tripType === "nightlife") {
       )
     ) as string[];
     return {
-      companions: nightlifeAnswers.companions === "group" || nightlifeAnswers.companions === "friends" ? "friends" : nightlifeAnswers.companions === "solo" ? "solo" : "couple",
+      companions: [nightlifeAnswers.companions === "group" || nightlifeAnswers.companions === "friends" ? "friends" : nightlifeAnswers.companions === "solo" ? "solo" : "couple"],
       hasPet: false,
       childAgeBands: [],
       timing: nightlifeAnswers.timing,
@@ -80,12 +80,12 @@ if (tripType === "nightlife") {
         )
       )
     ) as string[];
+    const vacationHasPet = vacationAnswers.companions.includes("with_pet");
     return {
-      companions:
-        vacationAnswers.companions === "with_pet"
-          ? "solo"
-          : (vacationAnswers.companions as DayTripAnswers["companions"]),
-      hasPet: vacationAnswers.companions === "with_pet",
+      companions: (vacationHasPet
+        ? vacationAnswers.companions.filter((c) => c !== "with_pet")
+        : vacationAnswers.companions) as DayTripAnswers["companions"],
+      hasPet: vacationHasPet,
       childAgeBands: vacationAnswers.childAgeBands,
       timing: "other_date" as DayTripAnswers["timing"],
       otherDate: vacationAnswers.startDate || null,
@@ -105,12 +105,12 @@ if (tripType === "nightlife") {
         )
       )
     ) as string[];
+    const weekendHasPet = weekendAnswers.companions.includes("with_pet");
     return {
-      companions:
-        weekendAnswers.companions === "with_pet"
-          ? "solo"
-          : (weekendAnswers.companions as DayTripAnswers["companions"]),
-      hasPet: weekendAnswers.companions === "with_pet",
+      companions: (weekendHasPet
+        ? weekendAnswers.companions.filter((c) => c !== "with_pet")
+        : weekendAnswers.companions) as DayTripAnswers["companions"],
+      hasPet: weekendHasPet,
       childAgeBands: weekendAnswers.childAgeBands,
       timing: "other_date" as DayTripAnswers["timing"],
       otherDate: weekendAnswers.startDate || null,

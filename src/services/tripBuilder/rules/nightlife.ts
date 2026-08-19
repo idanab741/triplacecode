@@ -32,7 +32,7 @@ export const NIGHTLIFE_QUESTIONS: TripBuilderStep[] = [
   {
     type: "slider",
     key: "distanceBand",
-    title: "מרחק מקסימלי מהבית",
+    title: "מרחק מקסימלי לנסיעה",
     steps: NIGHTLIFE_DISTANCE_STEPS,
   },
   {

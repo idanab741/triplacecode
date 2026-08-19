@@ -357,7 +357,7 @@ export async function POST(
       }
       if (learnedAttributes.liked.length) dnaSummaryParts.push(`נלמד מהתנהגות שאהב: ${learnedAttributes.liked.join(", ")}`);
       if (learnedAttributes.disliked.length) dnaSummaryParts.push(`נלמד מהתנהגות שלא אהב: ${learnedAttributes.disliked.join(", ")}`);
-      if (vacationAnswers.companions === "family" && vacationAnswers.childAgeBands?.length) {
+      if (vacationAnswers.companions?.includes("family") && vacationAnswers.childAgeBands?.length) {
         const ageLabels = vacationAnswers.childAgeBands.map(
           (band) => VACATION_CHILD_AGE_OPTIONS.find((o) => o.value === band)?.label ?? band
         );
@@ -832,7 +832,7 @@ export async function POST(
       const dnaSummary = dnaSummaryParts.length ? dnaSummaryParts.join(". ") : null;
 
       const questionnaireSummaryParts: string[] = [];
-      if (answers.companions) questionnaireSummaryParts.push(`הרכב מטיילים: ${answers.companions}`);
+      if (answers.companions?.length) questionnaireSummaryParts.push(`הרכב מטיילים: ${answers.companions.join(", ")}`);
       if (answers.childAgeBands?.length) questionnaireSummaryParts.push(`גילאי ילדים: ${answers.childAgeBands.join(", ")}`);
       if (answers.timing) questionnaireSummaryParts.push(`תזמון: ${answers.timing}`);
       if (answers.distanceBand) questionnaireSummaryParts.push(`מרחק מבוקש: ${answers.distanceBand}`);

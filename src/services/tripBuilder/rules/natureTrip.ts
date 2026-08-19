@@ -29,11 +29,12 @@ export const NATURE_TRIP_QUESTIONS: TripBuilderStep[] = [
     childAgeTitle: "גילאי הילדים",
     childAgeOptions: CHILD_AGE_OPTIONS,
     childAgeTriggerValue: "family",
+    multiSelect: true,
   },
   {
     type: "slider",
     key: "distanceBand",
-    title: "מרחק מקסימלי מהבית",
+    title: "מרחק מקסימלי לנסיעה",
     steps: DISTANCE_STEPS,
   },
   {

@@ -24,6 +24,7 @@ export const WEEKEND_QUESTIONS: TripBuilderStep[] = [
     childAgeTitle: "גילאי הילדים",
     childAgeOptions: VACATION_CHILD_AGE_OPTIONS,
     childAgeTriggerValue: "family",
+    multiSelect: true,
   },
   {
     type: "date",
@@ -44,7 +45,7 @@ export const WEEKEND_QUESTIONS: TripBuilderStep[] = [
   {
     type: "slider",
     key: "distanceBand",
-    title: "מרחק מקסימלי מהבית",
+    title: "מרחק מקסימלי לנסיעה",
     steps: DISTANCE_STEPS,
   },
   {

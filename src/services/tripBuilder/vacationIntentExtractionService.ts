@@ -15,7 +15,7 @@ export interface ExtractedVacationIntent {
   destination: string | null;
   /** כמה יעדים מפורשים (travelStyle multi) - כל אחד מהם מאומת מול הרשימה. */
   destinations: string[];
-  companions: "couple" | "family" | "friends" | "solo" | null;
+  companions: ("couple" | "family" | "family_no_kids" | "friends" | "solo")[];
   childAgeBands: ChildAgeBand[];
   hasBookedFlightAndHotel: boolean | null;
   lodgingType: LodgingType | null;
@@ -28,7 +28,7 @@ const EMPTY_RESULT: ExtractedVacationIntent = {
   travelStyle: null,
   destination: null,
   destinations: [],
-  companions: null,
+  companions: [],
   childAgeBands: [],
   hasBookedFlightAndHotel: null,
   lodgingType: null,
@@ -37,7 +37,7 @@ const EMPTY_RESULT: ExtractedVacationIntent = {
   pace: null,
 };
 
-const COMPANION_VALUES = new Set(["couple", "family", "friends", "solo"]);
+const COMPANION_VALUES = new Set(["couple", "family", "family_no_kids", "friends", "solo"]);
 const CHILD_AGE_VALUES = new Set(["0-3", "3-7", "7-12", "12-18"]);
 const LODGING_VALUES = new Set(["hotel", "resort", "apartment", "cabin", "hostel", "camping", "glamping", "villa"]);
 const BUDGET_VALUES = new Set(["0-2500", "2500-7500", "7500-12000", "12000+", "unlimited"]);
@@ -69,8 +69,9 @@ null/ריק מאשר לחלץ ערך לא בטוח.
   לא ברשימה, או שלא הוזכר יעד - null.
 - destinations: אותו עיקרון, מערך של כמה יעדים (רק אם travelStyle=multi_destination
   והם מופיעים ברשימה) - אחרת מערך ריק.
-- companions: "couple" (זוג) | "family" (משפחה עם ילדים) | "friends" (חברים) |
-  "solo" (לבד) - רק אם נאמר במפורש מי נוסע, אחרת null.
+- companions: מערך מתוך "couple" (זוג) | "family" (משפחה עם ילדים) | "family_no_kids"
+  (משפחה בלי ילדים) | "friends" (חברים) | "solo" (לבד) - כל מי שנאמר במפורש שנוסע
+  איתם, אפשר כמה יחד (למשל זוג עם חברים = ["couple","friends"]), אחרת מערך ריק.
 - childAgeBands: מערך מתוך "0-3","3-7","7-12","12-18" - רק אם companions=family
   וגילאי הילדים הוזכרו, אחרת מערך ריק.
 - hasBookedFlightAndHotel: true/false - רק אם המשתמש אמר במפורש שכבר הזמין
@@ -94,7 +95,7 @@ ${candidateList}
   "travelStyle": "single_destination" | "multi_destination" | null,
   "destination": "string או null",
   "destinations": ["..."],
-  "companions": "couple" | "family" | "friends" | "solo" | null,
+  "companions": ["couple" | "family" | "family_no_kids" | "friends" | "solo", ...],
   "childAgeBands": ["..."],
   "hasBookedFlightAndHotel": true | false | null,
   "lodgingType": "string או null",
@@ -167,10 +168,11 @@ export async function extractVacationIntent(freeText: string): Promise<Extracted
       travelStyle,
       destination: travelStyle === "multi_destination" ? null : validateDestinationName(parsed.destination, candidates),
       destinations: travelStyle === "multi_destination" ? destinations : [],
-      companions:
-        typeof parsed.companions === "string" && COMPANION_VALUES.has(parsed.companions)
-          ? (parsed.companions as ExtractedVacationIntent["companions"])
-          : null,
+      companions: Array.isArray(parsed.companions)
+        ? (parsed.companions as unknown[]).filter(
+            (v): v is ExtractedVacationIntent["companions"][number] => typeof v === "string" && COMPANION_VALUES.has(v)
+          )
+        : [],
       childAgeBands: Array.isArray(parsed.childAgeBands)
         ? (parsed.childAgeBands as unknown[]).filter((v): v is ChildAgeBand => typeof v === "string" && CHILD_AGE_VALUES.has(v))
         : [],

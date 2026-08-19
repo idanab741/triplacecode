@@ -110,7 +110,7 @@ function buildPrompt(context: VacationContext, dayNumber: number, previousDayTit
 הקשר הטיול:
 - סוגי חופשה שנבחרו: ${vacationTypeLabels}
 - קצב: ${context.trip.pace}
-- מלווים: ${context.trip.hasChildren ? "עם ילדים" : "בלי ילדים"}
+- מלווים: ${context.trip.companionsLabel}${context.trip.hasChildren ? " (עם ילדים)" : ""}
 - בקשה חופשית מהמשתמש (המקור החשוב ביותר לאופי הטיול - קרא אותה בעיון!): ${JSON.stringify(context.trip.freeText || null)}
 
 בקשה מפורשת - הבקשה החופשית חייבת לעצב את היום הזה בפועל, לא רק להישמר

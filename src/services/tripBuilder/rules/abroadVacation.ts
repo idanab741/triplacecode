@@ -58,6 +58,7 @@ export const ABROAD_VACATION_QUESTIONS: TripBuilderStep[] = [
     childAgeTitle: "גילאי הילדים",
     childAgeOptions: VACATION_CHILD_AGE_OPTIONS,
     childAgeTriggerValue: "family",
+    multiSelect: true,
   },
   {
     // מטופל כ"custom" בעמוד השאלון: yes/no, ואם "כן" - טופס טיסה+מלון

@@ -58,6 +58,9 @@ export interface VacationContext {
     numDays: number;
     travelers: number;
     hasChildren: boolean;
+    /** בקשה מפורשת - בחירה מרובה למי מטיילים (למשל "זוג, חברים") - כדי
+     *  שה-AI יראה את ההרכב המלא שנבחר, לא רק ספירה גסה. */
+    companionsLabel: string;
     budgetBand: string;
     pace: string;
     vacationTypes: string[];
@@ -205,7 +208,7 @@ export interface FinalItinerary {
   dayTitles?: Record<string, string>;
 }
 
-export type CompanionType = "couple" | "family" | "friends" | "solo" | "with_pet";
+export type CompanionType = "couple" | "family" | "family_no_kids" | "friends" | "solo" | "with_pet";
 export type ChildAgeBand = "0-3" | "3-7" | "7-12" | "12-18";
 export type TimingChoice = "today" | "tomorrow" | "other_date";
 export type DistanceBand =
@@ -214,7 +217,7 @@ export type DistanceBand =
 export type BudgetBand = "0-100" | "100-300" | "300-600" | "600-1000" | "unlimited";
 export type DurationBand = "1-2h" | "half_day" | "full_day";
 export interface DayTripAnswers {
-  companions: CompanionType;
+  companions: CompanionType[];
   hasPet: boolean;
   childAgeBands: ChildAgeBand[];
   timing: TimingChoice;
@@ -231,7 +234,7 @@ export type DifficultyLevel = "easy" | "moderate" | "challenging";
 export type NatureDurationBand = DurationBand | "custom";
 
 export interface NatureTripAnswers {
-  companions: CompanionType;
+  companions: CompanionType[];
   hasPet: boolean;
   childAgeBands: ChildAgeBand[];
   timing: TimingChoice;
@@ -281,6 +284,10 @@ export interface CompanionsStep {
   childAgeTitle: string;
   childAgeOptions: StepOption[];
   childAgeTriggerValue: string;
+  /** בקשה מפורשת - בטיול יומי/בטבע/סופ"ש/חופשה בחו"ל אפשר לבחור כמה
+   *  אפשרויות (למשל "זוג" + "חברים") - לא רק אחת. ברירת מחדל: false
+   *  (בחירה יחידה, כמו בחיי לילה ומסעדות). */
+  multiSelect?: boolean;
 }
 
 export interface DateStep {
@@ -352,7 +359,7 @@ export interface NightlifeAnswers {
   venueTypes: string[];
   freeText: string;
 }
-export type VacationCompanionType = "couple" | "family" | "friends" | "solo" | "with_pet";
+export type VacationCompanionType = "couple" | "family" | "family_no_kids" | "friends" | "solo" | "with_pet";
 export type VacationPace = "relaxed" | "balanced" | "packed";
 export type LodgingType = "hotel" | "resort" | "apartment" | "cabin" | "hostel" | "camping" | "glamping" | "villa";
 export type TravelStyle = "single_destination" | "multi_destination";
@@ -371,7 +378,7 @@ export interface HotelInfo {
 export type FlightPreference = "direct" | "one_stop" | "two_plus_stops";
 
 export interface AbroadVacationAnswers {
-  companions: VacationCompanionType;
+  companions: VacationCompanionType[];
   childAgeBands: ChildAgeBand[];
   startDate: string;
   endDate: string;
@@ -391,7 +398,7 @@ export interface AbroadVacationAnswers {
   freeText: string;
 }
 export interface WeekendAnswers {
-  companions: VacationCompanionType;
+  companions: VacationCompanionType[];
   childAgeBands: ChildAgeBand[];
 
   startDate: string;

@@ -18,7 +18,7 @@ import Image from "next/image";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: NatureTripAnswers = {
-  companions: "solo",
+  companions: ["solo"],
   hasPet: false,
   childAgeBands: [],
   timing: "today",
@@ -109,7 +109,7 @@ export default function NatureTripQuestionnairePage() {
   const [tempMulti, setTempMulti] = useState<string[]>([]);
   const [tempSlider, setTempSlider] = useState<string | null>(null);
   const [tempText, setTempText] = useState("");
-  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+  const [tempCompanions, setTempCompanions] = useState<string[]>([]);
   const [tempHasPet, setTempHasPet] = useState(false);
 
   const [editingFieldKey, setEditingFieldKey] = useState<EditableFieldKey | null>(null);
@@ -118,7 +118,7 @@ export default function NatureTripQuestionnairePage() {
   const [editTempSlider, setEditTempSlider] = useState<string | null>(null);
   const [editTempMulti, setEditTempMulti] = useState<string[]>([]);
   const [editTempText, setEditTempText] = useState("");
-  const [editTempCompanion, setEditTempCompanion] = useState<string | null>(null);
+  const [editTempCompanions, setEditTempCompanions] = useState<string[]>([]);
   const [editTempHasPet, setEditTempHasPet] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const idRef = useRef(0);
@@ -215,23 +215,19 @@ export default function NatureTripQuestionnairePage() {
 
   // ---------- מטפלים בתשובה, לפי סוג השאלה הנוכחית ----------
 
-  function handleCompanionsSelect(value: string) {
-    setTempCompanion(value);
-  }
-
   function togglePet() {
     setTempHasPet((v) => !v);
   }
 
   function confirmCompanions() {
-    if (step.type !== "companions" || !tempCompanion) return;
-    updateField("companions", tempCompanion as NatureTripAnswers["companions"]);
+    if (step.type !== "companions" || tempCompanions.length === 0) return;
+    updateField("companions", tempCompanions as NatureTripAnswers["companions"]);
     updateField("hasPet", tempHasPet);
 
-    const label = labelFor(step.options, tempCompanion);
+    const label = labelsFor(step.options, tempCompanions).join("، ");
     addUser(tempHasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
 
-    if (tempCompanion === step.childAgeTriggerValue) {
+    if (tempCompanions.includes(step.childAgeTriggerValue)) {
       setAwaitingChildAges(true);
       setTyping(true);
       setTimeout(() => {
@@ -331,7 +327,7 @@ export default function NatureTripQuestionnairePage() {
     setEditingMessageId(message.id);
 
     if (key === "companions") {
-      setEditTempCompanion(form.companions);
+      setEditTempCompanions(form.companions);
       setEditTempHasPet(form.hasPet);
     } else if (key === "childAgeBands" || key === "natureTypes") {
       setEditTempMulti(key === "childAgeBands" ? form.childAgeBands : form.natureTypes);
@@ -357,7 +353,7 @@ export default function NatureTripQuestionnairePage() {
     setEditTempSlider(null);
     setEditTempMulti([]);
     setEditTempText("");
-    setEditTempCompanion(null);
+    setEditTempCompanions([]);
     setEditTempHasPet(false);
   }
 
@@ -370,13 +366,13 @@ export default function NatureTripQuestionnairePage() {
     let newLabel = "";
 
     if (key === "companions" && editStep.type === "companions") {
-      if (!editTempCompanion) return;
-      updateField("companions", editTempCompanion as NatureTripAnswers["companions"]);
+      if (editTempCompanions.length === 0) return;
+      updateField("companions", editTempCompanions as NatureTripAnswers["companions"]);
       updateField("hasPet", editTempHasPet);
-      const label = labelFor(editStep.options, editTempCompanion);
+      const label = labelsFor(editStep.options, editTempCompanions).join("، ");
       newLabel = editTempHasPet ? `${label} · 🐶 עם בעל חיים` : label;
 
-      if (editTempCompanion !== editStep.childAgeTriggerValue) {
+      if (!editTempCompanions.includes(editStep.childAgeTriggerValue)) {
         updateField("childAgeBands", [] as NatureTripAnswers["childAgeBands"]);
         setMessages((msgs) => msgs.filter((m) => m.fieldKey !== "childAgeBands"));
       }
@@ -469,11 +465,11 @@ export default function NatureTripQuestionnairePage() {
     while (extracted && idx < NATURE_TRIP_QUESTIONS.length) {
       const s = NATURE_TRIP_QUESTIONS[idx];
 
-      if (s.type === "companions" && extracted.companions) {
+      if (s.type === "companions" && extracted.companions.length > 0) {
         workingForm = { ...workingForm, companions: extracted.companions, hasPet: extracted.hasPet };
-        const label = labelFor(s.options, extracted.companions);
+        const label = labelsFor(s.options, extracted.companions).join("، ");
         addUser(extracted.hasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
-        if (extracted.companions === s.childAgeTriggerValue) {
+        if (extracted.companions.includes(s.childAgeTriggerValue as NatureTripAnswers["companions"][number])) {
           if (extracted.childAgeBands.length > 0) {
             workingForm = { ...workingForm, childAgeBands: extracted.childAgeBands as NatureTripAnswers["childAgeBands"] };
             addUser(labelsFor(s.childAgeOptions, extracted.childAgeBands).join("، "), "childAgeBands");
@@ -599,43 +595,22 @@ export default function NatureTripQuestionnairePage() {
       setPendingSessionId(sessionId);
       fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
 
-      // בקשה מפורשת: לא מנווטים בכוח אחרי X שניות גם אם הטיול עוד לא מוכן -
-      // זה בדיוק מה שגרם למסך הביניים הממותג (BuildingTripIntro, "רשת
-      // ביטחון" בעמוד התוצאה) לקפוץ למשתמש. נשארים כאן בצ'אט (עם הגרפיקה
-      // בבועה, ר' waitingForBuild) ומתשאלים בלי הפסקה עד שהמסלול באמת
-      // מוכן - ורק אז מנווטים. POLL_SLOW_AFTER_MS מאט את קצב התשאול אחרי
-      // המתנה ארוכה במיוחד, כדי לא להציף שרת על session שתקוע.
+      const MAX_WAIT_MS = 20000;
       const POLL_INTERVAL_MS = 1200;
-      const POLL_SLOW_AFTER_MS = 30000;
-      const POLL_INTERVAL_SLOW_MS = 4000;
-      // רשת ביטחון בלבד למקרה קיצון (למשל השרת לא זמין בכלל) - לא תקרה
-      // רגילה לניווט. אם מגיעים לזה, לא מנווטים לשום מקום - נשארים בצ'אט
-      // ומראים שגיאה עם אפשרות לנסות שוב.
-      const HARD_GIVE_UP_MS = 90000;
       const startedAt = Date.now();
-      let gaveUp = false;
-      while (Date.now() - startedAt < HARD_GIVE_UP_MS) {
-        const elapsed = Date.now() - startedAt;
-        await new Promise((resolve) => setTimeout(resolve, elapsed > POLL_SLOW_AFTER_MS ? POLL_INTERVAL_SLOW_MS : POLL_INTERVAL_MS));
+      while (Date.now() - startedAt < MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
         try {
           const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
           const pollData = await pollRes.json();
           const s = pollData?.session;
           const hasStops = (s?.final_itinerary?.stops?.length ?? 0) > 0;
-          if (s?.status === "completed" || hasStops) {
-            router.push(`/trip-builder/nature-trip/result?sessionId=${sessionId}`);
-            return;
-          }
+          if (s?.status === "completed" || hasStops) break;
         } catch {
           // שגיאת רשת חד-פעמית בתשאול - ממשיכים לנסות
         }
       }
-      gaveUp = true;
-      if (gaveUp) {
-        buildTriggeredRef.current = false;
-        setWaitingForBuild(false);
-        setLocationError("זה לוקח יותר זמן מהרגיל. אפשר לנסות שוב.");
-      }
+      router.push(`/trip-builder/nature-trip/result?sessionId=${sessionId}`);
     } catch (error) {
       buildTriggeredRef.current = false;
       setWaitingForBuild(false);
@@ -651,7 +626,7 @@ export default function NatureTripQuestionnairePage() {
       return { label: "המשך", onClick: confirmChildAges };
     }
     if (step.type === "companions" && !awaitingChildAges) {
-      return { label: "המשך", onClick: confirmCompanions, disabled: !tempCompanion };
+      return { label: "המשך", onClick: confirmCompanions, disabled: tempCompanions.length === 0 };
     }
     if (step.type === "date" && awaitingOtherDate) {
       return { label: "המשך", onClick: confirmOtherDate, disabled: !tempText };
@@ -694,7 +669,7 @@ export default function NatureTripQuestionnairePage() {
                     if (!editStep || editStep.type !== "companions") return null;
                     return (
                       <div className="flex flex-col gap-3">
-                        <AnswerOptions options={editStep.options} selected={editTempCompanion} onSelect={setEditTempCompanion} />
+                        <ChipGroup options={editStep.options} selected={editTempCompanions} onChange={setEditTempCompanions} />
                         <button
                           type="button"
                           onClick={() => setEditTempHasPet((v) => !v)}
@@ -840,7 +815,7 @@ export default function NatureTripQuestionnairePage() {
           <div className="mt-1">
             {step.type === "companions" && !awaitingChildAges && (
               <div className="flex flex-col gap-3">
-                <AnswerOptions options={step.options} selected={tempCompanion} onSelect={handleCompanionsSelect} />
+                <ChipGroup options={step.options} selected={tempCompanions} onChange={setTempCompanions} />
                 <button
                   type="button"
                   onClick={togglePet}
@@ -939,17 +914,7 @@ export default function NatureTripQuestionnairePage() {
             כאן בצ'אט בזמן שהטיול נבנה ברקע, בלי לקפוץ למסך משחק נפרד. */}
         {waitingForBuild && (
           <div className="flex flex-col gap-2">
-            <ChatBubble>
-              <div className="flex items-center gap-3">
-                <div
-                  className="relative h-9 w-9 shrink-0"
-                  style={{ animation: "natureTripBuildingPulse 2.6s ease-in-out infinite" }}
-                >
-                  <Image src="/images/game/runtrippy-logo.png" alt="" fill className="object-contain" />
-                </div>
-                <span>רגע, בונים לכם את יום הטבע...</span>
-              </div>
-            </ChatBubble>
+            <ChatBubble>רגע, בונים לכם את יום הטבע...</ChatBubble>
             {pendingSessionId && (
               <RuntrippyPromptBubble
                 onClick={() => {
@@ -957,17 +922,6 @@ export default function NatureTripQuestionnairePage() {
                 }}
               />
             )}
-            <style jsx>{`
-              @keyframes natureTripBuildingPulse {
-                0%,
-                100% {
-                  transform: scale(0.88);
-                }
-                50% {
-                  transform: scale(1.08);
-                }
-              }
-            `}</style>
           </div>
         )}
 

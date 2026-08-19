@@ -30,7 +30,7 @@ export const RESTAURANTS_CAFES_QUESTIONS: TripBuilderStep[] = [
   {
     type: "slider",
     key: "distanceBand",
-    title: "מרחק מקסימלי מהבית",
+    title: "מרחק מקסימלי לנסיעה",
     steps: RESTAURANT_DISTANCE_STEPS,
   },
   {

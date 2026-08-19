@@ -25,7 +25,7 @@ export const ROMANTIC_DATE_QUESTIONS: TripBuilderStep[] = [
   {
     type: "slider",
     key: "distanceBand",
-    title: "מרחק מקסימלי מהבית",
+    title: "מרחק מקסימלי לנסיעה",
     steps: ROMANTIC_DISTANCE_STEPS,
   },
   {

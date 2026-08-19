@@ -3,6 +3,7 @@ import type { StepOption } from "@/services/tripBuilder/types";
 export const VACATION_COMPANION_OPTIONS: StepOption[] = [
   { value: "couple", label: "זוג", emoji: "💑" },
   { value: "family", label: "משפחה עם ילדים", emoji: "👨‍👩‍👧‍👦" },
+  { value: "family_no_kids", label: "משפחה", emoji: "👪" },
   { value: "friends", label: "חברים", emoji: "🙋" },
   { value: "solo", label: "לבד", emoji: "🧍" },
 ];

@@ -42,7 +42,7 @@ const STAGE_TITLES: Record<Stage, string> = {
   companions: "עם מי אתם נוסעים?",
   childAges: "גילאי הילדים",
   dates: "מתי נוסעים? תאריך התחלה",
-  distanceBand: "מרחק מקסימלי מהבית",
+  distanceBand: "מרחק מקסימלי לנסיעה",
   bookedQuestion: "האם כבר סגרתם מקום לינה?",
   lodgingInfo: "איפה מקום הלינה?",
   lodgingType: "איזה סוג לינה אתם מחפשים?",
@@ -53,7 +53,7 @@ const STAGE_TITLES: Record<Stage, string> = {
 };
 
 const DEFAULT_ANSWERS: WeekendAnswers = {
-  companions: "couple",
+  companions: ["couple"],
   childAgeBands: [],
   startDate: "",
   endDate: "",
@@ -101,7 +101,7 @@ export default function WeekendQuestionnairePage() {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   // temp state per stage
-  const [tempCompanion, setTempCompanion] = useState<string | null>(null);
+  const [tempCompanions, setTempCompanions] = useState<string[]>([]);
   const [tempChildAges, setTempChildAges] = useState<string[]>([]);
   const [tempStartDate, setTempStartDate] = useState("");
   const [tempEndDate, setTempEndDate] = useState("");
@@ -179,10 +179,10 @@ export default function WeekendQuestionnairePage() {
   }
 
   function confirmCompanions() {
-    if (!tempCompanion) return;
-    setForm((f) => ({ ...f, companions: tempCompanion as WeekendAnswers["companions"] }));
-    addUser(labelFor(VACATION_COMPANION_OPTIONS, tempCompanion), "companions");
-    if (tempCompanion === "family") {
+    if (tempCompanions.length === 0) return;
+    setForm((f) => ({ ...f, companions: tempCompanions as WeekendAnswers["companions"] }));
+    addUser(labelsFor(VACATION_COMPANION_OPTIONS, tempCompanions).join("، "), "companions");
+    if (tempCompanions.includes("family")) {
       goTo("childAges");
     } else {
       goTo("dates");
@@ -267,7 +267,7 @@ export default function WeekendQuestionnairePage() {
     setEditingMessageId(message.id);
     setEditingStage(message.editStage);
 
-    if (message.editStage === "companions") setEditTempValue(form.companions);
+    if (message.editStage === "companions") setEditTempMultiValue(form.companions);
     else if (message.editStage === "childAges") setEditTempMultiValue(form.childAgeBands);
     else if (message.editStage === "dates") {
       setEditTempStartDate(form.startDate);
@@ -304,9 +304,9 @@ export default function WeekendQuestionnairePage() {
     if (!editingStage || editingMessageId == null) return;
 
     if (editingStage === "companions") {
-      if (!editTempValue) return;
-      setForm((f) => ({ ...f, companions: editTempValue as WeekendAnswers["companions"] }));
-      updateMessageLabel(labelFor(VACATION_COMPANION_OPTIONS, editTempValue));
+      if (editTempMultiValue.length === 0) return;
+      setForm((f) => ({ ...f, companions: editTempMultiValue as WeekendAnswers["companions"] }));
+      updateMessageLabel(labelsFor(VACATION_COMPANION_OPTIONS, editTempMultiValue).join("، "));
     } else if (editingStage === "childAges") {
       setForm((f) => ({ ...f, childAgeBands: editTempMultiValue as WeekendAnswers["childAgeBands"] }));
       updateMessageLabel(editTempMultiValue.length > 0 ? labelsFor(VACATION_CHILD_AGE_OPTIONS, editTempMultiValue).join("، ") : "לא רלוונטי");
@@ -405,7 +405,7 @@ export default function WeekendQuestionnairePage() {
           ) : editingMessageId === m.id ? (
             <div key={m.id} className="mt-1">
               {editingStage === "companions" && (
-                <AnswerOptions options={VACATION_COMPANION_OPTIONS} selected={editTempValue} onSelect={setEditTempValue} />
+                <ChipGroup options={VACATION_COMPANION_OPTIONS} selected={editTempMultiValue} onChange={setEditTempMultiValue} />
               )}
               {editingStage === "childAges" && (
                 <ChipGroup options={VACATION_CHILD_AGE_OPTIONS} selected={editTempMultiValue} onChange={setEditTempMultiValue} />
@@ -501,7 +501,7 @@ export default function WeekendQuestionnairePage() {
         {!typing && !submitting && (
           <div className="mt-1">
             {stage === "companions" && (
-              <AnswerOptions options={VACATION_COMPANION_OPTIONS} selected={tempCompanion} onSelect={setTempCompanion} />
+              <ChipGroup options={VACATION_COMPANION_OPTIONS} selected={tempCompanions} onChange={setTempCompanions} />
             )}
 
             {stage === "childAges" && (
@@ -612,7 +612,7 @@ export default function WeekendQuestionnairePage() {
                 else if (stage === "freeText") confirmFreeText();
               }}
               disabled={
-                (stage === "companions" && !tempCompanion) ||
+                (stage === "companions" && tempCompanions.length === 0) ||
                 (stage === "dates" && (!tempStartDate || !tempEndDate)) ||
                 (stage === "bookedQuestion" && !tempBooked) ||
                 (stage === "lodgingInfo" && !tempLodgingName && !tempLodgingAddress) ||

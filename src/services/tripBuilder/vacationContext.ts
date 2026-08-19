@@ -1,5 +1,6 @@
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import type { AbroadVacationAnswers, VacationContext } from "./types";
+import { VACATION_COMPANION_OPTIONS } from "@/locales/he/abroadVacation";
 
 interface BuildVacationContextParams {
   answers: AbroadVacationAnswers;
@@ -33,6 +34,7 @@ export function buildVacationContext(params: BuildVacationContextParams): Vacati
       numDays,
       travelers: companionsToTravelerCount(answers.companions),
       hasChildren: (answers.childAgeBands ?? []).length > 0,
+      companionsLabel: companionsToLabel(answers.companions),
       budgetBand: answers.budgetPerPerson,
       pace: answers.pace,
       vacationTypes: answers.vacationTypes ?? [],
@@ -53,7 +55,11 @@ export function buildVacationContext(params: BuildVacationContextParams): Vacati
 }
 
 function companionsToTravelerCount(companions: AbroadVacationAnswers["companions"]): number {
-  switch (companions) {
+  // בקשה מפורשת - בחירה מרובה: כשנבחרה יותר מאפשרות אחת (למשל "זוג" +
+  // "חברים"), מדובר בפועל בקבוצה גדולה יותר מכל אפשרות בודדת - "כמה"
+  // מספיק להקשר של ה-AI, לא צריך להיות מדויק.
+  if (companions.length > 1) return 3;
+  switch (companions[0]) {
     case "solo":
       return 1;
     case "couple":
@@ -61,4 +67,13 @@ function companionsToTravelerCount(companions: AbroadVacationAnswers["companions
     default:
       return 3; // family/friends - מספר לא ידוע מדויק, "כמה" מספיק להקשר
   }
+}
+
+/** תווית קריאה-אנושית של כל הבחירות שנבחרו (למשל "זוג, חברים") - כדי
+ *  שה-AI שבונה את היום יראה את ההרכב המלא, לא רק ספירה גסה. */
+function companionsToLabel(companions: AbroadVacationAnswers["companions"]): string {
+  if (companions.length === 0) return "לא צוין";
+  return companions
+    .map((c) => VACATION_COMPANION_OPTIONS.find((o) => o.value === c)?.label ?? c)
+    .join(", ");
 }

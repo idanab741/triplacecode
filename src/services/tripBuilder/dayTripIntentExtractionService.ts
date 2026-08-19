@@ -8,7 +8,7 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
  * ידלג בהמשך על מה שכבר נענה בתוכו.
  */
 export interface ExtractedDayTripIntent {
-  companions: "couple" | "family" | "friends" | "solo" | null;
+  companions: ("couple" | "family" | "family_no_kids" | "friends" | "solo")[];
   hasPet: boolean;
   childAgeBands: string[];
   distanceBand: string | null;
@@ -18,7 +18,7 @@ export interface ExtractedDayTripIntent {
 }
 
 const EMPTY_RESULT: ExtractedDayTripIntent = {
-  companions: null,
+  companions: [],
   hasPet: false,
   childAgeBands: [],
   distanceBand: null,
@@ -27,7 +27,7 @@ const EMPTY_RESULT: ExtractedDayTripIntent = {
   durationBand: null,
 };
 
-const COMPANION_VALUES = new Set(["couple", "family", "friends", "solo"]);
+const COMPANION_VALUES = new Set(["couple", "family", "family_no_kids", "friends", "solo"]);
 const CHILD_AGE_VALUES = new Set(["0-3", "3-7", "7-12", "12-18"]);
 const DISTANCE_VALUES = new Set(["10min", "20min", "30min", "40min", "50min", "1h", "1.5h", "2h", "2.5h", "3h"]);
 const BUDGET_VALUES = new Set(["0-100", "100-300", "300-600", "600-1000", "unlimited"]);
@@ -47,8 +47,9 @@ function buildPrompt(freeText: string): string {
 
 חלץ את השדות הבאים (כל אחד null/ריק אם לא ברור מהטקסט):
 
-- companions: "couple" (זוג) | "family" (משפחה עם ילדים) | "friends" (חברים) |
-  "solo" (לבד) - רק אם נאמר במפורש מי נוסע, אחרת null.
+- companions: מערך מתוך "couple" (זוג) | "family" (משפחה עם ילדים) | "family_no_kids" (משפחה
+  בלי ילדים) | "friends" (חברים) | "solo" (לבד) - רק מי שנאמר במפורש שנוסע איתם, אפשר כמה יחד
+  (למשל זוג שנוסע עם חברים = ["couple","friends"]), אחרת מערך ריק.
 - hasPet: true רק אם נאמר במפורש שיוצאים עם כלב/חיית מחמד, אחרת false.
 - childAgeBands: מערך מתוך "0-3","3-7","7-12","12-18" - רק אם companions=family וגילאי הילדים הוזכרו.
 - distanceBand: אחד מתוך "10min","20min","30min","40min","50min","1h","1.5h","2h","2.5h","3h"
@@ -61,7 +62,7 @@ function buildPrompt(freeText: string): string {
 
 השב אך ורק במבנה JSON הבא, בלי שום טקסט נוסף:
 {
-  "companions": "couple" | "family" | "friends" | "solo" | null,
+  "companions": ["couple" | "family" | "family_no_kids" | "friends" | "solo", ...],
   "hasPet": true | false,
   "childAgeBands": ["..."],
   "distanceBand": "string או null",
@@ -87,9 +88,12 @@ export async function extractDayTripIntent(freeText: string): Promise<ExtractedD
     const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
 
     const companions =
-      typeof parsed.companions === "string" && COMPANION_VALUES.has(parsed.companions)
-        ? (parsed.companions as ExtractedDayTripIntent["companions"])
-        : null;
+      Array.isArray(parsed.companions)
+        ? (parsed.companions as unknown[]).filter(
+            (v): v is ExtractedDayTripIntent["companions"][number] =>
+              typeof v === "string" && COMPANION_VALUES.has(v)
+          )
+        : [];
     const childAgeBands = Array.isArray(parsed.childAgeBands)
       ? (parsed.childAgeBands as unknown[]).filter((v): v is string => typeof v === "string" && CHILD_AGE_VALUES.has(v))
       : [];
