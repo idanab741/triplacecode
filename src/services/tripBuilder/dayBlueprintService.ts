@@ -1,5 +1,5 @@
 import { callClaude, logAiError } from "@/services/ai/claudeService";
-import { getVacationTypeLabel } from "@/locales/he/abroadVacation";
+import { getVacationTypeLabel, VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
 import type { DayBlueprint, VacationContext } from "./types";
 
 /** בקשה מפורשת - 5 שניות: אם קריאת ה-AI ליום מסוים לא חוזרת בזמן הזה,
@@ -42,10 +42,25 @@ export async function generateDayBlueprint(
     if (!jsonMatch) return fallback;
     const parsed = JSON.parse(jsonMatch[0]) as Partial<DayBlueprint>;
 
+    // תיקון באג אמיתי (בקשה מפורשת - "יותר מידי מסעדות ביחס לכמות
+    // אטרקציות! צריך 2 מסעדות ביום! האטרקציות צריכות להיות מסודרות לפי
+    // אופי הטיול (רגוע/מאוזן/מתוכנן), למה זה לא מאופיין פה??"):
+    // VACATION_PACE_DAILY_COUNTS כבר קיים בקוד בדיוק בשביל זה (מוגדר
+    // עם attractions/food לכל pace) - אבל מעולם לא יובא/נעשה בו שימוש
+    // בשום מקום בקוד (בדקתי - רק הערות שמפנות אליו). Claude קיבל את ה-
+    // pace רק כמשפט הקשר בפרומפט, בלי שום אכיפה אמיתית - attractionsCount
+    // ו-includeSecondFoodStop יצאו בפועל כמעט אקראיים, לא תלויים בקצב
+    // שנבחר. עכשיו האכיפה דטרמיניסטית ולא תלויה בניחוש של Claude:
+    // attractionsCount נגזר ישירות מה-pace, ו-includeSecondFoodStop=true
+    // אך ורק אם ה-pace מבקש 2+ ארוחות (food:2 ל-relaxed/balanced -
+    // בדיוק "2 מסעדות ביום" שביקשת; אין עדיין תמיכה בשלישית ל-packed,
+    // so זה עדיין מוגבל ל-1/2, לא 3).
+    const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
+
     return {
       title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : fallback.title,
-      attractionsCount: clampAttractionsCount(parsed.attractionsCount),
-      includeSecondFoodStop: typeof parsed.includeSecondFoodStop === "boolean" ? parsed.includeSecondFoodStop : fallback.includeSecondFoodStop,
+      attractionsCount: clampAttractionsCount(paceCounts.attractions),
+      includeSecondFoodStop: paceCounts.food >= 2,
       focusCategories:
         Array.isArray(parsed.focusCategories) && parsed.focusCategories.length > 0
           ? parsed.focusCategories.filter((c): c is string => typeof c === "string").slice(0, 2)
@@ -65,13 +80,15 @@ function clampAttractionsCount(value: unknown): number {
   return Math.min(4, Math.max(2, n));
 }
 
-/** תבנית קבועה - זהה למה שהיה קיים לפני ה-Blueprint (קפה-אטרקציה-אטרקציה-
- *  מסעדה-אטרקציה-אטרקציה-מסעדה) - fallback בטוח שכבר עבד היטב. */
+/** תבנית קבועה - fallback בטוח כשקריאת Claude נכשלת/עוברת timeout.
+ *  attractionsCount/includeSecondFoodStop נגזרים מ-pace (ר' ההערה
+ *  למעלה על VACATION_PACE_DAILY_COUNTS) - לא קבועים, גם כאן. */
 function fallbackBlueprint(context: VacationContext): DayBlueprint {
+  const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
   return {
     title: `יום בילויים ב${context.trip.destination}`,
-    attractionsCount: 4,
-    includeSecondFoodStop: true,
+    attractionsCount: clampAttractionsCount(paceCounts.attractions),
+    includeSecondFoodStop: paceCounts.food >= 2,
     focusCategories: context.trip.vacationTypes.slice(0, 2),
   };
 }

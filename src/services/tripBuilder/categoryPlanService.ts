@@ -501,8 +501,15 @@ export function buildMultiDayVacationPlan(answers: {
     }
 
     if (day === 1) {
-      // סופ"ש - דפוס ישן ללא שינוי (יש לו attraction אמיתי מהמאגר ביום 1).
-      // גם כאן בלי חיי לילה ביום ההגעה, מאותה סיבה בדיוק.
+      // סופ"ש - דפוס ישן, עם תיקון באג אמיתי (בקשה מפורשת - "צריך כאן
+      // בבוקר - חובה - ארוחת בוקר בלבד - בתי קפה ועגלות קפה! לא מסעדות
+      // שלא מוגדרות ככה!"): יום 2 (categoryPlanForDay) ויום אחרון (למטה)
+      // כבר מתחילים תמיד ב-coffee_carts_cafes/coffee_dessert - יום 1
+      // היה היחיד בלי סלוט בוקר מובטח כזה, והתחיל ישר ב-attraction
+      // (שיכול לצאת מסעדה מלאה אם ה"אטרקציה" בפועל היא כזו). עכשיו אותו
+      // דפוס בדיוק כמו שאר הימים. גם כאן בלי חיי לילה ביום ההגעה, מאותה
+      // סיבה בדיוק כמו קודם.
+      plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
       plan.push({ category: nextCategory(), role: "attraction", order: order++, day });
       plan.push({ category: "wineries_dining", role: "food", order: order++, day });
       continue;

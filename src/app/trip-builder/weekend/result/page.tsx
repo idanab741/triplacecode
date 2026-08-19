@@ -32,6 +32,16 @@ function WeekendResultContent() {
 
   const [justShared, setJustShared] = useState(false);
   const [lodgingImage, setLodgingImage] = useState<string | null | undefined>(undefined);
+  // תיקון באג אמיתי (בקשה מפורשת - "למה יש שעות למסלול? אני רוצה שזה
+  // יהיה כמו בחופשה בחו"ל - בלי שעות, רק עם אופציה להוסיף"): בחופשה
+  // בחו"ל כבר יש בדיוק את המנגנון הזה (dayStartMinutes/stopTimeOverrides/
+  // editingStopId) - כאן זה פשוט לא יובא בכלל, ותמיד הוצגה שעה מחושבת
+  // אוטומטית (9*60 + arrivalOffsetMinutes) לכל תחנה, קבועה, בלי אפשרות
+  // הסתרה. אותו מנגנון בדיוק, מועתק לכאן.
+  const [dayStartMinutes, setDayStartMinutes] = useState<Record<number, number>>({});
+  const [stopTimeOverrides, setStopTimeOverrides] = useState<Record<string, number>>({});
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+  const [editingTime, setEditingTime] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -87,6 +97,26 @@ function WeekendResultContent() {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const reordered = arrayMove(itinerary.stops, oldIndex, newIndex);
+
+    // תיקון באג אמיתי (בקשה מפורשת - "הגרירה בין הימים עושה בעיות -
+    // מעבירה ליום אחר אם שמים אטרקציה ראשונה"): כשתחנה "נוחתת" בין
+    // תחנות של יום אחר, dayIndex שלה לא התעדכן בכלל - היא נשארה שייכת
+    // ליום הישן שלה למרות שהמיקום הוויזואלי שלה השתנה. בגבול בין ימים
+    // ספציפית (השכן הקודם שייך ליום X-1, השכן הבא שייך ליום X) - גרירה
+    // "לתחילת יום X" (ממש לפני התחנה הראשונה שלו, בדיוק התרחיש שתואר)
+    // הייתה מעדיפה תמיד את יום השכן הקודם (X-1), דוחפת את התחנה אחורה
+    // בטעות. אותו תיקון בדיוק שכבר קיים בחופשה בחו"ל - לא היה מיושם כאן.
+    const movedStop = reordered[newIndex];
+    const prevStop = reordered[newIndex - 1];
+    const nextStop = reordered[newIndex + 1];
+    const inferredDay =
+      prevStop && nextStop && prevStop.dayIndex !== nextStop.dayIndex
+        ? nextStop.dayIndex
+        : (prevStop?.dayIndex ?? nextStop?.dayIndex ?? movedStop.dayIndex);
+    if (inferredDay != null && inferredDay !== movedStop.dayIndex) {
+      reordered[newIndex] = { ...movedStop, dayIndex: inferredDay };
+    }
+
     const recalculated = recalculateStopTimes(reordered, {
       lat: session.origin_latitude!,
       lng: session.origin_longitude!,
@@ -102,6 +132,40 @@ function WeekendResultContent() {
         body: JSON.stringify({ itinerary: updatedItinerary }),
       }).catch(() => {});
     }
+  }
+
+  function handleDayStartChange(day: number, newMinutes: number, dayStopsForDay: FinalItinerary["stops"]) {
+    setDayStartMinutes((s) => ({ ...s, [day]: newMinutes }));
+    setStopTimeOverrides((s) => {
+      const updated = { ...s };
+      for (const stop of dayStopsForDay) delete updated[stop.stopId];
+      return updated;
+    });
+  }
+
+  /** משנה את השעה של תחנה ספציפית ביום. אם זו התחנה הראשונה ביום - זה
+   *  שקול לשינוי שעת ההתחלה של כל היום. אחרת - מזיז את כל התחנות שאחריה
+   *  באותו יום באותו הפרש בדיוק, כדי שהסדר הכרונולוגי יישאר הגיוני. */
+  function handleStopTimeChange(day: number, dayStopsForDay: FinalItinerary["stops"], stopId: string, newMinutes: number) {
+    const idx = dayStopsForDay.findIndex((s) => s.stopId === stopId);
+    if (idx === -1) return;
+
+    if (idx === 0) {
+      handleDayStartChange(day, newMinutes - dayStopsForDay[0].arrivalOffsetMinutes, dayStopsForDay);
+      return;
+    }
+
+    setStopTimeOverrides((s) => {
+      const currentDisplay = s[stopId] ?? (dayStartMinutes[day] ?? 9 * 60) + dayStopsForDay[idx].arrivalOffsetMinutes;
+      const delta = newMinutes - currentDisplay;
+      const updated = { ...s };
+      for (let i = idx; i < dayStopsForDay.length; i++) {
+        const stop = dayStopsForDay[i];
+        const displayForStop = s[stop.stopId] ?? (dayStartMinutes[day] ?? 9 * 60) + stop.arrivalOffsetMinutes;
+        updated[stop.stopId] = displayForStop + delta;
+      }
+      return updated;
+    });
   }
 
   useEffect(() => {
@@ -340,24 +404,99 @@ function WeekendResultContent() {
             {visibleDayGroups.map(({ day, stops: dayStops }) => (
               <div key={day} className="flex flex-col gap-3">
                 {dayGroups.length > 1 && activeDayFilter === "all" && (
-                  <h2 className="mt-2 text-sm font-bold text-ink">יום {day}</h2>
+                  <div className="mt-2 flex items-center justify-between">
+                    <h2 className="text-sm font-bold text-ink">יום {day}</h2>
+                    {editingTime === day ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="time"
+                          value={minutesToTimeLabel(dayStartMinutes[day] ?? 9 * 60)}
+                          onChange={(e) => {
+                            const [h, m] = e.target.value.split(":").map(Number);
+                            if (!isNaN(h) && !isNaN(m)) handleDayStartChange(day, h * 60 + m, dayStops);
+                          }}
+                          autoFocus
+                          className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1.5 text-sm font-semibold text-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingTime(null)}
+                          className="rounded-pill bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                        >
+                          אישור
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditingTime(day)}
+                        className="rounded-pill border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm font-semibold text-accent"
+                      >
+                        {minutesToTimeLabel(dayStartMinutes[day] ?? 9 * 60)}
+                      </button>
+                    )}
+                  </div>
                 )}
                 {dayStops.map((stop) => {
+                  const defaultMinutes = (dayStartMinutes[day] ?? 9 * 60) + stop.arrivalOffsetMinutes;
+                  const displayMinutes = stopTimeOverrides[stop.stopId] ?? defaultMinutes;
+
                   if (stop.specialType) {
                     return (
                       <div key={stop.stopId} className="flex flex-col gap-1">
-                        <p className="pr-1 text-sm font-bold text-accent">
-                          🕐 {minutesToTimeLabel(9 * 60 + stop.arrivalOffsetMinutes)}
-                        </p>
+                        <span className="w-fit pr-1 text-sm font-bold text-accent">
+                          🕐 {minutesToTimeLabel(displayMinutes)}
+                        </span>
                         <LogisticsStopCard stop={stop} />
                       </div>
                     );
                   }
                   return (
                     <div key={stop.stopId} className="flex flex-col gap-1">
-                      <p className="pr-1 text-sm font-bold text-accent">
-                        🕐 {minutesToTimeLabel(9 * 60 + stop.arrivalOffsetMinutes)}
-                      </p>
+                      {editingStopId === stop.stopId ? (
+                        <div className="flex w-fit items-center gap-1.5">
+                          <input
+                            type="time"
+                            value={minutesToTimeLabel(displayMinutes)}
+                            onChange={(e) => {
+                              const [h, m] = e.target.value.split(":").map(Number);
+                              if (!isNaN(h) && !isNaN(m)) {
+                                handleStopTimeChange(day, dayStops, stop.stopId, h * 60 + m);
+                              }
+                            }}
+                            autoFocus
+                            className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1 text-sm font-bold text-accent"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setEditingStopId(null)}
+                            className="rounded-pill bg-accent px-2 py-1 text-[10px] font-semibold text-white"
+                          >
+                            אישור
+                          </button>
+                        </div>
+                      ) : stopTimeOverrides[stop.stopId] !== undefined ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingStopId(stop.stopId)}
+                          className="w-fit pr-1 text-sm font-bold text-accent"
+                        >
+                          🕐 {minutesToTimeLabel(displayMinutes)}
+                        </button>
+                      ) : (
+                        // תיקון באג אמיתי (בקשה מפורשת - "למה יש שעות
+                        // למסלול? אני רוצה שזה יהיה כמו בחופשה בחו"ל -
+                        // בלי שעות, רק עם אופציה להוסיף") - בלי override
+                        // ידני, לא מציגים שעה מחושבת אוטומטית בכלל - רק
+                        // כפתור עדין להוספה, למי שכן רוצה לקבוע שעה בעצמו.
+                        <button
+                          type="button"
+                          onClick={() => setEditingStopId(stop.stopId)}
+                          className="w-fit rounded-pill border border-dashed border-ink-secondary/30 px-2 py-0.5 text-xs text-ink-secondary"
+                        >
+                          + הוסף שעה
+                        </button>
+                      )}
                       <SortableStopCard
                         stop={stop}
                         sessionId={sessionId}
