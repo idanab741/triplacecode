@@ -320,17 +320,7 @@ function computeFallbackScore(
       ? (candidate.rating / 5) * 100
       : 50;
 
-  // תיקון באג אמיתי (בקשה מפורשת - "התחנה הכי טובה יצאה במקרה הכי
-  // רחוקה"): *20 הופך לאפס כל מועמד שמעל 5 ק"מ מהעוגן - בלי שום הבדל
-  // בין 6 ק"מ ל-150 ק"מ. זה בסדר כשה-radius עצמו תמיד קטן (חיפוש
-  // בין-תחנתי, INTER_STOP_RADIUS_KM=5), אבל rankCandidatesFast נקראת גם
-  // על עוגן היום הראשון בסופ"ש/חופשה, שיכול להגיע לרדיוס של עשרות עד
-  // מאות ק"מ (destinationMaxDistanceKm/WEEKEND_DAY_ANCHOR_RADIUS_KM) - שם
-  // *20 הפך את "מרחק" ללא-רלוונטי לגמרי בפועל, והבחירה נעשתה בלי שום
-  // העדפה לקרוב מתוך כל הרדיוס. *2 עדיין מעדיף חזק מקומות קרובים
-  // (מתאפס ב-50 ק"מ במקום ב-5), אבל לא הופך את כל מה שמעבר ל-5 ק"מ
-  // לזהה מבחינת האלגוריתם.
-  const distanceScore = Math.max(0, 100 - candidate.distanceKm * 2);
+const distanceScore = Math.max(0, 100 - candidate.distanceKm * 20);
   
   const likedSet = new Set([
     ...(dna?.interests ?? []),

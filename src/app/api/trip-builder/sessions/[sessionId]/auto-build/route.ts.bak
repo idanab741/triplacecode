@@ -311,14 +311,7 @@ export async function POST(
       vacationDestinationName = (await reverseGeocodeToLocality(searchOrigin)) ?? "האזור המבוקש";
     }
 
-    // תיקון באג אמיתי (בקשה מפורשת - "רשמתי מקום לינה, הוא לא הופיע
-    // במסלול"): כשכבר יש dayOriginOverride מוצק (לינה שנרשמה ונגאוקדה
-    // בהצלחה, למשל בסופ"ש) - אסור לדרוס אותו כאן רק כי המלל החופשי גם
-    // הזכיר שם אזור (למשל "כנרת"). לפני התיקון, התנאי הזה החריג רק
-    // "abroad_vacation" ולא "weekend" - כך שסופ"ש עם לינה קיימת נדרס
-    // בפועל בכל פעם שהמלל החופשי הזכיר שם מקום, וכל הבנייה עברה לעגן
-    // סביב geocoding גנרי של השם (רדיוס 3 ק"מ בלבד) במקום סביב הלינה.
-    if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation" && !dayOriginOverride) {
+    if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation") {
       const geocoded = await geocodePlaceName(tripIntent.requestedArea);
       if (geocoded) {
         searchOrigin = geocoded;
@@ -456,16 +449,6 @@ export async function POST(
       const excludePlaceIdsForVacation = [...excludePlaceIds];
       let mustSeeCursor = 0;
       const INTER_STOP_RADIUS_KM = 5;
-      // תיקון באג אמיתי (בקשה מפורשת - "מסלול קפץ בין תל אביב לצפון בין
-      // ימים שונים"): בלי זה, התחנה הראשונה של *כל* יום שעדיין אין לו
-      // dayCursor הייתה מחפשת סביב searchOrigin ברדיוס destinationMaxDistanceKm -
-      // שזה בפועל כל רדיוס הנסיעה המקסימלי מהשאלון (יכול להגיע ל-150+
-      // ק"מ). כלומר כל יום "מגריל" עוגן עצמאי בתוך רדיוס ענק, בלי שום
-      // קשר ליום הקודם או ללינה - זו הסיבה שימים שונים באותו סופ"ש יצאו
-      // רחוקים זה מזה עשרות ק"מ. בסופ"ש עם לינה קבועה לכל הטיול, התחנה
-      // הראשונה של כל יום שאין לו עדיין עוגן מחפשת סביב הלינה עצמה,
-      // ברדיוס סביר (לא כל רדיוס הנסיעה המקסימלי) - לא סביב searchOrigin.
-      const WEEKEND_DAY_ANCHOR_RADIUS_KM = 20;
       const dayCursors = new Map<number, LatLng>();
       if (centralNeighborhood) {
         dayCursors.set(1, centralNeighborhood.coords);
@@ -547,9 +530,7 @@ export async function POST(
             ? { origin: centralNeighborhood!.coords, maxDistanceKm: 1 }
             : cursor
               ? { origin: cursor, maxDistanceKm: INTER_STOP_RADIUS_KM }
-              : session.trip_type === "weekend" && dayOriginOverride
-                ? { origin: dayOriginOverride, maxDistanceKm: Math.min(destinationMaxDistanceKm, WEEKEND_DAY_ANCHOR_RADIUS_KM) }
-                : { origin: searchOrigin, maxDistanceKm: destinationMaxDistanceKm };
+              : { origin: searchOrigin, maxDistanceKm: destinationMaxDistanceKm };
 
           let pool = await fetchCandidatePool(supabase, {
             category: stop.category,
