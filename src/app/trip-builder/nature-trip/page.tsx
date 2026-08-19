@@ -469,7 +469,7 @@ export default function NatureTripQuestionnairePage() {
         workingForm = { ...workingForm, companions: extracted.companions, hasPet: extracted.hasPet };
         const label = labelsFor(s.options, extracted.companions).join("، ");
         addUser(extracted.hasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
-        if (extracted.companions.includes(s.childAgeTriggerValue as NatureTripAnswers["companions"][number])) {
+        if (extracted.companions.includes(s.childAgeTriggerValue as ExtractedNatureTripIntent["companions"][number])) {
           if (extracted.childAgeBands.length > 0) {
             workingForm = { ...workingForm, childAgeBands: extracted.childAgeBands as NatureTripAnswers["childAgeBands"] };
             addUser(labelsFor(s.childAgeOptions, extracted.childAgeBands).join("، "), "childAgeBands");
