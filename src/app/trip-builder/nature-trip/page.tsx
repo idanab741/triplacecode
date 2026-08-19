@@ -185,7 +185,7 @@ export default function NatureTripQuestionnairePage() {
     setTempMulti([]);
     setTempSlider(null);
     setTempText("");
-    setTempCompanion(null);
+    setTempCompanions([]);
     setTempHasPet(false);
     setAwaitingChildAges(false);
     setAwaitingOtherDate(false);
