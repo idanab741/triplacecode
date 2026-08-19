@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
-import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -186,11 +186,18 @@ function NatureTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // בקשה מפורשת ("שוב החזיר את המשחק בכוח!") - אסור שמסך המשחק
-      // האינטראקטיבי (LoadingGame) יופיע אוטומטית - הוא מוצג רק אם המשתמש
-      // עצמו לחץ על בועת ה-runtrippy בצ'אט. כאן - רשת ביטחון בלבד, עיצוב
-      // על-מותגי (לוגו runtrippy דופק) בלי שום אינטראקציה נכפית.
-      return <BuildingTripIntro />;
+      // בקשה מפורשת: אחרי שהניווט האוטומטי בוטל (ר' nature-trip/page.tsx),
+      // המצב הזה מגיע אך ורק מלחיצה יזומה של המשתמש על בועת ה-runtrippy
+      // בצ'אט ("בואו נצא לדרך!") - כלומר המשתמש בחר במפורש "להיכנס למשחק".
+      // לכן כאן, ורק כאן, מציגים את מסך המשחק האינטראקטיבי (LoadingGame)
+      // בפועל - לא את המסך הסטטי (BuildingTripIntro), שנשאר רק כרשת ביטחון
+      // ל-edge case שבו אין session בכלל (ר' מעלה, "if (!session)").
+      return (
+        <LoadingGame
+          statusText="רגע, בונים לכם את יום הטבע..."
+          steps={["🌳 סורקים שבילים ואתרי טבע באזור", "📍 בודקים מרחק וזמן הגעה", "⭐ מסננים לפי דירוג ותנאי מזג אוויר", "🥾 בונים את המסלול המושלם"]}
+        />
+      );
     }
     return (
       <Screen>

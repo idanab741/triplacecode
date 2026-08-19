@@ -16,7 +16,7 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getTripDayOfWeek, minutesToTimeLabel, parseOpeningHoursForDay } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
-import { BuildingTripIntro } from "@/screens/trip-builder/BuildingTripIntro";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import type { DayTripAnswers, FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -203,14 +203,20 @@ function DayTripResultContent() {
 
   if (!itinerary || itinerary.stops.length === 0) {
     if (session.status !== "completed") {
-      // בקשה מפורשת ("שוב החזיר את המשחק בכוח!") - טיול יומי אסור שיציג את
-      // מסך המשחק האינטראקטיבי (LoadingGame) באופן אוטומטי - המשחק מוצג
-      // רק אם המשתמש עצמו לחץ על בועת ה-runtrippy בצ'אט (וגם אז זה קורה
-      // בעמוד ה-build, לא כאן). כאן - רשת ביטחון בלבד, עיצוב על-מותגי
-      // (לוגו runtrippy דופק) בלי שום אינטראקציה נכפית. התשאול (polling,
-      // כל 2.5 שניות, כבר קיים למעלה) ימשיך וידליק את התוצאה האמיתית ברגע
-      // שהיא מוכנה, בלי שהמשתמש יצטרך לעשות כלום.
-      return <BuildingTripIntro />;
+      // בקשה מפורשת: אחרי שהניווט האוטומטי בוטל (ר' day-trip/page.tsx),
+      // המצב הזה מגיע אך ורק מלחיצה יזומה של המשתמש על בועת ה-runtrippy
+      // בצ'אט ("בואו נצא לדרך!") - כלומר המשתמש בחר במפורש "להיכנס למשחק".
+      // לכן כאן, ורק כאן, מציגים את מסך המשחק האינטראקטיבי (LoadingGame)
+      // בפועל - לא את המסך הסטטי (BuildingTripIntro), שנשאר רק כרשת ביטחון
+      // ל-edge case שבו אין session בכלל (ר' מעלה, "if (!session)"). התשאול
+      // (polling, כל 2.5 שניות, כבר קיים למעלה) ימשיך וידליק את התוצאה
+      // האמיתית ברגע שהיא מוכנה, בלי שהמשתמש יצטרך לעשות כלום.
+      return (
+        <LoadingGame
+          statusText="רגע, בונים לכם את הטיול..."
+          steps={["🔍 סורקים אטרקציות ומקומות באזור שלכם", "📍 בודקים מרחק וזמן הגעה", "⭐ מסננים לפי דירוג והתאמה", "🗺️ בונים את המסלול המושלם"]}
+        />
+      );
     }
     return (
       <Screen>
