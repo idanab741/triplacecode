@@ -813,8 +813,24 @@ export async function POST(
 
       if (numDays > 2) {
         const contextWeatherSummary = await getWeatherSummary(origin.lat, origin.lng);
+        // תיקון באג אמיתי (בקשה מפורשת - "למה אין התייחסות למלל החופשי??
+        // ביקשתי אטרקציות, חיי לילה וחופים!"): buildVacationContext קורא
+        // רק answers.vacationTypes - שדה ששייך לחופשה בחו"ל בלבד. בסופ"ש
+        // השדה נקרא weekendStyles (אותו רעיון, שם אחר - ר' הערה דומה
+        // ב-vacationDestinationName קודם בקובץ הזה) - ה-cast הגולמי ל-
+        // AbroadVacationAnswers לא "ממפה" בין השמות, כך ש-vacationTypes
+        // יצא [] תמיד עבור סופ"ש, גם כשהמשתמש בחר "חיי לילה"/"חופים"
+        // בפירוש. Context Engine (buildVacationContext) מזין את זה ישירות
+        // ל-focusCategories/effectiveVacationTypes של כל קריאת Blueprint
+        // ליום - כך שהסגנונות שהמשתמש בחר מעולם לא הגיעו לתכנון הימים
+        // בפועל, רק freeText (שכן הגיע, אבל בלי vacationTypes לחזק אותו).
+        const weekendAnswersForContext = answers as unknown as { vacationTypes?: string[]; weekendStyles?: string[] };
+        const contextAnswers = {
+          ...(answers as unknown as AbroadVacationAnswers),
+          vacationTypes: weekendAnswersForContext.vacationTypes ?? weekendAnswersForContext.weekendStyles ?? [],
+        };
         const vacationContext = buildVacationContext({
-          answers: answers as unknown as AbroadVacationAnswers,
+          answers: contextAnswers,
           dna,
           destinationName,
           numDays,

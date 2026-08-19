@@ -14,6 +14,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
 import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { LogisticsStopCard } from "@/screens/trip-builder/LogisticsStopCard";
 import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
 import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
 import type { FinalItinerary, TripBuilderSession, WeekendAnswers } from "@/services/tripBuilder/types";
@@ -30,6 +31,7 @@ function WeekendResultContent() {
   const [activeDayFilter, setActiveDayFilter] = useState<number | "all">("all");
 
   const [justShared, setJustShared] = useState(false);
+  const [lodgingImage, setLodgingImage] = useState<string | null | undefined>(undefined);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -139,6 +141,24 @@ function WeekendResultContent() {
   const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
   const answers = session?.answers as unknown as WeekendAnswers | undefined;
 
+  // תיקון באג אמיתי (בקשה מפורשת - "למה הלינה שהזנתי לא מופיעה במסלול??
+  // כמו שיש בחופשה בחו"ל?"): בחופשה בחו"ל יש מנגנון שלם שמזריק כרטיס
+  // תצוגה סינתטי של המלון (injectLogisticsStops/makeSyntheticStop ב-
+  // abroad-vacation/result/page.tsx) - בעמוד הזה הוא פשוט לא היה קיים
+  // בכלל, אז גם כשהלינה כבר עגנה את המסלול נכון (התיקונים הקודמים) היא
+  // מעולם לא הופיעה כתחנה בתצוגה עצמה. אותו עיקרון בדיוק, מותאם לסופ"ש
+  // (בלי טיסה/שדה תעופה - רק כרטיס לינה אחד ביום 1).
+  useEffect(() => {
+    const lodgingName = answers?.lodgingName;
+    const lodgingAddress = answers?.lodgingAddress;
+    if (!lodgingName || lodgingImage !== undefined) return;
+    fetch(`/api/places/photo-search?q=${encodeURIComponent(`${lodgingName} ${lodgingAddress ?? ""}`.trim())}`)
+      .then((res) => res.json())
+      .then((data) => setLodgingImage(data.imageUrl ?? null))
+      .catch(() => setLodgingImage(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers?.lodgingName, answers?.lodgingAddress]);
+
   if (error) {
     return (
       <Screen>
@@ -208,7 +228,12 @@ function WeekendResultContent() {
     );
   }
 
-  const dayGroups = groupStopsByDay(itinerary.stops);
+  const rawDayGroups = groupStopsByDay(itinerary.stops);
+  const dayGroups = injectLodgingStop(
+    rawDayGroups,
+    { lodgingName: answers?.lodgingName ?? null, lodgingAddress: answers?.lodgingAddress ?? null, hasBookedLodging: answers?.hasBookedLodging ?? false },
+    lodgingImage ?? null
+  );
   const visibleDayGroups = dayGroups.filter(({ day }) => activeDayFilter === "all" || day === activeDayFilter);
   const visibleStopsForMap = itinerary.stops.filter((s) => {
     if (activeDayFilter === "all") return true;
@@ -317,21 +342,33 @@ function WeekendResultContent() {
                 {dayGroups.length > 1 && activeDayFilter === "all" && (
                   <h2 className="mt-2 text-sm font-bold text-ink">יום {day}</h2>
                 )}
-                {dayStops.map((stop) => (
-                  <div key={stop.stopId} className="flex flex-col gap-1">
-                    <p className="pr-1 text-sm font-bold text-accent">
-                      🕐 {minutesToTimeLabel(9 * 60 + stop.arrivalOffsetMinutes)}
-                    </p>
-                    <SortableStopCard
-                      stop={stop}
-                      sessionId={sessionId}
-                      onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
-                      draggable={itinerary.stops.length >= 2}
-                      onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
-                      placeHref={`/place/${stop.placeId}?from=ai`}
-                    />
-                  </div>
-                ))}
+                {dayStops.map((stop) => {
+                  if (stop.specialType) {
+                    return (
+                      <div key={stop.stopId} className="flex flex-col gap-1">
+                        <p className="pr-1 text-sm font-bold text-accent">
+                          🕐 {minutesToTimeLabel(9 * 60 + stop.arrivalOffsetMinutes)}
+                        </p>
+                        <LogisticsStopCard stop={stop} />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={stop.stopId} className="flex flex-col gap-1">
+                      <p className="pr-1 text-sm font-bold text-accent">
+                        🕐 {minutesToTimeLabel(9 * 60 + stop.arrivalOffsetMinutes)}
+                      </p>
+                      <SortableStopCard
+                        stop={stop}
+                        sessionId={sessionId}
+                        onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
+                        draggable={itinerary.stops.length >= 2}
+                        onDelete={itinerary.stops.length >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                        placeHref={`/place/${stop.placeId}?from=ai`}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </SortableContext>
@@ -372,6 +409,91 @@ function groupStopsByDay(stops: FinalItinerary["stops"]): { day: number; stops: 
   return Array.from(groups.entries())
     .sort(([a], [b]) => a - b)
     .map(([day, dayStops]) => ({ day, stops: dayStops }));
+}
+
+/** בונה קישור ל-Google Maps עם מסלול נסיעה מוכן (origin -> destination). */
+function buildDirectionsUrl(origin: string, destination: string): string {
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+}
+
+/** יוצר תחנת-תצוגה מלאכותית (לא מ-DB) - צ'ק-אין בלינה - בהתבסס על מה
+ *  שהמשתמש הזין בשאלון. אותו עיקרון בדיוק כמו makeSyntheticStop בחופשה
+ *  בחו"ל, בלי טיסה/שדה תעופה (סופ"ש הוא תמיד בארץ). */
+function makeLodgingStop(
+  id: string,
+  name: string,
+  description: string,
+  offsetMinutes: number,
+  imageUrl?: string | null,
+  directionsUrl?: string | null
+): FinalItinerary["stops"][number] {
+  return {
+    stopId: id,
+    placeId: id,
+    name,
+    category: "logistics",
+    imageUrls: imageUrl ? [imageUrl] : [],
+    etaMinutes: 0,
+    arrivalOffsetMinutes: offsetMinutes,
+    estimatedVisitMinutes: 30,
+    priceLevel: null,
+    rating: null,
+    reason: null,
+    shortDescription: description,
+    latitude: 0,
+    longitude: 0,
+    openingHours: null,
+    dayIndex: null,
+    specialType: "hotel_checkin",
+    directionsUrl: directionsUrl ?? null,
+  };
+}
+
+/**
+ * תיקון באג אמיתי (בקשה מפורשת - "למה הלינה שהזנתי לא מופיעה במסלול??
+ * כמו שיש בחופשה בחו"ל? אמורה להופיע ביום הראשון, מיד אחרי האטרקציה
+ * הראשונה"): מזריק כרטיס לינה סינתטי (לא תחנת DB אמיתית) ליום 1, מיד
+ * אחרי התחנה הראשונה - לא לפניה (בניגוד לחו"ל, שם הצ'ק-אין קודם לכל
+ * דבר אחר, מיד אחרי הנחיתה בשדה התעופה). אם אין עדיין תחנה אחת ביום 1
+ * בכלל, לא מוסיפים כלום (אין "אחרי הראשונה" להתייחס אליו).
+ */
+function injectLodgingStop(
+  dayGroups: { day: number; stops: FinalItinerary["stops"] }[],
+  answers: { lodgingName: string | null; lodgingAddress: string | null; hasBookedLodging: boolean },
+  lodgingImage: string | null
+): { day: number; stops: FinalItinerary["stops"] }[] {
+  if (!answers.hasBookedLodging || !answers.lodgingName) return dayGroups;
+  if (dayGroups.length === 0) return dayGroups;
+
+  const firstDay = dayGroups[0];
+  if (firstDay.stops.length === 0) return dayGroups;
+
+  const firstStop = firstDay.stops[0];
+  const secondStop = firstDay.stops[1];
+  // ממקמים בין התחנה הראשונה לשנייה (אם יש) - כדי שהשעה המוצגת תהיה
+  // הגיונית ("בין" שתי התחנות האמיתיות), לא תמיד +30 דק' קבוע שעלול
+  // להתנגש עם שעת התחנה הבאה בפועל.
+  const checkinOffset = secondStop
+    ? Math.round((firstStop.arrivalOffsetMinutes + secondStop.arrivalOffsetMinutes) / 2)
+    : firstStop.arrivalOffsetMinutes + 30;
+
+  const checkinStop = makeLodgingStop(
+    "synthetic-lodging-checkin",
+    `הגעה ללינה - ${answers.lodgingName}`,
+    answers.lodgingAddress || "צ'ק-אין",
+    checkinOffset,
+    lodgingImage,
+    answers.lodgingAddress && firstStop.latitude && firstStop.longitude
+      ? buildDirectionsUrl(`${firstStop.latitude},${firstStop.longitude}`, answers.lodgingAddress)
+      : null
+  );
+
+  const updatedFirstDay = {
+    ...firstDay,
+    stops: [firstStop, checkinStop, ...firstDay.stops.slice(1)],
+  };
+
+  return [updatedFirstDay, ...dayGroups.slice(1)];
 }
 
 export default function WeekendResultPage() {
