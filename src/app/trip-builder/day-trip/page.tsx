@@ -449,7 +449,7 @@ if (key === "companions" && editStep.type === "companions") {
         workingForm = { ...workingForm, companions: extracted.companions, hasPet: extracted.hasPet };
         const label = labelsFor(s.options, extracted.companions).join("، ");
         addUser(extracted.hasPet ? `${label} · 🐶 עם בעל חיים` : label, "companions");
-        if (extracted.companions.includes(s.childAgeTriggerValue as DayTripAnswers["companions"][number])) {
+        if (extracted.companions.includes(s.childAgeTriggerValue as ExtractedDayTripIntent["companions"][number])) {
           if (extracted.childAgeBands.length > 0) {
             workingForm = { ...workingForm, childAgeBands: extracted.childAgeBands as DayTripAnswers["childAgeBands"] };
             addUser(labelsFor(s.childAgeOptions, extracted.childAgeBands).join("، "), "childAgeBands");
