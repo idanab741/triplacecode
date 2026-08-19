@@ -526,6 +526,19 @@ export async function POST(
       // ממרכז העיר. dayCursors עוקב אחרי המיקום האחרון שנבחר בכל יום.
       const excludePlaceIdsForVacation = [...excludePlaceIds];
       let mustSeeCursor = 0;
+      // תיקון באג אמיתי (בקשה מפורשת - "יש מאגר עם מאות אטרקציות...
+      // למה לא להשתמש בזה?? יוצא מקומות מוזרים כמו Magdala"): קודם *כל*
+      // סלוט role="attraction" קיבל עדיפות מוחלטת לרשימת mustSeePlaces
+      // (הצעות Claude + אימות/יצירה מול Google) - בלי קשר לכמה כאלה כבר
+      // שובצו, ובלי לתת שום סיכוי למאגר הפנימי המתויג/האצור שלנו (שכן
+      // עדיפות ראשונה בכל role אחר - food/nightlife). "אתרי חובה" נועד
+      // ל-1-2 אתרים באמת איקוניים שאסור לפספס (כמו מגדל אייפל) - לא
+      // מקור ראשי לכל תחנה. עכשיו מוגבל למספר קטן קבוע; מעבר לזה, סלוטי
+      // "attraction" עוברים לנתיב הרגיל (fetchCandidatePool על המאגר
+      // הפנימי, בדיוק כמו כל role אחר) - ורק אם גם הוא ריק, התחנה נשמטת
+      // בשקט (לא ממציאים ולא פונים ל-Google בשבילה).
+      const MAX_MUST_SEE_STOPS = 2;
+      let mustSeeAssignedCount = 0;
       const INTER_STOP_RADIUS_KM = 5;
       // תיקון באג אמיתי (בקשה מפורשת - "מסלול קפץ בין תל אביב לצפון בין
       // ימים שונים"): בלי זה, התחנה הראשונה של *כל* יום שעדיין אין לו
@@ -564,7 +577,7 @@ export async function POST(
           // אתרי חובה תופסים סלוטים מסוג "attraction" קודם לכל דבר אחר -
           // כל עוד יש עוד אתר חובה שלא נוצל, הוא זוכה לסלוט הבא, בלי לעבור
           // דרך fetchCandidatePool/rankCandidatesFast הרגילים בכלל.
-          if (stop.role === "attraction" && mustSeeCursor < mustSeePlaces.length) {
+          if (stop.role === "attraction" && mustSeeAssignedCount < MAX_MUST_SEE_STOPS && mustSeeCursor < mustSeePlaces.length) {
             const mustSee = mustSeePlaces[mustSeeCursor];
             if (!excludePlaceIdsForVacation.includes(mustSee.id)) {
               console.error("[auto-build DEBUG] אתר חובה משובץ לסלוט", {
@@ -596,6 +609,7 @@ export async function POST(
               excludePlaceIdsForVacation.push(mustSee.id);
               dayCursors.set(day, { lat: mustSee.latitude, lng: mustSee.longitude });
               mustSeeCursor += 1;
+              mustSeeAssignedCount += 1;
               continue;
             }
             mustSeeCursor += 1;
