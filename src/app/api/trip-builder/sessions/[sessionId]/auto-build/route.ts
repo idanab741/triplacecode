@@ -72,6 +72,37 @@ async function getWeatherSummary(lat: number, lng: number): Promise<string | nul
 }
 
 /**
+ * תיקון באג קריטי אמיתי (זוהה מפורשות ב-MASTER SPEC סעיף 65/250 -
+ * "Verify all Weekend calls to dayTripBudgetToMaxPriceLevel() ... Do not
+ * silently return null and thereby turn a limited Weekend budget into
+ * effectively unlimited"): בדקתי בפועל - `answers.budgetBand` לא קיים
+ * בכלל לא ב-WeekendAnswers ולא ב-AbroadVacationAnswers (בשניהם השדה
+ * נקרא `budgetPerPerson`, עם סקאלת ערכים שונה לגמרי מ-DayTripAnswers.
+ * budgetBand - זה Budget Envelope לכל הטיול לאדם, לא מחיר למקום בודד
+ * כמו ביום כיף). `dayTripBudgetToMaxPriceLevel(undefined)` מחזיר תמיד
+ * null - כלומר עד עכשיו, לכל בנייה של סופ"ש/חופשה בחו"ל, מגבלת התקציב
+ * שהמשתמש בחר **התעלמה לגמרי** מהחיפוש בפועל (maxPriceLevel=null =
+ * ללא הגבלה), בלי קשר אם המשתמש בחר "0-1,000" או "ללא הגבלה".
+ */
+const VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL: Record<string, number | null> = {
+  // סופ"ש (WEEKEND_BUDGET_STEPS)
+  "0-1000": 1,
+  "1000-3000": 2,
+  "3000+": 3,
+  // חופשה בחו"ל (VACATION_BUDGET_STEPS) - סקאלה שונה, אותו עיקרון
+  "0-2500": 1,
+  "2500-7500": 2,
+  "7500-12000": 3,
+  "12000+": 4,
+  unlimited: null,
+};
+
+function vacationBudgetToMaxPriceLevel(budgetPerPerson: string | null | undefined): number | null {
+  if (!budgetPerPerson) return null;
+  return VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL[budgetPerPerson] ?? null;
+}
+
+/**
  * "TripLace" - בונה מסלול מלא אוטומטית, בלי לשאול את המשתמש בכלל.
  * לכל תחנה: שולף מועמדים, מדרג, ובוחר את המדורג הראשון - כאילו המשתמש
  * עשה Like על הראשון בכל שלב. משתמש באותה שרשרת בדיוק כמו ההחלקות הרגילות.
@@ -673,7 +704,7 @@ export async function POST(
             origin: searchParamsForStop.origin,
             distanceBand: effectiveDistanceBand,
             maxDistanceKm: searchParamsForStop.maxDistanceKm,
-            maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+            maxPriceLevel: vacationBudgetToMaxPriceLevel((answers as unknown as { budgetPerPerson?: string }).budgetPerPerson),
             excludePlaceIds: excludePlaceIdsForVacation,
             requireKosher: dna?.kosher === true,
             requireAccessible: dna?.accessibility === true,
@@ -688,7 +719,7 @@ export async function POST(
               origin: searchOrigin,
               distanceBand: effectiveDistanceBand,
               maxDistanceKm: destinationMaxDistanceKm,
-              maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+              maxPriceLevel: vacationBudgetToMaxPriceLevel((answers as unknown as { budgetPerPerson?: string }).budgetPerPerson),
               excludePlaceIds: excludePlaceIdsForVacation,
               requireKosher: dna?.kosher === true,
               requireAccessible: dna?.accessibility === true,
