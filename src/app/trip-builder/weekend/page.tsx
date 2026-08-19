@@ -147,7 +147,24 @@ export default function WeekendQuestionnairePage() {
   const idRef = useRef(0);
   const startedRef = useRef(false);
   const pendingBuildAnswersRef = useRef<WeekendAnswers | null>(null);
-  const runtrippyTriggeredRef = useRef(false);
+  // תיקון באג אמיתי (בקשה מפורשת - "המשחק עדיין מועבר באופן אוטומטי!!
+  // ביקשתי שיופיע רק אם לוחצים על הלוגו!"): קודם דגל בודד (runtrippyTriggeredRef)
+  // שימש גם כ"מי מנצח במרוץ בין הנתיב האוטומטי לנתיב הלחיצה הידנית" וגם
+  // כ"מונע יצירת session כפולה" - promptBuildTrip קורא ל-autoBuildAndWaitThenNavigate
+  // מיד (כמעט באותו tick סינכרוני שבו בועת ה-runtrippy מוצגת), וזה היה
+  // מסמן את הדגל כ-true *באותו רגע* - כך שבפועל, לא היה שום חלון זמן
+  // אמיתי שבו handleRuntrippyClick (לחיצה על הבועה) לא נחסם מיד ע"י
+  // הבדיקה `if (runtrippyTriggeredRef.current) return;` בתחילתו. התוצאה:
+  // לחיצה על הלוגו לא עשתה כלום בפועל, ומסך התוצאה (result/page.tsx)
+  // תמיד הגיע דרך הנתיב האוטומטי - זו הסיבה שהמשחק "תמיד" הופיע (בשילוב
+  // עם game=1 החסר בנתיב הזה, שתוקן למטה). הפתרון: להפריד בין "האם כבר
+  // נוצר session" (sessionPromiseRef - משותף, כדי לא ליצור session כפול)
+  // לבין "האם המשתמש ביקש את המשחק" (manualGameRequestedRef) - עכשיו
+  // לחיצה על הבועה **בכל שלב**, גם תוך כדי ההמתנה האוטומטית, "חוטפת"
+  // את הניווט (עם game=1) בלי ליצור session נוסף.
+  const sessionPromiseRef = useRef<Promise<string> | null>(null);
+  const manualGameRequestedRef = useRef(false);
+  const navigatedToResultRef = useRef(false);
 
   function nextId() {
     idRef.current += 1;
@@ -182,6 +199,35 @@ export default function WeekendQuestionnairePage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
+
+  // תיקון באג אמיתי (בקשה מפורשת - "למה בשורת ההתאמה של האטרקציות
+  // והקטגוריות לא מופיע לי כבר האטרקציות ששמורות אצלי? כמו שיש בחופשה
+  // בחו"ל???"): בחופשה בחו"ל, שלב "מה אתם אוהבים לעשות" כבר ממלא מראש
+  // מה-Travel DNA הקיים (ר' vacationTypes effect שם) - בסופ"ש לא היה שום
+  // מקבילה, ולכן weekendStyles תמיד התחיל ריק לגמרי גם כשלמשתמש כבר יש
+  // היסטוריה/העדפות שמורות. אותו עיקרון בדיוק, רק מול endpoint ייעודי
+  // (weekend-style-defaults) שממפה לערכי WEEKEND_STYLE_OPTIONS. לא דורס
+  // בחירה שהמשתמש כבר עשה בעצמו (tempStyles לא ריק).
+  useEffect(() => {
+    if (stage !== "weekendStyles" || tempStyles.length > 0) return;
+    const fromFreeText = extractedIntentRef.current?.weekendStyles ?? [];
+    fetch("/api/trip-builder/weekend-style-defaults")
+      .then((res) => res.json())
+      .then((data) => {
+        const fromDna: string[] = Array.isArray(data.weekendStyles) ? data.weekendStyles : [];
+        const merged = Array.from(new Set([...fromFreeText, ...fromDna]));
+        if (merged.length > 0) {
+          setTempStyles((current) => (current.length === 0 ? merged : current));
+        }
+      })
+      .catch(() => {
+        // גם אם השליפה מה-DNA נכשלת - עדיין ממלאים לפחות ממה שחולץ מהמלל.
+        if (fromFreeText.length > 0) {
+          setTempStyles((current) => (current.length === 0 ? fromFreeText : current));
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
 
   function labelFor(options: { value: string; label: string }[], value: string) {
     return options.find((o) => o.value === value)?.label ?? value;
@@ -369,7 +415,19 @@ export default function WeekendQuestionnairePage() {
 
   function confirmLodgingInfo() {
     if (!tempLodgingName && !tempLodgingAddress) return;
-    const next = { ...form, lodgingName: tempLodgingName || null, lodgingAddress: tempLodgingAddress || null };
+    // תיקון באג אמיתי (בקשה מפורשת - "הזנתי את מקום הלינה - והוא לא
+    // מופיע בליינאפ!!" + "המסלול שוב מפנה אותי חזרה לתל אביב"): אם
+    // המשתמש הקליד שם מלון בלי לבחור הצעה מהרשימה (למשל כי הרשימה
+    // נחתכה/לא הייתה נגישה - ר' תיקון HotelAutocomplete למעלה, או סתם
+    // הקליד וקפץ ישר ל"המשך") - tempLodgingAddress נשאר ריק, ו-`|| null`
+    // הפך אותו ל-null. lodgingAddress=null אומר ל-auto-build/route.ts
+    // שאין בכלל לינה לגאוקד - הוא נופל חזרה למיקום הבית של המשתמש (בפועל
+    // תל אביב/נתניה) לכל הטיול, בדיוק כמו לפני שהוזנה לינה בכלל. עכשיו,
+    // בהיעדר כתובת מובנית (מ-Google Place Details), משתמשים בשם שהמשתמש
+    // הקליד בעצמו כמחרוזת לגיאוקודינג - geocodePlaceName בשרת עדיין יכול
+    // לרוב לפענח שם מלון/צימר, גם בלי כתובת מדויקת, במקום לוותר לגמרי.
+    const resolvedLodgingAddress = tempLodgingAddress || tempLodgingName || null;
+    const next = { ...form, lodgingName: tempLodgingName || null, lodgingAddress: resolvedLodgingAddress };
     setForm(next);
     addUser(tempLodgingName || tempLodgingAddress, "lodgingInfo");
     advance("budget", next);
@@ -472,7 +530,8 @@ export default function WeekendQuestionnairePage() {
       updateMessageLabel(booked ? "כן" : "לא");
     } else if (editingStage === "lodgingInfo") {
       if (!editTempLodgingName && !editTempLodgingAddress) return;
-      setForm((f) => ({ ...f, lodgingName: editTempLodgingName || null, lodgingAddress: editTempLodgingAddress || null }));
+      const resolvedLodgingAddress = editTempLodgingAddress || editTempLodgingName || null;
+      setForm((f) => ({ ...f, lodgingName: editTempLodgingName || null, lodgingAddress: resolvedLodgingAddress }));
       updateMessageLabel(editTempLodgingName || editTempLodgingAddress);
     } else if (editingStage === "lodgingType") {
       if (!editTempValue) return;
@@ -520,10 +579,21 @@ export default function WeekendQuestionnairePage() {
   }
 
   function handleRuntrippyClick() {
-    if (runtrippyTriggeredRef.current) return;
+    if (manualGameRequestedRef.current) return; // כבר נלחץ
     if (!pendingBuildAnswersRef.current) return;
-    runtrippyTriggeredRef.current = true;
+    manualGameRequestedRef.current = true;
     buildTripDirectly(pendingBuildAnswersRef.current);
+  }
+
+  /**
+   * יוצר session (פעם אחת בלבד - משותף בין שני הנתיבים דרך sessionPromiseRef)
+   * ומפעיל auto-build ברקע.
+   */
+  function ensureSessionCreated(answers: WeekendAnswers): Promise<string> {
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = createSessionAndStartBuild(answers);
+    }
+    return sessionPromiseRef.current;
   }
 
   async function buildTripDirectly(answers: WeekendAnswers) {
@@ -534,8 +604,13 @@ export default function WeekendQuestionnairePage() {
     setSubmitting(true);
     setLocationError(null);
     try {
-      const sessionId = await createSessionAndStartBuild(answers);
-      router.push(`/trip-builder/weekend/result?sessionId=${sessionId}`);
+      const sessionId = await ensureSessionCreated(answers);
+      if (navigatedToResultRef.current) return; // מרוץ נדיר: הנתיב האוטומטי כבר ניווט קודם
+      navigatedToResultRef.current = true;
+      // game=1 מסמן שהמעבר הזה קרה כתוצאה מלחיצה ידנית על בועת ה-runtrippy -
+      // ההבדל היחיד שעמוד התוצאה מסתמך עליו כדי להחליט אם להציג את המשחק
+      // המלא-מסך או מסך המתנה רגיל (ר' result/page.tsx).
+      router.push(`/trip-builder/weekend/result?sessionId=${sessionId}&game=1`);
     } catch (error) {
       setLocationError(error instanceof Error ? error.message : 'לא הצלחנו לבנות את הסופ"ש. נסו שוב.');
       setSubmitting(false);
@@ -568,18 +643,18 @@ export default function WeekendQuestionnairePage() {
    * לעמוד המוכן - לא למסך טעינה/משחק."
    */
   async function autoBuildAndWaitThenNavigate(answers: WeekendAnswers) {
-    if (runtrippyTriggeredRef.current) return; // כבר נלחץ ידנית - לא כופלים session
     if (!user) return; // לא מפנים ל-/auth בכפייה - ממתינים ללחיצה הידנית של המשתמש
-    runtrippyTriggeredRef.current = true;
     setLocationError(null);
     try {
-      const sessionId = await createSessionAndStartBuild(answers);
+      const sessionId = await ensureSessionCreated(answers);
+      if (manualGameRequestedRef.current) return; // המשתמש כבר לחץ - buildTripDirectly מטפל בניווט
 
       const MAX_WAIT_MS = 20000;
       const POLL_INTERVAL_MS = 1200;
       const startedAt = Date.now();
       while (Date.now() - startedAt < MAX_WAIT_MS) {
         await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        if (manualGameRequestedRef.current) return; // נלחץ תוך כדי ההמתנה - עוצרים כאן
         try {
           const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
           const pollData = await pollRes.json();
@@ -591,10 +666,12 @@ export default function WeekendQuestionnairePage() {
         }
       }
 
+      if (manualGameRequestedRef.current || navigatedToResultRef.current) return;
+      navigatedToResultRef.current = true;
       router.push(`/trip-builder/weekend/result?sessionId=${sessionId}`);
     } catch (error) {
       // מאפשרים ניסיון נוסף (למשל לחיצה ידנית על הבועה) אם ההרשמה הראשונית נכשלה
-      runtrippyTriggeredRef.current = false;
+      sessionPromiseRef.current = null;
       setLocationError(error instanceof Error ? error.message : 'לא הצלחנו לבנות את הסופ"ש. נסו שוב.');
     }
   }

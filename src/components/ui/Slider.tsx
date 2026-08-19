@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 
 interface SliderStep {
   value: string;
@@ -37,18 +37,42 @@ export function Slider({ steps, value, onChange }: SliderProps) {
   );
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    updateFromClientX(e.clientX);
     setDragging(true);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    updateFromClientX(e.clientX);
   }
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+
+  // תיקון באג אמיתי (בקשה מפורשת - "העיגול תקוע, לא זז בכלל"): קודם
+  // pointermove/pointerup היו מוגדרים כ-handlers רגילים על ה-div של
+  // המסילה עצמה (onPointerMove/onPointerUp), בהסתמכות על setPointerCapture
+  // כדי שאירועים ימשיכו להגיע גם כשהאצבע זזה מחוץ לגבולות האלמנט. זה
+  // תלוי בכך שאותו DOM node בדיוק (זה שקיבל pointerdown) יישאר קיים
+  // וללא שינוי לאורך כל הגרירה - בתוך הצ'אט הזה, שמלא ב-setTimeout של
+  // הדמיית הקלדה/בועות שמחליפות איזה בלוק בדיוק מוצג, גרירה שנמשכת כמה
+  // שברירי שנייה יכולה "לתפוס" בדיוק בזמן re-render כזה ולאבד את
+  // ה-capture - ואז שום pointermove נוסף לא מגיע לשום מקום, והעיגול
+  // פשוט קופא במקום. הפתרון הסטנדרטי והחסין ביותר: להאזין ל-pointermove/
+  // pointerup ברמת ה-window כל עוד dragging=true (לא תלוי ב-DOM node
+  // ספציפי, ולא ב-setPointerCapture בכלל) - וה-useEffect עצמו כבר דואג
+  // לניקוי ה-listeners בסיום הגרירה או אם הקומפוננטה מתעדכנת.
+  useEffect(() => {
     if (!dragging) return;
-    updateFromClientX(e.clientX);
-  }
-  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    setDragging(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }
+
+    function handleMove(e: PointerEvent) {
+      updateFromClientX(e.clientX);
+    }
+    function handleUp() {
+      setDragging(false);
+    }
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
+    return () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+    };
+  }, [dragging, updateFromClientX]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -71,8 +95,6 @@ export function Slider({ steps, value, onChange }: SliderProps) {
       <div
         ref={trackRef}
         onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
         style={{
           position: "relative",
           height: "44px",

@@ -27,6 +27,7 @@ import { getOrCreateAreaExperience } from "@/services/tripBuilder/areaExperience
 import { findCentralNeighborhood } from "@/services/tripBuilder/centralNeighborhoodService";
 import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggestionService";
 import { findRequestedPlaceNear } from "@/services/tripBuilder/placeResolutionService";
+import { findPlaceStatusAndPhoto } from "@/services/tripBuilder/placePhotoService";
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
 import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { findAdminDestinationByName } from "@/services/destinations/destinationsServerService";
@@ -202,19 +203,50 @@ export async function POST(
 
     // עבור חופשה בחו"ל: מיקום ה"בית" לכל יום הוא מיקום המלון של אותו יום
     // (אם המשתמש הזין כמה מלונות), לא מיקום ה-GPS המקורי של המשתמש
+    //
+    // תיקון באג אמיתי (בקשה מפורשת - "הזנתי את מקום הלינה - והוא לא
+    // מופיע בליינאפ" + "המסלול שוב מפנה אותי חזרה לתל אביב"): geocodePlaceName
+    // משתמש ב-Geocoding API הרגיל, שנועד לכתובות רחוב מובנות - לא לשמות
+    // עסקים (מלון/צימר/הוסטל). אותו עיקרון בדיוק שכבר תועד ב-
+    // placeResolutionService.ts לגבי עסקים לא-רשמיים: לפעמים הוא לא מוצא
+    // כלום, ולפעמים "תופס" רק חלק מהמחרוזת ומחזיר קואורדינטות של מקום
+    // אחר לגמרי. Places Text Search (findPlaceStatusAndPhoto) בנוי בדיוק
+    // בשביל שמות עסקים כאלה ומחזיר את הקואורדינטות המדויקות של העסק
+    // עצמו. מנסים אותו קודם (עם שם+כתובת יחד, המידע העשיר ביותר שיש) -
+    // ורק אם הוא לא מוצא בכלל, נופלים ל-geocodePlaceName כרשת ביטחון.
+    async function resolveLodgingCoords(name: string | null | undefined, address: string): Promise<{ lat: number; lng: number } | null> {
+      const query = name && name.trim() && name.trim() !== address.trim() ? `${name.trim()} ${address.trim()}` : address.trim();
+      const textSearchResult = await findPlaceStatusAndPhoto(query);
+      if (textSearchResult.latitude != null && textSearchResult.longitude != null) {
+        return { lat: textSearchResult.latitude, lng: textSearchResult.longitude };
+      }
+      return geocodePlaceName(address);
+    }
+
     let dayOriginOverride: { lat: number; lng: number } | null = null;
     if (session.trip_type === "abroad_vacation") {
       const hotels = (session as unknown as { hotels?: { name: string; address: string }[] }).hotels ?? [];
       if (hotels.length > 0 && hotels[0].address) {
-        dayOriginOverride = await geocodePlaceName(hotels[0].address);
+        dayOriginOverride = await resolveLodgingCoords(hotels[0].name, hotels[0].address);
       }
     } else if (session.trip_type === "weekend") {
       // סופ"ש: אותו רעיון כמו חופשה בחו"ל - כל הימים "מתחילים" ממיקום
       // הלינה בפועל (אם כבר נסגרה), לא מהבית. שדה יחיד (lodgingAddress),
       // לא מערך hotels - סופ"ש הוא בדרך כלל לינה אחת לכל הטיול.
-      const weekendAnswers = answers as unknown as { hasBookedLodging?: boolean; lodgingAddress?: string | null };
+      const weekendAnswers = answers as unknown as {
+        hasBookedLodging?: boolean;
+        lodgingName?: string | null;
+        lodgingAddress?: string | null;
+      };
       if (weekendAnswers.hasBookedLodging && weekendAnswers.lodgingAddress) {
-        dayOriginOverride = await geocodePlaceName(weekendAnswers.lodgingAddress);
+        dayOriginOverride = await resolveLodgingCoords(weekendAnswers.lodgingName, weekendAnswers.lodgingAddress);
+        if (!dayOriginOverride) {
+          logAiError("לא הצלחנו לגאוקד את מקום הלינה שהוזן בסופ\"ש - נופלים חזרה למיקום הבית", {
+            sessionId,
+            lodgingName: weekendAnswers.lodgingName ?? null,
+            lodgingAddress: weekendAnswers.lodgingAddress,
+          });
+        }
       }
     }
 

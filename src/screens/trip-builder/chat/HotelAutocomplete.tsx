@@ -104,7 +104,15 @@ export function HotelAutocomplete({ name, address, onChange, destination }: Hote
         <p className="mt-1 text-xs text-danger">שגיאת חיפוש: {searchError}</p>
       )}
       {options.length > 0 && (
-        <div className="absolute inset-x-0 top-full z-20 mt-1 overflow-hidden rounded-card bg-white shadow-lg">
+        // תיקון באג אמיתי (בקשה מפורשת - "נחתך ברשימה למטה, צריך 2 ותוך
+        // כדי גלילה, כמו בשורת החיפוש בעמוד הבית"): קודם הרשימה הזו הייתה
+        // ללא הגבלת גובה בכלל (overflow-hidden בלי max-height) - עם הרבה
+        // תוצאות מגוגל, היא פשוט גדלה עד שנחתכה פיזית ע"י תחתית המסך/הבר
+        // התחתון, בלי שום דרך לגלול לשאר התוצאות. max-h-28 + overflow-y-auto
+        // הם בדיוק אותו דפוס שכבר בשימוש בהשלמה האוטומטית של כתובת בעמוד
+        // הבית (ChooseLocationSheet) - מציג כ-2 שורות ומאפשר גלילה פנימית
+        // לשאר, בלי לגעת בשום עמוד/עיצוב אחר.
+        <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-28 overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
           {options.map((option) => (
             <button
               key={option.placeId}
