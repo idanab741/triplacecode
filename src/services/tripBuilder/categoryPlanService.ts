@@ -516,8 +516,30 @@ export function buildMultiDayVacationPlan(answers: {
       // parks_gardens/viewpoints/shopping הן קטגוריות "קלות" מטבען -
       // הליכה, לא מסלול מאומץ. אחרי זה - רק צ'ק-אאוט מהמלון וטיסת חזרה
       // (כרטיסי תצוגה מלאכותיים, לא תחנות place - ר' injectLogisticsStops).
+      //
+      // תיקון באג אמיתי (בקשה מפורשת - "למה אין התייחסות למלל החופשי??
+      // ביקשתי אטרקציות, חיי לילה וחופים!"): קודם האטרקציה הקלילה הזו
+      // הייתה קבועה ל-parks_gardens בלבד, בלי שום קשר לקטגוריות
+      // שהמשתמש ביקש - גם אם ביקש חופים במפורש. עכשיו בוחרים את
+      // הקטגוריה ה"קלה" מתוך מה שהמשתמש בפועל ביקש (אם משהו מהבקשות
+      // שלו נכנס לרשימת הקטגוריות הקלות המותרות) - עדיין רק בין
+      // הקטגוריות הבטוחות/קלות, לא כל קטגוריה שנבחרה (למשל לא sports_extreme).
+      const LIGHT_LAST_DAY_CATEGORIES = new Set(["parks_gardens", "beaches_pools", "viewpoints", "shopping"]);
+      const requestedLightCategory = categoryPool.find((c) => LIGHT_LAST_DAY_CATEGORIES.has(c));
       plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
-      plan.push({ category: "parks_gardens", role: "attraction", order: order++, day });
+      plan.push({ category: requestedLightCategory ?? "parks_gardens", role: "attraction", order: order++, day });
+
+      // תיקון באג אמיתי נוסף: חיי לילה מוחרגים בכוונה מיום ההגעה/עזיבה
+      // בחופשה בחו"ל כי אחרי טיסה וימי נחיתה לא בונים ערב יציאה - אבל
+      // בסופ"ש (בלי טיסה בכלל) הנימוק הזה לא רלוונטי, ויום אחרון הוא
+      // לרוב הערב האמיתי היחיד שנשאר לצאת בו. אם המשתמש ביקש חיי לילה
+      // במפורש - נותנים לזה ניסיון אמיתי גם ביום האחרון של סופ"ש, לא
+      // רק ביום ה"רגיל" היחיד שיש בטיול קצר (שגם הוא מוגבל ל-2 קטגוריות
+      // מיקוד בלבד, ולעיתים אין בו בכלל מקום ל"חיי לילה"). אם אין
+      // מועמד אמיתי במאגר קרוב ללינה - התחנה נשמטת בשקט כרגיל, לא ממציאים.
+      if (answers.tripType === "weekend" && answers.vacationTypes.includes("nightlife")) {
+        plan.push({ category: "nightlife", role: "nightlife", order: order++, day });
+      }
       continue;
     }
 
