@@ -638,10 +638,26 @@ export async function POST(
                 ? { origin: dayOriginOverride, maxDistanceKm: Math.min(destinationMaxDistanceKm, WEEKEND_DAY_ANCHOR_RADIUS_KM) }
                 : { origin: searchOrigin, maxDistanceKm: destinationMaxDistanceKm };
 
+          // תיקון באג קריטי אמיתי (בקשה מפורשת - "עדיין קופץ רחוק, למרות
+          // שכל הרדיוסים המפורשים שחישבתי נראים נכונים"): "5h" כאן היה
+          // אמור להיות "לא בשימוש בפועל" כי maxDistanceKm מפורש תמיד
+          // גובר - נכון עבור החיפוש הראשון עצמו. אבל fetchCandidatePool
+          // (candidatePoolService.ts) יש לו רשת-ביטחון פנימית משלו: אם
+          // אין בכלל מועמדים ברדיוס הצר (maxDistanceKm), הוא מרחיב לבד
+          // ל-distanceBandToRadiusKm(params.distanceBand) - כלומר "5h"
+          // הקשיח היה הופך בשקט לרדיוס של 160 ק"מ (!) בכל פעם שהחיפוש
+          // הצר לא מצא כלום (למשל קטגוריה נדירה בעיירה קטנה) - בדיוק מה
+          // שגרם לתחנות ליפול רחוק (עד יגור/חיפה) בלי שום קשר לרדיוסים
+          // שחושבו למעלה. בסופ"ש, מעבירים את distanceBand האמיתי שהמשתמש
+          // בחר - כך שגם ה"רשת ביטחון" הפנימית הזו נשארת בגבול שהמשתמש
+          // בפועל אישר, לא מתפרצת לכל הארץ.
+          const effectiveDistanceBand: import("@/services/tripBuilder/types").DistanceBand =
+            session.trip_type === "weekend" ? (answers as unknown as WeekendAnswers).distanceBand : "5h";
+
           let pool = await fetchCandidatePool(supabase, {
             category: stop.category,
             origin: searchParamsForStop.origin,
-            distanceBand: "5h", // לא בשימוש בפועל - maxDistanceKm המפורש למטה גובר תמיד
+            distanceBand: effectiveDistanceBand,
             maxDistanceKm: searchParamsForStop.maxDistanceKm,
             maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
             excludePlaceIds: excludePlaceIdsForVacation,
@@ -656,7 +672,7 @@ export async function POST(
             pool = await fetchCandidatePool(supabase, {
               category: stop.category,
               origin: searchOrigin,
-              distanceBand: "5h",
+              distanceBand: effectiveDistanceBand,
               maxDistanceKm: destinationMaxDistanceKm,
               maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
               excludePlaceIds: excludePlaceIdsForVacation,
