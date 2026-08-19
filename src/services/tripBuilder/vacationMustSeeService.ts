@@ -193,6 +193,23 @@ async function searchByIlike(
     .order("rating", { ascending: false, nullsFirst: false })
     .limit(10);
 
+  // לוג אבחוני זמני (בקשה מפורשת - "עדיין קופץ לתל אביב, אני לא מאמין
+  // לך יותר") - מציג בדיוק אילו מועמדים ILIKE החזיר, המרחק המחושב של כל
+  // אחד, ומה maxDistanceKm שבו נעשה שימוש בפועל - כדי לדעת בוודאות אם
+  // הבעיה היא ב-maxDistanceKm שמגיע לפונקציה הזו, או במשהו אחר לגמרי.
+  console.error("[findMustSeePlaces DEBUG] תוצאות ILIKE גולמיות + מרחקים", {
+    searchTerm,
+    maxDistanceKm,
+    origin,
+    candidates: (data ?? []).map((row) => ({
+      name: row.name,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      distanceKm: Math.round(haversineDistanceKm(origin, { lat: row.latitude as number, lng: row.longitude as number }) * 10) / 10,
+      withinRange: haversineDistanceKm(origin, { lat: row.latitude as number, lng: row.longitude as number }) <= maxDistanceKm,
+    })),
+  });
+
   return (data ?? []).find((row) => {
     if (usedIds.has(row.id as string)) return false;
     const distanceKm = haversineDistanceKm(origin, { lat: row.latitude as number, lng: row.longitude as number });

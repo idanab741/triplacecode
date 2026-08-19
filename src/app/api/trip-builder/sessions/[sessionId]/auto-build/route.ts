@@ -436,6 +436,22 @@ export async function POST(
             : distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand)
           : 60;
 
+      // לוג אבחוני זמני (בקשה מפורשת - "עדיין קופץ לתל אביב, אני לא
+      // מאמין לך יותר") - מציג את כל הערכים שבפועל נכנסים לחישוב הרדיוס
+      // ולחיפוש אתרי החובה, כדי לדעת בוודאות איפה הניתוק קורה במקום
+      // לנחש שוב. יוסר אחרי שהבעיה תיפתר סופית.
+      console.error("[auto-build DEBUG] רדיוס חיפוש אתרי חובה/סופ\"ש", {
+        sessionId,
+        tripType: session.trip_type,
+        dayOriginOverride,
+        searchOrigin,
+        requestedAreaRadiusKm: requestedAreaRadiusKm ?? null,
+        distanceBand: (answers as unknown as WeekendAnswers).distanceBand ?? null,
+        distanceBandRadiusKm: distanceBandToRadiusKm((answers as unknown as WeekendAnswers).distanceBand),
+        WEEKEND_LODGING_TRIP_RADIUS_KM,
+        finalDestinationMaxDistanceKm: destinationMaxDistanceKm,
+      });
+
       // בקשה מפורשת נוספת ("חסר לי הקוליזיאום, הוותיקן, המדרגות
       // הספרדיות!"): התקרה נגזרת מאורך הטיול בפועל, לא מספר קבוע - יעד
       // עשיר כמו רומא לטיול 5 ימים צריך יותר מ-6 הצעות.
@@ -463,6 +479,11 @@ export async function POST(
             vacationTypeLabels: vacationTypeValues.map(getVacationTypeLabel),
             freeText: answers.freeText,
             maxCount: estimatedNumDays * 2,
+          });
+          console.error("[auto-build DEBUG] אתרי חובה - הצעות גולמיות מ-Claude", {
+            sessionId,
+            destinationName,
+            mustSeeNames,
           });
           return findMustSeePlaces(supabase, mustSeeNames, searchOrigin, destinationMaxDistanceKm, destinationName);
         })(),
@@ -546,6 +567,22 @@ export async function POST(
           if (stop.role === "attraction" && mustSeeCursor < mustSeePlaces.length) {
             const mustSee = mustSeePlaces[mustSeeCursor];
             if (!excludePlaceIdsForVacation.includes(mustSee.id)) {
+              console.error("[auto-build DEBUG] אתר חובה משובץ לסלוט", {
+                sessionId,
+                day,
+                mustSeeName: mustSee.name,
+                mustSeeLat: mustSee.latitude,
+                mustSeeLng: mustSee.longitude,
+                dayOriginOverride,
+                distanceFromLodgingKm: dayOriginOverride
+                  ? Math.round(
+                      Math.sqrt(
+                        Math.pow((mustSee.latitude - dayOriginOverride.lat) * 111, 2) +
+                          Math.pow((mustSee.longitude - dayOriginOverride.lng) * 111 * Math.cos((dayOriginOverride.lat * Math.PI) / 180), 2)
+                      ) * 10
+                    ) / 10
+                  : null,
+              });
               await likeStop(supabase, userId, stop.id, mustSee);
               // תיקון באג אמיתי (בקשה מפורשת - "התגית של היום לא רלוונטית
               // לאטרקציות שמופיעות!"): אתר-חובה תופס סלוט בלי קשר לקטגוריה
