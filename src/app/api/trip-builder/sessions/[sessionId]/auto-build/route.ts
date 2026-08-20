@@ -704,7 +704,7 @@ export async function POST(
               radiusKm: dayCursors.has(day) ? INTER_STOP_RADIUS_KM * 2 : destinationMaxDistanceKm,
               excludePlaceIds: excludePlaceIdsForVacation,
             });
-            const rankedNightlife = rankCandidatesFast(nightlifePool, dna, answers.freeText, attributeScoreMap);
+            const rankedNightlife = rankCandidatesFast(nightlifePool, dna, answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands);
             const topNightlife = rankedNightlife[0];
             if (!topNightlife) {
               continue; // אין מקום חיי-לילה מתאים ביעד הזה - לא remainingStops (אין AI fallback לזה)
@@ -779,7 +779,7 @@ export async function POST(
           // תיקון ביצועים (בקשה מפורשת - "יש הכל אצלי באדמין, למה AI לכל
           // תחנה?"): דירוג דטרמיניסטי מהיר (rankCandidatesFast, בלי שום
           // קריאת AI) מספיק כדי לבחור את המקום הכי מתאים מתוך המועמדים.
-          const ranked = rankCandidatesFast(pool, dna, stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText, attributeScoreMap);
+          const ranked = rankCandidatesFast(pool, dna, stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands);
 
           const top = ranked[0];
           if (!top) {

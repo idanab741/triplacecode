@@ -89,25 +89,32 @@ export function rankCandidatesFast(
   candidates: CandidatePlace[],
   dna: TravelDna | null,
   freeText: string,
-  attributeScoreMap?: Map<string, number>
+  attributeScoreMap?: Map<string, number>,
+  // תיקון פער אמיתי שאותר ב-Audit מול MASTER SPEC סעיף 168: אף מקום
+  // בדירוג לא שקל בכלל התאמת גיל ילדים (suitableChildAges), למרות
+  // שהנתון קיים ב-DB ועובר עד ל-payload של הדירוג-דרך-Claude. פרמטר
+  // אופציונלי - ברירת מחדל undefined, אפס שינוי לכל קורא קיים (טיול
+  // יומי/טבע/מסעדות) שלא יעביר אותו; רק סופ"ש/חופשה בחו"ל יעבירו בפועל.
+  childAgeBands?: string[]
 ): CandidatePlace[] {
   if (candidates.length === 0) return [];
   if (candidates.length === 1) {
     return [{ ...candidates[0], score: 100, reason: "המקום היחיד שנמצא במאגר בקטגוריה הזו", source: "fallback" as const }];
   }
-  return applyFallbackScoring(candidates, dna, freeText, attributeScoreMap);
+  return applyFallbackScoring(candidates, dna, freeText, attributeScoreMap, childAgeBands);
 }
 
 function applyFallbackScoring(
   candidates: CandidatePlace[],
   dna: TravelDna | null,
   freeText: string,
-  attributeScoreMap?: Map<string, number>
+  attributeScoreMap?: Map<string, number>,
+  childAgeBands?: string[]
 ): CandidatePlace[] {
   return candidates
     .map((candidate) => ({
       ...candidate,
-      score: computeFallbackScore(dna, candidate, freeText, attributeScoreMap),
+      score: computeFallbackScore(dna, candidate, freeText, attributeScoreMap, childAgeBands),
       reason: freeText ? `התאמה לפי "${freeText}", מרחק ודירוג` : "התאמה בסיסית לפי מרחק ודירוג",
       source: "fallback" as const,
     }))
@@ -310,7 +317,8 @@ function computeFallbackScore(
   dna: TravelDna | null,
   candidate: CandidatePlace,
   freeText: string,
-  attributeScoreMap?: Map<string, number>
+  attributeScoreMap?: Map<string, number>,
+  childAgeBands?: string[]
 ): number {
   const learnedBonus =
     (attributeScoreMap?.get(candidate.category) ?? 0) * 0.2;
@@ -392,13 +400,27 @@ function computeFallbackScore(
     }
   }
 
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 168 - "Ranking צריך
+  // להתחשב ב-... Companion Fit"): bonus חיובי כשלמקום יש תיוג gio מפורש
+  // שמתאים לגילאי הילדים שהוזנו בשאלון - לא עונש כשאין תיוג בכלל (רוב
+  // המקומות לא מתויגים suitable_child_ages, וזה לא אומר שהם לא מתאימים -
+  // רק שאין לנו מידע. עונש על "לא ידוע" היה מעניש בטעות מקומות טובים
+  // בלי סיבה אמיתית).
+  const childAgeBonus =
+    childAgeBands && childAgeBands.length > 0 && candidate.suitableChildAges
+      ? candidate.suitableChildAges.some((age) => childAgeBands.includes(age))
+        ? 12
+        : 0
+      : 0;
+
   const combined =
     ratingScore * 0.25 +
     distanceScore * 0.25 +
     profileBonus -
     profilePenalty +
     freeTextBonus * 1.5 +
-    learnedBonus;
+    learnedBonus +
+    childAgeBonus;
 
   return Math.max(
     0,
