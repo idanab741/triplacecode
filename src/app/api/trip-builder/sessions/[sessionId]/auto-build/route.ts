@@ -37,6 +37,7 @@ import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionServic
 import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services/tripBuilder/types";
 import type { LatLng, AbroadVacationAnswers } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
+import { getWeekendStyleLabel } from "@/locales/he/weekend";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import { saveTripIntent } from "@/services/tripBuilder/sessionService";
