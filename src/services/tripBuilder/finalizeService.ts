@@ -3,7 +3,7 @@ import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary, savePartialItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
-import { validateFinalItinerary } from "./validationService";
+import { validateFinalItinerary, detectPlanBreakerWarnings } from "./validationService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
@@ -25,10 +25,26 @@ interface LikedStopWithPlace extends TripBuilderStop {
 }
 
 const BUDGET_BAND_MAX_TOTAL: Record<string, number | null> = {
+  // טיול יומי (DayTripAnswers.budgetBand)
   "0-100": 100,
   "100-300": 300,
   "300-600": 600,
   "600-1000": 1000,
+  // תיקון באג אמיתי (זוהה ב-MASTER SPEC סעיף 65/250, ואומת בקוד): קריאות
+  // finalizeItinerary עבור סופ"ש/חופשה בחו"ל העבירו answers.budgetBand -
+  // שדה שלא קיים בכלל באף אחד מהם (השדה האמיתי הוא budgetPerPerson, כבר
+  // Budget Envelope לכל הטיול, לא צריך שום חלוקה נוספת) - כך שבדיקת
+  // "העלות המשוערת חורגת מהתקציב" (סעיף 66) תמיד קיבלה undefined וקצרה
+  // ל-null (=ללא הגבלה), בלי קשר לתקציב שנבחר בפועל. מוסיפים כאן את
+  // הערכים האמיתיים של שני סוגי הטיול (סופ"ש + חו"ל, סקאלות שונות),
+  // כדי שאותה טבלה תשרת את שניהם נכון ברגע שהשדה הנכון מועבר בקריאה.
+  "0-1000": 1000, // סופ"ש (WEEKEND_BUDGET_STEPS)
+  "1000-3000": 3000,
+  "3000+": null,
+  "0-2500": 2500, // חופשה בחו"ל (VACATION_BUDGET_STEPS)
+  "2500-7500": 7500,
+  "7500-12000": 12000,
+  "12000+": null,
   unlimited: null,
 };
 
@@ -161,7 +177,7 @@ const warnings: string[] = [];
   // שלה היא ללוג פנימי בלבד ולעולם לא משפיעה על ה-itinerary שמוחזר למשתמש,
   // אין שום סיבה שהמשתמש יחכה עוד קריאת Claude מלאה (3-15+ שניות) רק כדי
   // שנרשום אזהרת ניטור. רץ ברקע, לא חוסם את התשובה.
-  if ((durationBand === "half_day" || durationBand === "full_day") && finalStops.length > 0) {
+  if (isFinal && finalStops.length >= 3) {
     reviewItinerary({ stops: finalStops, tripIntent })
       .then((issues) => {
         if (issues.length > 0) {
@@ -219,11 +235,20 @@ const warnings: string[] = [];
     throw new Error(`המסלול שנבנה אינו תקין: ${validation.errors.join("; ")}`);
   }
 
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיפים 74/121/202): בדיקות
+  // Plan Breaker דטרמיניסטיות (גיאוגרפיה/תזמון חיי-לילה) שלא נבדקו בשום
+  // מקום קודם - לא חוסמות את הבנייה (עדיין אין Repair אמיתי), אבל כן
+  // מגיעות בפועל למשתמש (warnings, כבר מוצג בעמוד התוצאה), לא רק ללוג.
+  const planBreakerWarnings = detectPlanBreakerWarnings(finalStops);
+  if (planBreakerWarnings.length > 0) {
+    console.warn("[Validation] נמצאו Plan Breakers (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
+  }
+
   const itinerary: FinalItinerary = {
     stops: finalStops,
     events: [],
     totalEtaMinutes: cumulativeMinutes,
-    warnings: [...warnings, ...extraWarnings],
+    warnings: [...warnings, ...planBreakerWarnings, ...extraWarnings],
     dayTitles: deriveDayTitles(finalStops),
   };
 

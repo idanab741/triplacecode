@@ -1,4 +1,59 @@
 import type { FinalItineraryStop } from "./types";
+import { haversineDistanceKm } from "./geo";
+
+/**
+ * תיקון פער אמיתי שאותר ב-Audit מול ה-MASTER SPEC (סעיפים 74, 121, 202,
+ * 32, 240): validateFinalItinerary בדק רק תקינות מבנית (placeId/
+ * קואורדינטות/שם/כפילות) - אף אחד מ-20 ה"Plan Breakers" שהמפרט מפרט
+ * (גיאוגרפיה, שעות, ...) לא נבדק בפועל. פונקציה זו בודקת breakers
+ * דטרמיניסטיים שניתן לזהות בלי AI מתוך הנתונים שכבר קיימים ב-stops -
+ * ומחזירה אזהרות (לא חוסמת את הבנייה, לא זורקת שגיאה) - כי אין עדיין
+ * מנגנון Repair אמיתי (Detect→Replace→Recalculate→Revalidate) שיכול
+ * לתקן אותן בבטחה; להחליט "מסלול שבור לגמרי" צריך יותר ודאות מזה, אבל
+ * להראות למשתמש שיש בעיה אמיתית (למשל "40 ק"מ בין שתי תחנות") עדיף
+ * בהרבה על שתיקה מוחלטת, בדיוק כמו שהתקציב כבר עושה (BUDGET_BAND_MAX_TOTAL
+ * ב-finalizeService.ts).
+ */
+const MAX_REASONABLE_INTER_STOP_KM = 40; // MASTER SPEC סעיף 32 - "40km Rule"
+const NIGHTLIFE_EARLIEST_OFFSET_MINUTES = 600; // 19:00 בהנחת יום שמתחיל 09:00 (סעיף 16/240)
+
+export function detectPlanBreakerWarnings(stops: FinalItineraryStop[]): string[] {
+  const warnings: string[] = [];
+
+  // סעיף 32/139-142 - "40km Rule": מרחק גדול מדי בין תחנות עוקבות באותו
+  // יום. בודקים רק בין תחנות **רגילות** (לא תחנות לוגיסטיקה סינתטיות -
+  // אלה תמיד lat=0/lng=0, לא מיקום אמיתי).
+  const realStops = stops.filter((s) => !s.specialType);
+  const byDay = new Map<number, FinalItineraryStop[]>();
+  for (const stop of realStops) {
+    const day = stop.dayIndex ?? 1;
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push(stop);
+  }
+  for (const [day, dayStops] of byDay) {
+    for (let i = 1; i < dayStops.length; i++) {
+      const distanceKm = haversineDistanceKm(
+        { lat: dayStops[i - 1].latitude, lng: dayStops[i - 1].longitude },
+        { lat: dayStops[i].latitude, lng: dayStops[i].longitude }
+      );
+      if (distanceKm > MAX_REASONABLE_INTER_STOP_KM) {
+        warnings.push(
+          `יום ${day}: המרחק בין "${dayStops[i - 1].name}" ל-"${dayStops[i].name}" הוא כ-${Math.round(distanceKm)} ק"מ - רחוק מהמצופה בין תחנות עוקבות.`
+        );
+      }
+    }
+  }
+
+  // סעיף 16/240 - Nightlife לא לפני 19:00.
+  for (const stop of realStops) {
+    if (stop.role === "nightlife" && stop.arrivalOffsetMinutes < NIGHTLIFE_EARLIEST_OFFSET_MINUTES) {
+      warnings.push(`תחנת חיי הלילה "${stop.name}" מתוזמנת מוקדם מדי (לפני 19:00) - חיי לילה אמורים להיות אחת התחנות האחרונות של היום.`);
+    }
+  }
+
+  return warnings;
+}
+
 
 /**
  * ולידציה קשיחה על המסלול הסופי, לפני שהוא נשמר/מוצג ב-Result Page.

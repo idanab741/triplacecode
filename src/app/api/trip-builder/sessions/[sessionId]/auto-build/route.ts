@@ -29,7 +29,7 @@ import { suggestRealRestaurant } from "@/services/tripBuilder/restaurantSuggesti
 import { findRequestedPlaceNear } from "@/services/tripBuilder/placeResolutionService";
 import { findPlaceStatusAndPhoto } from "@/services/tripBuilder/placePhotoService";
 import { generateVacationItinerary, type VacationDaySpec } from "@/services/tripBuilder/vacationAttractionListService";
-import { pickSurpriseDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
+import { pickSurpriseDestination, pickWeekendDestination } from "@/services/tripBuilder/vacationDestinationPickerService";
 import { findAdminDestinationByName } from "@/services/destinations/destinationsServerService";
 import { logAiError } from "@/services/ai/claudeService";
 import { suggestMustSeeLandmarks, findMustSeePlaces } from "@/services/tripBuilder/vacationMustSeeService";
@@ -255,6 +255,10 @@ export async function POST(
     }
 
     let dayOriginOverride: { lat: number; lng: number } | null = null;
+    // מבדיל בין לינה אמיתית (BASE סמכותי - אף פעם לא נדרס) לבין יעד
+    // שהתגלה אוטומטית (ניחוש-ברירת-מחדל, פחות סמכותי מבקשת אזור מפורשת
+    // שעשויה עוד להיפתר אחרי הנקודה הזו - ר' ההערה למטה ליד "אזור מבוקש").
+    let dayOriginOverrideIsLodging = false;
     if (session.trip_type === "abroad_vacation") {
       const hotels = (session as unknown as { hotels?: { name: string; address: string }[] }).hotels ?? [];
       if (hotels.length > 0 && hotels[0].address) {
@@ -271,6 +275,7 @@ export async function POST(
       };
       if (weekendAnswers.hasBookedLodging && weekendAnswers.lodgingAddress) {
         dayOriginOverride = await resolveLodgingCoords(weekendAnswers.lodgingName, weekendAnswers.lodgingAddress);
+        dayOriginOverrideIsLodging = dayOriginOverride != null;
         if (!dayOriginOverride) {
           logAiError("לא הצלחנו לגאוקד את מקום הלינה שהוזן בסופ\"ש - נופלים חזרה למיקום הבית", {
             sessionId,
@@ -278,6 +283,40 @@ export async function POST(
             lodgingAddress: weekendAnswers.lodgingAddress,
           });
         }
+      } else {
+        // תיקון פער אמיתי שאותר ב-Audit מול ה-MASTER SPEC (סעיפים 25-29,
+        // 90, 197): בלי לינה, לא הייתה שום בחירת יעד אמיתית - החיפוש
+        // נשאר שטוח סביב הבית בכל הרדיוס המקסימלי, בדיוק התרחיש שסעיף
+        // 197 מזהיר עליו ("5h תמיד מחזיר near-home"). רצים את זה גם אם
+        // ייתכן ש-tripIntent.requestedArea עוד יתברר כאמיתי בהמשך (הוא
+        // נפתר lazy, לא בהכרח מוכן כאן עדיין) - dayOriginOverrideIsLodging
+        // נשאר false, כך שאם אזור מפורש כן מתגלה בהמשך, הוא עדיין גובר
+        // על הניחוש הזה (ר' הבדיקה למטה ליד "אזור מבוקש").
+        const weekendFullAnswers = answers as unknown as {
+          weekendStyles?: string[];
+          budgetPerPerson?: string;
+          distanceBand?: string;
+        };
+        const dnaSummaryPartsForWeekendDestination: string[] = [];
+        if (dna) {
+          if (dna.interests?.length) dnaSummaryPartsForWeekendDestination.push(`תחומי עניין: ${dna.interests.map(getCategoryLabel).join(", ")}`);
+          if (dna.kosher) dnaSummaryPartsForWeekendDestination.push("חובה: כשרות");
+          if (dna.accessibility) dnaSummaryPartsForWeekendDestination.push("חובה: נגישות");
+        }
+        const chosenWeekendDestination = await pickWeekendDestination({
+          origin,
+          maxRadiusKm: distanceBandToRadiusKm(weekendFullAnswers.distanceBand as Parameters<typeof distanceBandToRadiusKm>[0]),
+          weekendStyleLabels: (weekendFullAnswers.weekendStyles ?? []).map(getWeekendStyleLabel),
+          freeText: answers.freeText,
+          budgetLabel: weekendFullAnswers.budgetPerPerson ?? "לא צוין",
+          travelDnaSummary: dnaSummaryPartsForWeekendDestination.length ? dnaSummaryPartsForWeekendDestination.join(". ") : null,
+        });
+        if (chosenWeekendDestination) {
+          dayOriginOverride = chosenWeekendDestination.coords;
+        }
+        // אם לא נמצא יעד מתאים בטווח (candidates=[] או timeout/שגיאה) -
+        // dayOriginOverride נשאר null, ו-auto-build ממשיך בהתנהגות המקורית
+        // (חיפוש שטוח סביב הבית) כרשת ביטחון - לא נכשל.
       }
     }
 
@@ -381,7 +420,13 @@ export async function POST(
     // "abroad_vacation" ולא "weekend" - כך שסופ"ש עם לינה קיימת נדרס
     // בפועל בכל פעם שהמלל החופשי הזכיר שם מקום, וכל הבנייה עברה לעגן
     // סביב geocoding גנרי של השם (רדיוס 3 ק"מ בלבד) במקום סביב הלינה.
-    if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation" && !dayOriginOverride) {
+    //
+    // תיקון נוסף (Audit): dayOriginOverrideIsLodging, לא רק dayOriginOverride -
+    // יעד שהתגלה אוטומטית (pickWeekendDestination, בלי לינה בכלל) הוא
+    // ניחוש-ברירת-מחדל, פחות סמכותי מבקשת אזור מפורשת בפועל. אם tripIntent
+    // עוד לא היה מוכן כשהיעד התגלה (נפתר lazy), ורק עכשיו מתברר שהמשתמש
+    // כן ביקש אזור ספציפי - האזור המפורש עדיין צריך לגבור על הניחוש.
+    if (tripIntent?.requestedArea && session.trip_type !== "abroad_vacation" && !dayOriginOverrideIsLodging) {
       const geocoded = await geocodePlaceName(tripIntent.requestedArea);
       if (geocoded) {
         searchOrigin = geocoded;
@@ -811,7 +856,7 @@ export async function POST(
           supabase,
           sessionId,
           searchOrigin,
-          answers.budgetBand,
+          (answers as unknown as { budgetPerPerson?: string }).budgetPerPerson ?? "unlimited",
           answers.durationBand,
           tripIntent,
           answers.freeText,
@@ -914,7 +959,7 @@ export async function POST(
               supabase,
               sessionId,
               searchOrigin,
-              answers.budgetBand,
+              (answers as unknown as { budgetPerPerson?: string }).budgetPerPerson ?? "unlimited",
               answers.durationBand,
               tripIntent,
               answers.freeText,
@@ -943,7 +988,7 @@ export async function POST(
         supabase,
         sessionId,
         searchOrigin,
-        answers.budgetBand,
+        (answers as unknown as { budgetPerPerson?: string }).budgetPerPerson ?? "unlimited",
         answers.durationBand,
         tripIntent,
         answers.freeText,
