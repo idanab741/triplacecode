@@ -24,6 +24,14 @@ export interface DestinationCandidate {
   longitude: number;
   /** כמה מקומות/אטרקציות אמיתיים קיימים ביעד הזה ב-DB - ר' הערה למטה. */
   placeCount: number;
+  /** תיקון פער אמיתי (Audit מול MASTER SPEC סעיפים 62/67): רמת-מחיר
+   *  ממוצעת (0-4, סקאלת Google) של המקומות שכבר קיימים ב-DB באזור הזה -
+   *  נתון **אמיתי**, לא מומצא (אין לנו מחיר לינה אמיתי לאף יעד, והמפרט
+   *  אוסר להמציא אחד) - אבל כן אפשר להשתמש בעלות הממוצעת של מקומות
+   *  אמיתיים באזור כאיתות הקשר גס לרמת היוקרה/עלות הכללית שלו, כדי
+   *  שתקציב יוכל בכלל להשפיע על בחירת יעד. null אם אין מספיק נתוני מחיר.
+   */
+  avgPriceLevel: number | null;
 }
 
 /** מתחת לסף הזה, "יעד" לא נחשב מספיק מוכן כדי להפתיע אליו משתמש.
@@ -61,7 +69,7 @@ async function computeAllDestinationCandidates(): Promise<DestinationCandidate[]
   const supabase = await createClient();
   const { data } = await supabase
     .from("places")
-    .select("city, country, latitude, longitude")
+    .select("city, country, latitude, longitude, price_level")
     .eq("is_legacy", false)
     .not("city", "is", null)
     .not("country", "is", null)
@@ -78,6 +86,8 @@ async function computeAllDestinationCandidates(): Promise<DestinationCandidate[]
     latSum: number;
     lngSum: number;
     count: number;
+    priceLevelSum: number;
+    priceLevelCount: number;
   }
   const grouped = new Map<string, Accumulator>();
 
@@ -86,13 +96,26 @@ async function computeAllDestinationCandidates(): Promise<DestinationCandidate[]
     const country = (row.country as string).trim();
     if (!city || !country) continue;
     const key = `${city.toLowerCase()}__${country.toLowerCase()}`;
+    const priceLevel = row.price_level as number | null;
     const existing = grouped.get(key);
     if (existing) {
       existing.latSum += row.latitude as number;
       existing.lngSum += row.longitude as number;
       existing.count += 1;
+      if (priceLevel != null) {
+        existing.priceLevelSum += priceLevel;
+        existing.priceLevelCount += 1;
+      }
     } else {
-      grouped.set(key, { name: city, country, latSum: row.latitude as number, lngSum: row.longitude as number, count: 1 });
+      grouped.set(key, {
+        name: city,
+        country,
+        latSum: row.latitude as number,
+        lngSum: row.longitude as number,
+        count: 1,
+        priceLevelSum: priceLevel ?? 0,
+        priceLevelCount: priceLevel != null ? 1 : 0,
+      });
     }
   }
 
@@ -102,6 +125,7 @@ async function computeAllDestinationCandidates(): Promise<DestinationCandidate[]
     latitude: g.latSum / g.count,
     longitude: g.lngSum / g.count,
     placeCount: g.count,
+    avgPriceLevel: g.priceLevelCount > 0 ? g.priceLevelSum / g.priceLevelCount : null,
   }));
 }
 

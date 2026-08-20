@@ -2,6 +2,33 @@ import type { FinalItineraryStop } from "./types";
 import { haversineDistanceKm } from "./geo";
 
 /**
+ * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 75-77 - Repair Engine):
+ * מנוע Repair מלא (Detect→Replace→Recalculate→Revalidate, עם ניסיונות
+ * חוזרים מוגבלים ו-rollback) הוא פרויקט הנדסי משמעותי בפני עצמו - צריך
+ * להיכנס מחדש ל-candidate pool/ranking עם exclusions, ולוודא שאין לולאה
+ * אינסופית או מצב "תחנה נעלמת בלי סיבה" בלי שיהיה אפשר להריץ ולבדוק את
+ * זה בפועל. במקום זה - החלק הבטוח והבעל-ערך-מיידי ביותר: הסרת כפילויות
+ * אוטומטית, בדיוק העיקרון של סעיף 77 ("עדיף פחות Stops מאשר Stop שבור").
+ * זו הסרה בלבד (לא מוסיפה שום דבר חדש שעלול להיות שגוי) - ומייתרת את
+ * אחד משני מצבי הכשל שקודם היו מפילים את *כל* הבנייה (validateFinalItinerary
+ * זרק שגיאה על כפילות, במקום פשוט להסיר אותה).
+ */
+export function repairDuplicates(stops: FinalItineraryStop[]): { repaired: FinalItineraryStop[]; removedCount: number } {
+  const seenPlaceIds = new Set<string>();
+  const repaired: FinalItineraryStop[] = [];
+  let removedCount = 0;
+  for (const stop of stops) {
+    if (stop.placeId && seenPlaceIds.has(stop.placeId)) {
+      removedCount += 1;
+      continue;
+    }
+    if (stop.placeId) seenPlaceIds.add(stop.placeId);
+    repaired.push(stop);
+  }
+  return { repaired, removedCount };
+}
+
+/**
  * תיקון פער אמיתי שאותר ב-Audit מול ה-MASTER SPEC (סעיפים 74, 121, 202,
  * 32, 240): validateFinalItinerary בדק רק תקינות מבנית (placeId/
  * קואורדינטות/שם/כפילות) - אף אחד מ-20 ה"Plan Breakers" שהמפרט מפרט

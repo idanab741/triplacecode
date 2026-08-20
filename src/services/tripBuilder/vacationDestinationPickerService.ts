@@ -205,7 +205,10 @@ async function pickWeekendDestinationInner(params: {
   if (candidates.length === 0) return null;
 
   const candidateList = candidates
-    .map((c) => `${c.name}, ${c.country} (כ-${Math.round(haversineKm(params.origin, { lat: c.latitude, lng: c.longitude }))} ק"מ מהבית)`)
+    .map((c) => {
+      const priceLabel = c.avgPriceLevel != null ? `, רמת מחירים ממוצעת ${"₪".repeat(Math.max(1, Math.round(c.avgPriceLevel)))}` : "";
+      return `${c.name}, ${c.country} (כ-${Math.round(haversineKm(params.origin, { lat: c.latitude, lng: c.longitude }))} ק"מ מהבית${priceLabel})`;
+    })
     .join("\n");
 
   const prompt = `אתה מומחה טיולים בישראל. המשתמש ביקש שתבחרו עבורו אזור/יעד לסופ"ש, לפי היררכיית מקורות המידע הבאה:
@@ -225,6 +228,13 @@ async function pickWeekendDestinationInner(params: {
 
 אל תעדיף אוטומטית את היעד הכי קרוב - בחר את היעד עם ההתאמה הכי טובה
 לבקשה ולפרופיל, מתוך כל הרשימה.
+
+תיקון (בקשה מפורשת - "תקציב שמשפיע על בחירת יעד"): "רמת מחירים ממוצעת"
+ליד כל יעד היא ממוצע אמיתי של מקומות שכבר קיימים אצלנו שם - לא מחיר
+לינה (אין לנו נתון כזה, ואסור להמציא אחד) - אלא אינדיקציה כללית לרמת
+היוקרה/עלות של האזור. אם התקציב שצוין נמוך, העדף יעדים עם רמת מחירים
+נמוכה-בינונית יותר; אם התקציב גבוה, זה פחות מגביל. יעד בלי נתון מחיר
+בכלל - לא לפסול אותו רק בגלל זה, פשוט אין לנו מספיק מידע עליו.
 
 רשימת היעדים הזמינים:
 ${candidateList}

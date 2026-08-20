@@ -3,7 +3,8 @@ import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary, savePartialItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
-import { validateFinalItinerary, detectPlanBreakerWarnings } from "./validationService";
+import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates } from "./validationService";
+import { attemptGeographyRepair } from "./repairService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
@@ -168,29 +169,6 @@ const warnings: string[] = [];
   if (maxBudget != null && cumulativeCost > maxBudget) {
     warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
   }
-  
-// בקרת איכות אחרונה - רק למסלולים ארוכים יותר, שבהם הסיכון לחוסר איזון גבוה יותר.
-  // זהו כלי ניטור פנימי בלבד - הבעיות נרשמות ביומן (Vercel logs) לצורך מעקב איכות,
-  // ולא מוצגות למשתמש כאזהרה. משתמש שרואה "רשימת תלונות" על הטיול שלו זו חוויה גרועה.
-  //
-  // תיקון מהירות: בכוונה **לא** ממתינים (await) לקריאת ה-Claude הזו - התוצאה
-  // שלה היא ללוג פנימי בלבד ולעולם לא משפיעה על ה-itinerary שמוחזר למשתמש,
-  // אין שום סיבה שהמשתמש יחכה עוד קריאת Claude מלאה (3-15+ שניות) רק כדי
-  // שנרשום אזהרת ניטור. רץ ברקע, לא חוסם את התשובה.
-  if (isFinal && finalStops.length >= 3) {
-    reviewItinerary({ stops: finalStops, tripIntent })
-      .then((issues) => {
-        if (issues.length > 0) {
-          console.warn("[Quality Check] נמצאו בעיות איכות במסלול", {
-            sessionId,
-            issues,
-          });
-        }
-      })
-      .catch(() => {
-        // כלי ניטור פנימי בלבד - כשל כאן לא אמור להפריע לכלום
-      });
-  }
 
   // תיאורים אישיים - Claude כותב תיאור *רק* לתחנות שבאמת אין להן תיאור
   // אמיתי כבר (short_description ריק). קודם זה נקרא לכל התחנות ותמיד
@@ -222,10 +200,33 @@ const warnings: string[] = [];
     }
   }
 
+  // Repair Engine, שלב 1 (בטוח): מסירים כפילויות **לפני** הולידציה
+  // הקשיחה - כך שכפילות בודדת כבר לא מפילה את כל הבנייה, אלא פשוט
+  // מוסרת בשקט (in-place, כי finalStops היא const).
+  const { repaired: dedupedStops, removedCount } = repairDuplicates(finalStops);
+  if (removedCount > 0) {
+    console.warn("[Repair] הוסרו כפילויות מהמסלול לפני ולידציה", { sessionId, removedCount });
+    finalStops.length = 0;
+    finalStops.push(...dedupedStops);
+  }
+
+  // Repair Engine, שלב 2 (Audit מול MASTER SPEC סעיפים 75-77 - היה
+  // מסומן PARTIAL, לא PASS): ניסיון החלפה אמיתי לתחנות ששוברות את כלל
+  // ה-40 ק"מ - Replacement + Retry Limit + Rollback (ר' repairService.ts
+  // להסבר המלא, כולל למה זה עדיין לא Repair Engine מלא לכל 20 ה-Breakers).
+  const { repaired: geoRepairedStops, repairedCount, attemptedCount } = await attemptGeographyRepair(supabase, finalStops, sessionId);
+  if (attemptedCount > 0) {
+    finalStops.length = 0;
+    finalStops.push(...geoRepairedStops);
+    console.warn("[Repair] סיכום ניסיונות תיקון גיאוגרפי", { sessionId, attemptedCount, repairedCount });
+  }
+
 // ולידציה קשיחה לפני שמירה/הצגה (מפרט סעיף 23-24: Generate → Validate →
   // Display). אם יש בעיה מבנית אמיתית - לא שומרים ולא מחזירים מסלול פגום;
   // ה-API route (finalize/route.ts) כבר עוטף קריאה זו ב-try/catch ומחזיר
   // { error } למשתמש במקום itinerary, כך שאין סיכון להצגת "חצי מסלול".
+  // חשוב - זו עדיין הבדיקה **החוסמת** היחידה: Repair (למעלה) וQuality
+  // Check (למטה, אחרי השמירה) לעולם לא מחליפים אותה או עוקפים אותה.
   const validation = validateFinalItinerary(finalStops);
   if (!validation.valid) {
     console.error("[Validation] המסלול נכשל בבדיקת התקינות - לא נשמר ולא יוצג", {
@@ -235,13 +236,12 @@ const warnings: string[] = [];
     throw new Error(`המסלול שנבנה אינו תקין: ${validation.errors.join("; ")}`);
   }
 
-  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיפים 74/121/202): בדיקות
-  // Plan Breaker דטרמיניסטיות (גיאוגרפיה/תזמון חיי-לילה) שלא נבדקו בשום
-  // מקום קודם - לא חוסמות את הבנייה (עדיין אין Repair אמיתי), אבל כן
-  // מגיעות בפועל למשתמש (warnings, כבר מוצג בעמוד התוצאה), לא רק ללוג.
+  // Revalidation (אחרי Repair): בודקים שוב את ה-Plan Breakers הדטרמיניסטיים
+  // על המסלול **אחרי** ניסיון התיקון - חלק מהם תוקנו (לא יופיעו יותר),
+  // מה שנשאר (לא נמצא תחליף) עדיין מוצג כאזהרה למשתמש, לא נחסם.
   const planBreakerWarnings = detectPlanBreakerWarnings(finalStops);
   if (planBreakerWarnings.length > 0) {
-    console.warn("[Validation] נמצאו Plan Breakers (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
+    console.warn("[Validation] נמצאו Plan Breakers גם אחרי Repair (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
   }
 
   const itinerary: FinalItinerary = {
@@ -257,6 +257,51 @@ const warnings: string[] = [];
   } else {
     await savePartialItinerary(supabase, sessionId, itinerary);
   }
+
+  // בקרת איכות אחרונה (AI) - רק **אחרי** שהמסלול כבר עבר Repair+Validation
+  // ונשמר בהצלחה (בקשה מפורשת - "תוודא ש-Hard Validation נשאר נפרד ממנו
+  // וחוסם Finalize כאשר יש הפרה אמיתית" - קודם זה רץ *לפני* הולידציה
+  // הקשיחה, כלומר גם על מסלול שעמד להיכשל ולא להישמר בכלל). עדיין
+  // אסינכרוני/לא-חוסם (ר' ההסבר המקורי למטה) - ההבדל היחיד הוא מתי זה
+  // מתחיל לרוץ, לא איך.
+  //
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 122-124 - "Quality Check
+  // אינו לוג בלבד"): קודם הממצאים הגיעו רק ל-console.warn (לוג שרת בלבד,
+  // המשתמש לעולם לא רואה אותם). ההחלטה הארכיטקטונית שאושרה: להשאיר את
+  // זה אסינכרוני (לא מעכב את התשובה - בלי זה, כל בנייה גמורה הייתה
+  // מחכה עוד קריאת Claude מלאה, 3-15+ שניות, רק בשביל בדיקת איכות) -
+  // אבל ברגע שהתוצאה מגיעה, לכתוב אותה בפועל ל-final_itinerary.warnings
+  // ב-DB, לא רק ללוג. עמוד התוצאה כבר עושה polling ל-session כל 2.5
+  // שניות (result/page.tsx) - כך שהאזהרות "יופיעו" למשתמש תוך שניות
+  // ספורות אחרי טעינת המסלול, בלי לעכב את הטעינה הראשונית בכלל. קוראים
+  // מחדש את ה-final_itinerary העדכני ביותר לפני הכתיבה (לא את המשתנה
+  // המקומי itinerary) כדי לא לדרוס עריכות שהמשתמש כבר עשה (גרירה/מחיקה/
+  // עריכה) בזמן שקריאת ה-AI הזו עדיין רצה ברקע.
+  if (isFinal && finalStops.length >= 3) {
+    reviewItinerary({ stops: finalStops, tripIntent })
+      .then(async (issues) => {
+        if (issues.length === 0) return;
+        console.warn("[Quality Check] נמצאו בעיות איכות במסלול - נכתבות ל-warnings", {
+          sessionId,
+          issues,
+        });
+        const { data: latest } = await supabase
+          .from("trip_builder_sessions")
+          .select("final_itinerary")
+          .eq("id", sessionId)
+          .maybeSingle();
+        const latestItinerary = latest?.final_itinerary as FinalItinerary | null;
+        if (!latestItinerary) return;
+        await supabase
+          .from("trip_builder_sessions")
+          .update({ final_itinerary: { ...latestItinerary, warnings: [...(latestItinerary.warnings ?? []), ...issues] } })
+          .eq("id", sessionId);
+      })
+      .catch(() => {
+        // כלי ניטור פנימי בלבד - כשל כאן לא אמור להפריע לכלום
+      });
+  }
+
   return itinerary;
 }
 
