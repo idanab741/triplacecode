@@ -57,9 +57,16 @@ export async function generateDayBlueprint(
     // so זה עדיין מוגבל ל-1/2, לא 3).
     const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
 
+    // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3/9 - "Companion Fit
+    // צריך להשפיע בפועל על Pace/Activities, לא רק להיות המלצה ל-AI"):
+    // ילד 0-3 = פחות מעברים/עצירות הוא Hard Constraint לפי המפרט, לא
+    // המלצה רכה - אוכף אותו בקוד (תקרה של 3 אטרקציות ביום, גם אם ה-pace
+    // שנבחר "packed"/"balanced" היה נותן יותר), לא רק מבקש בנימוס מ-AI.
+    const attractionsCap = context.trip.childAgeBands.includes("0-3") ? 3 : Infinity;
+
     return {
       title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : fallback.title,
-      attractionsCount: clampAttractionsCount(paceCounts.attractions),
+      attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
       includeSecondFoodStop: paceCounts.food >= 2,
       focusCategories:
         Array.isArray(parsed.focusCategories) && parsed.focusCategories.length > 0
@@ -85,9 +92,10 @@ function clampAttractionsCount(value: unknown): number {
  *  למעלה על VACATION_PACE_DAILY_COUNTS) - לא קבועים, גם כאן. */
 function fallbackBlueprint(context: VacationContext): DayBlueprint {
   const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
+  const attractionsCap = context.trip.childAgeBands.includes("0-3") ? 3 : Infinity;
   return {
     title: `יום בילויים ב${context.trip.destination}`,
-    attractionsCount: clampAttractionsCount(paceCounts.attractions),
+    attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
     includeSecondFoodStop: paceCounts.food >= 2,
     focusCategories: context.trip.vacationTypes.slice(0, 2),
   };
@@ -122,12 +130,25 @@ function buildPrompt(context: VacationContext, dayNumber: number, previousDayTit
   const previousTitlesText =
     previousDayTitles.length > 0 ? previousDayTitles.map((t, i) => `יום ${i + 1}: ${t}`).join("\n") : "(אין ימים קודמים)";
 
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3/8 - "Companion Fit
+  // צריך להשפיע על Day Blueprint/Pace, לא רק לדעת ש'יש ילדים'"): גיל
+  // ילדים ספציפי משנה לגמרי מה מתאים - 0-3 (עגלה, הליכות קצרות, פחות
+  // מעברים) שונה בתכלית מ-12-18 (כמעט הכל מתאים, כולל אקסטרים קל).
+  const childGuidance =
+    context.trip.childAgeBands.length === 0
+      ? ""
+      : context.trip.childAgeBands.includes("0-3")
+        ? "\n- חשוב: יש ילד/ה בגיל 0-3 - העדף הליכות קצרות, מקומות נגישים לעגלה, פחות מעברים בין תחנות, ולא פעילות אקסטרים/הליכה מתישה."
+        : context.trip.childAgeBands.includes("3-7")
+          ? "\n- יש ילד/ה בגיל 3-7 - מתאים: פארקים, חיות, פעילויות אינטראקטיביות, טבע קצר - לא הליכות ארוכות/מוזיאונים כבדים."
+          : "";
+
   return `אתה מדריך טיולים מקומי מומחה ב-${context.trip.destination}, לא רק "ממלא תבנית". זהו יום ${dayNumber} מתוך חופשה בת ${context.trip.numDays} ימים.
 
 הקשר הטיול:
 - סוגי חופשה שנבחרו: ${vacationTypeLabels}
 - קצב: ${context.trip.pace}
-- מלווים: ${context.trip.companionsLabel}${context.trip.hasChildren ? " (עם ילדים)" : ""}
+- מלווים: ${context.trip.companionsLabel}${context.trip.hasChildren ? " (עם ילדים)" : ""}${childGuidance}
 - בקשה חופשית מהמשתמש (המקור החשוב ביותר לאופי הטיול - קרא אותה בעיון!): ${JSON.stringify(context.trip.freeText || null)}
 
 בקשה מפורשת - הבקשה החופשית חייבת לעצב את היום הזה בפועל, לא רק להישמר

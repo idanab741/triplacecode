@@ -58,6 +58,11 @@ export interface VacationContext {
     numDays: number;
     travelers: number;
     hasChildren: boolean;
+    /** תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3 - "Companion Fit"):
+     *  hasChildren בוליאני לבדו לא מספיק - משפחה עם ילד בן 0-3 (עגלה,
+     *  הליכות קצרות) שונה לגמרי ממשפחה עם נער בן 16 (כמעט הכל מתאים).
+     *  שדה חדש, לא שובר כלום קיים. */
+    childAgeBands: string[];
     /** בקשה מפורשת - בחירה מרובה למי מטיילים (למשל "זוג, חברים") - כדי
      *  שה-AI יראה את ההרכב המלא שנבחר, לא רק ספירה גסה. */
     companionsLabel: string;

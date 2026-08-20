@@ -34,6 +34,7 @@ export function buildVacationContext(params: BuildVacationContextParams): Vacati
       numDays,
       travelers: companionsToTravelerCount(answers.companions),
       hasChildren: (answers.childAgeBands ?? []).length > 0,
+      childAgeBands: answers.childAgeBands ?? [],
       companionsLabel: companionsToLabel(answers.companions),
       budgetBand: answers.budgetPerPerson,
       pace: answers.pace,
