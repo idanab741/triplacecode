@@ -44,7 +44,10 @@ export function repairDuplicates(stops: FinalItineraryStop[]): { repaired: Final
 const MAX_REASONABLE_INTER_STOP_KM = 40; // MASTER SPEC סעיף 32 - "40km Rule"
 const NIGHTLIFE_EARLIEST_OFFSET_MINUTES = 600; // 19:00 בהנחת יום שמתחיל 09:00 (סעיף 16/240)
 
-export function detectPlanBreakerWarnings(stops: FinalItineraryStop[]): string[] {
+export function detectPlanBreakerWarnings(
+  stops: FinalItineraryStop[],
+  requirements?: { requireKosher?: boolean; requireAccessible?: boolean; childAgeBands?: string[] }
+): string[] {
   const warnings: string[] = [];
 
   // סעיף 32/139-142 - "40km Rule": מרחק גדול מדי בין תחנות עוקבות באותו
@@ -69,12 +72,65 @@ export function detectPlanBreakerWarnings(stops: FinalItineraryStop[]): string[]
         );
       }
     }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 74 Breaker 6, סעיף 233):
+    // יותר מדי תחנות ביום ביחס לכל pace סביר - גם "packed" לא אמור לחרוג
+    // מ-8 תחנות אמיתיות ביום אחד (VACATION_PACE_DAILY_COUNTS: attractions
+    // עד 5 + food עד 3 = 8, התקרה העליונה מכל הפרופילים).
+    const MAX_REASONABLE_STOPS_PER_DAY = 8;
+    if (dayStops.length > MAX_REASONABLE_STOPS_PER_DAY) {
+      warnings.push(`יום ${day}: ${dayStops.length} תחנות ביום אחד - עמוס מהמצופה, גם לקצב "מתוכנן".`);
+    }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 131-132 Breaker 16):
+    // חזרתיות קטגוריה ללא הצדקה - 3+ תחנות מאותה קטגוריה באותו יום
+    // (לדוגמה 3 בתי קפה) בלי שהוזכר במפורש "סיבוב קפה/יין" וכדומה.
+    // בדיקה שמרנית - לא בודקת freeText, רק סופרת, ומזהירה רק מ-3+.
+    const categoryCounts = new Map<string, number>();
+    for (const s of dayStops) categoryCounts.set(s.category, (categoryCounts.get(s.category) ?? 0) + 1);
+    for (const [category, count] of categoryCounts) {
+      if (count >= 3) {
+        warnings.push(`יום ${day}: ${count} תחנות מאותה קטגוריה (${category}) - ודאו שזה מכוון ולא חזרתיות מיותרת.`);
+      }
+    }
   }
 
   // סעיף 16/240 - Nightlife לא לפני 19:00.
   for (const stop of realStops) {
     if (stop.role === "nightlife" && stop.arrivalOffsetMinutes < NIGHTLIFE_EARLIEST_OFFSET_MINUTES) {
       warnings.push(`תחנת חיי הלילה "${stop.name}" מתוזמנת מוקדם מדי (לפני 19:00) - חיי לילה אמורים להיות אחת התחנות האחרונות של היום.`);
+    }
+  }
+
+  // תיקון פער אמיתי (Audit מול MASTER SPEC Breakers 9/10/11 - סעיף 74):
+  // defense-in-depth על כשרות/נגישות/גיל ילדים - אלה כבר hard-filter
+  // ב-Candidate Pool (rankCandidatesFast/fetchCandidatePool), אז זה לא
+  // אמור לקרות בזרימה תקינה - אבל אם קרה בכל זאת (למשל תחנה שהוזנה
+  // ידנית ע"י Chat Edit, שלא עוברת דרך אותו hard filter), עדיף להתריע
+  // מאשר לשתוק. בודקים רק אם התחנה בכלל מתויגת (kosher/accessible לא
+  // null) - אין עונש על "לא ידוע", רק על סתירה מפורשת בפועל.
+  if (requirements?.requireKosher) {
+    for (const stop of realStops) {
+      if (stop.kosher === false) {
+        warnings.push(`התחנה "${stop.name}" מתויגת כלא-כשרה, למרות שביקשתם כשרות.`);
+      }
+    }
+  }
+  if (requirements?.requireAccessible) {
+    for (const stop of realStops) {
+      if (stop.accessible === false) {
+        warnings.push(`התחנה "${stop.name}" מתויגת כלא-נגישה, למרות שביקשתם נגישות.`);
+      }
+    }
+  }
+  if (requirements?.childAgeBands && requirements.childAgeBands.length > 0) {
+    for (const stop of realStops) {
+      if (stop.suitableChildAges && stop.suitableChildAges.length > 0) {
+        const matches = stop.suitableChildAges.some((age) => requirements.childAgeBands!.includes(age));
+        if (!matches) {
+          warnings.push(`התחנה "${stop.name}" מתויגת כמתאימה לגילאים אחרים מגילאי הילדים שצוינו.`);
+        }
+      }
     }
   }
 

@@ -185,6 +185,16 @@ export interface FinalItineraryStop {
   /** ×§×™×©×•×¨ ×œ×”×–×ž× ×ª × ×¡×™×¢×” (Google Maps directions - ×”×ž×©×ª×ž×© ×‘×•×—×¨ ×©× ××•×‘×¨/×ž×•× ×™×ª/
    *  ×ª×—×‘×•×¨×” ×¦×™×‘×•×¨×™×ª) - ×¨×§ ×œ×ª×—× ×•×ª ×œ×•×’×™×¡×˜×™×§×” (× ×—×™×ª×”/×˜×™×¡×ª ×—×–×¨×”). null/undefined ×œ×ª×—× ×” ×¨×’×™×œ×”. */
   directionsUrl?: string | null;
+  /** תיקון פער אמיתי (Audit מול MASTER SPEC - Plan Breakers 9/10/11):
+   *  שדות אופציונליים חדשים - מאפשרים ל-detectPlanBreakerWarnings לבדוק
+   *  כשרות/נגישות/התאמת גיל ברמת defense-in-depth *אחרי* שהתחנה כבר
+   *  נבחרה, גם אם זה כבר hard-filter לפני הבחירה (rankCandidatesFast) -
+   *  תפיסת מקרה קצה שהמסנן המקורי פספס. undefined כברירת מחדל, לא שובר
+   *  קוד קיים שלא ממלא את זה.
+   */
+  kosher?: boolean | null;
+  accessible?: boolean | null;
+  suitableChildAges?: string[] | null;
 }
 
 export interface FinalItineraryEvent {

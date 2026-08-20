@@ -22,6 +22,9 @@ interface LikedStopWithPlace extends TripBuilderStop {
     estimated_visit_minutes: number | null;
     opening_hours: string[] | null;
     short_description: string | null;
+    kosher: boolean | null;
+    accessible: boolean | null;
+    suitable_child_ages: string[] | null;
   } | null;
 }
 
@@ -71,7 +74,16 @@ export async function finalizeItinerary(
    *  אזהרות נוספות (למשל "יום 3 נכשל בבנייה: ...") שמוזרקות ישירות
    *  ל-warnings של המסלול הסופי - נראה בפועל בעמוד התוצאה, בלי צורך
    *  בגישה לטרמינל/לוגים בכלל. */
-  extraWarnings: string[] = []
+  extraWarnings: string[] = [],
+  /** תיקון פער אמיתי (Audit מול MASTER SPEC - Plan Breakers 9/10/11):
+   *  פרמטר אופציונלי חדש בסוף הרשימה - תואם-לאחור לגמרי, אף קורא קיים
+   *  לא צריך להשתנות. מאפשר ל-detectPlanBreakerWarnings לבדוק אם תחנה
+   *  שנבחרה בפועל סותרת דרישה קשיחה שהמשתמש ציין (כשרות/נגישות/גיל
+   *  ילדים) - defense-in-depth, לא מחליף את ה-hard filter ב-Candidate
+   *  Pool (rankCandidatesFast/fetchCandidatePool), רק תופס מקרה קצה
+   *  שהמסנן שם פספס.
+   */
+  requirements?: { requireKosher?: boolean; requireAccessible?: boolean; childAgeBands?: string[] }
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -84,7 +96,7 @@ export async function finalizeItinerary(
 const { data: stops } = await supabase
     .from("trip_builder_stops")
 .select(
-      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description)"
+      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description,kosher,accessible,suitable_child_ages)"
     )
     .eq("session_id", sessionId)
     .eq("status", "liked")
@@ -150,6 +162,9 @@ finalStops.push({
         longitude: placeLatLng.lng,
         openingHours: stop.place!.opening_hours,
         dayIndex: stop.day_index,
+        kosher: stop.place!.kosher,
+        accessible: stop.place!.accessible,
+        suitableChildAges: stop.place!.suitable_child_ages,
     });
 
     cumulativeMinutes += stop.place!.estimated_visit_minutes ?? 60;
@@ -239,7 +254,7 @@ const warnings: string[] = [];
   // Revalidation (אחרי Repair): בודקים שוב את ה-Plan Breakers הדטרמיניסטיים
   // על המסלול **אחרי** ניסיון התיקון - חלק מהם תוקנו (לא יופיעו יותר),
   // מה שנשאר (לא נמצא תחליף) עדיין מוצג כאזהרה למשתמש, לא נחסם.
-  const planBreakerWarnings = detectPlanBreakerWarnings(finalStops);
+  const planBreakerWarnings = detectPlanBreakerWarnings(finalStops, requirements);
   if (planBreakerWarnings.length > 0) {
     console.warn("[Validation] נמצאו Plan Breakers גם אחרי Repair (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
   }

@@ -9,8 +9,27 @@ import { rankCandidates } from "@/services/tripBuilder/rankingService";
 import { likeStop } from "@/services/tripBuilder/swipeService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel } from "@/services/tripBuilder/rules/dayTrip";
+import { distanceBandToRadiusKm } from "@/services/tripBuilder/geo";
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
+
+/** תיקון פער אמיתי - אותו mapping בדיוק שכבר קיים ב-auto-build/route.ts
+ *  (VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL) - סקאלת budgetPerPerson
+ *  של סופ"ש/חופשה בחו"ל שונה לגמרי מ-DayTripAnswers.budgetBand. */
+const VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL: Record<string, number | null> = {
+  "0-1000": 1,
+  "1000-3000": 2,
+  "3000+": 3,
+  "0-2500": 1,
+  "2500-7500": 2,
+  "7500-12000": 3,
+  "12000+": 4,
+  unlimited: null,
+};
+function vacationBudgetToMaxPriceLevel(budgetPerPerson: string | null | undefined): number | null {
+  if (!budgetPerPerson) return null;
+  return VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL[budgetPerPerson] ?? null;
+}
 
 /**
  * "טריפי" - עריכת המסלול בשיחה חופשית. המשתמש כותב בקשה ("תחליף את המסעדה
@@ -42,7 +61,17 @@ export async function POST(
   const itinerary = session.final_itinerary;
   if (!itinerary) return NextResponse.json({ error: "אין עדיין מסלול סופי" }, { status: 400 });
 
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 115-118 - Chat Edit):
+  // הקובץ הזה טיפל בכל trip_type כאילו הוא DayTripAnswers - אותו באג
+  // בדיוק שכבר תוקן 3 פעמים ב-auto-build/route.ts/finalizeService.ts:
+  // answers.budgetBand לא קיים בכלל בסופ"ש/חופשה (השדה שם הוא budgetPerPerson,
+  // סקאלת ערכים שונה). כאן זה עוד יותר משמעותי כי chat-edit הוא בדיוק
+  // הזרימה ש"תוזילו את המסלול" (סעיף 118) אמורה לעבוד בה - עם הבאג הזה,
+  // בקשה כזו בסופ"ש/חופשה בכלל לא הייתה מוגבלת לשום תקציב אמיתי.
+  const isVacationLikeTrip = session.trip_type === "weekend" || session.trip_type === "abroad_vacation";
   const answers = session.answers as unknown as DayTripAnswers;
+  const vacationAnswers = session.answers as unknown as { budgetPerPerson?: string; distanceBand?: string };
+  const effectiveBudgetBand = isVacationLikeTrip ? (vacationAnswers.budgetPerPerson ?? "unlimited") : answers.budgetBand;
 
   try {
     const interpretation = await interpretInstruction(instruction, itinerary.stops);
@@ -66,15 +95,25 @@ export async function POST(
       const attributeScoreMap = await getAttributeScoreMap(supabase, user.id);
       const learnedAttributes = summarizeTopAttributes(attributeScoreMap);
       const rules = getTripTypeRules(session.trip_type);
-      const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
+      const remainingBudgetLabel = effectiveBudgetBand === "unlimited" ? "ללא הגבלה" : effectiveBudgetBand;
       const excludePlaceIds = itinerary.stops.map((s) => s.placeId);
+
+      // תיקון פער אמיתי: distanceBand בפועל משמש רק כ-fallback אם pool
+      // ריק ברדיוס 3 ק"מ המפורש - עבור abroad_vacation אין distanceBand
+      // בכלל (undefined), מה שהיה עלול לגרום ל-fetchCandidatePool להיכשל
+      // בשקט על ה-fallback שלה. "1h" הוא ברירת מחדל סבירה כשאין ערך אמיתי.
+      const effectiveDistanceBand = isVacationLikeTrip
+        ? ((vacationAnswers.distanceBand as Parameters<typeof distanceBandToRadiusKm>[0]) ?? "1h")
+        : answers.distanceBand;
 
       const pool = await fetchCandidatePool(supabase, {
         category: targetStop.category,
         origin: { lat: targetStop.latitude, lng: targetStop.longitude },
-        distanceBand: answers.distanceBand,
+        distanceBand: effectiveDistanceBand,
         maxDistanceKm: 3,
-        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+        maxPriceLevel: isVacationLikeTrip
+          ? vacationBudgetToMaxPriceLevel(effectiveBudgetBand)
+          : dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
         requireKosher: dna?.kosher === true,
         requireAccessible: dna?.accessibility === true,
@@ -109,9 +148,15 @@ export async function POST(
       supabase,
       sessionId,
       { lat: session.origin_latitude!, lng: session.origin_longitude! },
-      answers.budgetBand,
+      effectiveBudgetBand,
       answers.durationBand,
-      session.trip_intent
+      session.trip_intent,
+      undefined,
+      true,
+      [],
+      {
+        childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+      }
     );
 
     return NextResponse.json({ itinerary: updatedItinerary, message: interpretation.confirmationMessage });

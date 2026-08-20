@@ -9,8 +9,24 @@ import { rankCandidates } from "@/services/tripBuilder/rankingService";
 import { likeStop } from "@/services/tripBuilder/swipeService";
 import { getTripTypeRules } from "@/services/tripBuilder/rules";
 import { dayTripBudgetToMaxPriceLevel } from "@/services/tripBuilder/rules/dayTrip";
+import { distanceBandToRadiusKm } from "@/services/tripBuilder/geo";
 import { finalizeItinerary } from "@/services/tripBuilder/finalizeService";
 import type { DayTripAnswers } from "@/services/tripBuilder/types";
+
+const VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL: Record<string, number | null> = {
+  "0-1000": 1,
+  "1000-3000": 2,
+  "3000+": 3,
+  "0-2500": 1,
+  "2500-7500": 2,
+  "7500-12000": 3,
+  "12000+": 4,
+  unlimited: null,
+};
+function vacationBudgetToMaxPriceLevel(budgetPerPerson: string | null | undefined): number | null {
+  if (!budgetPerPerson) return null;
+  return VACATION_BUDGET_PER_PERSON_MAX_PRICE_LEVEL[budgetPerPerson] ?? null;
+}
 
 /**
  * "טריפי" לפי תחנה ספציפית - בשונה מ-chat-edit הכללי, כאן כבר יודעים בוודאות
@@ -46,7 +62,10 @@ export async function POST(
   const targetStop = itinerary.stops.find((s) => s.stopId === stopId);
   if (!targetStop) return NextResponse.json({ error: "התחנה לא נמצאה" }, { status: 404 });
 
+  const isVacationLikeTrip = session.trip_type === "weekend" || session.trip_type === "abroad_vacation";
   const answers = session.answers as unknown as DayTripAnswers;
+  const vacationAnswers = session.answers as unknown as { budgetPerPerson?: string; distanceBand?: string };
+  const effectiveBudgetBand = isVacationLikeTrip ? (vacationAnswers.budgetPerPerson ?? "unlimited") : answers.budgetBand;
 
   try {
     // כפתור המחיקה בסוויפ שולח action="remove" ישירות - אין צורך לבזבז קריאת
@@ -62,15 +81,20 @@ export async function POST(
       const attributeScoreMap = await getAttributeScoreMap(supabase, user.id);
       const learnedAttributes = summarizeTopAttributes(attributeScoreMap);
       const rules = getTripTypeRules(session.trip_type);
-      const remainingBudgetLabel = answers.budgetBand === "unlimited" ? "ללא הגבלה" : answers.budgetBand;
+      const remainingBudgetLabel = effectiveBudgetBand === "unlimited" ? "ללא הגבלה" : effectiveBudgetBand;
       const excludePlaceIds = itinerary.stops.map((s) => s.placeId);
+      const effectiveDistanceBand = isVacationLikeTrip
+        ? ((vacationAnswers.distanceBand as Parameters<typeof distanceBandToRadiusKm>[0]) ?? "1h")
+        : answers.distanceBand;
 
       const pool = await fetchCandidatePool(supabase, {
         category: targetStop.category,
         origin: { lat: targetStop.latitude, lng: targetStop.longitude },
-        distanceBand: answers.distanceBand,
+        distanceBand: effectiveDistanceBand,
         maxDistanceKm: 3,
-        maxPriceLevel: dayTripBudgetToMaxPriceLevel(answers.budgetBand),
+        maxPriceLevel: isVacationLikeTrip
+          ? vacationBudgetToMaxPriceLevel(effectiveBudgetBand)
+          : dayTripBudgetToMaxPriceLevel(answers.budgetBand),
         excludePlaceIds,
         requireKosher: dna?.kosher === true,
         requireAccessible: dna?.accessibility === true,
@@ -105,10 +129,15 @@ const updatedItinerary = await finalizeItinerary(
       supabase,
       sessionId,
       { lat: session.origin_latitude!, lng: session.origin_longitude! },
-      answers.budgetBand,
+      effectiveBudgetBand,
       answers.durationBand,
       session.trip_intent,
-      answers.freeText
+      answers.freeText,
+      true,
+      [],
+      {
+        childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+      }
     );
 
     return NextResponse.json({ itinerary: updatedItinerary });

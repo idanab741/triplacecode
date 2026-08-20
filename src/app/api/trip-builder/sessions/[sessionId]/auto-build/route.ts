@@ -861,7 +861,13 @@ export async function POST(
           answers.durationBand,
           tripIntent,
           answers.freeText,
-          false
+          false,
+          [],
+          {
+            requireKosher: dna?.kosher === true,
+            requireAccessible: dna?.accessibility === true,
+            childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+          }
         );
       }
 
@@ -964,7 +970,13 @@ export async function POST(
               answers.durationBand,
               tripIntent,
               answers.freeText,
-              false
+              false,
+              [],
+              {
+                requireKosher: dna?.kosher === true,
+                requireAccessible: dna?.accessibility === true,
+                childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+              }
             );
           } catch (dayError) {
             // בקשה מפורשת - יום בודד שנכשל לא אמור "לבלוע" בשקט את כל
@@ -994,7 +1006,12 @@ export async function POST(
         tripIntent,
         answers.freeText,
         true,
-        dayBuildWarnings
+        dayBuildWarnings,
+        {
+          requireKosher: dna?.kosher === true,
+          requireAccessible: dna?.accessibility === true,
+          childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+        }
       );
       return NextResponse.json({ itinerary });
     }
