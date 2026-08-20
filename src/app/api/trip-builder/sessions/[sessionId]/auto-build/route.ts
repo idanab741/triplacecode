@@ -825,7 +825,13 @@ export async function POST(
         ? Promise.resolve(tripIntent)
         : (async () => {
             try {
-              const weatherSummary = await getWeatherSummary(origin.lat, origin.lng);
+              // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 68): מזג האוויר
+              // נשלף עבור origin (מיקום הבית המקורי של המשתמש), לא עבור
+              // searchOrigin (הלינה/היעד בפועל של הטיול) - אם המשתמש
+              // בתל אביב אבל הסופ"ש בכנרת, זה היה מביא מזג אוויר של
+              // תל אביב לתוך תכנון סופ"ש בכנרת. searchOrigin כבר נקבע
+              // בשלב הזה (גילוי יעד/לינה כבר רץ למעלה).
+              const weatherSummary = await getWeatherSummary(searchOrigin.lat, searchOrigin.lng);
               const generated = await generateTripIntent({
                 dna,
                 answers: normalizeAnswers(session.trip_type, answers),
@@ -909,7 +915,7 @@ export async function POST(
       }
 
       if (numDays > 2) {
-        const contextWeatherSummary = await getWeatherSummary(origin.lat, origin.lng);
+        const contextWeatherSummary = await getWeatherSummary(searchOrigin.lat, searchOrigin.lng);
         // תיקון באג אמיתי (בקשה מפורשת - "למה אין התייחסות למלל החופשי??
         // ביקשתי אטרקציות, חיי לילה וחופים!"): buildVacationContext קורא
         // רק answers.vacationTypes - שדה ששייך לחופשה בחו"ל בלבד. בסופ"ש

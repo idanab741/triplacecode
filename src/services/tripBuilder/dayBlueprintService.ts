@@ -149,7 +149,7 @@ function buildPrompt(context: VacationContext, dayNumber: number, previousDayTit
 - סוגי חופשה שנבחרו: ${vacationTypeLabels}
 - קצב: ${context.trip.pace}
 - מלווים: ${context.trip.companionsLabel}${context.trip.hasChildren ? " (עם ילדים)" : ""}${childGuidance}
-- בקשה חופשית מהמשתמש (המקור החשוב ביותר לאופי הטיול - קרא אותה בעיון!): ${JSON.stringify(context.trip.freeText || null)}
+${context.live.weatherSummary ? `- מזג אוויר צפוי: ${context.live.weatherSummary} - אם יש גשם/חום קיצוני, העדף focusCategories מתאימות (indoor/culture/food בגשם; טבע בבוקר ומקומות מוצלים/עם מים בחום) - בלי לשנות את אופי הטיול שהמשתמש ביקש, רק את הבחירה בתוכו.\n` : ""}- בקשה חופשית מהמשתמש (המקור החשוב ביותר לאופי הטיול - קרא אותה בעיון!): ${JSON.stringify(context.trip.freeText || null)}
 
 בקשה מפורשת - הבקשה החופשית חייבת לעצב את היום הזה בפועל, לא רק להישמר
 כרקע. תחשוב כמו מדריך טיולים מקומי אמיתי שמכיר את ${context.trip.destination}
