@@ -3,6 +3,7 @@ import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary, savePartialItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
+import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates } from "./validationService";
 import { attemptGeographyRepair } from "./repairService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
@@ -25,6 +26,7 @@ interface LikedStopWithPlace extends TripBuilderStop {
     kosher: boolean | null;
     accessible: boolean | null;
     suitable_child_ages: string[] | null;
+    source: string | null;
   } | null;
 }
 
@@ -96,7 +98,7 @@ export async function finalizeItinerary(
 const { data: stops } = await supabase
     .from("trip_builder_stops")
 .select(
-      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description,kosher,accessible,suitable_child_ages)"
+      "*, place:places(id,name,latitude,longitude,image_urls,price_level,rating,estimated_visit_minutes,opening_hours,short_description,kosher,accessible,suitable_child_ages,source)"
     )
     .eq("session_id", sessionId)
     .eq("status", "liked")
@@ -116,6 +118,15 @@ let cursor = origin;
   let cumulativeCost = 0;
   let previousDay: number | null = null;
   const finalStops: FinalItineraryStop[] = [];
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 40-41/125 - "95% Database
+  // Rule"): קודם "DB-first" היה עיקרון בקוד (must-see מוגבל, candidate
+  // pool מסנן AI_TRIP_BUILDER_SOURCE) בלי שום מדד מדיד בפועל. source על
+  // ה-place עצמו (places.source) מבדיל במדויק בין מקום מהמאגר המקורי
+  // לבין מקום שנוצר ע"י המנוע דרך Google (AI_TRIP_BUILDER_SOURCE) - סופרים
+  // את זה בפועל ומזהירים אם היחס נופל מתחת ל-95%, בלי לשנות שום התנהגות
+  // בחירה (המדידה קורית *אחרי* שהבחירה כבר נעשתה, לא משפיעה עליה).
+  let dbSourcedCount = 0;
+  let totalRealStopCount = 0;
 
   for (const stop of ordered) {
     // מאפסים את המונה **וגם** את ה-cursor בתחילת כל יום חדש - חוזרים
@@ -143,6 +154,9 @@ let cursor = origin;
     if (stop.category === "nightlife" && cumulativeMinutes < NIGHTLIFE_MIN_OFFSET_MINUTES) {
       cumulativeMinutes = NIGHTLIFE_MIN_OFFSET_MINUTES;
     }
+
+    totalRealStopCount += 1;
+    if (stop.place!.source !== AI_TRIP_BUILDER_SOURCE) dbSourcedCount += 1;
 
 finalStops.push({
         stopId: stop.id,
@@ -257,6 +271,20 @@ const warnings: string[] = [];
   const planBreakerWarnings = detectPlanBreakerWarnings(finalStops, requirements);
   if (planBreakerWarnings.length > 0) {
     console.warn("[Validation] נמצאו Plan Breakers גם אחרי Repair (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
+  }
+
+  // מדד 95%-DB (Audit מול MASTER SPEC סעיף 40-41/125): databasePlaces /
+  // totalPlaceStops. מדווחים בלוג בלבד (לא ל-warnings שהמשתמש רואה - זה
+  // מדד תפעולי/איכות מאגר, לא בעיה בטיול הספציפי הזה) - ולא ממציאים
+  // מקום כדי "להגיע" ל-95%, בהתאם מפורש למפרט.
+  const dbCoverageRatio = totalRealStopCount > 0 ? dbSourcedCount / totalRealStopCount : 1;
+  if (totalRealStopCount > 0 && dbCoverageRatio < 0.95) {
+    console.warn("[DB Coverage] שיעור המקומות מהמאגר הפנימי נמוך מ-95% היעד", {
+      sessionId,
+      dbSourcedCount,
+      totalRealStopCount,
+      dbCoverageRatio: Math.round(dbCoverageRatio * 100),
+    });
   }
 
   const itinerary: FinalItinerary = {
