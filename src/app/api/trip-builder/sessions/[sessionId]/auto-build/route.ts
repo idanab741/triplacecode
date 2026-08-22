@@ -73,6 +73,31 @@ async function getWeatherSummary(lat: number, lng: number): Promise<string | nul
 }
 
 /**
+ * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 68 - "Weather צריך להשפיע
+ * על Ranking/Selection, לא רק על Prompt"): getWeatherSummary הקיימת
+ * מחזירה רק מחרוזת לתצוגה/AI - לא שדה בוליאני שאפשר לבסס עליו ניקוד
+ * דירוג אמיתי. פונקציה נפרדת (לא משנה את הקיימת - תואם-לאחור לגמרי) -
+ * מחזירה flags מבוססי WMO weather code הגולמי (לא ניחוש): קודים 51-67/
+ * 80-82/95-99 = גשם (תיעוד רשמי של תקן WMO), חום קיצוני = מעל 32°C.
+ */
+async function getWeatherFlags(lat: number, lng: number): Promise<{ isRainy: boolean; isExtremeHeat: boolean } | null> {
+  try {
+    const forecast = await Promise.race([
+      getWeeklyForecast(lat, lng),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("weather timeout")), 4000)),
+    ]);
+    const today = forecast[0];
+    if (!today) return null;
+    const code = today.weatherCode;
+    const isRainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99);
+    const isExtremeHeat = today.maxTemp >= 32;
+    return { isRainy, isExtremeHeat };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * תיקון באג קריטי אמיתי (זוהה מפורשות ב-MASTER SPEC סעיף 65/250 -
  * "Verify all Weekend calls to dayTripBudgetToMaxPriceLevel() ... Do not
  * silently return null and thereby turn a limited Weekend budget into
@@ -636,6 +661,14 @@ export async function POST(
       // לא באג אמיתי. משתנה עזר פשוט פותר את זה.
       const userId = user.id;
 
+      // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 68 - Weather Ranking):
+      // מחשבים פעם אחת (לא בכל תחנה - יקר), ליד ה-BASE בפועל (searchOrigin,
+      // לא origin/הבית - אותו תיקון שכבר בוצע ל-weatherSummary הקודם).
+      const weatherFlagsForRanking =
+        session.trip_type === "weekend" || session.trip_type === "abroad_vacation"
+          ? await getWeatherFlags(searchOrigin.lat, searchOrigin.lng)
+          : null;
+
       /**
        * ממלאת קבוצת תחנות נתונה (יום 1 לבד, או שאר הימים יחד) - קודם
        * מהמאגר הפנימי (fetchCandidatePool/fetchNightlifeCandidatePool +
@@ -705,7 +738,7 @@ export async function POST(
               radiusKm: dayCursors.has(day) ? INTER_STOP_RADIUS_KM * 2 : destinationMaxDistanceKm,
               excludePlaceIds: excludePlaceIdsForVacation,
             });
-            const rankedNightlife = rankCandidatesFast(nightlifePool, dna, answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands);
+            const rankedNightlife = rankCandidatesFast(nightlifePool, dna, answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands, (answers as unknown as { companions?: string[] }).companions, weatherFlagsForRanking);
             const topNightlife = rankedNightlife[0];
             if (!topNightlife) {
               continue; // אין מקום חיי-לילה מתאים ביעד הזה - לא remainingStops (אין AI fallback לזה)
@@ -780,7 +813,7 @@ export async function POST(
           // תיקון ביצועים (בקשה מפורשת - "יש הכל אצלי באדמין, למה AI לכל
           // תחנה?"): דירוג דטרמיניסטי מהיר (rankCandidatesFast, בלי שום
           // קריאת AI) מספיק כדי לבחור את המקום הכי מתאים מתוך המועמדים.
-          const ranked = rankCandidatesFast(pool, dna, stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands);
+          const ranked = rankCandidatesFast(pool, dna, stop.note ? `${answers.freeText}. ${stop.note}` : answers.freeText, attributeScoreMap, (answers as unknown as { childAgeBands?: string[] }).childAgeBands, (answers as unknown as { companions?: string[] }).companions, weatherFlagsForRanking);
 
           const top = ranked[0];
           if (!top) {
@@ -873,6 +906,7 @@ export async function POST(
             requireKosher: dna?.kosher === true,
             requireAccessible: dna?.accessibility === true,
             childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+            tripStartDate: (answers as unknown as { startDate?: string }).startDate,
           }
         );
       }
@@ -982,6 +1016,7 @@ export async function POST(
                 requireKosher: dna?.kosher === true,
                 requireAccessible: dna?.accessibility === true,
                 childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+            tripStartDate: (answers as unknown as { startDate?: string }).startDate,
               }
             );
           } catch (dayError) {
@@ -1017,6 +1052,7 @@ export async function POST(
           requireKosher: dna?.kosher === true,
           requireAccessible: dna?.accessibility === true,
           childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+            tripStartDate: (answers as unknown as { startDate?: string }).startDate,
         }
       );
       return NextResponse.json({ itinerary });

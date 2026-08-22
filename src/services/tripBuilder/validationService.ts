@@ -2,6 +2,83 @@ import type { FinalItineraryStop } from "./types";
 import { haversineDistanceKm } from "./geo";
 
 /**
+ * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 72/173 - Opening Hours):
+ * מקור הנתונים אומת בפועל - placesCleaningService.ts ממלא opening_hours
+ * מ-Google Places API הרשמי (regularOpeningHours.weekdayDescriptions,
+ * שדה מתועד: מערך 7 מחרוזות "<Weekday>: <H:MM AM> – <H:MM PM>" / "Closed"
+ * / "Open 24 hours", תמיד באנגלית מ-Google, סדר תמיד Monday-Sunday).
+ * זה **לא** "פורמט לא מתועד" - יש כאן מקור אמין. אבל: (1) זה טקסט
+ * בשפה טבעית, לא שעות מובנות - פרסור עלול להיכשל על תבניות לא-צפויות.
+ * (2) לא כל השורות בהכרח עברו את הצינור הזה (admin-curated ישן, למשל).
+ * לכן: הבדיקה הזו **fail-open** לחלוטין - כל אי-ודאות (פורמט לא מוכר,
+ * יום חסר, שדה ריק) גורמת לדילוג שקט על התחנה הזו, לא לאזהרת "סגור"
+ * שגויה. זו החלטה מכוונת: false negative (מפספסים מקום שבאמת סגור)
+ * עדיף לאין שיעור על false positive (מזהירים בטעות על מקום פתוח).
+ */
+const WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function parseGoogleHoursLine(line: string): { openMinutes: number; closeMinutes: number } | null {
+  // "9:00 AM – 6:00 PM" / "9:00 AM – 6:00 PM, 7:00 PM – 10:00 PM" (טווח כפול - לוקחים רק את הראשון, שמרני)
+  const match = line.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*[–-]\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  const to24 = (h: string, ampm: string) => {
+    let hour = parseInt(h, 10);
+    if (/PM/i.test(ampm) && hour !== 12) hour += 12;
+    if (/AM/i.test(ampm) && hour === 12) hour = 0;
+    return hour;
+  };
+  const openMinutes = to24(match[1], match[3]) * 60 + parseInt(match[2], 10);
+  const closeMinutes = to24(match[4], match[6]) * 60 + parseInt(match[5], 10);
+  return { openMinutes, closeMinutes };
+}
+
+/**
+ * בודקת אם תחנה מגיעה בזמן שהמקום מוגדר סגור בו, לפי Google
+ * weekdayDescriptions. Soft Warning בלבד (לא Hard Failure חוסם) - חוסר
+ * הוודאות סביב כיסוי הנתונים/תרגום ימים (חג/מועד מיוחד) גדול מדי בשביל
+ * לחסום Finalize על בסיס זה, לפי אותו עיקרון "עדיף להראות אזהרה מאשר
+ * להפיל בנייה שלמה על ניחוש".
+ */
+export function detectOpeningHoursWarnings(stops: FinalItineraryStop[], tripStartDate?: string): string[] {
+  if (!tripStartDate) return []; // fail-open: בלי תאריך התחלה אין דרך לדעת יום בשבוע בכלל
+  const warnings: string[] = [];
+  const startDate = new Date(tripStartDate);
+  if (isNaN(startDate.getTime())) return []; // fail-open: תאריך לא תקין
+
+  for (const stop of stops) {
+    if (stop.specialType) continue;
+    if (!stop.openingHours || stop.openingHours.length !== 7) continue; // fail-open: לא בפורמט הצפוי (7 ימים)
+
+    const dayOffset = (stop.dayIndex ?? 1) - 1;
+    const arrivalDate = new Date(startDate);
+    arrivalDate.setDate(arrivalDate.getDate() + dayOffset);
+    const jsWeekday = arrivalDate.getDay(); // 0=Sunday..6=Saturday
+    const googleWeekdayName = WEEKDAY_ORDER[(jsWeekday + 6) % 7]; // JS Sunday=0 -> Google Monday-first index
+
+    const dayLine = stop.openingHours.find((l) => l.startsWith(`${googleWeekdayName}:`));
+    if (!dayLine) continue; // fail-open: לא מצאנו שורה תואמת ליום הזה
+
+    if (/closed/i.test(dayLine)) {
+      warnings.push(`התחנה "${stop.name}" מוגדרת סגורה ב${googleWeekdayName} (לפי הנתונים שלנו) - כדאי לוודא לפני היציאה.`);
+      continue;
+    }
+    if (/24 hours/i.test(dayLine)) continue; // פתוח כל השעות - אין מה לבדוק
+
+    const parsed = parseGoogleHoursLine(dayLine);
+    if (!parsed) continue; // fail-open: פורמט לא מוכר
+
+    const arrivalMinutesOfDay = 9 * 60 + stop.arrivalOffsetMinutes; // 9:00 = תחילת יום ברירת מחדל, כמו שאר המערכת
+    if (arrivalMinutesOfDay < parsed.openMinutes || arrivalMinutesOfDay > parsed.closeMinutes) {
+      warnings.push(
+        `התחנה "${stop.name}" עשויה להיות סגורה בשעת ההגעה המשוערת (לפי שעות הפתיחה הידועות ל${googleWeekdayName}) - כדאי לבדוק לפני היציאה.`
+      );
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 75-77 - Repair Engine):
  * מנוע Repair מלא (Detect→Replace→Recalculate→Revalidate, עם ניסיונות
  * חוזרים מוגבלים ו-rollback) הוא פרויקט הנדסי משמעותי בפני עצמו - צריך
@@ -46,7 +123,7 @@ const NIGHTLIFE_EARLIEST_OFFSET_MINUTES = 600; // 19:00 בהנחת יום שמת
 
 export function detectPlanBreakerWarnings(
   stops: FinalItineraryStop[],
-  requirements?: { requireKosher?: boolean; requireAccessible?: boolean; childAgeBands?: string[] }
+  requirements?: { requireKosher?: boolean; requireAccessible?: boolean; childAgeBands?: string[]; lodgingCoords?: { lat: number; lng: number } | null }
 ): string[] {
   const warnings: string[] = [];
 
@@ -91,6 +168,65 @@ export function detectPlanBreakerWarnings(
     for (const [category, count] of categoryCounts) {
       if (count >= 3) {
         warnings.push(`יום ${day}: ${count} תחנות מאותה קטגוריה (${category}) - ודאו שזה מכוון ולא חזרתיות מיותרת.`);
+      }
+    }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC Breaker 2/3 - "זמן נסיעה
+    // לא מאפשר להגיע בזמן" / "משך ביקור חורג מהחלון"): arrivalOffsetMinutes
+    // כבר מחושב במצטבר לאורך היום (נסיעה+ביקור, מתאפס בכל יום חדש -
+    // finalizeService.ts) - עד עכשיו אף אחד לא בדק אם הסכום הזה בכלל
+    // הגיוני. אם התחנה האחרונה ביום "מגיעה" אחרי 15 שעות מ-09:00 (=
+    // חצות) - היום פשוט לא ריאלי מבחינת זמן, בלי קשר למרחק הבודד בין
+    // תחנות (שכן יכול להיות תקין כשלעצמו, אבל בסך הכל - יותר מדי).
+    const MAX_REASONABLE_DAY_MINUTES = 900; // 15 שעות מ-09:00 = חצות
+    const lastStopOffset = Math.max(...dayStops.map((s) => s.arrivalOffsetMinutes));
+    if (lastStopOffset > MAX_REASONABLE_DAY_MINUTES) {
+      warnings.push(`יום ${day}: לפי זמני הנסיעה/ביקור המחושבים, היום הזה נמשך עד אחרי חצות - כנראה עמוס מדי בפועל.`);
+    }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC Breaker 5 - "Breakfast לא
+    // מתאים לבוקר"): התחנה הראשונה בכל יום (אם role=coffee_dessert, כפי
+    // שהמערכת אמורה להבטיח - ר' categoryPlanService.ts) חייבת להיות
+    // בקטגוריה coffee_carts_cafes בפועל, לא רק בתכנון - defense-in-depth
+    // למקרה שמנגנון אחר (Repair/Chat Edit/must-see) שינה אותה בדיעבד.
+    const firstStop = dayStops[0];
+    if (firstStop?.role === "coffee_dessert" && firstStop.category !== "coffee_carts_cafes") {
+      warnings.push(`יום ${day}: התחנה הראשונה (בוקר) מתויגת "${firstStop.category}" ולא כבית קפה/עגלת קפה - ייתכן שאינה מתאימה לארוחת בוקר.`);
+    }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC Breaker 8 - "יום מפוזר
+    // גיאוגרפית"): שונה מ-40km Rule (שבודק רק תחנות *עוקבות*) - כאן
+    // בודקים את המרחק בין שתי התחנות **הרחוקות ביותר זו מזו** באותו יום
+    // (לא בהכרח עוקבות) - יום יכול לעבור את בדיקת ה-40km הרגילה (כל
+    // קפיצה בודדת סבירה) ועדיין להיות "מפושט" על פני שטח גדול מדי בסך
+    // הכל (למשל: A->B->C->A, כשA ו-C רחוקים 60 ק"מ אבל B באמצע מקרב).
+    const MAX_DAY_SPREAD_KM = 60;
+    let maxSpreadKm = 0;
+    for (let i = 0; i < dayStops.length; i++) {
+      for (let j = i + 1; j < dayStops.length; j++) {
+        const d = haversineDistanceKm(
+          { lat: dayStops[i].latitude, lng: dayStops[i].longitude },
+          { lat: dayStops[j].latitude, lng: dayStops[j].longitude }
+        );
+        if (d > maxSpreadKm) maxSpreadKm = d;
+      }
+    }
+    if (maxSpreadKm > MAX_DAY_SPREAD_KM) {
+      warnings.push(`יום ${day}: התחנות פרושות על פני כ-${Math.round(maxSpreadKm)} ק"מ בסך הכל - ייתכן שהיום מפוזר גיאוגרפית יותר מהרצוי.`);
+    }
+
+    // תיקון פער אמיתי (Audit מול MASTER SPEC Breaker 18 - "סתירת לינה"):
+    // שונה מ-40km/Day Spread - בודק במפורש מרחק מה-BASE/הלינה עצמה (לא
+    // רק בין תחנות זו לזו). רשת ביטחון נוספת - אם dayOriginOverride/
+    // WEEKEND_LODGING_TRIP_RADIUS_KM עבדו נכון בזמן הבנייה, זה לא אמור
+    // לקרות; זו בדיקה עצמאית אחרי העובדה, לא תלויה בהנחה שהמנגנון ההוא תקין.
+    if (requirements?.lodgingCoords) {
+      const MAX_DISTANCE_FROM_LODGING_KM = 50;
+      for (const s of dayStops) {
+        const distanceFromLodging = haversineDistanceKm(requirements.lodgingCoords, { lat: s.latitude, lng: s.longitude });
+        if (distanceFromLodging > MAX_DISTANCE_FROM_LODGING_KM) {
+          warnings.push(`התחנה "${s.name}" (יום ${day}) נמצאת כ-${Math.round(distanceFromLodging)} ק"מ מהלינה - רחוקה מהמצופה.`);
+        }
       }
     }
   }

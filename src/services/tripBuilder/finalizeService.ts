@@ -4,8 +4,9 @@ import { haversineDistanceKm, estimateTravelMinutes } from "./geo";
 import { saveFinalItinerary, savePartialItinerary } from "./sessionService";
 import { reviewItinerary } from "./qualityCheckService";
 import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
-import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates } from "./validationService";
-import { attemptGeographyRepair } from "./repairService";
+import { logPipelineWarning, logPipelineError } from "./pipelineLogger";
+import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates, detectOpeningHoursWarnings } from "./validationService";
+import { attemptGeographyRepair, attemptBreakfastRepair, attemptRemovalRepair, attemptBudgetRepair } from "./repairService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
@@ -85,7 +86,13 @@ export async function finalizeItinerary(
    *  Pool (rankCandidatesFast/fetchCandidatePool), רק תופס מקרה קצה
    *  שהמסנן שם פספס.
    */
-  requirements?: { requireKosher?: boolean; requireAccessible?: boolean; childAgeBands?: string[] }
+  requirements?: {
+    requireKosher?: boolean;
+    requireAccessible?: boolean;
+    childAgeBands?: string[];
+    tripStartDate?: string;
+    lodgingCoords?: { lat: number; lng: number } | null;
+  }
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
     .from("trip_builder_sessions")
@@ -195,9 +202,6 @@ finalStops.push({
 
 const warnings: string[] = [];
   const maxBudget = BUDGET_BAND_MAX_TOTAL[budgetBand];
-  if (maxBudget != null && cumulativeCost > maxBudget) {
-    warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
-  }
 
   // תיאורים אישיים - Claude כותב תיאור *רק* לתחנות שבאמת אין להן תיאור
   // אמיתי כבר (short_description ריק). קודם זה נקרא לכל התחנות ותמיד
@@ -234,7 +238,7 @@ const warnings: string[] = [];
   // מוסרת בשקט (in-place, כי finalStops היא const).
   const { repaired: dedupedStops, removedCount } = repairDuplicates(finalStops);
   if (removedCount > 0) {
-    console.warn("[Repair] הוסרו כפילויות מהמסלול לפני ולידציה", { sessionId, removedCount });
+    logPipelineWarning({ sessionId, stage: "repair" }, "הוסרו כפילויות מהמסלול לפני ולידציה", { removedCount });
     finalStops.length = 0;
     finalStops.push(...dedupedStops);
   }
@@ -247,7 +251,58 @@ const warnings: string[] = [];
   if (attemptedCount > 0) {
     finalStops.length = 0;
     finalStops.push(...geoRepairedStops);
-    console.warn("[Repair] סיכום ניסיונות תיקון גיאוגרפי", { sessionId, attemptedCount, repairedCount });
+    logPipelineWarning({ sessionId, stage: "repair" }, "סיכום ניסיונות תיקון גיאוגרפי", { attemptedCount, repairedCount });
+  }
+
+  // Repair Engine, שלב 3 (Audit מול MASTER SPEC Breaker 5 - "Breakfast
+  // לא מתאים"): ניסיון החלפה לבית קפה/עגלת קפה אמיתי אם התחנה הראשונה
+  // ביום יצאה לא-בית-קפה בפועל.
+  const { repaired: breakfastRepairedStops, repairedCount: breakfastRepairedCount } = await attemptBreakfastRepair(
+    supabase,
+    finalStops,
+    sessionId
+  );
+  if (breakfastRepairedCount > 0) {
+    finalStops.length = 0;
+    finalStops.push(...breakfastRepairedStops);
+  }
+
+  // Repair Engine, שלב 4 (Audit מול MASTER SPEC Breaker 2/3 + 18 - "יום
+  // לא ריאלי מבחינת זמן" / "סתירת לינה"): אין מועמד תקין הגיוני להחליף
+  // אליו בשני אלה - התיקון היחיד הבטוח הוא הסרה (עדיף פחות Stops מ-Stop
+  // שבור, בדיוק כמו שהמפרט דורש במפורש). origin כאן הוא ה-BASE/לינה.
+  const { repaired: removalRepairedStops, removedCount: breakerRemovedCount } = await attemptRemovalRepair(
+    supabase,
+    finalStops,
+    sessionId,
+    origin
+  );
+  if (breakerRemovedCount > 0) {
+    finalStops.length = 0;
+    finalStops.push(...removalRepairedStops);
+    logPipelineWarning({ sessionId, stage: "repair" }, "תחנות הוסרו (Breaker זמן/לינה, אין מועמד תקין להחליף)", { breakerRemovedCount });
+  }
+
+  // Repair Engine, שלב 5 (Audit מול MASTER SPEC Breaker 12 - "Budget
+  // breach"): קודם הייתה רק אזהרה, בלי שום ניסיון תיקון. מחליף תחנות
+  // יקרות במועמדים זולים יותר מאותה קטגוריה, עד לתקציב או עד שאין עוד
+  // מה להחליף (Rollback - משאיר את מה שנשאר, לא מוחק תחנה רק בגלל מחיר).
+  if (maxBudget != null && cumulativeCost > maxBudget) {
+    const { repaired: budgetRepairedStops, repairedCount: budgetRepairedCount } = await attemptBudgetRepair(
+      supabase,
+      finalStops,
+      sessionId,
+      maxBudget,
+      estimateCostFromPriceLevel
+    );
+    if (budgetRepairedCount > 0) {
+      finalStops.length = 0;
+      finalStops.push(...budgetRepairedStops);
+      cumulativeCost = finalStops.filter((s) => !s.specialType).reduce((sum, s) => sum + estimateCostFromPriceLevel(s.priceLevel), 0);
+    }
+  }
+  if (maxBudget != null && cumulativeCost > maxBudget) {
+    warnings.push("העלות המשוערת של המסלול עשויה לחרוג מהתקציב שנבחר");
   }
 
 // ולידציה קשיחה לפני שמירה/הצגה (מפרט סעיף 23-24: Generate → Validate →
@@ -258,8 +313,7 @@ const warnings: string[] = [];
   // Check (למטה, אחרי השמירה) לעולם לא מחליפים אותה או עוקפים אותה.
   const validation = validateFinalItinerary(finalStops);
   if (!validation.valid) {
-    console.error("[Validation] המסלול נכשל בבדיקת התקינות - לא נשמר ולא יוצג", {
-      sessionId,
+    logPipelineError({ sessionId, stage: "validation" }, "המסלול נכשל בבדיקת התקינות - לא נשמר ולא יוצג", {
       errors: validation.errors,
     });
     throw new Error(`המסלול שנבנה אינו תקין: ${validation.errors.join("; ")}`);
@@ -268,9 +322,16 @@ const warnings: string[] = [];
   // Revalidation (אחרי Repair): בודקים שוב את ה-Plan Breakers הדטרמיניסטיים
   // על המסלול **אחרי** ניסיון התיקון - חלק מהם תוקנו (לא יופיעו יותר),
   // מה שנשאר (לא נמצא תחליף) עדיין מוצג כאזהרה למשתמש, לא נחסם.
-  const planBreakerWarnings = detectPlanBreakerWarnings(finalStops, requirements);
+  // origin כאן הוא כבר ה-BASE (לינה שהוזנה/יעד שהתגלה - ר' auto-build/route.ts)
+  // - לא צריך פרמטר נוסף מבחוץ בשביל Breaker 18 (סתירת לינה), רק להעביר
+  // אותו הלאה כאן פנימית.
+  const planBreakerWarnings = detectPlanBreakerWarnings(finalStops, { ...requirements, lodgingCoords: origin });
+  const openingHoursWarnings = detectOpeningHoursWarnings(finalStops, requirements?.tripStartDate);
   if (planBreakerWarnings.length > 0) {
-    console.warn("[Validation] נמצאו Plan Breakers גם אחרי Repair (לא חוסם, מוצג כאזהרה)", { sessionId, planBreakerWarnings });
+    logPipelineWarning({ sessionId, stage: "validation" }, "נמצאו Plan Breakers גם אחרי Repair (לא חוסם, מוצג כאזהרה)", { planBreakerWarnings });
+  }
+  if (openingHoursWarnings.length > 0) {
+    logPipelineWarning({ sessionId, stage: "validation" }, "נמצאו אזהרות שעות פתיחה (fail-open, לא חוסם)", { openingHoursWarnings });
   }
 
   // מדד 95%-DB (Audit מול MASTER SPEC סעיף 40-41/125): databasePlaces /
@@ -279,8 +340,7 @@ const warnings: string[] = [];
   // מקום כדי "להגיע" ל-95%, בהתאם מפורש למפרט.
   const dbCoverageRatio = totalRealStopCount > 0 ? dbSourcedCount / totalRealStopCount : 1;
   if (totalRealStopCount > 0 && dbCoverageRatio < 0.95) {
-    console.warn("[DB Coverage] שיעור המקומות מהמאגר הפנימי נמוך מ-95% היעד", {
-      sessionId,
+    logPipelineWarning({ sessionId, stage: "finalize" }, "שיעור המקומות מהמאגר הפנימי נמוך מ-95% היעד", {
       dbSourcedCount,
       totalRealStopCount,
       dbCoverageRatio: Math.round(dbCoverageRatio * 100),
@@ -291,7 +351,7 @@ const warnings: string[] = [];
     stops: finalStops,
     events: [],
     totalEtaMinutes: cumulativeMinutes,
-    warnings: [...warnings, ...planBreakerWarnings, ...extraWarnings],
+    warnings: [...warnings, ...planBreakerWarnings, ...openingHoursWarnings, ...extraWarnings],
     dayTitles: deriveDayTitles(finalStops),
   };
 
@@ -324,8 +384,7 @@ const warnings: string[] = [];
     reviewItinerary({ stops: finalStops, tripIntent })
       .then(async (issues) => {
         if (issues.length === 0) return;
-        console.warn("[Quality Check] נמצאו בעיות איכות במסלול - נכתבות ל-warnings", {
-          sessionId,
+        logPipelineWarning({ sessionId, stage: "quality_check" }, "נמצאו בעיות איכות במסלול - נכתבות ל-warnings", {
           issues,
         });
         const { data: latest } = await supabase

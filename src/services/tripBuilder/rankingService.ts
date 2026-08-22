@@ -95,13 +95,25 @@ export function rankCandidatesFast(
   // שהנתון קיים ב-DB ועובר עד ל-payload של הדירוג-דרך-Claude. פרמטר
   // אופציונלי - ברירת מחדל undefined, אפס שינוי לכל קורא קיים (טיול
   // יומי/טבע/מסעדות) שלא יעביר אותו; רק סופ"ש/חופשה בחו"ל יעבירו בפועל.
-  childAgeBands?: string[]
+  childAgeBands?: string[],
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3 - "Companion Fit
+  // צריך להשפיע על Ranking"): בדקתי בפועל אילו תגיות DB קיימות (לא
+  // המצאתי) - יש place_dna_tag אמיתי בשם "romantic" ו-"family_friendly"
+  // (migration 0016). אין תג מקביל ל-friends/solo/group בכלל - לכן זה
+  // מכסה רק couple/family, לא friends/solo (BLOCKED שם, לא PARTIAL -
+  // אין נתון קיים לבסס עליו bonus, לא נמציא אחד).
+  companions?: string[],
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 68 - "Weather צריך
+  // להשפיע על Ranking, לא רק Prompt"): flags מבוססי WMO code אמיתי
+  // (getWeatherFlags), לא ניחוש. משפיע רק כ-soft bonus/penalty בתוך
+  // ה-Intent הקיים (לא מחליף/מסנן קטגוריות).
+  weatherFlags?: { isRainy: boolean; isExtremeHeat: boolean } | null
 ): CandidatePlace[] {
   if (candidates.length === 0) return [];
   if (candidates.length === 1) {
     return [{ ...candidates[0], score: 100, reason: "המקום היחיד שנמצא במאגר בקטגוריה הזו", source: "fallback" as const }];
   }
-  return applyFallbackScoring(candidates, dna, freeText, attributeScoreMap, childAgeBands);
+  return applyFallbackScoring(candidates, dna, freeText, attributeScoreMap, childAgeBands, companions, weatherFlags);
 }
 
 function applyFallbackScoring(
@@ -109,12 +121,14 @@ function applyFallbackScoring(
   dna: TravelDna | null,
   freeText: string,
   attributeScoreMap?: Map<string, number>,
-  childAgeBands?: string[]
+  childAgeBands?: string[],
+  companions?: string[],
+  weatherFlags?: { isRainy: boolean; isExtremeHeat: boolean } | null
 ): CandidatePlace[] {
   return candidates
     .map((candidate) => ({
       ...candidate,
-      score: computeFallbackScore(dna, candidate, freeText, attributeScoreMap, childAgeBands),
+      score: computeFallbackScore(dna, candidate, freeText, attributeScoreMap, childAgeBands, companions, weatherFlags),
       reason: freeText ? `התאמה לפי "${freeText}", מרחק ודירוג` : "התאמה בסיסית לפי מרחק ודירוג",
       source: "fallback" as const,
     }))
@@ -318,7 +332,9 @@ function computeFallbackScore(
   candidate: CandidatePlace,
   freeText: string,
   attributeScoreMap?: Map<string, number>,
-  childAgeBands?: string[]
+  childAgeBands?: string[],
+  companions?: string[],
+  weatherFlags?: { isRainy: boolean; isExtremeHeat: boolean } | null
 ): number {
   const learnedBonus =
     (attributeScoreMap?.get(candidate.category) ?? 0) * 0.2;
@@ -413,6 +429,32 @@ function computeFallbackScore(
         : 0
       : 0;
 
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3 - Companion Fit):
+  // bonus רק כשיש תיוג DB אמיתי שתומך בו (place_dna_tag: romantic/
+  // family_friendly) - לא ניחוש. "couple" בלבד (בלי family) -> bonus
+  // ל-romantic. "family"/"family_no_kids" -> bonus ל-family_friendly.
+  // friends/solo/with_pet - אין תג מקביל בכלל, בלי bonus (לא מומצא).
+  const candidateTags = candidate.tags ?? [];
+  const isCoupleOnly = companions?.length === 1 && companions[0] === "couple";
+  const isFamily = companions?.some((c) => c === "family" || c === "family_no_kids") ?? false;
+  const companionBonus =
+    (isCoupleOnly && candidateTags.includes("romantic") ? 8 : 0) +
+    (isFamily && candidateTags.includes("family_friendly") ? 8 : 0);
+
+  // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 68 - Weather Ranking):
+  // קטגוריות outdoor/indoor מובהקות (מ-tripTaxonomy.ts, לא ניחוש) -
+  // penalty קל ל-outdoor בגשם/חום קיצוני, bonus קל ל-indoor באותם
+  // תנאים. לא מדובר בסינון/פסילה - זה soft signal בלבד, בתוך אותה
+  // קטגוריה שהמשתמש כבר ביקש (למשל בין שתי אטרקציות טבע, לא בין טבע
+  // לקניון). מזג אוויר נוח - בלי penalty/bonus כלל, לפי המפרט המפורש.
+  const OUTDOOR_CATEGORIES = new Set(["nature_trails", "beaches_pools", "viewpoints", "parks_gardens"]);
+  const INDOOR_CATEGORIES = new Set(["culture_history", "spa_relaxation", "shopping"]);
+  let weatherBonus = 0;
+  if (weatherFlags?.isRainy || weatherFlags?.isExtremeHeat) {
+    if (OUTDOOR_CATEGORIES.has(candidate.category)) weatherBonus -= 6;
+    if (INDOOR_CATEGORIES.has(candidate.category)) weatherBonus += 6;
+  }
+
   const combined =
     ratingScore * 0.25 +
     distanceScore * 0.25 +
@@ -420,7 +462,9 @@ function computeFallbackScore(
     profilePenalty +
     freeTextBonus * 1.5 +
     learnedBonus +
-    childAgeBonus;
+    childAgeBonus +
+    companionBonus +
+    weatherBonus;
 
   return Math.max(
     0,
