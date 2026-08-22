@@ -24,6 +24,13 @@ interface FetchCandidatePoolParams {
   requireKosher?: boolean;
   /** אילוץ קשיח: אם true, פוסלים רק מקומות שסומנו במפורש accessible=false. */
   requireAccessible?: boolean;
+  /** תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 5 - "Negative Intent
+   *  חייב להיות Constraint אמיתי, לא רק Prompt instruction"): קטגוריות
+   *  שהמשתמש ביקש במפורש להימנע מהן (tripIntent.avoid, ממופה לקטגוריות
+   *  DB אמיתיות - ר' mapAvoidTermsToCategoryIds). Hard Constraint אמיתי:
+   *  אם params.category נמצא ברשימה הזו, לא מבצעים שום שאילתה בכלל.
+   */
+  excludeCategories?: string[];
 }
 
 interface PlaceRow {
@@ -58,6 +65,12 @@ export async function fetchCandidatePool(
   supabase: SupabaseClient,
   params: FetchCandidatePoolParams
 ): Promise<CandidatePlace[]> {
+  // Hard Constraint אמיתי (לא רק Prompt) - אם המשתמש ביקש במפורש להימנע
+  // מהקטגוריה הזו, לא מחפשים בכלל, בלי קשר לכמה טוב הציון היה יוצא.
+  if (params.excludeCategories?.includes(params.category)) {
+    return [];
+  }
+
   const tightRadiusKm = params.maxDistanceKm ?? distanceBandToRadiusKm(params.distanceBand);
 
   let pool = await queryPool(supabase, params, tightRadiusKm, true);

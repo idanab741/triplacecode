@@ -38,6 +38,7 @@ import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services
 import type { LatLng, AbroadVacationAnswers } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
 import { getWeekendStyleLabel } from "@/locales/he/weekend";
+import { mapAvoidTermsToCategoryIds } from "@/services/places/tripTaxonomy";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generateTripIntent } from "@/services/tripBuilder/tripIntentService";
 import { saveTripIntent } from "@/services/tripBuilder/sessionService";
@@ -680,6 +681,14 @@ export async function POST(
        * פעמיים בין יום 1 לשאר הימים.
        */
       async function fillStopsFromPoolThenAi(stopsToFill: TripBuilderStop[]): Promise<void> {
+        // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 5 - "Negative
+        // Intent"): tripIntent.avoid כבר קיים ומחושב (tripIntentService.ts)
+        // אבל אף פעם לא נאכף בקוד - רק הוזרק כטקסט לפרומפט. ממפים אותו
+        // לקטגוריות DB אמיתיות (לא ניחוש - מיפוי מול המילון הקנוני).
+        // מחושב **כאן**, בתוך הפונקציה (לא ליד ה-declaration שלה למעלה) -
+        // כי tripIntent נפתר lazy (tripIntentPromise) ורק מתעדכן סופית
+        // מאוחר יותר; הפונקציה הזו נקראת בפועל רק אחרי שזה כבר קרה.
+        const negativeIntentCategories = mapAvoidTermsToCategoryIds(tripIntent?.avoid ?? []);
         const remainingStops: TripBuilderStop[] = [];
 
         for (const stop of stopsToFill) {
@@ -787,6 +796,7 @@ export async function POST(
             excludePlaceIds: excludePlaceIdsForVacation,
             requireKosher: dna?.kosher === true,
             requireAccessible: dna?.accessibility === true,
+            excludeCategories: negativeIntentCategories,
           });
 
           // רשת ביטחון: אם החיפוש הצר (סביב התחנה הקודמת) לא מצא כלום -
@@ -798,6 +808,7 @@ export async function POST(
               origin: searchOrigin,
               distanceBand: effectiveDistanceBand,
               maxDistanceKm: destinationMaxDistanceKm,
+              excludeCategories: negativeIntentCategories,
               maxPriceLevel: vacationBudgetToMaxPriceLevel((answers as unknown as { budgetPerPerson?: string }).budgetPerPerson),
               excludePlaceIds: excludePlaceIdsForVacation,
               requireKosher: dna?.kosher === true,

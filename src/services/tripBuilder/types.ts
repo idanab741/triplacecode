@@ -58,10 +58,6 @@ export interface VacationContext {
     numDays: number;
     travelers: number;
     hasChildren: boolean;
-    /** תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3 - "Companion Fit"):
-     *  hasChildren בוליאני לבדו לא מספיק - משפחה עם ילד בן 0-3 (עגלה,
-     *  הליכות קצרות) שונה לגמרי ממשפחה עם נער בן 16 (כמעט הכל מתאים).
-     *  שדה חדש, לא שובר כלום קיים. */
     childAgeBands: string[];
     /** בקשה מפורשת - בחירה מרובה למי מטיילים (למשל "זוג, חברים") - כדי
      *  שה-AI יראה את ההרכב המלא שנבחר, לא רק ספירה גסה. */
@@ -190,13 +186,6 @@ export interface FinalItineraryStop {
   /** ×§×™×©×•×¨ ×œ×”×–×ž× ×ª × ×¡×™×¢×” (Google Maps directions - ×”×ž×©×ª×ž×© ×‘×•×—×¨ ×©× ××•×‘×¨/×ž×•× ×™×ª/
    *  ×ª×—×‘×•×¨×” ×¦×™×‘×•×¨×™×ª) - ×¨×§ ×œ×ª×—× ×•×ª ×œ×•×’×™×¡×˜×™×§×” (× ×—×™×ª×”/×˜×™×¡×ª ×—×–×¨×”). null/undefined ×œ×ª×—× ×” ×¨×’×™×œ×”. */
   directionsUrl?: string | null;
-  /** תיקון פער אמיתי (Audit מול MASTER SPEC - Plan Breakers 9/10/11):
-   *  שדות אופציונליים חדשים - מאפשרים ל-detectPlanBreakerWarnings לבדוק
-   *  כשרות/נגישות/התאמת גיל ברמת defense-in-depth *אחרי* שהתחנה כבר
-   *  נבחרה, גם אם זה כבר hard-filter לפני הבחירה (rankCandidatesFast) -
-   *  תפיסת מקרה קצה שהמסנן המקורי פספס. undefined כברירת מחדל, לא שובר
-   *  קוד קיים שלא ממלא את זה.
-   */
   kosher?: boolean | null;
   accessible?: boolean | null;
   suitableChildAges?: string[] | null;
@@ -388,6 +377,16 @@ export interface FlightInfo {
 export interface HotelInfo {
   name: string;
   address: string;
+  /** תיקון פער אמיתי (Audit מול MASTER SPEC - Vacation Abroad Multi-
+   *  Destination): שדות חדשים ואופציונליים בלבד - name/address הקיימים
+   *  לא שונו, כל קוד קיים שבונה HotelInfo בלי השדות האלה ממשיך לעבוד
+   *  בדיוק כמו קודם. תאריכים בפורמט ISO ("YYYY-MM-DD"), כמו startDate/
+   *  endDate בשאר המערכת - לא נבנה פורמט חדש. null/undefined = לא הוזן
+   *  (המשתמש דילג/עדיין לא ידוע) - לא מומצא ערך, ר' resolveDayOrigin
+   *  ב-vacationLodgingScheduleService.ts לגבי ה-fallback כשזה קורה.
+   */
+  checkInDate?: string | null;
+  checkOutDate?: string | null;
 }
 
 export type FlightPreference = "direct" | "one_stop" | "two_plus_stops";

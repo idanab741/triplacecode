@@ -55,6 +55,15 @@ export async function generateDayBlueprint(
     // אך ורק אם ה-pace מבקש 2+ ארוחות (food:2 ל-relaxed/balanced -
     // בדיוק "2 מסעדות ביום" שביקשת; אין עדיין תמיכה בשלישית ל-packed,
     // so זה עדיין מוגבל ל-1/2, לא 3).
+    // תיקון פער אמיתי קריטי (Audit מול MASTER SPEC סעיפים 3-4, בקשה
+    // מפורשת - "מסלול הוצף במסעדות בלי בקשה קולינרית"): הבאג האמיתי -
+    // VACATION_PACE_DAILY_COUNTS נותן food:2 בכל שלושת ה-pace (relaxed,
+    // balanced) ו-food:3 (packed) - כלומר `paceCounts.food >= 2` יצא
+    // **true בכל מקרה**, ללא שום קשר לכוונה קולינרית. כל יום, בכל pace,
+    // תמיד קיבל 2 ארוחות מתוכננות. עכשיו: ארוחה שנייה (מעבר ל-dinner
+    // הבסיסי) רק אם culinary נבחר במפורש כסגנון (Explicit Intent אמיתי -
+    // לא ניחוש מטקסט חופשי, שעלול לטעות).
+    const isCulinaryFocused = context.trip.vacationTypes.includes("culinary");
     const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
 
     // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3/9 - "Companion Fit
@@ -67,7 +76,7 @@ export async function generateDayBlueprint(
     return {
       title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : fallback.title,
       attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
-      includeSecondFoodStop: paceCounts.food >= 2,
+      includeSecondFoodStop: isCulinaryFocused && paceCounts.food >= 2,
       focusCategories:
         Array.isArray(parsed.focusCategories) && parsed.focusCategories.length > 0
           ? parsed.focusCategories.filter((c): c is string => typeof c === "string").slice(0, 2)
@@ -88,15 +97,16 @@ function clampAttractionsCount(value: unknown): number {
 }
 
 /** תבנית קבועה - fallback בטוח כשקריאת Claude נכשלת/עוברת timeout.
- *  attractionsCount/includeSecondFoodStop נגזרים מ-pace (ר' ההערה
- *  למעלה על VACATION_PACE_DAILY_COUNTS) - לא קבועים, גם כאן. */
+ *  attractionsCount/includeSecondFoodStop נגזרים מ-pace+culinary-intent
+ *  (ר' ההערה למעלה על VACATION_PACE_DAILY_COUNTS) - לא קבועים, גם כאן. */
 function fallbackBlueprint(context: VacationContext): DayBlueprint {
+  const isCulinaryFocused = context.trip.vacationTypes.includes("culinary");
   const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
   const attractionsCap = context.trip.childAgeBands.includes("0-3") ? 3 : Infinity;
   return {
     title: `יום בילויים ב${context.trip.destination}`,
     attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
-    includeSecondFoodStop: paceCounts.food >= 2,
+    includeSecondFoodStop: isCulinaryFocused && paceCounts.food >= 2,
     focusCategories: context.trip.vacationTypes.slice(0, 2),
   };
 }

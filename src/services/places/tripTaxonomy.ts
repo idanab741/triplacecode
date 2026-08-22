@@ -299,3 +299,40 @@ export const BUDGET_TIER_OPTIONS: TaxonomyOption[] = [
   { id: "$$$", label: "$$$" },
   { id: "$$$$", label: "$$$$" },
 ];
+/**
+ * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 5 - "Negative Intent") +
+ * (בקשה מפורשת - "בלי מוזיאונים חייב להיות Constraint אמיתי, לא רק
+ * Prompt instruction"): tripIntent.avoid כבר קיים ומחושב ע"י Claude
+ * (tripIntentService.ts) - אבל בדקתי: אף מקום בקוד לא השתמש בו בפועל,
+ * רק כמשפט הקשר לפרומפט. הפונקציה הזו ממפה מונחים חופשיים (למשל
+ * "מוזיאונים") לקטגוריות DB אמיתיות (id) - לא ניחוש, אלא התאמת טקסט מול
+ * המילון הקנוני שהמערכת כבר משתמשת בו (TRIP_TYPE_GROUPS + subTags),
+ * כדי שאפשר יהיה לסנן אותן בפועל ב-fetchCandidatePool (WHERE NOT IN).
+ * התאמה שמרנית: substring דו-כיווני מול label בלבד (לא ניחוש סמנטי).
+ */
+export function mapAvoidTermsToCategoryIds(avoidTerms: string[]): string[] {
+  if (avoidTerms.length === 0) return [];
+  const matchedCategoryIds = new Set<string>();
+
+  for (const term of avoidTerms) {
+    const normalized = term.trim().toLowerCase();
+    if (!normalized) continue;
+
+    for (const group of TRIP_TYPE_GROUPS) {
+      const groupLabel = group.label.toLowerCase();
+      if (groupLabel.includes(normalized) || normalized.includes(groupLabel)) {
+        matchedCategoryIds.add(group.id);
+        continue;
+      }
+      for (const subTag of group.subTags) {
+        const subLabel = subTag.label.toLowerCase();
+        if (subLabel.includes(normalized) || normalized.includes(subLabel)) {
+          matchedCategoryIds.add(group.id);
+          break;
+        }
+      }
+    }
+  }
+
+  return Array.from(matchedCategoryIds);
+}

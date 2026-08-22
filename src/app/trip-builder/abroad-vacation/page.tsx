@@ -1312,20 +1312,58 @@ function confirmBooked() {
                       )}
 
                       {activeTab === "hotel" && (
-                        <Field label="שם המלון">
-                          <HotelAutocomplete
-                            name={tempHotels[i]?.name ?? ""}
-                            address={tempHotels[i]?.address ?? ""}
-                            onChange={(name, address) => {
-                              const copy = [...tempHotels];
-                              copy[i] = { name, address };
-                              setTempHotels(copy);
-                            }}
-                          />
-                          {tempHotels[i]?.address && (
-                            <p className="mt-1 text-xs text-ink-secondary">{tempHotels[i].address}</p>
+                        <>
+                          <Field label="שם המלון">
+                            <HotelAutocomplete
+                              name={tempHotels[i]?.name ?? ""}
+                              address={tempHotels[i]?.address ?? ""}
+                              onChange={(name, address) => {
+                                const copy = [...tempHotels];
+                                copy[i] = { ...copy[i], name, address };
+                                setTempHotels(copy);
+                              }}
+                            />
+                            {tempHotels[i]?.address && (
+                              <p className="mt-1 text-xs text-ink-secondary">{tempHotels[i].address}</p>
+                            )}
+                          </Field>
+                          {/* תיקון פער אמיתי (Audit - Vacation Abroad
+                              Multi-Destination, שלב 1): תאריכי צ'ק-אין/
+                              צ'ק-אאוט לכל יעד - רק כשיש יותר מיעד אחד,
+                              כדי לא לשנות כלל את חוויית single_destination
+                              הקיימת (שם אין צורך - כל הטיול הוא אותו מלון
+                              ממילא). אופציונלי לגמרי - אם המשתמש מדלג,
+                              המערכת נופלת לחלוקה שווה בין היעדים (ר'
+                              vacationLodgingScheduleService.ts). */}
+                          {tempFlights.length > 1 && (
+                            <div className="flex gap-2">
+                              <Field label="צ'ק-אין (אופציונלי)">
+                                <input
+                                  type="date"
+                                  value={tempHotels[i]?.checkInDate ?? ""}
+                                  onChange={(e) => {
+                                    const copy = [...tempHotels];
+                                    copy[i] = { ...copy[i], checkInDate: e.target.value || null };
+                                    setTempHotels(copy);
+                                  }}
+                                  className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-3 py-2.5 text-center text-sm text-ink"
+                                />
+                              </Field>
+                              <Field label="צ'ק-אאוט (אופציונלי)">
+                                <input
+                                  type="date"
+                                  value={tempHotels[i]?.checkOutDate ?? ""}
+                                  onChange={(e) => {
+                                    const copy = [...tempHotels];
+                                    copy[i] = { ...copy[i], checkOutDate: e.target.value || null };
+                                    setTempHotels(copy);
+                                  }}
+                                  className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-3 py-2.5 text-center text-sm text-ink"
+                                />
+                              </Field>
+                            </div>
                           )}
-                        </Field>
+                        </>
                       )}
                     </div>
                   );
