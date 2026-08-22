@@ -10,6 +10,19 @@ import {
 import { TRIP_TYPE_TAG_TO_FALLBACK_CATEGORIES } from "@/constants/placeCategories";
 import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 
+/**
+ * תיקון מהותי (Audit מול "עצור רגע... הפילטר של התינוק חייב לפעול כבר
+ * בשלב Candidate Retrieval. לא לבחור מקום ואז לבדוק בדיעבד אם הוא
+ * מתאים"): קודם childAgeBands/תינוק היו משפיעים אך ורק ב-Ranking (בונוס
+ * קטן, +12, שיכול בקלות "להיבלע" ע"י ציוני מרחק/דירוג) וב-Validation
+ * (אזהרה בדיעבד) - **לא** ב-Retrieval עצמו. קטגוריות עם מגבלת-גיל/
+ * אינטנסיביות פיזית מובנית (ספורט אתגרי) הן Hard Exclude אמיתי כשיש
+ * תינוק בטיול - לא "פחות מומלץ", אלא לא נכנס לבריכת המועמדים בכלל.
+ * זו רשימה שמרנית ומפורשת (לא ניחוש AI) - קטגוריה אחת בלבד שה-DB כבר
+ * מגדיר (tripTaxonomy.ts) כמובהקת פיזית/מגבלת-גיל.
+ */
+export const INFANT_UNSAFE_CATEGORIES = new Set(["sports_extreme"]);
+
 interface FetchCandidatePoolParams {
   category: string;
   origin: LatLng;
@@ -31,6 +44,11 @@ interface FetchCandidatePoolParams {
    *  אם params.category נמצא ברשימה הזו, לא מבצעים שום שאילתה בכלל.
    */
   excludeCategories?: string[];
+  /** תיקון (Audit מול "childAgeBands=0-3 הוא לא Preference רגיל"): כשיש
+   *  תינוק (0-3) בטיול - Hard Exclude על קטגוריות שמובנית לא מתאימות
+   *  (INFANT_UNSAFE_CATEGORIES למעלה), פועל כאן ב-Retrieval עצמו - לא
+   *  רק כבונוס/עונש מאוחר יותר ב-Ranking. */
+  hasInfant?: boolean;
 }
 
 interface PlaceRow {
@@ -68,6 +86,12 @@ export async function fetchCandidatePool(
   // Hard Constraint אמיתי (לא רק Prompt) - אם המשתמש ביקש במפורש להימנע
   // מהקטגוריה הזו, לא מחפשים בכלל, בלי קשר לכמה טוב הציון היה יוצא.
   if (params.excludeCategories?.includes(params.category)) {
+    return [];
+  }
+  // תיקון (Audit מול "childAgeBands=0-3 הוא לא Preference רגיל"): אותו
+  // עיקרון בדיוק, עבור תינוק בטיול - קטגוריה שמובנית לא מתאימה לא
+  // נכנסת לחיפוש בכלל, לא רק מדורגת נמוך יותר בהמשך.
+  if (params.hasInfant && INFANT_UNSAFE_CATEGORIES.has(params.category)) {
     return [];
   }
 
@@ -282,6 +306,20 @@ async function queryPool(
 
   return rows
     .filter((row) => row.latitude != null && row.longitude != null)
+    // תיקון (Audit מול "childAgeBands=0-3 הוא לא Preference רגיל" -
+    // "הפילטר של התינוק חייב לפעול כבר בשלב Candidate Retrieval"): אם
+    // יש תינוק בטיול, ומקום **כן** תויג במפורש suitable_child_ages (לא
+    // ריק) אבל 0-3 לא נמצא ברשימה - נפסל כאן, ב-Retrieval, לא רק
+    // מדורג נמוך יותר אחר כך. מקומות שלא תויגו בכלל (מערך ריק/null)
+    // לא נפסלים - "לא ידוע" אינו "לא מתאים" (אותו עיקרון כמו kosher/
+    // accessible קיים כבר בקובץ הזה).
+    .filter(
+      (row) =>
+        !params.hasInfant ||
+        !row.suitable_child_ages ||
+        row.suitable_child_ages.length === 0 ||
+        row.suitable_child_ages.includes("0-3")
+    )
     .map((row) => {
       const distanceKm = haversineDistanceKm(params.origin, {
         lat: row.latitude!,

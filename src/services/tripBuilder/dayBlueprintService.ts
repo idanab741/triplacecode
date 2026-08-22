@@ -1,6 +1,8 @@
 import { callClaude, logAiError } from "@/services/ai/claudeService";
-import { getVacationTypeLabel, VACATION_PACE_DAILY_COUNTS } from "@/locales/he/abroadVacation";
+import { getVacationTypeLabel } from "@/locales/he/abroadVacation";
+import { hasInfantAgeBand } from "./types";
 import type { DayBlueprint, VacationContext } from "./types";
+import type { TripStrategy } from "./tripStrategyService";
 
 /** בקשה מפורשת - 5 שניות: אם קריאת ה-AI ליום מסוים לא חוזרת בזמן הזה,
  *  נופלים לתבנית הקבועה הדטרמיניסטית (ר' fallbackBlueprint למטה) - לא
@@ -8,22 +10,23 @@ import type { DayBlueprint, VacationContext } from "./types";
 const BLUEPRINT_TIMEOUT_MS = 5000;
 
 /**
- * קריאת ה-AI המרכזית (MASTER PROMPT סעיף 36) לכל יום "רגיל" - לא יום 1,
- * לא יום אחרון (אלה נשארים דטרמיניסטיים לגמרי, בלי שום קריאת AI). מחזירה
- * **רק אסטרטגיה ברמת-על** - כותרת, עוצמה (כמה אטרקציות, האם יש ארוחת
- * צהריים בנוסף לערב), ומיקוד קטגוריות. **לא** בוחרת מקום ספציפי - זה
- * נשאר אצל fetchCandidatePool/rankCandidatesFast, בדיוק כמו כל התחנות
- * האחרות היום. previousDayTitles מועבר כדי שהיום הזה לא יחזור על אותה
- * תמה מילולית כמו יום קודם - בכוונה בלי לפרט focusCategories של הימים
- * הקודמים (מיותר, ומסוכן: AI שרואה בדיוק מה "נוצל" עלול לברוח לקטגוריות
- * אקזוטיות רק כדי להיות שונה, במקום לבחור את המתאים ביותר).
+ * תיקון ארכיטקטוני (Audit מול "בחן מחדש את כל מנגנון בניית המסלול" -
+ * "14. לבנות Day Missions"): זהו ה-Day Mission של הפייפ��ין - קריאת ה-AI
+ * המרכזית לכל יום "רגיל" (לא יום 1, לא יום אחרון - אלה דטרמיניסטיים
+ * לגמרי, בלי AI). "כמות" (attractionsCount/restaurantStopsCount) **אינה
+ * מחושבת כאן יותר** - היא מגיעה מוכנה מ-TripStrategy (tripStrategyService.ts,
+ * מחושב פעם אחת לכל הטיול, לא בכל יום מחדש). הפונקציה הזו קובעת **רק**
+ * את אופי/נושא היום (title, focusCategories) - Day Mission טהור, בלי
+ * שום חישוב קיבולת בתוכה. זה ההבדל בין "עוד תיקון לניקוד" לבין שינוי
+ * סדר אמיתי: המספרים כבר קבועים לפני שהיום הזה בכלל מתוכנן.
  */
 export async function generateDayBlueprint(
   context: VacationContext,
+  strategy: TripStrategy,
   dayNumber: number,
   previousDayTitles: string[]
 ): Promise<DayBlueprint> {
-  const fallback = fallbackBlueprint(context);
+  const fallback = fallbackBlueprint(context, strategy);
 
   const prompt = buildPrompt(context, dayNumber, previousDayTitles);
   const { text, error } = await callClaude(prompt, 400, BLUEPRINT_TIMEOUT_MS);
@@ -42,41 +45,14 @@ export async function generateDayBlueprint(
     if (!jsonMatch) return fallback;
     const parsed = JSON.parse(jsonMatch[0]) as Partial<DayBlueprint>;
 
-    // תיקון באג אמיתי (בקשה מפורשת - "יותר מידי מסעדות ביחס לכמות
-    // אטרקציות! צריך 2 מסעדות ביום! האטרקציות צריכות להיות מסודרות לפי
-    // אופי הטיול (רגוע/מאוזן/מתוכנן), למה זה לא מאופיין פה??"):
-    // VACATION_PACE_DAILY_COUNTS כבר קיים בקוד בדיוק בשביל זה (מוגדר
-    // עם attractions/food לכל pace) - אבל מעולם לא יובא/נעשה בו שימוש
-    // בשום מקום בקוד (בדקתי - רק הערות שמפנות אליו). Claude קיבל את ה-
-    // pace רק כמשפט הקשר בפרומפט, בלי שום אכיפה אמיתית - attractionsCount
-    // ו-includeSecondFoodStop יצאו בפועל כמעט אקראיים, לא תלויים בקצב
-    // שנבחר. עכשיו האכיפה דטרמיניסטית ולא תלויה בניחוש של Claude:
-    // attractionsCount נגזר ישירות מה-pace, ו-includeSecondFoodStop=true
-    // אך ורק אם ה-pace מבקש 2+ ארוחות (food:2 ל-relaxed/balanced -
-    // בדיוק "2 מסעדות ביום" שביקשת; אין עדיין תמיכה בשלישית ל-packed,
-    // so זה עדיין מוגבל ל-1/2, לא 3).
-    // תיקון פער אמיתי קריטי (Audit מול MASTER SPEC סעיפים 3-4, בקשה
-    // מפורשת - "מסלול הוצף במסעדות בלי בקשה קולינרית"): הבאג האמיתי -
-    // VACATION_PACE_DAILY_COUNTS נותן food:2 בכל שלושת ה-pace (relaxed,
-    // balanced) ו-food:3 (packed) - כלומר `paceCounts.food >= 2` יצא
-    // **true בכל מקרה**, ללא שום קשר לכוונה קולינרית. כל יום, בכל pace,
-    // תמיד קיבל 2 ארוחות מתוכננות. עכשיו: ארוחה שנייה (מעבר ל-dinner
-    // הבסיסי) רק אם culinary נבחר במפורש כסגנון (Explicit Intent אמיתי -
-    // לא ניחוש מטקסט חופשי, שעלול לטעות).
-    const isCulinaryFocused = context.trip.vacationTypes.includes("culinary");
-    const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
-
-    // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3/9 - "Companion Fit
-    // צריך להשפיע בפועל על Pace/Activities, לא רק להיות המלצה ל-AI"):
-    // ילד 0-3 = פחות מעברים/עצירות הוא Hard Constraint לפי המפרט, לא
-    // המלצה רכה - אוכף אותו בקוד (תקרה של 3 אטרקציות ביום, גם אם ה-pace
-    // שנבחר "packed"/"balanced" היה נותן יותר), לא רק מבקש בנימוס מ-AI.
-    const attractionsCap = context.trip.childAgeBands.includes("0-3") ? 3 : Infinity;
-
+    // ה-AI קובע כאן אך ורק title/focusCategories (אופי היום) - הכמות
+    // (attractionsCount/restaurantStopsCount) מגיעה במלואה מ-TripStrategy,
+    // שכבר חושבה פעם אחת לכל הטיול (לא מנוחשת מחדש, ולא ניתנת לשינוי
+    // ע"י Claude פר-יום - זה בדיוק מה שמנע עקביות בין ימים לפני התיקון).
     return {
       title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : fallback.title,
-      attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
-      includeSecondFoodStop: isCulinaryFocused && paceCounts.food >= 2,
+      attractionsCount: strategy.activityDensity,
+      restaurantStopsCount: strategy.maxFoodStopsPerDay,
       focusCategories:
         Array.isArray(parsed.focusCategories) && parsed.focusCategories.length > 0
           ? parsed.focusCategories.filter((c): c is string => typeof c === "string").slice(0, 2)
@@ -91,22 +67,15 @@ export async function generateDayBlueprint(
   }
 }
 
-function clampAttractionsCount(value: unknown): number {
-  const n = typeof value === "number" ? Math.round(value) : 4;
-  return Math.min(4, Math.max(2, n));
-}
-
 /** תבנית קבועה - fallback בטוח כשקריאת Claude נכשלת/עוברת timeout.
- *  attractionsCount/includeSecondFoodStop נגזרים מ-pace+culinary-intent
- *  (ר' ההערה למעלה על VACATION_PACE_DAILY_COUNTS) - לא קבועים, גם כאן. */
-function fallbackBlueprint(context: VacationContext): DayBlueprint {
-  const isCulinaryFocused = context.trip.vacationTypes.includes("culinary");
-  const paceCounts = VACATION_PACE_DAILY_COUNTS[context.trip.pace as keyof typeof VACATION_PACE_DAILY_COUNTS] ?? VACATION_PACE_DAILY_COUNTS.balanced;
-  const attractionsCap = context.trip.childAgeBands.includes("0-3") ? 3 : Infinity;
+ *  attractionsCount/restaurantStopsCount מגיעים במלואם מ-TripStrategy -
+ *  אותם מספרים בדיוק שהיו מתקבלים גם אם ה-AI כן היה עונה בזמן, כי
+ *  ה-AI לא קובע אותם יותר (ר' generateDayBlueprint למעלה). */
+function fallbackBlueprint(context: VacationContext, strategy: TripStrategy): DayBlueprint {
   return {
     title: `יום בילויים ב${context.trip.destination}`,
-    attractionsCount: Math.min(clampAttractionsCount(paceCounts.attractions), attractionsCap),
-    includeSecondFoodStop: isCulinaryFocused && paceCounts.food >= 2,
+    attractionsCount: strategy.activityDensity,
+    restaurantStopsCount: strategy.maxFoodStopsPerDay,
     focusCategories: context.trip.vacationTypes.slice(0, 2),
   };
 }
@@ -147,7 +116,7 @@ function buildPrompt(context: VacationContext, dayNumber: number, previousDayTit
   const childGuidance =
     context.trip.childAgeBands.length === 0
       ? ""
-      : context.trip.childAgeBands.includes("0-3")
+      : hasInfantAgeBand(context.trip.childAgeBands)
         ? "\n- חשוב: יש ילד/ה בגיל 0-3 - העדף הליכות קצרות, מקומות נגישים לעגלה, פחות מעברים בין תחנות, ולא פעילות אקסטרים/הליכה מתישה."
         : context.trip.childAgeBands.includes("3-7")
           ? "\n- יש ילד/ה בגיל 3-7 - מתאים: פארקים, חיות, פעילויות אינטראקטיביות, טבע קצר - לא הליכות ארוכות/מוזיאונים כבדים."

@@ -90,10 +90,23 @@ export interface VacationContext {
 export interface DayBlueprint {
   /** כותרת קצרה וטבעית ליום, למשל "דובאי הקלאסית" - משמשת גם כ-dayTitle בתוצאה הסופית. */
   title: string;
-  /** כמה תחנות "אטרקציה" ביום הזה - סטייה אמיתית מהתבנית הקבועה (2-4). */
+  /** כמה תחנות "אטרקציה"/פעילות משמעותית ביום הזה - נגזר מה-pace (RELAXED/BALANCED/PACKED),
+   *  לא ממכסת האוכל. האוכל (ראה restaurantStopsCount) לעולם לא "גוזל" מהמספר הזה -
+   *  הפעילויות הן שלד היום, לא האוכל. */
   attractionsCount: number;
-  /** true = מסעדת צהריים בנוסף לערב (כמו התבנית הקבועה); false = יום קליל יותר, ארוחה אחת בלבד. */
-  includeSecondFoodStop: boolean;
+  /**
+   * מספר תחנות ה-Restaurant בפועל ביום הזה (role="food", קטגוריית
+   * wineries_dining) - **לא** מספר הארוחות. תיקון מהותי (Audit מול "תיקון
+   * חשוב מאוד להגדרת ה-Food Quota"): MEAL QUOTA ≠ RESTAURANT QUOTA.
+   * לכל יום "רגיל" יש עד 3 נקודות אוכל (ארוחת בוקר + צהריים + ערב), אבל
+   * ארוחת הבוקר היא **תמיד** role="coffee_dessert" (בית קפה/עגלת קפה) -
+   * לא נספרת כ-Restaurant Stop בכלל. ברירת המחדל: 2 (צהריים+ערב), גם
+   * בקצב רגוע/מאוזן/עמוס כאחד - זה לא "1 מסעדה ליום", אלא "2 ארוחות
+   * שהן מסעדה, ועוד ארוחת בוקר שהיא לא". Culinary Intent מפורש יכול
+   * להעלות את זה ל-3 (תחנת אוכל/יין נוספת), אבל לעולם לא בלתי מוגבל,
+   * ולעולם לא על חשבון attractionsCount.
+   */
+  restaurantStopsCount: number;
   /** 1-2 קטגוריות מתוך vacationTypes שהיום הזה מתמקד בהן - קוד ממפה אותן ל-trip_type_tags בפועל. */
   focusCategories: string[];
 }
@@ -111,10 +124,47 @@ export interface TripBuilderStop {
   rejected_place_ids: string[];
   day_index: number | null;
   note: string | null;
+  /** ר' SlotRequirements למטה - הדרישות הקונקרטיות שנקבעו ל-Slot הזה
+   *  בזמן התכנון (לפני שנבחר מקום), נשמרות גם על ה-DB (עמודה
+   *  trip_builder_stops.requirements, ר' migration 0051) כדי ש-Repair/
+   *  Chat Edit/עריכה ידנית מאוחרת יותר עדיין "יזכרו" מה ה-Slot הזה
+   *  אמור לספק - לא רק category/role גולמיים. */
+  requirements?: SlotRequirements | null;
   created_at: string;
   updated_at: string;
 }
 
+/**
+ * תיקון ארכיטכטוני (Audit מול "בחן מחדש את כל מנגנון בניית המסלול" -
+ * "PLACES COME LAST... Slot Requirements... רק עכשיו לחפש Places"):
+ * עד עכשיו ה-Slot נשא רק category+role גולמיים - לא שום דרישה קונקרטית
+ * (גיל, משך, סוג ארוחה, זמן ביום). Retrieval/Ranking לא יכלו "לדעת" למה
+ * בדיוק ה-Slot הזה קיים, רק לאיזו קטגוריה לחפש. SlotRequirements הוא
+ * האובייקט שסוגר את הפער הזה - מחושב פעם אחת ב-categoryPlanForDay (מתוך
+ * DayBlueprint+TripStrategy), נשמר על ה-Slot (TripBuilderStop.requirements,
+ * ר' migration 0051), ומועבר בפועל ל-fetchCandidatePool/rankCandidatesFast
+ * (candidatePoolService.ts/rankingService.ts) - כדי שהבחירה תהיה תוצאה
+ * של "מה ה-Slot הזה צריך להגשים", לא רק "מה הקטגוריה".
+ *
+ * זהו אובייקט קטן ומכוון-מטרה, לא סכימה גנרית אינסופית - כל שדה קיים
+ * כי יש היום קוד קונקרטי שקורא אותו (לא "future-proofing" ריק).
+ */
+export interface SlotRequirements {
+  /** רלוונטי רק ל-role="food"/"coffee_dessert" - איזו ארוחה בפועל ה-Slot
+   *  הזה ממלא. "breakfast" תמיד role="coffee_dessert" (לא נחשב Restaurant
+   *  Stop בכלל) - "lunch"/"dinner" הם role="food" (Restaurant Stop אמיתי). */
+  mealType?: "breakfast" | "lunch" | "dinner";
+  /** true כשיש תינוק (0-3) בטיול - Hard Constraint אמיתי ב-Retrieval
+   *  (candidatePoolService.ts), לא רק תיוג תיאורי. */
+  infantSafe?: boolean;
+  /** תקרת משך ביקור מועדפת בדקות (soft - שיקול בדירוג, לא Hard Filter
+   *  שעלול לרוקן את בריכת המועמדים כשאין למקום נתון estimated_visit_minutes
+   *  בכלל). נגזר מ-TripStrategy (יום רגוע/תינוק = תקרה נמוכה יותר). */
+  preferredMaxDurationMinutes?: number;
+  /** מתי ביום ה-Slot הזה אמור להתרחש - להתאמה לקטגוריות מוצללות/פנימיות
+   *  (rankingService.ts) ולעתיד ה-Time Engine (עדיין לא ממומש - ר' דוח). */
+  timeOfDay?: "morning" | "midday" | "afternoon" | "evening";
+}
 export interface CategoryPlanItem {
   category: string;
   role: StopRole;
@@ -127,6 +177,9 @@ export interface CategoryPlanItem {
    *  ×’× ×¨×™×™× ×•×¦×¨×™×š "×œ× ×—×© ×ž×—×“×©" ××ª ×”×›×•×•× ×” ×”×ž×“×•×™×§×ª ×ž×ª×•×š ×”×ž×œ×œ ×”×—×•×¤×©×™ ×”×ž×œ× -
    *  ×•×–×” × ×›×©×œ ×‘×¤×•×¢×œ. */
   note?: string;
+  /** ר' SlotRequirements למעלה - הדרישות הקונקרטיות שקובעות מה בדיוק
+   *  ה-Slot הזה צריך להגשים, מעבר לקטגוריה/role. */
+  requirements?: SlotRequirements;
 }
 
 export interface CandidatePlace {
@@ -189,6 +242,10 @@ export interface FinalItineraryStop {
   kosher?: boolean | null;
   accessible?: boolean | null;
   suitableChildAges?: string[] | null;
+  /** SlotRequirements מקורי (ר' הגדרה למעלה) - מועבר מ-TripBuilderStop
+   *  כדי שבדיקות התאמה סופיות (validationService.ts) יוכלו לבדוק שהמקום
+   *  שנבחר בפועל ממלא את הדרישה שה-Slot הזה נוצר בשבילו - לא רק category/role גולמיים. */
+  requirements?: SlotRequirements | null;
 }
 
 export interface FinalItineraryEvent {
@@ -214,6 +271,19 @@ export interface FinalItinerary {
 
 export type CompanionType = "couple" | "family" | "family_no_kids" | "friends" | "solo" | "with_pet";
 export type ChildAgeBand = "0-3" | "3-7" | "7-12" | "12-18";
+
+/**
+ * תיקון (Audit מול "עצור רגע... childAgeBands = 0-3 הוא לא Preference
+ * רגיל"): מקום יחיד ומרכזי להגדרת "יש תינוק בטיול" - קודם המחרוזת
+ * הגולמית "0-3" הייתה חוזרת על עצמה (השוואת מחרוזת) בכל מקום שרצה לבדוק
+ * את זה (dayBlueprintService.ts בלבד, בפועל) - עכשיו כל שירות (Candidate
+ * Retrieval/Ranking/Blueprint/Validation) קורא לאותה פונקציה, כדי
+ * שהפילטר יהיה עקבי ולא תלוי בהעתקה-הדבקה של המחרוזת בכל מקום בנפרד.
+ */
+export const INFANT_AGE_BAND: ChildAgeBand = "0-3";
+export function hasInfantAgeBand(bands: string[] | null | undefined): boolean {
+  return Array.isArray(bands) && bands.includes(INFANT_AGE_BAND);
+}
 export type TimingChoice = "today" | "tomorrow" | "other_date";
 export type DistanceBand =
   | "10min" | "20min" | "30min" | "40min" | "50min"

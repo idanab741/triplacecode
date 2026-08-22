@@ -93,6 +93,7 @@ export async function saveCategoryPlan(
     slot_index: item.order,
     day_index: item.day ?? null,
     note: item.note ?? null,
+    requirements: item.requirements ?? null,
   }));
 
   const { data, error } = await supabase.from("trip_builder_stops").insert(rows).select("*");
@@ -122,6 +123,7 @@ export async function appendDayStops(
     slot_index: item.order,
     day_index: item.day ?? null,
     note: item.note ?? null,
+    requirements: item.requirements ?? null,
   }));
 
   const { data, error } = await supabase.from("trip_builder_stops").insert(rows).select("*");

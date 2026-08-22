@@ -1,5 +1,6 @@
 import type { FinalItineraryStop } from "./types";
 import { haversineDistanceKm } from "./geo";
+import { INFANT_UNSAFE_CATEGORIES } from "./candidatePoolService";
 
 /**
  * תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 72/173 - Opening Hours):
@@ -228,6 +229,43 @@ export function detectPlanBreakerWarnings(
           warnings.push(`התחנה "${s.name}" (יום ${day}) נמצאת כ-${Math.round(distanceFromLodging)} ק"מ מהלינה - רחוקה מהמצופה.`);
         }
       }
+    }
+  }
+
+  // תיקון (Audit מול "תיקון חשוב מאוד להגדרת ה-Food Quota" - "אסור ש-
+  // wineries_dining ייכנס ל-attraction role"): הגנה-בעומק אחרונה על
+  // המסלול הסופי בפועל - אם משום מה תחנת מסעדה/יין הגיעה לכאן מתויגת
+  // כ-role="attraction" (למשל דרך עריכה ידנית/Chat Edit שלא עברה דרך
+  // categoryPlanForDay), מזהירים על כך במפורש.
+  for (const stop of realStops) {
+    if (stop.category === "wineries_dining" && stop.role === "attraction") {
+      warnings.push(`התחנה "${stop.name}" היא מסעדה/יין (wineries_dining) אבל מתויגת כאטרקציה - ייתכן שהיא נספרת בטעות כפעילות ולא כארוחה.`);
+    }
+  }
+
+  // תיקון ארכיטקטוני (Audit מול "בחן מחדש את כל מנגנון בניית המסלול" -
+  // "18. Quality Evaluator... WHY DOES EACH STOP EXIST?"): בדיקת התאמה
+  // דטרמיניסטית (לא AI - ר' qualityCheckService.ts לבדיקת האיכות
+  // המבוססת-AI, נפרדת ולא-חוסמת) בין ה-SlotRequirements שנקבעו ל-Slot
+  // בזמן התכנון (categoryPlanForDay) לבין המקום שבפועל נבחר עבורו.
+  // הגנה-בעומק: Retrieval (candidatePoolService.ts) כבר אמור למנוע חלק
+  // מזה מראש - זו בדיקה עצמאית *אחרי העובדה*, לא תלויה בהנחה שהמסנן שם
+  // תמיד רץ (למשל תחנה שהוזנה/הוחלפה ידנית דרך Chat Edit/Swap, שלא
+  // תמיד מעבירים requirements/hasInfant הלאה - ר' "Remaining Problems").
+  for (const stop of realStops) {
+    if (stop.requirements?.infantSafe && INFANT_UNSAFE_CATEGORIES.has(stop.category)) {
+      warnings.push(
+        `התחנה "${stop.name}" תויגה כ-Slot שדורש infantSafe (יש תינוק בטיול), אבל הקטגוריה שלה (${stop.category}) אינה מתאימה לתינוק.`
+      );
+    }
+    if (
+      stop.requirements?.mealType &&
+      stop.requirements.mealType !== "breakfast" &&
+      stop.role !== "food"
+    ) {
+      warnings.push(
+        `התחנה "${stop.name}" נועדה למלא ארוחת ${stop.requirements.mealType === "lunch" ? "צהריים" : "ערב"} אבל אינה מתויגת role="food" בפועל.`
+      );
     }
   }
 

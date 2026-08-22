@@ -7,6 +7,7 @@ import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 import { logPipelineWarning, logPipelineError } from "./pipelineLogger";
 import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates, detectOpeningHoursWarnings } from "./validationService";
 import { attemptGeographyRepair, attemptBreakfastRepair, attemptRemovalRepair, attemptBudgetRepair, attemptFoodQuotaRepair } from "./repairService";
+import { DEFAULT_RESTAURANT_STOPS_PER_DAY, CULINARY_RESTAURANT_STOPS_PER_DAY } from "@/locales/he/abroadVacation";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
@@ -92,11 +93,14 @@ export async function finalizeItinerary(
     childAgeBands?: string[];
     tripStartDate?: string;
     lodgingCoords?: { lat: number; lng: number } | null;
-    /** תיקון פער אמיתי (Audit מול המסמך "המסלול שמתקבל כרגע אינו תקין",
-     *  סעיף 3/6 - Culinary Intent): אם המשתמש בחר במפורש סגנון קולינרי -
-     *  מכסת המסעדות ליום עולה מ-1 ל-2 (attemptFoodQuotaRepair למטה),
-     *  אבל אף פעם לא בלתי מוגבלת. ברירת המחדל (undefined/false) = 1
-     *  מסעדה מתוכננת מקסימום ביום - "חופשה בארץ ≠ חופשה קולינרית". */
+    /** תיקון פער אמיתי (Audit מול המסמך "תיקון חשוב מאוד להגדרת ה-Food
+     *  Quota"): MEAL QUOTA ≠ RESTAURANT QUOTA. אם המשתמש בחר במפורש
+     *  סגנון קולינרי (או ציין זאת בבירור במלל החופשי) - מכסת ה-Restaurant
+     *  Stops ליום עולה מ-DEFAULT_RESTAURANT_STOPS_PER_DAY (2, צהריים+ערב)
+     *  ל-CULINARY_RESTAURANT_STOPS_PER_DAY (3) - אבל אף פעם לא בלתי
+     *  מוגבלת, ואף פעם לא על חשבון האטרקציות של היום. ארוחת הבוקר
+     *  (coffee_dessert) לעולם לא נספרת כאן - "חופשה בארץ ≠ חופשה
+     *  קולינרית", אבל גם "חופשה ≠ 0-1 ארוחות ביום". */
     isCulinaryFocused?: boolean;
   }
 ): Promise<FinalItinerary> {
@@ -177,6 +181,7 @@ finalStops.push({
         name: stop.place!.name,
         category: stop.category,
         role: stop.role,
+        requirements: stop.requirements ?? null,
         imageUrls: stop.place!.image_urls ?? [],
         etaMinutes,
         arrivalOffsetMinutes: cumulativeMinutes,
@@ -258,7 +263,7 @@ const warnings: string[] = [];
   // מסעדות-וקפה אין "מכסת מסעדות ליום" רלוונטית בכלל.
   const hasMultiDayStructure = finalStops.some((s) => s.dayIndex != null);
   if (hasMultiDayStructure) {
-    const maxFoodPerDay = requirements?.isCulinaryFocused ? 2 : 1;
+    const maxFoodPerDay = requirements?.isCulinaryFocused ? CULINARY_RESTAURANT_STOPS_PER_DAY : DEFAULT_RESTAURANT_STOPS_PER_DAY;
     const { repaired: foodQuotaRepairedStops, convertedCount: foodConvertedCount, removedCount: foodRemovedCount } =
       await attemptFoodQuotaRepair(supabase, finalStops, sessionId, maxFoodPerDay);
     if (foodConvertedCount > 0 || foodRemovedCount > 0) {
@@ -342,7 +347,7 @@ const warnings: string[] = [];
   // Check (למטה, אחרי השמירה) לעולם לא מחליפים אותה או עוקפים אותה.
   const validation = validateFinalItinerary(
     finalStops,
-    hasMultiDayStructure ? { maxFoodPerDay: requirements?.isCulinaryFocused ? 2 : 1 } : undefined
+    hasMultiDayStructure ? { maxFoodPerDay: requirements?.isCulinaryFocused ? CULINARY_RESTAURANT_STOPS_PER_DAY : DEFAULT_RESTAURANT_STOPS_PER_DAY } : undefined
   );
   if (!validation.valid) {
     logPipelineError({ sessionId, stage: "validation" }, "המסלול נכשל בבדיקת התקינות - לא נשמר ולא יוצג", {

@@ -10,7 +10,11 @@ import {
 import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 
 function buildSearchHref(id: QuickCategoryId): string {
-  if (id === "day_trip") return "/trip-builder/day-trip";
+  // תיקון Product מפורש (Audit מול "PROMPT 1 - בניית עמוד Discovery"):
+  // "טיול יומי" עובר ל-Discovery החדש, לא ל-Trip Builder הישן. ה-Trip
+  // Builder הישן (/trip-builder/day-trip) נשאר קיים במלואו, בלי שינוי -
+  // פשוט אף כפתור לא מצביע אליו יותר. לא נמחק שום route/flow קיים.
+  if (id === "day_trip") return "/trip-builder/day-trip/discover";
   if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes";
   if (id === "romantic_date") return "/trip-builder/romantic-date";
   if (id === "nightlife") return "/trip-builder/nightlife";

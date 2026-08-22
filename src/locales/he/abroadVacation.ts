@@ -77,14 +77,34 @@ export function getVacationTypeLabel(value: string): string {
 }
 
 
+/**
+ * תיקון מהותי (Audit מול "תיקון חשוב מאוד להגדרת ה-Food Quota"): המודל
+ * הקודם (`food: number`) בלבל בין MEALS ל-RESTAURANT STOPS - "food:2/3"
+ * נספר כאילו זו מכסת מסעדות, בעוד שבפועל המטרה היא יום מאוזן: ארוחת
+ * בוקר (לא Restaurant, לא נספרת כאן בכלל - תמיד role="coffee_dessert")
+ * + עד 2 עצירות Restaurant אמיתיות (צהריים+ערב) שמסתדרות סביב הפעילויות,
+ * לא במקומן. `attractions` גדל אמיתית לפי הקצב (הפעילויות הן שלד היום -
+ * "DAY EXPERIENCE -> ACTIVITIES -> MEALS", לא ההפך) - `restaurantStops`
+ * הוא **קבוע** (2 = צהריים+ערב) בכל הקצבים כברירת מחדל; Culinary Intent
+ * (context.trip.vacationTypes.includes("culinary")) יכול להעלות אותו
+ * ל-CULINARY_RESTAURANT_STOPS_PER_DAY, לא ה-pace עצמו.
+ */
 export const VACATION_PACE_DAILY_COUNTS: Record<
   "relaxed" | "balanced" | "packed",
-  { attractions: number; food: number }
+  { attractions: number }
 > = {
-  relaxed: { attractions: 2, food: 2 },
-  balanced: { attractions: 3, food: 3 },
-  packed: { attractions: 5, food: 3 },
+  relaxed: { attractions: 2 }, // בוקר + 1-2 פעילויות + צהריים + זמן חופשי/פעילות + ערב
+  balanced: { attractions: 4 }, // בוקר + 2-3 פעילויות + צהריים + 1-2 פעילויות נוספות + ערב
+  packed: { attractions: 6 }, // בוקר + 3-5 פעילויות + צהריים + פעילויות נוספות + ערב
 };
+
+/** ברירת מחדל: צהריים+ערב = 2 עצירות Restaurant אמיתיות ליום "רגיל" -
+ *  לא 1 (זה לא "מסעדה אחת ליום"), ולא בלתי מוגבל. ארוחת הבוקר לא נספרת
+ *  כאן בכלל - היא coffee/breakfast, לא Restaurant. */
+export const DEFAULT_RESTAURANT_STOPS_PER_DAY = 2;
+/** Culinary Intent מפורש בלבד - תוספת עצירת אוכל/יין אחת (למשל טעימות
+ *  יין/סיור קולינרי), עדיין תקרה קשיחה - לעולם לא "כל היום מסעדות". */
+export const CULINARY_RESTAURANT_STOPS_PER_DAY = 3;
 
 /** מיפוי מסוג החופשה (מה שהמשתמש בוחר) לקטגוריית ה-DB בפועל (trip_type_tags group). */
 export const VACATION_TYPE_TO_CATEGORY: Record<string, string> = {

@@ -2,7 +2,16 @@ import { callClaude, logAiError } from "@/services/ai/claudeService";
 import type { TravelDna } from "@/services/travelDna/travelDnaService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "./types";
+import { hasInfantAgeBand } from "./types";
 import type { TripIntent } from "./tripIntentService";
+
+/** משותף בין childAgeBonus (תינוק) ל-weatherBonus - "outdoor" מובהק
+ *  (Audit מול "עצור רגע... פעילות שמתאימה לקצב משפחתי" - חשיפה ממושכת
+ *  לשמש/חום היא שיקול תינוק בפני עצמו, לא רק שיקול מזג אוויר). קבוע
+ *  ברמת המודול (לא בתוך הפונקציה) כדי שיהיה ניתן לשימוש גם לפני
+ *  ההגדרה המקורית וגם למניעת יצירה מחדש בכל קריאה. */
+const INFANT_AND_WEATHER_OUTDOOR_CATEGORIES = new Set(["nature_trails", "beaches_pools", "viewpoints", "parks_gardens"]);
+const INFANT_AND_WEATHER_INDOOR_CATEGORIES = new Set(["culture_history", "spa_relaxation", "shopping"]);
 
 interface RankCandidatesParams {
   dna: TravelDna | null;
@@ -422,12 +431,28 @@ function computeFallbackScore(
   // המקומות לא מתויגים suitable_child_ages, וזה לא אומר שהם לא מתאימים -
   // רק שאין לנו מידע. עונש על "לא ידוע" היה מעניש בטעות מקומות טובים
   // בלי סיבה אמיתית).
+  //
+  // תיקון מהותי (Audit מול "עצור רגע... childAgeBands=0-3 הוא לא
+  // Preference רגיל"): קודם הבונוס היה זהה (12) לכל גילאי הילדים - אבל
+  // תינוק (0-3) הוא מגבלה משמעותית בהרבה מ"ילד בן 10 שרוב האתרים בין
+  // כה מתאימים לו" - כשיש תינוק בפועל, בונוס ההתאמה חייב לשקול הרבה
+  // יותר מול distanceScore/ratingScore (25 נק' כל אחד), אחרת הוא
+  // "נבלע" בקלות ע"י מקום קרוב/מדורג-גבוה שלא באמת מתאים לתינוק.
+  const hasInfant = hasInfantAgeBand(childAgeBands ?? null);
   const childAgeBonus =
     childAgeBands && childAgeBands.length > 0 && candidate.suitableChildAges
       ? candidate.suitableChildAges.some((age) => childAgeBands.includes(age))
-        ? 12
+        ? hasInfant
+          ? 30
+          : 12
         : 0
       : 0;
+
+  // תיקון (אותו Audit): כשיש תינוק, קטגוריות ממוזגות/מוצלות/פנימיות
+  // מועדפות באופן קבוע (לא רק בגשם/חום קיצוני כמו weatherBonus למטה) -
+  // חשיפה ממושכת לשמש/חום היא שיקול תינוק בפני עצמו, לא רק שיקול מזג
+  // אוויר. אותה רשימת INDOOR_CATEGORIES המוגדרת כבר למטה לשימוש חוזר.
+  const infantIndoorBonus = hasInfant && INFANT_AND_WEATHER_INDOOR_CATEGORIES.has(candidate.category) ? 6 : 0;
 
   // תיקון פער אמיתי (Audit מול MASTER SPEC סעיף 3 - Companion Fit):
   // bonus רק כשיש תיוג DB אמיתי שתומך בו (place_dna_tag: romantic/
@@ -447,8 +472,8 @@ function computeFallbackScore(
   // תנאים. לא מדובר בסינון/פסילה - זה soft signal בלבד, בתוך אותה
   // קטגוריה שהמשתמש כבר ביקש (למשל בין שתי אטרקציות טבע, לא בין טבע
   // לקניון). מזג אוויר נוח - בלי penalty/bonus כלל, לפי המפרט המפורש.
-  const OUTDOOR_CATEGORIES = new Set(["nature_trails", "beaches_pools", "viewpoints", "parks_gardens"]);
-  const INDOOR_CATEGORIES = new Set(["culture_history", "spa_relaxation", "shopping"]);
+  const OUTDOOR_CATEGORIES = INFANT_AND_WEATHER_OUTDOOR_CATEGORIES;
+  const INDOOR_CATEGORIES = INFANT_AND_WEATHER_INDOOR_CATEGORIES;
   let weatherBonus = 0;
   if (weatherFlags?.isRainy || weatherFlags?.isExtremeHeat) {
     if (OUTDOOR_CATEGORIES.has(candidate.category)) weatherBonus -= 6;
@@ -463,6 +488,7 @@ function computeFallbackScore(
     freeTextBonus * 1.5 +
     learnedBonus +
     childAgeBonus +
+    infantIndoorBonus +
     companionBonus +
     weatherBonus;
 

@@ -36,6 +36,7 @@ import { suggestMustSeeLandmarks, findMustSeePlaces } from "@/services/tripBuild
 import { ensurePlaceExists } from "@/services/tripBuilder/aiPlaceInsertionService";
 import type { DayTripAnswers, TripBuilderStop, WeekendAnswers } from "@/services/tripBuilder/types";
 import type { LatLng, AbroadVacationAnswers } from "@/services/tripBuilder/types";
+import { hasInfantAgeBand } from "@/services/tripBuilder/types";
 import { getVacationTypeLabel, VACATION_CHILD_AGE_OPTIONS } from "@/locales/he/abroadVacation";
 import { getWeekendStyleLabel } from "@/locales/he/weekend";
 import { mapAvoidTermsToCategoryIds } from "@/services/places/tripTaxonomy";
@@ -47,6 +48,7 @@ import { saveCategoryPlan } from "@/services/tripBuilder/sessionService";
 import { saveFinalItinerary } from "@/services/tripBuilder/sessionService";
 import { appendDayStops } from "@/services/tripBuilder/sessionService";
 import { buildVacationContext } from "@/services/tripBuilder/vacationContext";
+import { buildTripStrategy } from "@/services/tripBuilder/tripStrategyService";
 import { generateDayBlueprint } from "@/services/tripBuilder/dayBlueprintService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { describeWeatherCode } from "@/utils/weatherCodes";
@@ -797,6 +799,7 @@ export async function POST(
             requireKosher: dna?.kosher === true,
             requireAccessible: dna?.accessibility === true,
             excludeCategories: negativeIntentCategories,
+            hasInfant: stop.requirements?.infantSafe ?? hasInfantAgeBand((answers as unknown as { childAgeBands?: string[] }).childAgeBands),
           });
 
           // רשת ביטחון: אם החיפוש הצר (סביב התחנה הקודמת) לא מצא כלום -
@@ -813,6 +816,7 @@ export async function POST(
               excludePlaceIds: excludePlaceIdsForVacation,
               requireKosher: dna?.kosher === true,
               requireAccessible: dna?.accessibility === true,
+              hasInfant: stop.requirements?.infantSafe ?? hasInfantAgeBand((answers as unknown as { childAgeBands?: string[] }).childAgeBands),
             });
           }
 
@@ -988,6 +992,14 @@ export async function POST(
         });
         await supabase.from("trip_builder_sessions").update({ vacation_context: vacationContext }).eq("id", sessionId);
 
+        // תיקון ארכיטקטוני (Audit מול "בחן מחדש את כל מנגנון בניית המסלול"
+        // - "13. לבנות Trip Strategy"): מחושב פעם אחת לכל הטיול (לא בכל
+        // יום מחדש) - ר' tripStrategyService.ts. כל קריאה הבאה ל-
+        // generateDayBlueprint/categoryPlanForDay קוראת ממנו, לא מחשבת
+        // pace/תינוק/culinary בעצמה.
+        const tripStrategy = buildTripStrategy(vacationContext);
+        console.error("[auto-build] TripStrategy חושבה", { sessionId, tripStrategy });
+
         // תיקון באג אמיתי (נמצא בלוגים בפועל): trip_builder_stops.slot_index
         // ייחודי לכל ה-session (constraint DB: trip_builder_stops_session_id_slot_index_key),
         // לא רק בתוך אותו יום. קודם העברתי startOrder=0 קבוע לכל יום "רגיל" -
@@ -1006,10 +1018,10 @@ export async function POST(
         for (let day = 2; day < numDays; day++) {
           console.error("[auto-build] מתחיל יום Blueprint", { sessionId, day, numDays });
           try {
-            const blueprint = await generateDayBlueprint(vacationContext, day, previousDayTitles);
+            const blueprint = await generateDayBlueprint(vacationContext, tripStrategy, day, previousDayTitles);
             previousDayTitles.push(blueprint.title);
 
-            const dayPlan = categoryPlanForDay(blueprint, day, nextSlotOrder, includesNightlife);
+            const dayPlan = categoryPlanForDay(blueprint, tripStrategy, day, nextSlotOrder, includesNightlife);
             nextSlotOrder += dayPlan.length;
             const dayStops = await appendDayStops(supabase, sessionId, dayPlan);
             await fillStopsFromPoolThenAi(dayStops);

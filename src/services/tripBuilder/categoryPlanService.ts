@@ -8,6 +8,7 @@ import type { TripIntent } from "./tripIntentService";
 import { NIGHTLIFE_VENUE_TYPE_TO_CATEGORY } from "@/locales/he/nightlife";
 import { getDifficultyLabel } from "@/locales/he/natureTrip";
 import { VACATION_TYPE_TO_CATEGORY } from "@/locales/he/abroadVacation";
+import type { TripStrategy } from "./tripStrategyService";
 
 const ALL_CATEGORY_IDS = TRIP_TYPE_GROUPS.map((g) => g.id).join(", ");
 
@@ -296,7 +297,7 @@ category="shopping", ממוקם אחרון ברשימה.
 
     return parsed.map((item, index) => ({
       category: item.category,
-      role: normalizeRole(item.role),
+      role: normalizeRoleForCategory(item.role, item.category),
       order: item.order ?? index,
       note: typeof item.note === "string" && item.note.trim() ? item.note.trim() : undefined,
     }));
@@ -312,6 +313,19 @@ category="shopping", ממוקם אחרון ברשימה.
 function normalizeRole(role: string): StopRole {
   if (role === "food" || role === "coffee_dessert" || role === "viewpoint" || role === "bar" || role === "spa") return role;
   return "attraction";
+}
+
+/**
+ * תיקון (Audit מול "תיקון חשוב מאוד להגדרת ה-Food Quota" - "אסור ש-
+ * wineries_dining ייכנס ל-attraction role"): הגנה-בעומק על תוכנית ה-AI
+ * (tryClaudePlan/decideNextStop) - גם אם Claude "סוטה" ומחזיר קטגוריית
+ * מסעדות/יינות עם role="attraction" (למשל כי חשב שזו "חוויה" ולא
+ * "ארוחה"), הקוד לא נותן לזה לעבור ככה הלאה: קטגוריית wineries_dining
+ * תמיד מנורמלת ל-role="food" בפועל, בלי תלות במה ש-Claude כתב.
+ */
+function normalizeRoleForCategory(role: string, category: string): StopRole {
+  if (category === "wineries_dining") return "food";
+  return normalizeRole(role);
 }
 
 function describeDna(dna: TravelDna | null) {
@@ -406,7 +420,7 @@ export async function decideNextStop(params: DecideNextStopParams): Promise<{ ca
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as { category: string; role: string };
-        return { category: parsed.category, role: normalizeRole(parsed.role) };
+        return { category: parsed.category, role: normalizeRoleForCategory(parsed.role, parsed.category) };
       }
     } catch (parseError) {
       logAiError("כשל בפענוח תשובת JSON מ-Claude בתחנה דינמית", {
@@ -572,6 +586,7 @@ export function buildMultiDayVacationPlan(answers: {
  */
 export function categoryPlanForDay(
   blueprint: DayBlueprint,
+  strategy: TripStrategy,
   day: number,
   startOrder: number,
   includesNightlife: boolean
@@ -590,33 +605,87 @@ export function categoryPlanForDay(
     return category;
   }
 
+  // תיקון ארכיטקטוני (Audit מול "בחן מחדש את כל מנגנון בניית המסלול" -
+  // "16. להגדיר Slot Requirements"): כל תחנה שנוספת כאן מקבלת requirements
+  // קונקרטיים (לא רק category/role) - נגזרים מ-TripStrategy, שכבר חושבה
+  // פעם אחת לכל הטיול. זה מה שמאפשר ל-Retrieval/Ranking בהמשך "לדעת"
+  // *למה* ה-Slot הזה קיים (איזו ארוחה, האם צריך infantSafe, מתי ביום),
+  // לא רק לאיזו קטגוריה לחפש.
+  const infantSafe = strategy.hasInfant || undefined;
+  const preferredMaxDurationMinutes = strategy.hasInfant ? 90 : undefined;
+
   // בוקר - קפה תמיד ראשון, בלי קשר לעוצמה שה-Blueprint בחר (בקשה
-  // מפורשת קודמת, לא תלויה ביום "קליל"/"עמוס").
-  plan.push({ category: "coffee_carts_cafes", role: "coffee_dessert", order: order++, day });
+  // מפורשת קודמת, לא תלויה ביום "קליל"/"עמוס"). ארוחת הבוקר היא **תמיד**
+  // coffee_dessert - לעולם לא נספרת כ-Restaurant Stop (MEAL QUOTA ≠
+  // RESTAURANT QUOTA, BREAKFAST ≠ RESTAURANT).
+  plan.push({
+    category: "coffee_carts_cafes",
+    role: "coffee_dessert",
+    order: order++,
+    day,
+    requirements: { mealType: "breakfast", infantSafe, timeOfDay: "morning" },
+  });
 
   const attractionsCount = Math.max(1, blueprint.attractionsCount);
-  if (blueprint.includeSecondFoodStop) {
-    // ארוחת צהריים באמצע - חצי מהאטרקציות לפניה, חצי אחריה, עד לערב.
-    const beforeLunch = Math.ceil(attractionsCount / 2);
-    const afterLunch = attractionsCount - beforeLunch;
-    for (let i = 0; i < beforeLunch; i++) {
-      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
-    }
-    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
-    for (let i = 0; i < afterLunch; i++) {
-      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
-    }
-    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
-  } else {
-    // יום קליל יותר - כל האטרקציות לפני ארוחת ערב אחת יחידה.
+  const restaurantStopsCount = Math.max(0, blueprint.restaurantStopsCount);
+
+  // תיקון מהותי (Audit מול "תיקון חשוב מאוד להגדרת ה-Food Quota" -
+  // "FOOD MUST NEVER DISPLACE THE CORE ACTIVITIES OF THE DAY"): מחלקים
+  // את *כל* attractionsCount (שנקבע לגמרי לפי TripStrategy, לא לפי כמות
+  // הארוחות) ל-restaurantStopsCount קבוצות, עם עצירת Restaurant **אחרי**
+  // כל קבוצה (לא במקומה) - כך שמספר האטרקציות בפועל תמיד נשאר מלא, לא
+  // משנה כמה עצירות אוכל יש. restaurantStopsCount=2 (ברירת מחדל, כל
+  // pace) = צהריים+ערב; 3 (Culinary Intent) = מוסיף עצירת אוכל/יין
+  // נוספת בין הפעילויות; 0 (לא קורה כברירת מחדל, שמור לעתיד) = בלי
+  // ארוחה מתוכננת בכלל, כל האטרקציות ברצף אחד.
+  if (restaurantStopsCount === 0) {
     for (let i = 0; i < attractionsCount; i++) {
-      plan.push({ category: nextFocusCategory(), role: "attraction", order: order++, day });
+      plan.push({
+        category: nextFocusCategory(),
+        role: "attraction",
+        order: order++,
+        day,
+        requirements: { infantSafe, preferredMaxDurationMinutes, timeOfDay: "midday" },
+      });
     }
-    plan.push({ category: "wineries_dining", role: "food", order: order++, day });
+  } else {
+    const baseGroupSize = Math.floor(attractionsCount / restaurantStopsCount);
+    const remainder = attractionsCount % restaurantStopsCount;
+    for (let g = 0; g < restaurantStopsCount; g++) {
+      const isLastGroup = g === restaurantStopsCount - 1;
+      // השארית מתחלקת לקבוצות המוקדמות יותר של היום (בדיוק כמו ceil(n/2)
+      // הקודם לבוקר/צהריים) - לא לקבוצה האחרונה (ערב), כדי לא "לדחוס"
+      // את הערב באטרקציות נוספות סתם כי החלוקה לא התחלקה בשלם.
+      const groupSize = baseGroupSize + (g < remainder ? 1 : 0);
+      const groupTimeOfDay: NonNullable<CategoryPlanItem["requirements"]>["timeOfDay"] =
+        g === 0 ? "morning" : isLastGroup ? "afternoon" : "midday";
+      for (let i = 0; i < groupSize; i++) {
+        plan.push({
+          category: nextFocusCategory(),
+          role: "attraction",
+          order: order++,
+          day,
+          requirements: { infantSafe, preferredMaxDurationMinutes, timeOfDay: groupTimeOfDay },
+        });
+      }
+      // Restaurant Stop אמיתי (לא coffee/breakfast) - צהריים לקבוצה
+      // הראשונה, ערב לאחרונה, וכל עצירה נוספת באמצע (Culinary Intent בלבד).
+      plan.push({
+        category: "wineries_dining",
+        role: "food",
+        order: order++,
+        day,
+        requirements: {
+          mealType: isLastGroup ? "dinner" : "lunch",
+          infantSafe,
+          timeOfDay: isLastGroup ? "evening" : "midday",
+        },
+      });
+    }
   }
 
   if (includesNightlife) {
-    plan.push({ category: "nightlife", role: "nightlife", order: order++, day });
+    plan.push({ category: "nightlife", role: "nightlife", order: order++, day, requirements: { timeOfDay: "evening" } });
   }
 
   return plan;
