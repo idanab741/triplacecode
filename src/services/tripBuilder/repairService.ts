@@ -215,6 +215,176 @@ export async function attemptBreakfastRepair(
 }
 
 /**
+ * תיקון פער אמיתי קריטי (Audit מול המסמך "תיקון קריטי - המסלול שמתקבל
+ * כרגע אינו תקין", סעיפים 2/9-13/18): זהו הפער האמיתי היחיד שהיה עדיין
+ * *לגמרי* חסר במנוע ה-Repair - עד עכשיו validateFinalItinerary/
+ * detectPlanBreakerWarnings בדקו ומזהירים על הכל (מרחק, שעות, תקציב,
+ * כשרות...) **חוץ** ממכסת מסעדות ליום, ושום Repair לא נגע בזה בכלל.
+ * categoryPlanForDay/dayBlueprintService.ts כבר אוכפים בפועל מקסימום
+ * ארוחה מתוכננת אחת ביום (שתיים רק אם culinary נבחר במפורש) *בזמן
+ * הבנייה* - אבל זה Layer 2 (Candidate/Category Allocation) בלבד. בלי
+ * Layer 3 (Final Validation, לפי דרישת המסמך המפורשת: "if restaurantCount
+ * > allowedRestaurantCount: INVALID, REPAIR, REVALIDATE") - כל מנגנון
+ * אחר שמוסיף/מחליף תחנה בדיעבד (Chat Edit, Swap, Instruct, must-see,
+ * "הרחבת אתרי חובה") יכול עדיין "לדלוף" מסעדה נוספת לאותו יום בלי
+ * שאף בדיקה תתפוס את זה. זו הבדיקה/תיקון הזה: **הבטחה בקוד**, לא רק
+ * הנחיה בפרומפט - בסוף הריצה הזו, אף יום לא יכול להכיל יותר מ-
+ * maxFoodPerDay תחנות role="food" (מסעדות בפועל), בלי יוצא מן הכלל.
+ *
+ * Repair, לא רק Warning (בניגוד ל-attemptGeographyRepair/attemptBudgetRepair
+ * שיכולים "לוותר" ולהשאיר את הבעיה אם אין מועמד תחליף): כל תחנת "עודף"
+ * מנסה קודם להיות **מוחלפת** באטרקציה מקטגוריה שחסרה ביום הזה (סעיף 12 -
+ * "ה-Repair חייב להעדיף קטגוריה שחסרה ביום"). אם אין מועמד תחליף מתאים -
+ * התחנה **מוסרת** (לא נשארת "מסעדה רביעית") - כך שהאינווריאנט
+ * (restaurantCount <= maxFoodPerDay) מובטח תמיד, גם בלי תחליף. זה בדיוק
+ * העיקרון שכבר קיים בקוד הזה (attemptRemovalRepair) - "עדיף פחות Stops
+ * מאשר Stop שבור" - רק שכאן ההסרה היא הרשת ביטחון האחרונה שמבטיחה Hard
+ * Constraint אמיתי, לא רק best-effort.
+ *
+ * maxFoodPerDay מגיע מבחוץ (finalizeService.ts) - 1 כברירת מחדל, 2 רק
+ * אם Culinary Intent מפורש נבחר (isCulinaryFocused) - אף פעם לא בלתי
+ * מוגבל, בדיוק לפי סעיף 3 במסמך ("גם אז - אין לתת ל-AI חופש בלתי מוגבל").
+ * מופעל רק על תחנות עם dayIndex (מסלול רב-ימי - סופ"ש/חופשה בחו"ל) -
+ * לטיול יומי/מסעדות-וקפה/יום אחד אין "יום" למכסה הזו בכלל, ובכוונה.
+ */
+export async function attemptFoodQuotaRepair(
+  supabase: SupabaseClient,
+  stops: FinalItineraryStop[],
+  sessionId: string,
+  maxFoodPerDay: number
+): Promise<{ repaired: FinalItineraryStop[]; convertedCount: number; removedCount: number }> {
+  const cap = Math.max(1, Math.round(maxFoodPerDay));
+  const result = [...stops];
+  const usedPlaceIds = new Set(result.filter((s) => s.placeId).map((s) => s.placeId));
+
+  // "קטגוריות קלות/בטוחות" שמתאימות כאטרקציה חלופית כמעט בכל חופשה/סופ"ש -
+  // אותו עיקרון בדיוק כמו LIGHT_LAST_DAY_CATEGORIES (categoryPlanService.ts),
+  // מורחב מעט כדי לתת ל-Repair יותר סיכוי למצוא קטגוריה שבאמת חסרה היום.
+  const REPLACEMENT_CATEGORY_CANDIDATES = [
+    "nature_trails",
+    "beaches_pools",
+    "viewpoints",
+    "parks_gardens",
+    "attractions_activities",
+    "culture_history",
+    "shopping",
+    "spa_relaxation",
+  ];
+
+  const byDay = new Map<number, { s: FinalItineraryStop; i: number }[]>();
+  result.forEach((s, i) => {
+    if (s.specialType || s.dayIndex == null) return;
+    if (s.role !== "food") return;
+    const day = s.dayIndex;
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day)!.push({ s, i });
+  });
+
+  const indicesToRemove = new Set<number>();
+  let convertedCount = 0;
+
+  for (const [day, entries] of byDay) {
+    if (entries.length <= cap) continue;
+
+    // שומרים על ה-`cap` הראשונות (לפי הסדר המקורי - סדר slot_index, כבר
+    // ממוין כך מהשאילתה שבנתה את finalStops), מתקנים רק את העודף.
+    const excess = entries.slice(cap);
+
+    const dayStopsAll = result.filter((s) => !s.specialType && s.dayIndex === day);
+    const usedCategoriesToday = new Set(dayStopsAll.map((s) => s.category));
+
+    for (const { s: excessStop, i } of excess) {
+      const missingCategory = REPLACEMENT_CATEGORY_CANDIDATES.find((c) => !usedCategoriesToday.has(c));
+
+      let replaced = false;
+      if (missingCategory) {
+        try {
+          const candidates = await fetchCandidatePool(supabase, {
+            category: missingCategory,
+            origin: { lat: excessStop.latitude, lng: excessStop.longitude },
+            distanceBand: "1h",
+            maxDistanceKm: REPAIR_SEARCH_RADIUS_KM,
+            maxPriceLevel: null,
+            excludePlaceIds: Array.from(usedPlaceIds),
+          });
+          const best = candidates[0];
+          if (best) {
+            const oldPlaceId = excessStop.placeId;
+            result[i] = {
+              ...excessStop,
+              placeId: best.id,
+              name: best.name,
+              category: missingCategory,
+              role: "attraction",
+              imageUrls: best.imageUrls,
+              rating: best.rating,
+              priceLevel: best.priceLevel,
+              estimatedVisitMinutes: best.estimatedVisitMinutes,
+              shortDescription: best.shortDescription,
+              latitude: best.latitude,
+              longitude: best.longitude,
+              openingHours: null,
+              reason: "הוחלף אוטומטית - יותר מדי מסעדות מתוכננות באותו יום; הוחלף באטרקציה כדי לשמור על חופשה מאוזנת (לא רשימת מסעדות)",
+            };
+            if (oldPlaceId) usedPlaceIds.delete(oldPlaceId);
+            usedPlaceIds.add(best.id);
+            usedCategoriesToday.add(missingCategory);
+
+            await supabase
+              .from("trip_builder_stops")
+              .update({ place_id: best.id, category: missingCategory, role: "attraction", reason: result[i].reason })
+              .eq("id", excessStop.stopId);
+
+            convertedCount += 1;
+            replaced = true;
+            logPipelineWarning({ sessionId, stage: "repair" }, "מסעדת-עודף (מעבר למכסה היומית) הוחלפה באטרקציה", {
+              day,
+              stopId: excessStop.stopId,
+              oldName: excessStop.name,
+              newName: best.name,
+              newCategory: missingCategory,
+              maxFoodPerDay: cap,
+            });
+          }
+        } catch (err) {
+          logPipelineWarning({ sessionId, stage: "repair" }, "ניסיון החלפת מסעדת-עודף נכשל", {
+            day,
+            stopId: excessStop.stopId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
+      if (!replaced) {
+        // אין מועמד תחליף מתאים - מסירים (לא משאירים מסעדה רביעית),
+        // בדיוק לפי העיקרון "עדיף פחות Stops מאשר Stop שבור"/"עדיף
+        // פחות Stops מאשר חריגה ממכסה קשיחה".
+        indicesToRemove.add(i);
+      }
+    }
+  }
+
+  if (indicesToRemove.size === 0) {
+    return { repaired: result, convertedCount, removedCount: 0 };
+  }
+
+  let removedCount = 0;
+  for (const i of indicesToRemove) {
+    const stop = result[i];
+    await supabase.from("trip_builder_stops").delete().eq("id", stop.stopId);
+    removedCount += 1;
+    logPipelineWarning({ sessionId, stage: "repair" }, "מסעדת-עודף הוסרה (אין קטגוריה חלופית זמינה קרובה - עדיף פחות תחנות מחריגה ממכסה)", {
+      dayIndex: stop.dayIndex,
+      stopId: stop.stopId,
+      name: stop.name,
+      maxFoodPerDay: cap,
+    });
+  }
+
+  return { repaired: result.filter((_, i) => !indicesToRemove.has(i)), convertedCount, removedCount };
+}
+
+/**
  * תיקון פער אמיתי (Audit מול MASTER SPEC Breaker 18 - "סתירת לינה")
  * ו-Breaker 2/3 (יום לא ריאלי מבחינת זמן): לשני אלה **אין** "מועמד
  * תקין" הגיוני להחליף אליו (מה בדיוק מחליפים תחנה שרחוקה מדי מהלינה,

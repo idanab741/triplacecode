@@ -6,7 +6,7 @@ import { reviewItinerary } from "./qualityCheckService";
 import { AI_TRIP_BUILDER_SOURCE } from "./aiPlaceInsertionService";
 import { logPipelineWarning, logPipelineError } from "./pipelineLogger";
 import { validateFinalItinerary, detectPlanBreakerWarnings, repairDuplicates, detectOpeningHoursWarnings } from "./validationService";
-import { attemptGeographyRepair, attemptBreakfastRepair, attemptRemovalRepair, attemptBudgetRepair } from "./repairService";
+import { attemptGeographyRepair, attemptBreakfastRepair, attemptRemovalRepair, attemptBudgetRepair, attemptFoodQuotaRepair } from "./repairService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { generatePersonalizedDescriptions } from "./descriptionService";
 import type { TripIntent } from "./tripIntentService";
@@ -92,6 +92,12 @@ export async function finalizeItinerary(
     childAgeBands?: string[];
     tripStartDate?: string;
     lodgingCoords?: { lat: number; lng: number } | null;
+    /** תיקון פער אמיתי (Audit מול המסמך "המסלול שמתקבל כרגע אינו תקין",
+     *  סעיף 3/6 - Culinary Intent): אם המשתמש בחר במפורש סגנון קולינרי -
+     *  מכסת המסעדות ליום עולה מ-1 ל-2 (attemptFoodQuotaRepair למטה),
+     *  אבל אף פעם לא בלתי מוגבלת. ברירת המחדל (undefined/false) = 1
+     *  מסעדה מתוכננת מקסימום ביום - "חופשה בארץ ≠ חופשה קולינרית". */
+    isCulinaryFocused?: boolean;
   }
 ): Promise<FinalItinerary> {
   const { data: session } = await supabase
@@ -243,6 +249,29 @@ const warnings: string[] = [];
     finalStops.push(...dedupedStops);
   }
 
+  // Repair Engine, שלב 1.5 - Food Quota (Audit מול המסמך "המסלול שמתקבל
+  // כרגע אינו תקין", סעיפים 2/9-13/18): Hard Constraint אמיתי בקוד, לא
+  // רק בפרומפט - אחרי השלב הזה, אף יום (במסלול רב-ימי - יש dayIndex)
+  // לא יכול להכיל יותר מ-maxFoodPerDay תחנות role="food" (מסעדות
+  // מתוכננות בפועל), בלי יוצא מן הכלל. מופעל **רק** על מסלול רב-ימי
+  // (weekend/abroad_vacation, שקובעים dayIndex לכל תחנה) - לטיול יומי/
+  // מסעדות-וקפה אין "מכסת מסעדות ליום" רלוונטית בכלל.
+  const hasMultiDayStructure = finalStops.some((s) => s.dayIndex != null);
+  if (hasMultiDayStructure) {
+    const maxFoodPerDay = requirements?.isCulinaryFocused ? 2 : 1;
+    const { repaired: foodQuotaRepairedStops, convertedCount: foodConvertedCount, removedCount: foodRemovedCount } =
+      await attemptFoodQuotaRepair(supabase, finalStops, sessionId, maxFoodPerDay);
+    if (foodConvertedCount > 0 || foodRemovedCount > 0) {
+      finalStops.length = 0;
+      finalStops.push(...foodQuotaRepairedStops);
+      logPipelineWarning({ sessionId, stage: "repair" }, "סיכום תיקון מכסת מסעדות ליום", {
+        maxFoodPerDay,
+        foodConvertedCount,
+        foodRemovedCount,
+      });
+    }
+  }
+
   // Repair Engine, שלב 2 (Audit מול MASTER SPEC סעיפים 75-77 - היה
   // מסומן PARTIAL, לא PASS): ניסיון החלפה אמיתי לתחנות ששוברות את כלל
   // ה-40 ק"מ - Replacement + Retry Limit + Rollback (ר' repairService.ts
@@ -311,7 +340,10 @@ const warnings: string[] = [];
   // { error } למשתמש במקום itinerary, כך שאין סיכון להצגת "חצי מסלול".
   // חשוב - זו עדיין הבדיקה **החוסמת** היחידה: Repair (למעלה) וQuality
   // Check (למטה, אחרי השמירה) לעולם לא מחליפים אותה או עוקפים אותה.
-  const validation = validateFinalItinerary(finalStops);
+  const validation = validateFinalItinerary(
+    finalStops,
+    hasMultiDayStructure ? { maxFoodPerDay: requirements?.isCulinaryFocused ? 2 : 1 } : undefined
+  );
   if (!validation.valid) {
     logPipelineError({ sessionId, stage: "validation" }, "המסלול נכשל בבדיקת התקינות - לא נשמר ולא יוצג", {
       errors: validation.errors,

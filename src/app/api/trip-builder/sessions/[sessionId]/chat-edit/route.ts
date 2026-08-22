@@ -156,6 +156,11 @@ export async function POST(
       [],
       {
         childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
+        isCulinaryFocused: (
+          (answers as unknown as { vacationTypes?: string[]; weekendStyles?: string[] }).vacationTypes ??
+          (answers as unknown as { vacationTypes?: string[]; weekendStyles?: string[] }).weekendStyles ??
+          []
+        ).includes("culinary"),
       }
     );
 

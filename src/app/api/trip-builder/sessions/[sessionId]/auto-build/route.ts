@@ -918,6 +918,7 @@ export async function POST(
             requireAccessible: dna?.accessibility === true,
             childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
             tripStartDate: (answers as unknown as { startDate?: string }).startDate,
+            isCulinaryFocused: vacationTypeValues.includes("culinary"),
           }
         );
       }
@@ -1028,6 +1029,7 @@ export async function POST(
                 requireAccessible: dna?.accessibility === true,
                 childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
             tripStartDate: (answers as unknown as { startDate?: string }).startDate,
+                isCulinaryFocused: vacationTypeValues.includes("culinary"),
               }
             );
           } catch (dayError) {
@@ -1064,6 +1066,7 @@ export async function POST(
           requireAccessible: dna?.accessibility === true,
           childAgeBands: (answers as unknown as { childAgeBands?: string[] }).childAgeBands,
             tripStartDate: (answers as unknown as { startDate?: string }).startDate,
+          isCulinaryFocused: vacationTypeValues.includes("culinary"),
         }
       );
       return NextResponse.json({ itinerary });

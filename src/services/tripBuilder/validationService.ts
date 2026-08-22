@@ -293,11 +293,41 @@ export interface ItineraryValidationResult {
   errors: string[];
 }
 
-export function validateFinalItinerary(stops: FinalItineraryStop[]): ItineraryValidationResult {
+export function validateFinalItinerary(
+  stops: FinalItineraryStop[],
+  /**
+   * תיקון פער אמיתי (Audit מול המסמך "המסלול שמתקבל כרגע אינו תקין",
+   * סעיף 11/18 - "Category Quotas הם Hard Constraint" / "Layer 3 - Final
+   * Validation"): המסמך דורש במפורש `restaurant_count > 1 -> INVALID`,
+   * לא Warning. attemptFoodQuotaRepair (repairService.ts) כבר אמור
+   * להבטיח את זה **בפועל** לפני שמגיעים לכאן (עם הסרה כרשת ביטחון גם
+   * בלי מועמד תחליף) - זו בדיקת הגנה-בעומק (defense-in-depth) בלבד:
+   * אם משום מה ה-Repair לא רץ/לא הצליח, זו רשת הביטחון האחרונה שבאמת
+   * **חוסמת** (throw), לא רק מזהירה - בדיוק כמו שאר הבדיקות המבניות
+   * למעלה בפונקציה הזו. undefined = לא נבדק (מסלול יום-אחד, שאין לו
+   * "מכסת מסעדות ליום" רלוונטית בכלל).
+   */
+  foodQuotaCheck?: { maxFoodPerDay: number }
+): ItineraryValidationResult {
   const errors: string[] = [];
 
   if (stops.length === 0) {
     errors.push("המסלול שנבנה ריק - אין אף תחנה עם place תקין.");
+  }
+
+  if (foodQuotaCheck) {
+    const foodCountByDay = new Map<number, number>();
+    for (const stop of stops) {
+      if (stop.specialType || stop.dayIndex == null || stop.role !== "food") continue;
+      foodCountByDay.set(stop.dayIndex, (foodCountByDay.get(stop.dayIndex) ?? 0) + 1);
+    }
+    for (const [day, count] of foodCountByDay) {
+      if (count > foodQuotaCheck.maxFoodPerDay) {
+        errors.push(
+          `יום ${day}: ${count} מסעדות מתוכננות - חורג ממכסת ${foodQuotaCheck.maxFoodPerDay} המסעדות המקסימלית ליום (חופשה אינה רשימת מסעדות).`
+        );
+      }
+    }
   }
 
   const seenPlaceIds = new Set<string>();
