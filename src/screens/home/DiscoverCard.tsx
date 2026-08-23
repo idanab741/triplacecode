@@ -65,18 +65,11 @@ export function DiscoverCard() {
           clickable: true,
         }}
         onClick={handleClick}
-        className="rounded-[30px] shadow-xl"
+        className="aspect-[2142/734] rounded-[30px] shadow-xl"
       >
         {SLIDES.map((slide) => (
-          <SwiperSlide key={slide.href} className="cursor-pointer">
-            <Image
-              src={slide.image}
-              alt={slide.alt}
-              width={2142}
-              height={734}
-              priority
-              className="block h-auto w-full"
-            />
+          <SwiperSlide key={slide.href} className="relative cursor-pointer">
+            <Image src={slide.image} alt={slide.alt} fill sizes="100vw" priority className="object-cover" />
           </SwiperSlide>
         ))}
       </Swiper>
