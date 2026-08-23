@@ -89,13 +89,33 @@ export default function TripMatchPage() {
   );
 }
 
-function TripMatchPageContent() {
+interface TripMatchPageContentProps {
+  /** תיקון (Home - כניסה ל-TripMatch דרך שורת החיפוש): כש-true, הרכיב
+   *  מוטמע בתוך עמוד אחר (Home) במקום להיות עמוד עצמאי - בלי ה-Screen/
+   *  MainBottomNav/BackButton-לניווט המלאים שלו (Home כבר מספק את אלה).
+   *  ברירת המחדל false שומרת על ההתנהגות הקיימת של /tripmatch כעמוד
+   *  עצמאי, ללא שינוי. */
+  embedded?: boolean;
+  /** הטקסט שהמשתמש הקליד בשורת החיפוש של Home - "היעד" הראשוני, בלי
+   *  לאפס אותו ובלי לבקש מהמשתמש להקליד שוב. */
+  initialCityQuery?: string;
+  /** נקרא כש-embedded=true והמשתמש לוחץ "חזרה" (BackButton) - Home
+   *  מנקה את שורת החיפוש כדי לחזור למצב ההתחלתי (Reverse Scroll),
+   *  בלי router.push/שינוי URL. */
+  onExitEmbedded?: () => void;
+}
+
+export function TripMatchPageContent({ embedded = false, initialCityQuery, onExitEmbedded }: TripMatchPageContentProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { ready } = useFeatureOnboardingGuard("tripmatch", "/onboarding/tripmatch");
   const [stage, setStage] = useState<Stage>("city");
-  const [heroVisible, setHeroVisible] = useState(true);
+  // תיקון (Home - כניסה מוטמעת): כש-embedded=true אין להציג בכלל את
+  // תמונת ה-Hero הדקורטיבית ("אין Hero של TripMatch" - Home כבר הציג
+  // הירו/חיפוש משלו שהתחלף בכניסה הזו) - מתחילים עם false במקום עם
+  // true+איפוס מאוחר יותר, כדי שלא תבהב לרגע לפני שההיעד מתאשר.
+  const [heroVisible, setHeroVisible] = useState(() => !embedded);
 
   const [cityInput, setCityInput] = useState("");
   const [cityOptions, setCityOptions] = useState<{ value: string; label: string; type: "city" | "country" }[]>([]);
@@ -327,7 +347,43 @@ function TripMatchPageContent() {
     window.setTimeout(() => setStage("category"), 280);
   }
 
+  // *** תיקון (Home - כניסה ל-TripMatch): כש-embedded=true, שורת החיפוש
+  // של Home היא זו שמזינה את היעד - ה-cityInput כאן פשוט עוקב אחריה
+  // (בלי לבקש מהמשתמש להקליד שוב, "אין לאפס את הערך"). לא רץ יותר אחרי
+  // שכבר נבחרה עיר (selectedCity) - כדי לא "לדרוס" בחירה/מסך תוצאות קיים.
+  useEffect(() => {
+    if (!embedded || selectedCity) return;
+    setCityInput(initialCityQuery ?? "");
+  }, [embedded, initialCityQuery, selectedCity]);
+
+  // *** לאחר שה-query התייצב (משתמש הפסיק להקליד), מתקדמים אוטומטית
+  // לשלב הקטגוריה - בדיוק כמו בחירת עיר רגילה (handleSelectCity הקיים,
+  // בלי מנגנון חדש), עם עדיפות לתוצאת ההשלמה האוטומטית הקיימת
+  // (cityOptions, שכבר נטענת ע"י ה-effect למעלה) ונפילה חזרה לטקסט
+  // הגולמי שהוקלד אם אין התאמה - כדי ש-TripMatch תמיד "ייפתח" עם היעד
+  // שהמשתמש הקליד, גם בלי בחירה ידנית מהרשימה.
+  useEffect(() => {
+    if (!embedded || selectedCity) return;
+    if (!cityInput.trim()) return;
+    const timer = setTimeout(() => {
+      const match = cityOptions[0];
+      if (match) handleSelectCity(match);
+      else handleSelectCity({ value: cityInput.trim(), label: cityInput.trim(), type: "city" });
+    }, 550);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, cityInput, cityOptions, selectedCity]);
+
   function handleEditDestination() {
+    // *** תיקון (Home - מוטמע): כש-embedded=true, שורת החיפוש של Home
+    // היא ה"עריכת יעד" האמיתית - במקום להציג כאן שוב את מסך "איפה
+    // תרצו לטייל?" הפנימי של TripMatch (עם ה-Hero שלו, שלא אמור להופיע
+    // בכלל במצב מוטמע), פשוט חוזרים למצב ההתחלתי של Home (Reverse
+    // Scroll) והמשתמש עורך ישירות בשורת החיפוש.
+    if (embedded && onExitEmbedded) {
+      onExitEmbedded();
+      return;
+    }
     setStage("city");
     setHeroVisible(true);
     setCategoryValue(null);
@@ -550,7 +606,8 @@ function TripMatchPageContent() {
 
   function handleFinish() {
     if (sessionLikedPlaces.length === 0) {
-      router.push("/home");
+      if (embedded && onExitEmbedded) onExitEmbedded();
+      else router.push("/home");
     } else {
       setStage("results");
     }
@@ -727,24 +784,28 @@ function TripMatchPageContent() {
   // נראית כאילו "כלום לא קורה" בזמן שבפועל היא עדיין בתהליך.
   if (resuming) {
     return (
-      <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+      <Screen withBottomNavSpacing={!embedded} fullHeight={!embedded} className="!bg-bg !px-0 !pt-0">
         <div className="flex h-[70vh] flex-col items-center justify-center gap-4 px-8 text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
           <p className="text-sm font-medium text-ink-secondary">טוענים את הקטגוריה הבאה... זה יכול לקחת כמה שניות</p>
         </div>
-        <MainBottomNav active="favorites" />
+        {!embedded && <MainBottomNav active="favorites" />}
       </Screen>
     );
   }
 
   return (
-    <Screen withBottomNavSpacing className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}>
-      {stage !== "swiping" && (
+    <Screen
+      withBottomNavSpacing={!embedded}
+      fullHeight={!embedded}
+      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}
+    >
+      {!embedded && stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
           <div className="relative h-16">
             <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
               <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />
-              <BackButton onBack={() => router.push("/home")} />
+              <BackButton onBack={() => (embedded && onExitEmbedded ? onExitEmbedded() : router.push("/home"))} />
             </div>
 
             {/* מסך תוצאות - כפתורי שיתוף+שמירה בעיצוב זהה לשאר עמודי
@@ -779,7 +840,21 @@ function TripMatchPageContent() {
       )}
 
       <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
-        {stage === "city" && (
+        {stage === "city" && embedded && (
+          // *** תיקון (Home - כניסה מוטמעת): היעד כבר הגיע משורת החיפוש
+          // של Home ("אין לאפס את הערך, אין לבקש מהמשתמש להקליד שוב") -
+          // לא מציגים כאן שוב את מסך "איפה תרצו לטייל?" המלא, רק מסך
+          // ביניים קצר עד שה-effect למעלה מסיים לאשר את היעד ולהתקדם
+          // לשלב הקטגוריה (בדרך כלל כמה מאות מ"ש).
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
+            <p className="text-sm font-medium text-ink-secondary">
+              {cityInput ? `מכינים עבורכם המלצות ל${cityInput}...` : "מכינים עבורכם המלצות..."}
+            </p>
+          </div>
+        )}
+
+        {stage === "city" && !embedded && (
           <div className="flex flex-col gap-3">
             <ChatBubble>
               החליקו ימינה למקומות שאהבתם ושמאלה לאלה שפחות. ככל שתמשיכו להחליק, נכיר טוב יותר את הטעם שלכם ונמצא
@@ -1006,7 +1081,7 @@ function TripMatchPageContent() {
                 categoryLabel={categoryLabel}
                 currentIndex={totalDecisions}
                 total={totalDecisions + visibleCandidates.length}
-                onBack={() => router.push("/home")}
+                onBack={() => (embedded && onExitEmbedded ? onExitEmbedded() : router.push("/home"))}
                 onEditDestination={handleEditDestination}
                 onEditCategory={handleEditCategory}
                 onOpenFilters={() => setFiltersOpen(true)}
@@ -1218,7 +1293,7 @@ function TripMatchPageContent() {
         />
       )}
 
-      <MainBottomNav active="favorites" />
+      {!embedded && <MainBottomNav active="favorites" />}
     </Screen>
   );
 }

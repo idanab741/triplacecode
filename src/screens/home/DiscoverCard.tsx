@@ -12,24 +12,19 @@ import "swiper/css/pagination";
 
 const SLIDES = [
   {
-    href: "/tripmatch",
-    image: "/images/discover/tripmatch.png",
-    alt: "TripMatch",
-  },
-  {
-    href: "/test-game",
-    image: "/images/discover/game.png",
-    alt: "המשחק שלנו",
-  },
-  {
     href: "/deals",
-    image: "/images/discover/ai-powered.png",
-    alt: "דילים על חופשות בחו״ל",
+    image: "/images/discover/discover-triplacedeals.png",
+    alt: "TripLace Deals - הדילים והמבצעים המשתלמים ביותר עבורכם",
   },
   {
     href: "/community",
-    image: "/images/discover/places.png",
-    alt: "Places",
+    image: "/images/discover/discover-places-social.png",
+    alt: "Place's - משתפים, יוצאים לדרך",
+  },
+  {
+    href: "/test-game",
+    image: "/images/discover/discover-runtrippy.png",
+    alt: "RunTrippy - המשחק שלנו",
   },
 ];
 
@@ -77,8 +72,8 @@ export function DiscoverCard() {
             <Image
               src={slide.image}
               alt={slide.alt}
-              width={1200}
-              height={675}
+              width={2142}
+              height={734}
               priority
               className="block h-auto w-full"
             />

@@ -3,33 +3,63 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-interface Suggestion {
+interface PlaceSuggestion {
   placeId: string;
   mainText: string;
   secondaryText: string;
 }
 
-export function SearchBarLink() {
+interface DestinationSuggestion {
+  value: string;
+  label: string;
+  type: "city" | "country";
+}
+
+interface SearchBarLinkProps {
+  /** תיקון (Home - כניסה ל-TripMatch): כש-true, ה-autocomplete מביא
+   *  יעדים קיימים (ערים/מדינות - אותו /api/places/cities שכבר משמש את
+   *  TripMatch עצמו, לא search engine חדש) במקום חיפוש מקומות כללי,
+   *  ואף פעם לא מנווט בעצמו. "השלמת" יעד (לא כל הקשה!) - קליק על הצעה,
+   *  או Enter כשהטקסט תואם הצעה בדיוק - מדווחת כלפי מעלה דרך
+   *  onSelectDestination בלבד. ברירת המחדל false שומרת על ההתנהגות
+   *  המקורית (חיפוש מקומות כללי + ניווט ל-/search).
+   */
+  destinationMode?: boolean;
+  /** נקרא רק כשמשתמש בפועל "השלים" יעד קיים - לא נקרא על כל הקשה. */
+  onSelectDestination?: (label: string) => void;
+}
+
+export function SearchBarLink({ destinationMode = false, onSelectDestination }: SearchBarLinkProps = {}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<DestinationSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (query.trim().length < 2) {
-      setSuggestions([]);
+      setPlaceSuggestions([]);
+      setDestinationSuggestions([]);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/places/search-autocomplete?q=${encodeURIComponent(query.trim())}`)
-        .then((res) => res.json())
-        .then((data) => setSuggestions(data.suggestions ?? []))
-        .catch(() => setSuggestions([]));
-    }, 450); // תיקון עלויות: הוארך מ-300ms - פחות קריאות בתשלום לגוגל בזמן הקלדה
-  }, [query]);
+      if (destinationMode) {
+        // אותו endpoint בדיוק שבו TripMatch עצמו משתמש לבחירת יעד.
+        fetch(`/api/places/cities?q=${encodeURIComponent(query.trim())}`)
+          .then((res) => res.json())
+          .then((data) => setDestinationSuggestions(data.options ?? []))
+          .catch(() => setDestinationSuggestions([]));
+      } else {
+        fetch(`/api/places/search-autocomplete?q=${encodeURIComponent(query.trim())}`)
+          .then((res) => res.json())
+          .then((data) => setPlaceSuggestions(data.suggestions ?? []))
+          .catch(() => setPlaceSuggestions([]));
+      }
+    }, destinationMode ? 300 : 450); // תיקון עלויות: הוארך מ-450ms במצב הרגיל - פחות קריאות בתשלום לגוגל בזמן הקלדה
+  }, [query, destinationMode]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -49,6 +79,31 @@ export function SearchBarLink() {
     router.push(`/search/result?placeId=${encodeURIComponent(placeId)}`);
   }
 
+  function selectDestination(option: DestinationSuggestion) {
+    setOpen(false);
+    setQuery(option.label);
+    setDestinationSuggestions([]);
+    onSelectDestination?.(option.label);
+  }
+
+  function handleEnter() {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    if (destinationMode) {
+      // *** תיקון (בקשה מפורשת - "אין לי באפשרויות תל אביב"): השם
+      // הרשמי ב-destinations הוא "תל אביב-יפו" (לא "תל אביב") - התאמה
+      // מדויקת (exact string match) בין הטקסט שהוקלד להצעה מעולם לא
+      // תעבוד לערים כאלה. עכשיו Enter פשוט בוחר את ההצעה הראשונה
+      // שכבר נטענה (אותן תוצאות שמוצגות ברשימה) - עדיין רק מתוך יעדים
+      // קיימים אמיתיים, לא טקסט חופשי, ועדיין רק בפעולה מפורשת (Enter),
+      // לא על כל הקשה.
+      const topMatch = destinationSuggestions[0];
+      if (topMatch) selectDestination(topMatch);
+      return;
+    }
+    goToSearch(trimmed);
+  }
+
   return (
     <div ref={containerRef} className="relative mx-6">
       <div className="flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft">
@@ -61,16 +116,16 @@ export function SearchBarLink() {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && query.trim()) goToSearch(query.trim());
+            if (e.key === "Enter") handleEnter();
           }}
           placeholder="מה תרצו לעשות היום?"
           className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
         />
       </div>
 
-      {open && suggestions.length > 0 && (
+      {!destinationMode && open && placeSuggestions.length > 0 && (
         <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-[120px] overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
-          {suggestions.map((s) => (
+          {placeSuggestions.map((s) => (
             <button
               key={s.placeId}
               type="button"
@@ -79,6 +134,22 @@ export function SearchBarLink() {
             >
               <span className="text-sm font-medium text-ink">{s.mainText}</span>
               {s.secondaryText && <span className="text-xs text-ink-secondary">{s.secondaryText}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {destinationMode && open && destinationSuggestions.length > 0 && (
+        <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
+          {destinationSuggestions.map((option) => (
+            <button
+              key={`${option.type}-${option.value}`}
+              type="button"
+              onClick={() => selectDestination(option)}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-right text-sm text-ink hover:bg-bg-secondary"
+            >
+              <span>{option.label}</span>
+              {option.type === "country" && <span className="text-[11px] text-ink-secondary">מדינה שלמה</span>}
             </button>
           ))}
         </div>
