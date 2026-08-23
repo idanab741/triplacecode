@@ -138,23 +138,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ title: section.title, emoji: section.emoji, places });
   }
 
-  // עמוד ראשי - Aggregate: יעדים חמים (destinations) + הכי חמים עכשיו
-  // (places) + כל הסקשנים, preview מוגבל.
+  // עמוד ראשי - Aggregate: הכי חמים עכשיו (places) + כל הסקשנים, preview
+  // מוגבל. תיקון (בקשה מפורשת - "רוצה קרוסלה עם היעדים הבאים..."):
+  // "🔥 היעדים החמים" כבר לא DB-driven - הפך לרשימה סטטית וקבועה
+  // (constants/israelVacationDestinations.ts), מוצג ישירות ב-page.tsx
+  // בלי לעבור דרך ה-API הזה בכלל. לא נשלף כאן יותר.
   const PREVIEW_LIMIT = 10;
 
-  const [destinations, hotPlaces, sectionResults] = await Promise.all([
-    // 🔥 היעדים החמים (Audit סעיף 5): DESTINATIONS, לא Places - ממחזר
-    // את טבלת destinations הקיימת (is_hot_destination=true, בשימוש כבר
-    // ב-HotDestinations.tsx בדף הבית) - מסונן ל-country="ישראל" בלבד
-    // (לא כל היעדים החמים בעולם, רק "חופשה בארץ").
-    supabase
-      .from("destinations")
-      .select("id,name,country,image_url")
-      .eq("is_hot_destination", true)
-      .eq("country", "ישראל")
-      .order("created_at", { ascending: true })
-      .limit(12)
-      .then(({ data }: { data: { id: string; name: string; country: string; image_url: string | null }[] | null }) => data ?? []),
+  const [hotPlaces, sectionResults] = await Promise.all([
     fetchHotPlaces(supabase, location, PREVIEW_LIMIT, VACATION_HOT_CATEGORIES),
     Promise.all(
       DEFAULT_SECTION_ORDER.map(async (id) => {
@@ -175,7 +166,6 @@ export async function GET(request: Request) {
   ]);
 
   return NextResponse.json({
-    destinations,
     hotPlaces,
     sections: sectionResults,
   });

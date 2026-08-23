@@ -18,7 +18,10 @@ function buildSearchHref(id: QuickCategoryId): string {
   if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes";
   if (id === "romantic_date") return "/trip-builder/romantic-date";
   if (id === "nightlife") return "/trip-builder/nightlife";
-  if (id === "abroad") return "/trip-builder/abroad-vacation";
+  // תיקון Product מפורש (Audit - "חופשה בחו''ל שנבנה עכשיו"): "חו״ל"
+  // עובר ל-Discovery החדש, בדיוק כמו "טיול יומי"/"סופ״ש" קודם. ה-Trip
+  // Builder הישן (/trip-builder/abroad-vacation) נשאר קיים במלואו.
+  if (id === "abroad") return "/trip-builder/abroad-vacation/discover";
   if (id === "nature_trip") return "/trip-builder/nature-trip";
   // תיקון Product מפורש (Audit מול "חופשה בארץ - עמוד Discovery נפרד"):
   // "סופ"ש" עובר ל-Discovery החדש של "חופשה בארץ", בדיוק כמו ש"טיול

@@ -1,0 +1,103 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
+import { isPreferencesComplete } from "@/services/preferences/preferencesService";
+import { usePersonalizedDestinations } from "@/hooks/usePersonalizedDestinations";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { QUICK_CATEGORIES } from "@/constants/quickCategories";
+import { HotDestinations } from "@/screens/home/HotDestinations";
+import { DealsComingSoonCard } from "@/screens/discovery/DealsComingSoonCard";
+import { WorldwideCategorySection } from "@/screens/discovery/WorldwideCategorySection";
+import { CruiseLinesSection } from "@/screens/discovery/CruiseLinesSection";
+import { WORLDWIDE_VACATION_CATEGORIES } from "@/constants/worldwideVacationCategories";
+
+// אותה קטגוריה קיימת ("abroad") מדף הבית - ר' constants/quickCategories.ts.
+const ABROAD_CATEGORY = QUICK_CATEGORIES.find((c) => c.id === "abroad")!;
+
+/**
+ * עמוד Discovery של "חופשה בחו''ל" (Audit - "בוא נבנה אותו ככה: באנר
+ * עליון (כמו בחופשה בארץ + טיול יומי) / HERO / אייקון... / קרוסלת
+ * מותאם בשבילך / כרטיסיית דילים (בקרוב) / חלוקה לפי קטגוריות"):
+ * Shell זהה במדויק לשני העמודים הקודמים (SimpleAppHeader, Hero
+ * full-bleed) - אבל התוכן שונה לגמרי מהם:
+ * - קרוסלת "מותאם בשבילך" **הועברה** (לא שוכפלה) מדף הבית - ר'
+ *   usePersonalizedDestinations.ts. משתמשת ב-HotDestinations.tsx הקיים
+ *   כמו שהוא (בניגוד ל"חופשה בארץ", כאן היעדים הם רשומות אמיתיות
+ *   מ-destinations table עם UUID אמיתי, אז ה-href הקבוע ל-
+ *   /destination/[id] ברכיב הקיים מתאים בול - לא היה צריך קרוסלה
+ *   מותאמת אישית כמו VacationDestinationsCarousel).
+ * - כרטיסיית דילים (בקרוב) - כרטיס סטטי, לא Places.
+ * - 16 קטגוריות חופשה בחו"ל (worldwideVacationCategories.ts, לפי
+ *   הרשימה המלאה שסופקה) - כל אחת עם אייקון תמונה אמיתי + רשימת יעדים
+ *   ספציפיים. כל יעד מותאם (server-side, /api/discovery/worldwide-categories)
+ *   לרשומה אמיתית בטבלת destinations לפי שם - קליק פותח את דף היעד
+ *   האמיתי הקיים כשיש התאמה. "קרוזים ושייט" (חברות ספנות, לא יעדים)
+ *   מטופל בנפרד (CruiseLinesSection).
+ *
+ * בכוונה **אין** כאן "הכי חמים עכשיו"/סקשני Places לפי מיקום כמו בשני
+ * העמודים האחרים - זה לא נתבקש כאן, וחופשה בחו"ל היא ממילא לא Location-
+ * first באותו אופן (בוחרים יעד, לא "מה קרוב אליי עכשיו").
+ */
+export default function AbroadVacationDiscoverPage() {
+  const router = useRouter();
+  const { user, preferences } = useAuth();
+  const isGuest = Boolean(user?.is_anonymous);
+
+  const { destinations, personalized } = usePersonalizedDestinations({
+    isGuest,
+    userId: user?.id,
+    preferencesComplete: isPreferencesComplete(preferences),
+  });
+
+  const [destinationIdBySlug, setDestinationIdBySlug] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    fetch("/api/discovery/worldwide-categories")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => setDestinationIdBySlug(json?.matches ?? {}))
+      .catch(() => setDestinationIdBySlug({}));
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-bg pb-36">
+      {/* 1. TOP BAR - זהה במדויק לחופשה בארץ/טיול יומי. */}
+      <SimpleAppHeader onBack={() => router.back()} />
+
+      {/* 2. HERO - full-bleed, אותו דפוס בדיוק, עם ה-asset הקיים לחופשה בחו"ל. */}
+      <div className="relative w-full">
+        <Image src="/images/hero-abroad-vacation.png" alt="" width={800} height={450} priority className="h-auto w-full" />
+      </div>
+
+      {/* 3. שורה: אייקון+"חופשה בחו''ל" בצד ימין, באותו גודל בדיוק כמו
+          בשני העמודים האחרים. */}
+      <div className="flex items-center gap-2 px-6 pt-4">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={ABROAD_CATEGORY.imageSrc} alt="" className="h-full w-full object-cover" />
+        </span>
+        <span className="text-lg font-bold text-ink">חופשה בחו״ל</span>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-6">
+        {/* 4. "מותאם בשבילך" - הועבר מדף הבית. */}
+        <HotDestinations title={personalized ? "מותאם בשבילך" : "יעדים חמים"} destinations={destinations} />
+
+        {/* 5. דילים (בקרוב). */}
+        <DealsComingSoonCard />
+
+        {/* 6. 16 קטגוריות חופשה בחו"ל, כל אחת עם יעדים ספציפיים. */}
+        {WORLDWIDE_VACATION_CATEGORIES.map((category) => (
+          <WorldwideCategorySection key={category.id} category={category} destinationIdBySlug={destinationIdBySlug} />
+        ))}
+        <CruiseLinesSection />
+      </div>
+
+      {/* 7. Bottom Navigation - ממוחזר במלואו. */}
+      <MainBottomNav active="home" />
+    </div>
+  );
+}

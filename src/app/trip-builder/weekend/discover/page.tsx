@@ -10,13 +10,13 @@ import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
-import { HotDestinations, type Destination } from "@/screens/home/HotDestinations";
+import { ISRAEL_VACATION_DESTINATIONS } from "@/constants/israelVacationDestinations";
+import { VacationDestinationsCarousel } from "@/screens/discovery/VacationDestinationsCarousel";
 import { DiscoverySection } from "@/screens/discovery/DiscoverySection";
 import { HotPlacesSection } from "@/screens/discovery/HotPlacesSection";
 import type { DiscoveryPlace } from "@/services/places/discoveryService";
 
 interface VacationApiResponse {
-  destinations: { id: string; name: string; country: string; image_url: string | null }[];
   hotPlaces: DiscoveryPlace[];
   sections: { id: string; emoji: string; title: string; places: DiscoveryPlace[] }[];
 }
@@ -59,8 +59,10 @@ function writeStoredAddress(address: UserAddress) {
  * - API נפרד (`/api/discovery/vacation-il`, לא `/day-trip`).
  * - רשימת קטגוריות שונה לגמרי (מלונות/ספא/זוגי/משפחתי/צימרים... -
  *   לא מעתיק את קטגוריות טיול יומי, סעיף 21 מפורש).
- * - סקשן "🔥 היעדים החמים" חדש (DESTINATIONS - ממחזר HotDestinations.tsx
- *   הקיים מדף הבית + טבלת destinations, לא Places).
+ * - סקשן "🔥 היעדים החמים" - רשימה סטטית וקבועה (9 יעדים מוגדרים
+ *   מראש, לא DB), ר' constants/israelVacationDestinations.ts - כל יעד
+ *   מוביל לעמוד יעד ייעודי (destination/[slug]) עם אותם סקשני Discovery
+ *   עצמם, ממוקדים לאזור של אותו יעד.
  * - בלי אירועים/רחובות ומרכזי בילוי (שייכים ל"טיול יומי" בלבד).
  *
  * ה-route הישן /trip-builder/weekend (Trip Builder) לא נמחק/משתנה -
@@ -126,14 +128,6 @@ export default function VacationIlDiscoverPage() {
     return `/trip-builder/weekend/discover/category?${params.toString()}`;
   }
 
-  const destinations: Destination[] =
-    data?.destinations.map((d) => ({
-      id: d.id,
-      name: d.name,
-      subtitle: null,
-      imageUrl: d.image_url ?? "",
-    })) ?? [];
-
   return (
     <div className="min-h-screen bg-bg pb-36">
       {/* 1. TOP BAR - ממוחזר במלואו מ"הטיולים שלי" (SimpleAppHeader), בלי title. */}
@@ -165,18 +159,18 @@ export default function VacationIlDiscoverPage() {
         </button>
       </div>
 
-      {/* 4. קטגוריות ה-Discovery - תמיד מוצגות. */}
+      {/* 4. קטגוריות ה-Discovery. */}
       <div className="mt-5 flex flex-col gap-6">
+        {/* 🔥 היעדים החמים - DESTINATIONS סטטיים וקבועים (לא Places, לא
+            DB), מוצג מיד - לא תלוי בטעינת ה-API של שאר הסקשנים. */}
+        <VacationDestinationsCarousel title="🔥 היעדים החמים" destinations={ISRAEL_VACATION_DESTINATIONS} />
+
         {dataLoading || !data ? (
           <div className="px-6">
             <div className="h-40 animate-pulse rounded-card bg-bg-secondary" />
           </div>
         ) : (
           <>
-            {/* 🔥 היעדים החמים - DESTINATIONS (לא Places) - ממחזר את
-                HotDestinations.tsx הקיים מדף הבית במלואו. */}
-            {destinations.length > 0 && <HotDestinations title="🔥 היעדים החמים" destinations={destinations} />}
-
             {/* 🔥 הכי חמים עכשיו - PLACES/אטרקציות (הבדל ברור מהסקשן הקודם). */}
             <HotPlacesSection places={data.hotPlaces} from="vacation-il-discover" />
 
