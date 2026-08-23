@@ -165,6 +165,15 @@ interface FetchDiscoveryPlacesParams {
    *  (למשל category="hotels" OR tags overlaps ["hotel","resort"]).
    */
   categoryColumnEquals?: string;
+  /**
+   * תיקון (Audit - "מסעדות וקפה - קטגוריות לפי סוג מטבח"): places.cuisine_tags
+   * הוא **עמודה נפרדת** מ-tags (ר' migration 0027) - לא אותו מנגנון כמו
+   * requiredAnyTags למעלה, למרות שהצורה דומה (OR/overlaps). taxonomy_terms
+   * עם taxonomy_group='cuisine' (migration 0018) הוא מקור-האמת הקיים לערכים
+   * האלה (israeli_middle_eastern/italian/asian/... 17 ערכים) - לא נבנתה
+   * טקסונומיה מקבילה, רק שימוש בעמודה שכבר קיימת.
+   */
+  requiredAnyCuisineTags?: string[];
   radiusKm?: number;
   limit?: number;
   excludeIds?: string[];
@@ -218,6 +227,10 @@ async function queryPlaces(
 
   if (params.subcategories && params.subcategories.length > 0) {
     query = query.in("subcategory", params.subcategories);
+  }
+
+  if (params.requiredAnyCuisineTags && params.requiredAnyCuisineTags.length > 0) {
+    query = query.overlaps("cuisine_tags", params.requiredAnyCuisineTags);
   }
 
   if (params.excludeIds && params.excludeIds.length > 0) {
@@ -312,11 +325,19 @@ export async function fetchHotPlaces(
    *  spa_relaxation). ברירת המחדל (undefined) נשארת HOT_SCAN_CATEGORIES
    *  הקיים - "טיול יומי" ממשיך לעבוד בדיוק כמו קודם, בלי לשנות התנהגות
    *  קיימת. */
-  categoriesOverride?: string[]
+  categoriesOverride?: string[],
+  /** תיקון (Audit - "חיי לילה ובילויים" צריך "הכי חמים עכשיו" שכולל
+   *  nightlife): queryPlaces מדיר nightlife כברירת מחדל (ר' allowNightlife
+   *  ב-queryPlaces) - בלי הפרמטר הזה, "הכי חמים עכשיו" בעמוד חיי לילה
+   *  היה בשקט מדיר את כל המקומות שבאמת מתויגים category="nightlife",
+   *  למרות ש-HOT_NIGHTLIFE_CATEGORIES כולל אותה במפורש. ברירת המחדל
+   *  (false) לא משנה התנהגות קיימת בשום עמוד אחר. */
+  allowNightlife = false
 ): Promise<DiscoveryPlace[]> {
   const rows = await queryPlaces(supabase, {
     location,
     categories: categoriesOverride ?? HOT_SCAN_CATEGORIES,
+    allowNightlife,
     limit: limit * 3, // שולפים יותר כדי שיהיה ממה "לגוון" אחרי המכסה-לקטגוריה
   });
   const origin: LatLng | null = location.lat != null && location.lng != null ? { lat: location.lat, lng: location.lng } : null;

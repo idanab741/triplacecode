@@ -15,14 +15,26 @@ function buildSearchHref(id: QuickCategoryId): string {
   // Builder הישן (/trip-builder/day-trip) נשאר קיים במלואו, בלי שינוי -
   // פשוט אף כפתור לא מצביע אליו יותר. לא נמחק שום route/flow קיים.
   if (id === "day_trip") return "/trip-builder/day-trip/discover";
-  if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes";
-  if (id === "romantic_date") return "/trip-builder/romantic-date";
-  if (id === "nightlife") return "/trip-builder/nightlife";
+  // תיקון Product מפורש (Audit - "מסעדות וקפה - בדיוק כמו חופשה בחו''ל"):
+  // "מסעדות וקפה" עובר ל-Discovery החדש, בדיוק כמו שאר הקטגוריות.
+  // ה-Trip Builder הישן (/trip-builder/restaurants-cafes) נשאר קיים במלואו.
+  if (id === "restaurants_cafes") return "/trip-builder/restaurants-cafes/discover";
+  // תיקון Product מפורש (Audit - "דייטים רומנטיים - אותו דבר"): עובר
+  // ל-Discovery החדש. ה-Trip Builder הישן (/trip-builder/romantic-date)
+  // נשאר קיים במלואו.
+  if (id === "romantic_date") return "/trip-builder/romantic-date/discover";
+  // תיקון Product מפורש (Audit - "חיי לילה ובילויים - אותו דבר"): עובר
+  // ל-Discovery החדש. ה-Trip Builder הישן (/trip-builder/nightlife)
+  // נשאר קיים במלואו.
+  if (id === "nightlife") return "/trip-builder/nightlife/discover";
   // תיקון Product מפורש (Audit - "חופשה בחו''ל שנבנה עכשיו"): "חו״ל"
   // עובר ל-Discovery החדש, בדיוק כמו "טיול יומי"/"סופ״ש" קודם. ה-Trip
   // Builder הישן (/trip-builder/abroad-vacation) נשאר קיים במלואו.
   if (id === "abroad") return "/trip-builder/abroad-vacation/discover";
-  if (id === "nature_trip") return "/trip-builder/nature-trip";
+  // תיקון Product מפורש (Audit - "טיול בטבע - בדיוק כמו העמודים האחרים"):
+  // "טיול בטבע" עובר ל-Discovery החדש. ה-Trip Builder הישן
+  // (/trip-builder/nature-trip) נשאר קיים במלואו.
+  if (id === "nature_trip") return "/trip-builder/nature-trip/discover";
   // תיקון Product מפורש (Audit מול "חופשה בארץ - עמוד Discovery נפרד"):
   // "סופ"ש" עובר ל-Discovery החדש של "חופשה בארץ", בדיוק כמו ש"טיול
   // יומי" עבר קודם. ה-Trip Builder הישן (/trip-builder/weekend) נשאר
