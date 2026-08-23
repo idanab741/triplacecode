@@ -13,7 +13,6 @@ import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
-import { TripMatchPreview } from "@/screens/home/TripMatchPreview";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
 import { PartnersSection } from "@/screens/home/PartnersSection";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
@@ -139,7 +138,6 @@ export default function HomePage() {
                 (HotDestinations) הוסרה מכאן - עברה במלואה ל-
                 /trip-builder/abroad-vacation/discover (ר' usePersonalizedDestinations.ts). */}
             <div className="flex flex-col gap-6 pb-4 pt-5">
-              <TripMatchPreview />
               <DiscoverCard />
               <MyTripsSection />
               <PartnersSection />
