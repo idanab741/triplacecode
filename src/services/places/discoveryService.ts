@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { haversineDistanceKm, kmToDegreesLat, kmToDegreesLng } from "@/services/tripBuilder/geo";
 import type { LatLng } from "@/services/tripBuilder/types";
+import { AI_TRIP_BUILDER_SOURCE } from "@/services/tripBuilder/aiPlaceInsertionService";
+import { getSubcategoryLabel } from "@/services/places/tripTaxonomy";
 
 /**
  * שכבת Discovery (Audit מול "PROMPT 1 - בניית עמוד Discovery / יעדים
@@ -17,6 +19,11 @@ export interface DiscoveryPlace {
   name: string;
   category: string;
   subcategory: string | null;
+  /** תיקון (Audit - "למה הקטגוריות באנגלית ולא בעברית??"): תרגום עברי
+   *  מוכן של subcategory, ל-UI בלבד. null אם subcategory הוא ערך לא-
+   *  מוכר (למשל "general_attractions" - נתון legacy פגום, ר' placeCategories.ts) -
+   *  במקרה כזה עדיף לא להציג כלום מאשר להציג את המזהה הגולמי באנגלית. */
+  subcategoryLabel: string | null;
   shortDescription: string | null;
   imageUrls: string[];
   rating: number | null;
@@ -42,6 +49,10 @@ export interface DiscoveryLocation {
 const DEFAULT_DISCOVERY_RADIUS_KM = 40;
 /** תקרת בטיחות - לעולם לא רדיוס-על, גם אם קריאה חיצונית תעביר ערך גדול. */
 const MAX_DISCOVERY_RADIUS_KM = 120;
+/** ברירת המחדל כשאין מיקום נבחר בכלל ("אטרקציות כלליות") - מדינת הבית
+ *  של TRIPLACE (כבר ברירת המחדל הקיימת ב-collectionService.ts/
+ *  profile-setup) - לא "מכל העולם". */
+const DEFAULT_DISCOVERY_COUNTRY = "ישראל";
 
 const PLACE_COLUMNS =
   "id,name,category,subcategory,short_description,image_urls,rating,rating_count,city,latitude,longitude,tags";
@@ -71,6 +82,7 @@ function rowToDiscoveryPlace(row: PlaceRow, origin: LatLng | null): DiscoveryPla
     name: row.name,
     category: row.category,
     subcategory: row.subcategory,
+    subcategoryLabel: getSubcategoryLabel(row.subcategory),
     shortDescription: row.short_description,
     imageUrls: row.image_urls ?? [],
     rating: row.rating,
@@ -103,21 +115,64 @@ function computeWeightedScore(place: DiscoveryPlace): number {
   return weightedRating - distancePenalty;
 }
 
+/**
+ * תיקון באג אמיתי נוסף ("עגלות קפה צריכות להציג עגלות קפה! פארקים
+ * צריכים להיות פארקים!"): candidatePoolService.ts (Trip Builder) משתמש
+ * ב-Fallback ל-places.category (5 ערכים גסים בלבד - restaurants/
+ * nightlife/attractions/nature/hotels, ר' placeCategories.ts) כשאין
+ * trip_type_tags בכלל - זה סביר *שם* כי ה-Slot חייב להתמלא במשהו סביר
+ * מתוך בריכה מוגבלת, וכל שאר הפייפליין (Ranking/Validation) עדיין
+ * מסנן החוצה טעויות. אבל ב-Discovery, "עגלות קפה" חייב להיות **מדויק** -
+ * הפעלת אותו Fallback (category="restaurants" -> גם "coffee_carts_cafes"
+ * וגם "wineries_dining") היא בדיוק מה שהחזיר "Heritage Restaurant"/
+ * "Restaurant Slow" (place.category="restaurants", trip_type_tags ריק)
+ * לתוך סקשן עגלות הקפה. לכן כאן - **התאמה מחמירה בלבד** לפי
+ * trip_type_tags.ov, בלי שום Fallback ל-category הגס. עדיף פחות
+ * תוצאות ומדויקות (ואם באמת אין - Empty State כבר קיים) מאשר תוצאות
+ * לא-רלוונטיות "כדי למלא קרוסלה".
+ */
+function buildCategoryOrFilter(categoryIds: string[]): string {
+  return categoryIds.map((categoryId) => `trip_type_tags.ov.{${categoryId}}`).join(",");
+}
+
 interface FetchDiscoveryPlacesParams {
   location: DiscoveryLocation;
-  /** קטגוריה ראשית (places.category) - חובה, אלא אם categories מועבר. */
+  /** מזהה קטגוריה/trip_type_tag (תואם ל-tripTaxonomy.ts) - חובה, אלא
+   *  אם categories/rawOrFilter מועבר. ר' buildCategoryOrFilter למעלה -
+   *  ההתאמה בפועל היא trip_type_tags.ov, לא עמודת category ישירות. */
   category?: string;
   /** לחיפוש רוחבי (כמו "הכי חמים עכשיו") - כמה קטגוריות ביחד. */
   categories?: string[];
   /** סינון subcategory אופציונלי (למשל wineries_dining + subcategory
-   *  in ["winery","brewery"] ל"יקבים ומבשלות", לא כל wineries_dining). */
+   *  in ["winery","brewery"] ל"יקבים ומבשלות", לא כל wineries_dining).
+   *  זה עדיין עמודת subcategory ישירות (לא trip_type_tags) - היא לא
+   *  סובלת מאותו באג, כי אין לה מנגנון Fallback מקביל בשום מקום אחר
+   *  במערכת. */
   subcategories?: string[];
-  /** תגית חופשית (tags array contains) - למשל "romantic" ל"דייטים רומנטיים",
-   *  כשאין קטגוריה/subcategory ייעודיים בטקסונומיה הקיימת. */
-  requiredTag?: string;
+  /** תיקון (Audit מול "חופשה בארץ" - "❤️ חופשה זוגית"/"👨‍👩‍👧‍👦 חופשה
+   *  משפחתית"/"🏕️ צימרים, גלמפינג וקמפינג"): כל אחד מהתגים האלה
+   *  (DNA_TAGS/PLACE_TYPE_TAGS הקיימים ב-placeTagOptions.ts, כולם
+   *  נשמרים באותה עמודת places.tags) - OR ביניהם (`tags.ov`, לא
+   *  `tags.cs` - מספיק תג אחד מהרשימה, לא כולם). למשל
+   *  requiredAnyTags:["cabin","glamping","camping"] מחזיר מקום שתויג
+   *  ב**כל אחד** מהשלושה, לא רק מקום שתויג בכל השלושה יחד. */
+  requiredAnyTags?: string[];
+  /** תיקון (Audit - "🏨 מלונות"): places.category עצמו (5 הערכים הגסים,
+   *  ר' placeCategories.ts) - "מלונות" (category="hotels") הם המקרה
+   *  היחיד ש**אינו** מנוהל דרך trip_type_tags בכלל (ר' ההערה ב-
+   *  placeCategories.ts) - חובה להתאים ישירות לעמודת category, לא
+   *  ל-trip_type_tags. משולב ב-OR עם requiredAnyTags אם שניהם קיימים
+   *  (למשל category="hotels" OR tags overlaps ["hotel","resort"]).
+   */
+  categoryColumnEquals?: string;
   radiusKm?: number;
   limit?: number;
   excludeIds?: string[];
+  /** תיקון (Audit - "🌙 חיי לילה" בחופשה בארץ): queryPlaces מדיר nightlife
+   *  כברירת מחדל (ר' ההערה למטה) - true מבטל את ההדרה הזו במפורש, לשימוש
+   *  רק בסקשן שבאמת מבקש nightlife (לא דולף לשום סקשן אחר, כי ההתאמה
+   *  עדיין trip_type_tags.ov מדויק, לא Fallback רחב). */
+  allowNightlife?: boolean;
 }
 
 /** בונה שאילתת bounding box + city fallback - אותו דפוס בדיוק כמו
@@ -129,29 +184,55 @@ async function queryPlaces(
   const { location } = params;
   const radiusKm = Math.min(params.radiusKm ?? DEFAULT_DISCOVERY_RADIUS_KM, MAX_DISCOVERY_RADIUS_KM);
 
-  let query = supabase.from("places").select(PLACE_COLUMNS).eq("is_legacy", false);
+  let query = supabase
+    .from("places")
+    .select(PLACE_COLUMNS)
+    .eq("is_legacy", false)
+    // עקביות עם candidatePoolService.ts: לא מציגים מקומות שנוצרו אוטומטית
+    // ע"י AI ולא עברו אימות אדמין (source=AI_TRIP_BUILDER_SOURCE).
+    .neq("source", AI_TRIP_BUILDER_SOURCE);
 
-  if (params.category) {
-    query = query.eq("category", params.category);
-  } else if (params.categories && params.categories.length > 0) {
-    query = query.in("category", params.categories);
+  // תיקון (Audit - "חיי לילה" בחופשה בארץ): הדרת nightlife היא ברירת
+  // מחדל שמתאימה ל"טיול יומי" (אין שם סקשן nightlife בכלל), אבל לא
+  // עקרון אוניברסלי - כשסקשן מבקש nightlife במפורש (allowNightlife),
+  // לא מדירים. עדיין לא "דליפה" - ההתאמה עצמה תמיד trip_type_tags.ov
+  // מדויק, לא Fallback רחב.
+  if (!params.allowNightlife) {
+    query = query.neq("category", "nightlife");
+  }
+
+  if (params.categoryColumnEquals && params.requiredAnyTags && params.requiredAnyTags.length > 0) {
+    query = query.or(`category.eq.${params.categoryColumnEquals},tags.ov.{${params.requiredAnyTags.join(",")}}`);
+  } else if (params.categoryColumnEquals) {
+    query = query.eq("category", params.categoryColumnEquals);
+  } else {
+    if (params.category) {
+      query = query.or(buildCategoryOrFilter([params.category]));
+    } else if (params.categories && params.categories.length > 0) {
+      query = query.or(buildCategoryOrFilter(params.categories));
+    }
+    if (params.requiredAnyTags && params.requiredAnyTags.length > 0) {
+      query = query.overlaps("tags", params.requiredAnyTags);
+    }
   }
 
   if (params.subcategories && params.subcategories.length > 0) {
     query = query.in("subcategory", params.subcategories);
   }
 
-  if (params.requiredTag) {
-    query = query.contains("tags", [params.requiredTag]);
-  }
-
   if (params.excludeIds && params.excludeIds.length > 0) {
     query = query.not("id", "in", `(${params.excludeIds.join(",")})`);
   }
 
-  // LOCATION FIRST: אם יש קואורדינטות אמיתיות - bounding box geo (מרחק
-  // מדויק, לא תלוי בדיוק מחרוזת "עיר"). אחרת - fallback לשם עיר מדויק
-  // (למשל כשהמשתמש בחר עיר ידנית בלי לתת הרשאת מיקום).
+  // LOCATION FIRST כשיש מיקום: bounding box geo (מרחק מדויק) אם יש
+  // קואורדינטות אמיתיות, אחרת fallback לשם עיר מדויק. תיקון (בקשה
+  // מפורשת - "לפני שעושים מיקום - אטרקציות רק מהמדינה שנמצאים בה!!!
+  // לא מכל העולם"): קודם, בלי מיקום בכלל, לא היה שום סינון - זה החזיר
+  // תוצאות מכל העולם, לא רק מהמדינה. TRIPLACE הוא אפליקציה ישראלית
+  // (ר' collectionService.ts/profile-setup - "ישראל" כבר ברירת המחדל
+   // הקיימת בכמה מקומות אחרים באפליקציה) - "כללי" עדיין אומר "מהמדינה
+  // שבה אנחנו פועלים", לא "מכל העולם". זו עדיין לא "בחירת מיקום" אמיתית
+  // (אין רדיוס/עיר ספציפיים) - רק תיחום למדינה, בלי להמציא מקומות.
   if (location.lat != null && location.lng != null) {
     const latDelta = kmToDegreesLat(radiusKm);
     const lngDelta = kmToDegreesLng(radiusKm, location.lat);
@@ -163,10 +244,7 @@ async function queryPlaces(
   } else if (location.city) {
     query = query.eq("city", location.city);
   } else {
-    // אין שום מיקום בכלל - לא מחזירים "מקומות אקראיים מכל הארץ"
-    // (עיקרון LOCATION FIRST מפורש) - מחזירים ריק, ה-UI יציג מצב ריק/
-    // בקשת מיקום, לא רשימה גנרית.
-    return [];
+    query = query.eq("country", DEFAULT_DISCOVERY_COUNTRY);
   }
 
   // שולפים מעט יותר מהמכסה הסופית - הדירוג המשוקלל (computeWeightedScore)
@@ -228,11 +306,17 @@ const MAX_PER_CATEGORY_IN_HOT = 2;
 export async function fetchHotPlaces(
   supabase: SupabaseClient,
   location: DiscoveryLocation,
-  limit = 10
+  limit = 10,
+  /** תיקון (Audit - "חופשה בארץ" צריך "הכי חמים עכשיו" שונה מ"טיול
+   *  יומי" - קטגוריות רלוונטיות שונות, למשל כולל beaches_pools/
+   *  spa_relaxation). ברירת המחדל (undefined) נשארת HOT_SCAN_CATEGORIES
+   *  הקיים - "טיול יומי" ממשיך לעבוד בדיוק כמו קודם, בלי לשנות התנהגות
+   *  קיימת. */
+  categoriesOverride?: string[]
 ): Promise<DiscoveryPlace[]> {
   const rows = await queryPlaces(supabase, {
     location,
-    categories: HOT_SCAN_CATEGORIES,
+    categories: categoriesOverride ?? HOT_SCAN_CATEGORIES,
     limit: limit * 3, // שולפים יותר כדי שיהיה ממה "לגוון" אחרי המכסה-לקטגוריה
   });
   const origin: LatLng | null = location.lat != null && location.lng != null ? { lat: location.lat, lng: location.lng } : null;

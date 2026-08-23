@@ -23,7 +23,7 @@ interface DiscoveryPlaceCardProps {
  * "פתוח" יחיד במרכז).
  */
 export function DiscoveryPlaceCard({ place, from, fixedWidth = true }: DiscoveryPlaceCardProps) {
-  const subtitle = [place.subcategory, place.city].filter(Boolean).join(" · ") || null;
+  const subtitle = [place.subcategoryLabel, place.city].filter(Boolean).join(" · ") || null;
   const href = from ? `/place/${place.id}?from=${encodeURIComponent(from)}` : `/place/${place.id}`;
 
   return (

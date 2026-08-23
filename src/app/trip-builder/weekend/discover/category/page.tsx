@@ -4,16 +4,16 @@ import { Suspense } from "react";
 import { DiscoveryCategoryPageContent } from "@/screens/discovery/DiscoveryCategoryPageContent";
 
 /**
- * "ראה הכל" לסקשן בודד של "טיול יומי" - wrapper דק סביב
+ * "ראה הכל" לסקשן בודד של "חופשה בארץ" - wrapper דק סביב
  * DiscoveryCategoryPageContent המשותף (ר' שם להסבר המלא).
  */
-export default function CategoryDiscoverPage() {
+export default function VacationIlCategoryDiscoverPage() {
   return (
     <Suspense fallback={null}>
       <DiscoveryCategoryPageContent
-        apiEndpoint="/api/discovery/day-trip"
-        heroSrc="/images/hero-day-trip-result.png"
-        from="day-trip-discover"
+        apiEndpoint="/api/discovery/vacation-il"
+        heroSrc="/images/hero-weekend.png"
+        from="vacation-il-discover"
       />
     </Suspense>
   );

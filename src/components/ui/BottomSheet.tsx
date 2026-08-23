@@ -10,7 +10,18 @@ interface BottomSheetProps {
 
 const DRAG_CLOSE_THRESHOLD_PX = 100;
 
-export function BottomSheet({ onClose, children, zIndex = 60 }: BottomSheetProps) {
+/**
+ * תיקון (בקשה מפורשת - "שיהיה בר תחתון בכל העמודים שבהם מופיע חלון
+ * קופץ!"): ברירת המחדל הישנה (zIndex=60) הייתה **מעל** ה-Bottom Nav
+ * (z-50, ר' BottomNav.tsx) - ה-backdrop הכהה של ה-Sheet כיסה את כל
+ * המסך כולל אזור הבר התחתון, ולכן הוא נראה "נעלם" (בפועל רק מוסתר
+ * מאחורי השכבה הכהה). היה כבר תקדים בקוד לזה בדיוק - DateRangePicker.tsx
+ * כבר קבע zIndex={40} (מתחת לבר) עבור עצמו, עם הערה "כאן, ורק כאן" -
+ * עכשיו זו ברירת המחדל בשביל כולם, לא חריג בודד. mb (על כרטיס ה-Sheet
+ * עצמו, לא על ה-backdrop) משאיר רווח בגובה הבר התחתון כדי שהכרטיס
+ * הלבן לא "יתלבש" ויכסה את הבר שעכשיו גלוי מתחתיו.
+ */
+export function BottomSheet({ onClose, children, zIndex = 40 }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
@@ -45,7 +56,7 @@ export function BottomSheet({ onClose, children, zIndex = 60 }: BottomSheetProps
   return (
     <div className="fixed inset-0 flex items-end justify-center bg-black/50" style={{ zIndex }} onClick={handleBackdropClick}>
       <div
-        className="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-card bg-bg"
+        className="mb-[88px] flex max-h-[calc(90dvh-88px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card bg-bg"
         style={{ transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.2s ease-out" }}
       >
         <div
@@ -57,7 +68,7 @@ export function BottomSheet({ onClose, children, zIndex = 60 }: BottomSheetProps
         >
           <div className="h-1 w-10 rounded-pill bg-ink-secondary/30" />
         </div>
-        <div className="overflow-y-auto pb-28">{children}</div>
+        <div className="overflow-y-auto pb-6">{children}</div>
       </div>
     </div>
   );

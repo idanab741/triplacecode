@@ -336,3 +336,22 @@ export function mapAvoidTermsToCategoryIds(avoidTerms: string[]): string[] {
 
   return Array.from(matchedCategoryIds);
 }
+
+/**
+ * תיקון (Audit מול "למה הקטגוריות באנגלית ולא בעברית??"): מקור אמת
+ * יחיד לתרגום subcategory-id -> label בעברית, לשימוש בכל מקום שמציג
+ * subcategory למשתמש (Discovery, לדוגמה) - במקום להציג את המזהה הגולמי
+ * מה-DB (למשל "coffee_cart") כמו שהוא. נבנה פעם אחת מתוך TRIP_TYPE_GROUPS
+ * הקיים - לא טקסונומיה/תרגום מקביל.
+ */
+const SUBCATEGORY_LABELS: Record<string, string> = {};
+for (const group of TRIP_TYPE_GROUPS) {
+  for (const subTag of group.subTags) {
+    SUBCATEGORY_LABELS[subTag.id] = subTag.label;
+  }
+}
+
+export function getSubcategoryLabel(subcategoryId: string | null | undefined): string | null {
+  if (!subcategoryId) return null;
+  return SUBCATEGORY_LABELS[subcategoryId] ?? null;
+}

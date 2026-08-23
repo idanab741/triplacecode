@@ -20,17 +20,13 @@ function formatDateRange(event: DiscoveryEvent): string {
 }
 
 /**
- * "אירועים ופסטיבלים" (Audit מול "PROMPT 1" סעיף 8): **לא** משתמש
- * ב-DiscoveryPlaceCard הרגיל - כרטיס Featured גדול, ממחזר במדויק את
- * השפה הוויזואלית והמידות של DiscoverCard.tsx הקיים ("גלה עוד" בדף
- * הבית: Swiper, rounded-[30px], shadow-xl, סליידים ברוחב מלא) - כי זו
- * בדיוק הדרישה המפורשת ("FEATURED CONTENT, לא עוד Place Card קטן").
- * EMPTY STATE: אם אין אירועים פעילים/קרובים למיקום - הסקשן כולו לא
- * מוצג (לא כרטיס "אין אירועים" ריק).
+ * "אירועים ופסטיבלים" (Audit מול "PROMPT 2" סעיף 12/19 - שינוי מהמימוש
+ * הקודם): הסקשן **תמיד** מוצג, גם בלי אירועים - "אסור להעלים את כל
+ * הסקשן רק בגלל שאין נתונים". אם אין אירועים - Empty State גדול
+ * באותו אזור/מידות (לא Swiper, אין מה "להחליק" בין סליידים כשיש רק
+ * הודעה אחת) - לא כרטיס Featured רגיל שנעלם.
  */
 export function FeaturedEventsSection({ events }: FeaturedEventsSectionProps) {
-  if (events.length === 0) return null;
-
   // אותו תרגיל בדיוק כמו DiscoverCard.tsx - Swiper עם loop משכפל סליידים
   // ב-DOM ישירות בלי event handlers, אז הקליק חייב להיות ברמת ה-Swiper
   // עם data-swiper-slide-index, לא Link רגיל על כל סליים.
@@ -49,34 +45,41 @@ export function FeaturedEventsSection({ events }: FeaturedEventsSectionProps) {
     <section className="px-6">
       <h3 className="mb-3 text-lg font-semibold text-ink">🎪 אירועים ופסטיבלים</h3>
 
-      <Swiper
-        modules={[Autoplay, Pagination]}
-        slidesPerView={1}
-        spaceBetween={0}
-        loop={events.length > 1}
-        autoplay={events.length > 1 ? { delay: 6000, disableOnInteraction: false } : false}
-        pagination={{ clickable: true }}
-        onClick={handleClick}
-        className="rounded-[30px] shadow-xl"
-      >
-        {events.map((event) => (
-          <SwiperSlide key={event.id} className={event.linkUrl ? "cursor-pointer" : undefined}>
-            <div className="relative">
-              {event.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={event.imageUrl} alt={event.title} className="block h-auto w-full" />
-              ) : (
-                <div className="flex h-[220px] w-full items-center justify-center bg-bg-secondary text-4xl">🎪</div>
-              )}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.4)_55%,transparent_100%)] p-5 pt-16">
-                <p className="text-xs font-bold text-white/90">{formatDateRange(event)}</p>
-                <p className="truncate text-xl font-bold text-white">{event.title}</p>
-                {event.locationLabel && <p className="truncate text-sm text-white/85">{event.locationLabel}</p>}
+      {events.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-[30px] bg-bg-secondary px-6 py-14 text-center shadow-xl">
+          <span className="text-4xl">🎪</span>
+          <p className="text-sm font-medium text-ink">כרגע אין אירועים באזור</p>
+        </div>
+      ) : (
+        <Swiper
+          modules={[Autoplay, Pagination]}
+          slidesPerView={1}
+          spaceBetween={0}
+          loop={events.length > 1}
+          autoplay={events.length > 1 ? { delay: 6000, disableOnInteraction: false } : false}
+          pagination={{ clickable: true }}
+          onClick={handleClick}
+          className="rounded-[30px] shadow-xl"
+        >
+          {events.map((event) => (
+            <SwiperSlide key={event.id} className={event.linkUrl ? "cursor-pointer" : undefined}>
+              <div className="relative">
+                {event.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={event.imageUrl} alt={event.title} className="block h-auto w-full" />
+                ) : (
+                  <div className="flex h-[220px] w-full items-center justify-center bg-bg-secondary text-4xl">🎪</div>
+                )}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.4)_55%,transparent_100%)] p-5 pt-16">
+                  <p className="text-xs font-bold text-white/90">{formatDateRange(event)}</p>
+                  <p className="truncate text-xl font-bold text-white">{event.title}</p>
+                  {event.locationLabel && <p className="truncate text-sm text-white/85">{event.locationLabel}</p>}
+                </div>
               </div>
-            </div>
-          </SwiperSlide>
-        ))}
-      </Swiper>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      )}
     </section>
   );
 }

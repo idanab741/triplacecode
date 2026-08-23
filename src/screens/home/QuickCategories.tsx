@@ -20,7 +20,11 @@ function buildSearchHref(id: QuickCategoryId): string {
   if (id === "nightlife") return "/trip-builder/nightlife";
   if (id === "abroad") return "/trip-builder/abroad-vacation";
   if (id === "nature_trip") return "/trip-builder/nature-trip";
-  if (id === "weekend") return "/trip-builder/weekend";
+  // תיקון Product מפורש (Audit מול "חופשה בארץ - עמוד Discovery נפרד"):
+  // "סופ"ש" עובר ל-Discovery החדש של "חופשה בארץ", בדיוק כמו ש"טיול
+  // יומי" עבר קודם. ה-Trip Builder הישן (/trip-builder/weekend) נשאר
+  // קיים במלואו, בלי שינוי - שום route/flow קיים לא נמחק.
+  if (id === "weekend") return "/trip-builder/weekend/discover";
 
   const link = QUICK_CATEGORY_SEARCH_LINKS[id as QuickCategoryId];
   if (link.categories) return `/search?category=${link.categories.join(",")}`;

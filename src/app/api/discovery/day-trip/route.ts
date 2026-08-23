@@ -26,7 +26,7 @@ import {
  */
 const DISCOVERY_SECTIONS: Record<
   string,
-  { emoji: string; title: string; category?: string; categories?: string[]; subcategories?: string[]; requiredTag?: string }
+  { emoji: string; title: string; category?: string; categories?: string[]; subcategories?: string[] }
 > = {
   coffee_carts_cafes: { emoji: "☕", title: "עגלות קפה", category: "coffee_carts_cafes" },
   nature_trails: { emoji: "🌿", title: "מסלולי טבע", category: "nature_trails" },
@@ -41,49 +41,65 @@ const DISCOVERY_SECTIONS: Record<
     subcategories: ["winery", "brewery", "distillery", "wine_tasting", "beer_tasting", "culinary_tour"],
   },
   attractions_activities: { emoji: "🎯", title: "אטרקציות", category: "attractions_activities" },
-  culture_history: { emoji: "🏛️", title: "תרבות והיסטוריה", category: "culture_history" },
+  // תיקון (Audit מול "PROMPT 2" סעיף 11 - הפרדה מחייבת): קודם קטגוריה
+  // אחת "תרבות והיסטוריה" (culture_history גולמי). עכשיו שתי קטגוריות
+  // Discovery נפרדות מתוך אותו category ב-DB, מסוננות ע"י subcategory -
+  // לא טקסונומיה חדשה, רק חלוקה של ה-subTags הקיימים (tripTaxonomy.ts)
+  // לשתי קבוצות סמנטיות. "historic_street" לא נכלל באף אחת מהשתיים -
+  // הוא חלק מ"רחובות ומרכזי בילוי" (streets_centers, למטה).
+  culture_art: {
+    emoji: "🎨",
+    title: "תרבות ואמנות",
+    category: "culture_history",
+    subcategories: ["gallery", "exhibition", "culture_center", "artists_village"],
+  },
+  history_museums: {
+    emoji: "🏛️",
+    title: "היסטוריה ומוזיאונים",
+    category: "culture_history",
+    subcategories: [
+      "museum",
+      "heritage_site",
+      "archaeological_site",
+      "fortress",
+      "citadel",
+      "historic_building",
+      "church",
+      "monastery",
+      "ancient_synagogue",
+      "mosque",
+    ],
+  },
   picnics: {
     emoji: "🧺",
     title: "פיקניקים",
     category: "parks_gardens",
     subcategories: ["picnic_park"],
   },
-  // תיקון (Audit סעיף 12 - "אין להניח שכל רחוב הוא historic_street"):
-  // best-effort union של שתי הקטגוריות הקיימות הקרובות ביותר סמנטית -
-  // אין כרגע תגית ייעודית ל"רחוב מסחרי חי" (דיזנגוף/רוטשילד) בטקסונומיה.
-  // מדווח כפער ידוע בדוח הסיכום, לא מוסתר.
+  // תיקון (Audit סעיף 12 - "אין להניח שכל רחוב הוא historic_street" /
+  // "PROMPT 2" סעיף 10 - הגדרה רחבה יותר: רחובות מסחריים, מדרחובים,
+  // שדרות, טיילות, אזורי בילוי, מתחמי בילוי, מרכזים מיוחדים): best-effort
+  // union של שלוש קטגוריות/subTags קיימים קרובים סמנטית - אין כרגע
+  // תגית ייעודית אחת ל"רחוב/מתחם בילוי חי" (דיזנגוף/שרונה/נמל ת"א)
+  // בטקסונומיה הקיימת. food_complex (wineries_dining) נוסף כדי לכסות
+  // מתחמים כמו "שרונה"/"נמל ת"א" שהם בעיקר מתחמי אוכל/בילוי פתוחים.
+  // "market"/"flea_market"/"food_market_shopping" (shopping) לא נכללים
+  // בכוונה - שווקים נשארים אך ורק תחת "שופינג וקניות", גם דוגמת "שוק
+  // הפשפשים" בבקשה המקורית. מדווח כפער ידוע בדוח הסיכום, לא מוסתר.
   streets_centers: {
     emoji: "🏙️",
-    title: "רחובות ומרכזים",
-    categories: ["culture_history", "shopping"],
-    subcategories: ["historic_street", "open_shopping_area"],
+    title: "רחובות ומרכזי בילוי",
+    categories: ["culture_history", "shopping", "wineries_dining"],
+    subcategories: ["historic_street", "open_shopping_area", "food_complex"],
   },
-  restaurants_cafes: {
-    emoji: "🍽️",
-    title: "מסעדות וקפה",
-    categories: ["wineries_dining", "coffee_carts_cafes"],
-    subcategories: [
-      "chef_restaurant",
-      "local_restaurant",
-      "bakery",
-      "patisserie",
-      "ice_cream_shop",
-      "food_market",
-      "food_complex",
-      "cafe",
-      "coffee_cart",
-      "specialty_coffee",
-      "cafe_with_view",
-      "bakery_cafe",
-    ],
-  },
-  // "דייטים רומנטיים" - אין קטגוריה/subcategory ייעודיים; היחיד הקיים
-  // בפועל הוא tag="romantic" (place_dna_tag, ר' rankingService.ts).
-  romantic_date: { emoji: "❤️", title: "דייטים רומנטיים", requiredTag: "romantic" },
-  nightlife: { emoji: "🌙", title: "חיי לילה", category: "nightlife" },
+  // תיקון (בקשה מפורשת - "לא צריך פה חיי לילה, מסעדות וקפה ודייטים
+  // רומנטיים! אלו קטגוריות נפרדות!!"): הוסרו מה-Discovery של "טיול
+  // יומי" - אלה קטגוריות ראשיות עצמאיות משלהן (restaurants_cafes/
+  // romantic_date/nightlife כבר קיימים כ-Quick Categories/Trip Builder
+  // נפרדים בדף הבית) - לא שייכות לתת-הקטגוריות של "טיול יומי".
 };
 
-/** סדר ברירת המחדל בעמוד הראשי - בדיוק לפי סעיף 15 של הבקשה. */
+/** סדר ברירת המחדל בעמוד הראשי - בדיוק לפי סעיף 8/25 של הבקשה. */
 const DEFAULT_SECTION_ORDER = [
   "coffee_carts_cafes",
   "nature_trails",
@@ -93,12 +109,10 @@ const DEFAULT_SECTION_ORDER = [
   "parks_gardens",
   "wineries_dining",
   "attractions_activities",
-  "culture_history",
+  "culture_art",
+  "history_museums",
   "picnics",
   "streets_centers",
-  "restaurants_cafes",
-  "romantic_date",
-  "nightlife",
 ];
 
 function parseLocation(searchParams: URLSearchParams): DiscoveryLocation {
@@ -118,10 +132,6 @@ export async function GET(request: Request) {
   const categoryParam = searchParams.get("category");
   const limitParam = searchParams.get("limit");
 
-  if (location.lat == null && !location.city) {
-    return NextResponse.json({ error: "יש לספק מיקום (lat/lng או city)" }, { status: 400 });
-  }
-
   const supabase = await createClient();
 
   // "ראה הכל" - סקשן בודד, limit גדול.
@@ -135,7 +145,6 @@ export async function GET(request: Request) {
       category: section.category,
       categories: section.categories,
       subcategories: section.subcategories,
-      requiredTag: section.requiredTag,
       limit: limitParam ? Number(limitParam) : 40,
     });
     return NextResponse.json({ title: section.title, emoji: section.emoji, places });
@@ -155,7 +164,6 @@ export async function GET(request: Request) {
           category: section.category,
           categories: section.categories,
           subcategories: section.subcategories,
-          requiredTag: section.requiredTag,
           limit: PREVIEW_LIMIT,
         });
         return { id, emoji: section.emoji, title: section.title, places };
