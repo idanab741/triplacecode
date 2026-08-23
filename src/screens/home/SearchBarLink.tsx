@@ -118,7 +118,7 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
           onKeyDown={(e) => {
             if (e.key === "Enter") handleEnter();
           }}
-          placeholder="מה תרצו לעשות היום?"
+          placeholder="מה ה־match שלכם היום?"
           className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
         />
       </div>
