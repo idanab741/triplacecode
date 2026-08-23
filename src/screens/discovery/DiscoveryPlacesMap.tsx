@@ -9,6 +9,13 @@ import { useEffect } from "react";
 interface MapPlace {
   id: string;
   name: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface ValidMapPlace {
+  id: string;
+  name: string;
   latitude: number;
   longitude: number;
 }
@@ -27,7 +34,7 @@ interface DiscoveryPlacesMapProps {
  * רשימת "כל המקומות בקטגוריה", ללא סדר/רצף. סמן פשוט אחיד לכולם, קליק
  * פותח את דף המקום.
  */
-function FitBounds({ places }: { places: MapPlace[] }) {
+function FitBounds({ places }: { places: ValidMapPlace[] }) {
   const map = useMap();
   useEffect(() => {
     if (places.length === 0) return;
@@ -55,7 +62,9 @@ const PLACE_ICON = L.divIcon({
 
 export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
   const router = useRouter();
-  const validPlaces = places.filter((p) => p.latitude != null && p.longitude != null);
+  const validPlaces = places.filter(
+    (p): p is ValidMapPlace => p.latitude != null && p.longitude != null
+  );
   if (validPlaces.length === 0) return null;
 
   const positions: [number, number][] = validPlaces.map((p) => [p.latitude, p.longitude]);
