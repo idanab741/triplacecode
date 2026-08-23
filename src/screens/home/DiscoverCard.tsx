@@ -22,9 +22,9 @@ const SLIDES = [
     alt: "המשחק שלנו",
   },
   {
-    href: "/ai",
+    href: "/deals",
     image: "/images/discover/ai-powered.png",
-    alt: "AI Powered",
+    alt: "דילים על חופשות בחו״ל",
   },
   {
     href: "/community",

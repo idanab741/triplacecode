@@ -1,11 +1,12 @@
 import { CRUISE_LINES } from "@/constants/worldwideVacationCategories";
 
 /**
- * "קרוזים ושייט" (Audit - "למה הקרוזים לא באותו גודל של כל השאר??"):
- * תוקן - אותו גודל כרטיס בדיוק כמו שאר הקטגוריות (220x150, rounded-card,
- * shadow-soft). עדיין שונה מהם *ויזואלית* (לוגו ממורכז על רקע אחיד,
- * לא תמונת נוף עם גרדיאנט+דגל) כי חברת ספנות היא לא יעד גיאוגרפי -
- * אין לה subtitle/דגל, ואין קישור ל-/destination (אין לה רשומה שם בכלל).
+ * "קרוזים ושייט" (Audit - "4 תמונות הספינות... שיהיה בגודל של הכרטיסייה
+ * בעמוד כמו שיש בעמוד"): תוקן - במקום לוגו ממורכז על רקע אחיד, עכשיו
+ * זה בדיוק אותו כרטיס-יעד כמו ב-WorldwideCategorySection.tsx (220x150,
+ * rounded-card, shadow-soft, תמונה מלאה עם גרדיאנט+שם בתחתית) - חברת
+ * ספנות מוצגת עם תמונת הספינה עצמה, לא יעד גיאוגרפי, אז עדיין בלי דגל
+ * ובלי קישור ל-/destination (אין לה רשומה שם בכלל) - div רגיל, לא Link.
  */
 export function CruiseLinesSection() {
   return (
@@ -26,18 +27,21 @@ export function CruiseLinesSection() {
         {CRUISE_LINES.map((line) => (
           <div
             key={line.slug}
-            className="flex h-[220px] w-[150px] shrink-0 flex-col items-center justify-center gap-3 rounded-card bg-bg-secondary px-3 shadow-soft"
+            className="relative block h-[220px] w-[150px] shrink-0 overflow-hidden rounded-card bg-bg-secondary shadow-soft"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={line.logoUrl}
+              src={line.imageUrl}
               alt={line.name}
-              className="h-16 max-w-[120px] object-contain"
+              className="h-full w-full object-cover"
+              loading="lazy"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
               }}
             />
-            <p className="text-center text-sm font-medium leading-tight text-ink">{line.name}</p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.75)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2.5 pt-10">
+              <p className="truncate text-sm font-bold leading-tight text-white">{line.name}</p>
+            </div>
           </div>
         ))}
       </div>

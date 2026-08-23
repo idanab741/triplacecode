@@ -186,7 +186,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     destinations: [
       { slug: "new-york", subtitle: "בכריסמס", imageUrl: "/images/destination/newyork-christmas.png" },
       { slug: "tokyo", subtitle: "בסאקורה", imageUrl: "/images/destination/tokyo-sakura.png" },
-      { slug: "paris", subtitle: "בכריסמס" },
+      { slug: "paris", subtitle: "בכריסמס", imageUrl: "/images/destination/paris-christmas.png" },
       { slug: "vienna", subtitle: "בכריסמס" },
       { slug: "london", subtitle: "בכריסמס" },
       { slug: "amsterdam", subtitle: "בעונת הצבעונים" },
@@ -201,7 +201,8 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     title: "חופשה רומנטית וירח דבש",
     iconUrl: "/images/vacation-type-icons/romantic-honeymoon.png",
     destinations: [
-      { slug: "paris" }, { slug: "santorini" }, { slug: "amalfi-coast" }, { slug: "lake-como" },
+      { slug: "paris", imageUrl: "/images/destination/paris-romantic.png" },
+      { slug: "santorini" }, { slug: "amalfi-coast" }, { slug: "lake-como" },
       { slug: "venice" }, { slug: "lucerne" }, { slug: "salzburg" }, { slug: "french-riviera" },
       { slug: "florence" }, { slug: "bruges" },
     ],
@@ -333,14 +334,14 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
 export interface CruiseLineEntry {
   slug: string;
   name: string;
-  /** נתיב לוגו צפוי - ממתין לקובץ בפועל, כמו כל תמונה אחרת כאן. */
-  logoUrl: string;
+  /** תמונת נוף של הספינה עצמה (לא לוגו) - אותו דפוס תמונה כמו יעד רגיל. */
+  imageUrl: string;
 }
 
 export const CRUISE_LINES: CruiseLineEntry[] = [
-  { slug: "royal-caribbean", name: "Royal Caribbean", logoUrl: "/images/cruise-lines/royal-caribbean.png" },
-  { slug: "ncl", name: "Norwegian Cruise Line (NCL)", logoUrl: "/images/cruise-lines/ncl.png" },
-  { slug: "msc", name: "MSC Cruises", logoUrl: "/images/cruise-lines/msc.png" },
-  { slug: "mano", name: "מנו ספנות", logoUrl: "/images/cruise-lines/mano.png" },
-  { slug: "costa", name: "Costa Cruises", logoUrl: "/images/cruise-lines/costa.png" },
+  { slug: "royal-caribbean", name: "Royal Caribbean", imageUrl: "/images/cruise-lines/royal-caribbean.png" },
+  { slug: "ncl", name: "Norwegian Cruise Line (NCL)", imageUrl: "/images/cruise-lines/ncl.png" },
+  { slug: "msc", name: "MSC Cruises", imageUrl: "/images/cruise-lines/msc.png" },
+  { slug: "mano", name: "מנו ספנות", imageUrl: "/images/cruise-lines/mano.png" },
+  { slug: "costa", name: "Costa Cruises", imageUrl: "/images/cruise-lines/costa.png" },
 ];

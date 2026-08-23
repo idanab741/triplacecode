@@ -79,7 +79,15 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // "ראה הכל" - סקשן בודד, limit גדול.
+  // "ראה הכל" - סקשן בודד, limit גדול. תיקון (Audit - "ראה עוד בכל
+  // קטגוריה, כמו שיש בחיי לילה ובילויים"): "hot" הוא פסאודו-קטגוריה
+  // מיוחדת ל"🔥 הכי חמים עכשיו" (שהיה כבר קיים כאן, עכשיו מקבל גם הוא
+  // "ראה הכל", לא רק שאר הקטגוריות).
+  if (categoryParam === "hot") {
+    const places = await fetchHotPlaces(supabase, location, limitParam ? Number(limitParam) : 40, HOT_NIGHTLIFE_CATEGORIES, true);
+    return NextResponse.json({ title: "הכי חמים עכשיו", emoji: "🔥", places });
+  }
+
   if (categoryParam) {
     const section = DISCOVERY_SECTIONS[categoryParam];
     if (!section) {

@@ -150,7 +150,7 @@ export default function RomanticDateDiscoverPage() {
           </div>
         ) : (
           <>
-            <HotPlacesSection places={data.hotPlaces} from="romantic-date-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="romantic-date-discover" seeAllHref={buildSeeAllHref("hot")} />
             {data.sections.map((section) => (
               <DiscoverySection
                 key={section.id}

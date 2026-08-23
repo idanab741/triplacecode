@@ -151,7 +151,7 @@ export default function NightlifeDiscoverPage() {
           </div>
         ) : (
           <>
-            <HotPlacesSection places={data.hotPlaces} from="nightlife-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="nightlife-discover" seeAllHref={buildSeeAllHref("hot")} />
             {data.sections.map((section) => (
               <DiscoverySection
                 key={section.id}

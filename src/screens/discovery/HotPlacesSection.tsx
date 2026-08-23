@@ -5,6 +5,12 @@ interface HotPlacesSectionProps {
   from: string;
   title?: string;
   description?: string;
+  /** תיקון (Audit - "אני רוצה שבכל קטגוריה... יופיע ראה עוד... כמו
+   *  שיש בחיי לילה ובילויים"): "הכי חמים עכשיו" היה היחיד בלי קישור
+   *  "ראה הכל" בכל 6 עמודי ה-Discovery (כל שאר הסקשנים כבר קיבלו את
+   *  זה דרך DiscoverySection.tsx). אופציונלי בכוונה - אם לא מועבר,
+   *  שום דבר לא נשבר (התנהגות זהה לקודם). */
+  seeAllHref?: string;
 }
 
 /**
@@ -19,10 +25,18 @@ export function HotPlacesSection({
   from,
   title = "🔥 הכי חמים עכשיו",
   description = "היעדים והבילויים הכי פופולריים באזור.",
+  seeAllHref,
 }: HotPlacesSectionProps) {
   return (
     <section className="px-6">
-      <h3 className="mb-1 text-lg font-semibold text-ink">{title}</h3>
+      <div className="mb-1 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-ink">{title}</h3>
+        {seeAllHref && places.length > 0 && (
+          <a href={seeAllHref} className="text-sm font-medium text-[var(--color-primary-start)]">
+            ראה הכל
+          </a>
+        )}
+      </div>
       <p className="mb-3 text-sm text-ink-secondary">{description}</p>
       {places.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-card bg-bg-secondary px-6 py-8 text-center">

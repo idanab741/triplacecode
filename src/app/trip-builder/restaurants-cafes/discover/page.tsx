@@ -157,7 +157,7 @@ export default function RestaurantsCafesDiscoverPage() {
           </div>
         ) : (
           <>
-            <HotPlacesSection places={data.hotPlaces} from="restaurants-cafes-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="restaurants-cafes-discover" seeAllHref={buildSeeAllHref("hot")} />
             {data.sections.map((section) => (
               <DiscoverySection
                 key={section.id}

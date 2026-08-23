@@ -172,7 +172,7 @@ export default function VacationIlDiscoverPage() {
         ) : (
           <>
             {/* 🔥 הכי חמים עכשיו - PLACES/אטרקציות (הבדל ברור מהסקשן הקודם). */}
-            <HotPlacesSection places={data.hotPlaces} from="vacation-il-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="vacation-il-discover" seeAllHref={buildSeeAllHref("hot")} />
 
             {data.sections.map((section) => (
               <DiscoverySection

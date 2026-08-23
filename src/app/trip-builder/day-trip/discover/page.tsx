@@ -192,7 +192,7 @@ export default function DayTripDiscoverPage() {
         ) : (
           <>
             {/* 🔥 הכי חמים עכשיו */}
-            <HotPlacesSection places={data.hotPlaces} from="day-trip-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="day-trip-discover" seeAllHref={buildSeeAllHref("hot")} />
 
             {/* 🎪 אירועים ופסטיבלים - מיד אחרי "הכי חמים עכשיו", Featured, תמיד מוצג. */}
             <FeaturedEventsSection events={data.events} />

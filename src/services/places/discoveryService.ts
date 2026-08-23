@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { haversineDistanceKm, kmToDegreesLat, kmToDegreesLng } from "@/services/tripBuilder/geo";
 import type { LatLng } from "@/services/tripBuilder/types";
 import { AI_TRIP_BUILDER_SOURCE } from "@/services/tripBuilder/aiPlaceInsertionService";
-import { getSubcategoryLabel } from "@/services/places/tripTaxonomy";
+import { getSubcategoryLabel, TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 
 /**
  * שכבת Discovery (Audit מול "PROMPT 1 - בניית עמוד Discovery / יעדים
@@ -31,6 +31,11 @@ export interface DiscoveryPlace {
   city: string | null;
   distanceKm: number | null;
   tags: string[];
+  /** תיקון (Audit - "מפה עם מיקום ונעץ של כל המקומות"): נחוץ להצגת
+   *  סמנים על מפה בעמוד "ראה הכל" (DiscoveryPlacesMap.tsx) - לא היה
+   *  חשוף קודם על DiscoveryPlace (רק בשימוש פנימי לחישוב distanceKm). */
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface DiscoveryLocation {
@@ -90,6 +95,8 @@ function rowToDiscoveryPlace(row: PlaceRow, origin: LatLng | null): DiscoveryPla
     city: row.city,
     distanceKm,
     tags: row.tags ?? [],
+    latitude: row.latitude,
+    longitude: row.longitude,
   };
 }
 
@@ -116,23 +123,40 @@ function computeWeightedScore(place: DiscoveryPlace): number {
 }
 
 /**
- * תיקון באג אמיתי נוסף ("עגלות קפה צריכות להציג עגלות קפה! פארקים
- * צריכים להיות פארקים!"): candidatePoolService.ts (Trip Builder) משתמש
- * ב-Fallback ל-places.category (5 ערכים גסים בלבד - restaurants/
- * nightlife/attractions/nature/hotels, ר' placeCategories.ts) כשאין
- * trip_type_tags בכלל - זה סביר *שם* כי ה-Slot חייב להתמלא במשהו סביר
- * מתוך בריכה מוגבלת, וכל שאר הפייפליין (Ranking/Validation) עדיין
- * מסנן החוצה טעויות. אבל ב-Discovery, "עגלות קפה" חייב להיות **מדויק** -
- * הפעלת אותו Fallback (category="restaurants" -> גם "coffee_carts_cafes"
- * וגם "wineries_dining") היא בדיוק מה שהחזיר "Heritage Restaurant"/
- * "Restaurant Slow" (place.category="restaurants", trip_type_tags ריק)
- * לתוך סקשן עגלות הקפה. לכן כאן - **התאמה מחמירה בלבד** לפי
- * trip_type_tags.ov, בלי שום Fallback ל-category הגס. עדיף פחות
- * תוצאות ומדויקות (ואם באמת אין - Empty State כבר קיים) מאשר תוצאות
- * לא-רלוונטיות "כדי למלא קרוסלה".
+ * תיקון באג אמיתי וקריטי ("לא הגיוני ש3/4 ריק! יש שם המון המון
+ * אטרקציות שהכנסתי"): מצאתי את הסיבה בפועל בקוד האדמין עצמו
+ * (src/app/admin/places/[id]/page.tsx) - יש שם הערה ואזהרה מפורשות:
+ * "מנוע החיפוש... בודק רק trip_type_tags" ו-"⚠️ קטגוריה ראשית... צריכה
+ * לפחות אחת מהתגיות... ללא זה, המקום לא יוחזר כמועמד". כלומר: trip_type_tags
+ * הוא שדה **נפרד ואופציונלי** בטופס האדמין (multi-select שקל לשכוח),
+ * בעוד ש-subcategory הוא השדה שה-admin בפועל תמיד ממלא (זה "התת-קטגוריה
+ * (סוג מדויק)" - הבחירה המרכזית כשמוסיפים מקום). ההתאמה המחמירה-בלבד
+ * לפי trip_type_tags (שהוספתי בסבב קודם כדי לתקן "עגלת קפה מציגה
+ * מסעדות") הייתה נכונה *בכיוון* אבל שגויה *במנגנון* - היא סיננה החוצה
+ * בטעות גם מקומות עם subcategory מדויק ונכון, רק כי trip_type_tags
+ * נשאר ריק. בגלל זה 3/4 מהסקשנים יצאו ריקים, למרות שהמקומות קיימים.
+ *
+ * התיקון: subcategory לבדו (ר' params.subcategories למטה) הוא **מספיק**
+ * להתאמה - לא דורש גם trip_type_tags. זה עדיין מדויק (subcategory="forest"
+ * שייך רק ל-nature_trails באמת, לא יכול "לדלוף" ל-coffee_carts_cafes) -
+ * ועדיין פותר את הבעיה המקורית (עגלת קפה לא תופיע בטבע, כי ל-subcategory
+ * שלה אין שום קשר ל-nature_trails). וכש-category/categories מועבר בלי
+ * subcategories מפורש (סקשן "רחב", כמו "ספא ורוגע" שלא מסנן subcategory
+ * ספציפי) - עכשיו גם subcategory שמשתייך לקבוצת הטקסונומיה הזו (מתוך
+ * TRIP_TYPE_GROUPS הקיים, לא רשימה חדשה) מספיק, לא רק trip_type_tags.ov.
  */
+const CATEGORY_ALL_SUBCATEGORIES: Record<string, string[]> = {};
+for (const group of TRIP_TYPE_GROUPS) {
+  CATEGORY_ALL_SUBCATEGORIES[group.id] = group.subTags.map((s) => s.id);
+}
+
 function buildCategoryOrFilter(categoryIds: string[]): string {
-  return categoryIds.map((categoryId) => `trip_type_tags.ov.{${categoryId}}`).join(",");
+  const clauses = categoryIds.map((categoryId) => `trip_type_tags.ov.{${categoryId}}`);
+  const allSubcategories = categoryIds.flatMap((id) => CATEGORY_ALL_SUBCATEGORIES[id] ?? []);
+  if (allSubcategories.length > 0) {
+    clauses.push(`subcategory.in.(${allSubcategories.join(",")})`);
+  }
+  return clauses.join(",");
 }
 
 interface FetchDiscoveryPlacesParams {

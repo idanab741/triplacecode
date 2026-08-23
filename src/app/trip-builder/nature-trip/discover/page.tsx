@@ -151,7 +151,7 @@ export default function NatureTripDiscoverPage() {
           </div>
         ) : (
           <>
-            <HotPlacesSection places={data.hotPlaces} from="nature-trip-discover" />
+            <HotPlacesSection places={data.hotPlaces} from="nature-trip-discover" seeAllHref={buildSeeAllHref("hot")} />
             {data.sections.map((section) => (
               <DiscoverySection
                 key={section.id}

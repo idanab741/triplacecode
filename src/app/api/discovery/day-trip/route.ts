@@ -134,7 +134,16 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // "ראה הכל" - סקשן בודד, limit גדול.
+  // "ראה הכל" - סקשן בודד, limit גדול. תיקון (Audit - "אני רוצה שבכל
+  // קטגוריה יופיע ראה עוד"): "hot" הוא פסאודו-קטגוריה מיוחדת ל"🔥 הכי
+  // חמים עכשיו" (לא ב-DISCOVERY_SECTIONS - זה סריקה רוחבית, לא קטגוריה
+  // בודדת) - טופל בנפרד כדי ש"ראה הכל" יעבוד גם עליה, בדיוק כמו כל
+  // סקשן אחר.
+  if (categoryParam === "hot") {
+    const places = await fetchHotPlaces(supabase, location, limitParam ? Number(limitParam) : 40);
+    return NextResponse.json({ title: "הכי חמים עכשיו", emoji: "🔥", places });
+  }
+
   if (categoryParam) {
     const section = DISCOVERY_SECTIONS[categoryParam];
     if (!section) {
