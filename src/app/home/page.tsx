@@ -172,28 +172,22 @@ export default function HomePage() {
             {/* תיקון (בקשה מפורשת - "גלה עוד ישר מתחת לסוג הטיול" +
                 "השותפים צריך להיות אחרון"): גלה עוד ראשון מתחת ל-Trip
                 Types (בגודל המקורי), הטיולים שלי אחריו, והשותפים עברו
-                לסוף לגמרי - אחרי כל 5 הסקשנים החדשים. */}
-            <div className="flex flex-col gap-6 pb-4 pt-5">
+                לסוף לגמרי - אחרי כל 5 הסקשנים החדשים.
+                תיקון (בקשה מפורשת - "הרווחים בין כל בלוק לא זהים"):
+                כל התוכן הזה היה מפוצל ל-3 div-ים נפרדים, כל אחד עם
+                pt/pb משלו - בגבול שבין שני div-ים העיטופים הצטברו
+                זה על זה (pb של האחד + pt של הבא), ויצרו רווח *גדול
+                יותר* בדיוק בנקודות המעבר בין הבלוקים, לעומת ה-gap
+                האחיד בתוך כל div. עכשיו הכל div אחד, gap-6 יחיד -
+                בדיוק אותו רווח בין כל שני בלוקים לאורך כל העמוד. */}
+            <div className="flex flex-col gap-6 pb-6 pt-5">
               <DiscoverCard />
               <MyTripsSection />
-            </div>
-
-            {/* 5 הסקשנים החדשים - Trending -> Personalized Matches ->
-                Surprise Me -> Nearby -> Community. תיקון (בקשה מפורשת -
-                "לצמצם את הרווח בין Matches הקהילה למפה מעל, שיהיה בגובה
-                הקבוע של העמוד"): gap-7 -> gap-6, אותו מרווח בדיוק כמו
-                הבלוק שמעל (gap-6) - עקבי לכל אורך העמוד, לא רווח גדול
-                יותר במיוחד כאן. */}
-            <div className="flex flex-col gap-6 pb-6 pt-6">
               <TrendingSection />
               <PersonalizedMatchesSection />
               <SurpriseMeSection />
               <NearbySection />
               <CommunitySection />
-            </div>
-
-            {/* השותפים - אחרון בעמוד, כמבוקש. */}
-            <div className="pb-6">
               <PartnersSection />
             </div>
           </>
