@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getDestinationById } from "@/services/destinations/destinationsServerService";
+import { getDestinationById, getDestinationEditionSection } from "@/services/destinations/destinationsServerService";
 import { getPlacesByCityAndCategory } from "@/services/places/placesServerService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
@@ -13,10 +13,14 @@ import { BusinessOwnersRow } from "@/screens/destination/BusinessOwnersRow";
 
 interface DestinationPageProps {
   params: Promise<{ id: string }>;
+  /** subtitle - מגיע רק כשנלחצים על כרטיס תת-יעד ב-WorldwideCategorySection
+   *  (למשל "ניו יורק בכריסמס") - לא קיים בכניסה רגילה ליעד. */
+  searchParams: Promise<{ subtitle?: string }>;
 }
 
-export default async function DestinationPage({ params }: DestinationPageProps) {
+export default async function DestinationPage({ params, searchParams }: DestinationPageProps) {
   const { id } = await params;
+  const { subtitle } = await searchParams;
   const destination = await getDestinationById(id);
 
   if (!destination) {
@@ -34,12 +38,13 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
   const hasCoords = destination.latitude != null && destination.longitude != null;
 
-  const [restaurants, attractions, hotels, forecast, events] = await Promise.all([
+  const [restaurants, attractions, hotels, forecast, events, editionSection] = await Promise.all([
     getPlacesByCityAndCategory(destination.name, "restaurants_culinary"),
     getPlacesByCityAndCategory(destination.name, "attractions"),
     getPlacesByCityAndCategory(destination.name, "hotels"),
     hasCoords ? getWeeklyForecast(destination.latitude!, destination.longitude!) : Promise.resolve([]),
     hasCoords ? getUpcomingEvents(destination.latitude!, destination.longitude!) : Promise.resolve([]),
+    subtitle ? getDestinationEditionSection(destination.id, subtitle) : Promise.resolve(null),
   ]);
 
   return (
@@ -78,6 +83,19 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       </div>
 
       <div className="flex flex-col gap-6 pt-5">
+        {editionSection && (
+          <div className="mx-6 rounded-card bg-accent/10 py-4">
+            <h2 className="mb-3 px-6 text-xl font-extrabold text-ink">
+              {destination.name} {editionSection.subtitle}
+            </h2>
+            <PlaceRow
+              title="אטרקציות"
+              places={editionSection.places}
+              emptyMessage={`עוד לא הוספנו אטרקציות ל-${destination.name} ${editionSection.subtitle}`}
+            />
+          </div>
+        )}
+
         {destination.description && (
           <p className="px-6 text-sm leading-relaxed text-ink-secondary">
             {destination.description}

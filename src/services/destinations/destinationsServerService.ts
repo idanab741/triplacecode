@@ -17,6 +17,57 @@ export async function getDestinationById(id: string): Promise<Destination | null
   return data;
 }
 
+export interface EditionPlace {
+  id: string;
+  name: string;
+  rating: number | null;
+  image_urls: string[];
+}
+
+export interface EditionSection {
+  title: string;
+  subtitle: string;
+  places: EditionPlace[];
+}
+
+/**
+ * שולף את ה"סקשן" המיוחד של תת-יעד (destination_edition) - למשל "ניו
+ * יורק בכריסמס" - כדי להציג אותו כשורה נוספת בראש עמוד היעד הרגיל,
+ * רק כשמגיעים דרך הכרטיס הספציפי הזה (subtitle מגיע כ-query param
+ * מ-WorldwideCategorySection.tsx). destinationId+subtitle תמיד ייחודי
+ * בפועל בתוך quick_category='abroad' (ר' worldwideVacationCategories.ts -
+ * לאותו יעד אין 2 subtitle-ים זהים במילה). null אם אין edition תואמת -
+ * העמוד אז מתנהג כמו יעד רגיל, בלי הסקשן הנוסף.
+ */
+export async function getDestinationEditionSection(
+  destinationId: string,
+  subtitle: string
+): Promise<EditionSection | null> {
+  const supabase = await createClient();
+
+  const { data: edition } = await supabase
+    .from("destination_editions")
+    .select("id, title, subtitle")
+    .eq("destination_id", destinationId)
+    .eq("quick_category", "abroad")
+    .eq("subtitle", subtitle)
+    .maybeSingle();
+
+  if (!edition) return null;
+
+  const { data: rows } = await supabase
+    .from("destination_edition_places")
+    .select("sort_order, places(id, name, rating, image_urls)")
+    .eq("edition_id", edition.id)
+    .order("sort_order", { ascending: true });
+
+  const places: EditionPlace[] = (rows ?? [])
+    .map((r: Record<string, unknown>) => r.places as EditionPlace | null)
+    .filter((p): p is EditionPlace => p !== null);
+
+  return { title: edition.title, subtitle: edition.subtitle ?? subtitle, places };
+}
+
 export interface DestinationCandidate {
   name: string;
   country: string;

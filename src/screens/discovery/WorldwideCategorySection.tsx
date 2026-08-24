@@ -45,6 +45,15 @@ export function WorldwideCategorySection({ category, destinationIdBySlug }: Worl
           if (!entry) return null;
           const imageUrl = ref.imageUrl ?? entry.imageUrl;
           const destinationId = destinationIdBySlug[ref.slug];
+          // subtitle כ-query param - כך שעמוד היעד (אותו עמוד אחד לכל
+          // יעד ייחודי!) יודע להציג את סקשן תת-היעד המתאים (ר'
+          // getDestinationEditionSection) רק כשמגיעים דרך הכרטיס הזה
+          // ספציפית, ולא כשנכנסים ליעד ה"רגיל".
+          const href = destinationId
+            ? ref.subtitle
+              ? `/destination/${destinationId}?subtitle=${encodeURIComponent(ref.subtitle)}`
+              : `/destination/${destinationId}`
+            : null;
           const cardContent = (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -58,8 +67,8 @@ export function WorldwideCategorySection({ category, destinationIdBySlug }: Worl
             </>
           );
           const className = "relative block h-[220px] w-[150px] shrink-0 overflow-hidden rounded-card bg-bg-secondary shadow-soft";
-          return destinationId ? (
-            <Link key={`${ref.slug}-${i}`} href={`/destination/${destinationId}`} className={className}>
+          return href ? (
+            <Link key={`${ref.slug}-${i}`} href={href} className={className}>
               {cardContent}
             </Link>
           ) : (
