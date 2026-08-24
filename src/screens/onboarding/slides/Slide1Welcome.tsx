@@ -12,7 +12,7 @@ const CATEGORIES = [
  *  בלי כותרת עליונה (אין "המיקום שלי"/עיגולי אווטאר-פעמון) - נשארים ישר עם ה-Hero. */
 export function Slide1Welcome() {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
+    <div className="relative flex flex-1 flex-col items-center justify-start gap-7 px-6 pt-6">
       <OnboardingVisual tint="#e5e6f4">
         <div className="px-7 pt-5">
           <RealPhoto src="/images/home-hero.png" alt="TRIPLACE - AI Powered by" />

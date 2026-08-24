@@ -52,25 +52,34 @@ export default function HomePage() {
   }
 
   // *** תיקון (בקשה מפורשת - "ברגע שגוללים למעלה זה מאפשר חזרה לעמוד
-  // הבית"): כשכבר בראש הדף (scrollY=0) וממשיכים "לגלול למעלה" - גלגלת
-  // עכבר כלפי מעלה (deltaY שלילי), או משיכת אצבע כלפי מטה במסך מגע
-  // (מה שמזיז את התוכן כלפי מעלה/חושף את החלק העליון, "pull to go
-  // back") - יוצאים בחזרה למצב ה-Home הרגיל, בדיוק כמו מחיקת הטקסט.
+  // הבית"): כשכבר בראש הדף (scrollY=0) וממשיכים "לגלול למעלה" - יוצאים
+  // בחזרה למצב ה-Home הרגיל, בדיוק כמו מחיקת הטקסט.
+  // *** תיקון נוסף (Audit - "כתבתי יעד, זה נכנס ויצא מיד חזרה הביתה!"):
+  // התנועה של האצבע/העכבר *באותה לחיצה* שבוחרת את היעד (ה-tap עצמו,
+  // הרמת האצבע מהמסך) יכולה להיראות בדיוק כמו "משיכה למטה בראש הדף" -
+  // גרם ליציאה אוטומטית מיד אחרי הכניסה. עכשיו יש "צינון" של 900ms
+  // אחרי הכניסה לפני שהמחווה בכלל מופעלת, וסף הרגישות עלה משמעותית
+  // (40px -> 90px) כדי שרק משיכה מכוונת וברורה תפעיל את זה.
   useEffect(() => {
     if (!inTripMatchMode) return;
+
+    let gestureEnabled = false;
+    const enableTimer = setTimeout(() => {
+      gestureEnabled = true;
+    }, 900);
 
     let touchStartY: number | null = null;
 
     function handleWheel(e: WheelEvent) {
-      if (window.scrollY <= 0 && e.deltaY < -8) handleExitTripMatch();
+      if (gestureEnabled && window.scrollY <= 0 && e.deltaY < -8) handleExitTripMatch();
     }
     function handleTouchStart(e: TouchEvent) {
       touchStartY = e.touches[0]?.clientY ?? null;
     }
     function handleTouchMove(e: TouchEvent) {
-      if (touchStartY == null || window.scrollY > 0) return;
+      if (!gestureEnabled || touchStartY == null || window.scrollY > 0) return;
       const currentY = e.touches[0]?.clientY ?? touchStartY;
-      if (currentY - touchStartY > 40) {
+      if (currentY - touchStartY > 90) {
         handleExitTripMatch();
         touchStartY = null;
       }
@@ -80,6 +89,7 @@ export default function HomePage() {
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
     window.addEventListener("touchmove", handleTouchMove, { passive: true });
     return () => {
+      clearTimeout(enableTimer);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
@@ -189,7 +199,7 @@ export default function HomePage() {
                 הקבוע של העמוד"): gap-7 -> gap-6, אותו מרווח בדיוק כמו
                 הבלוק שמעל (gap-6) - עקבי לכל אורך העמוד, לא רווח גדול
                 יותר במיוחד כאן. */}
-            <div className="flex flex-col gap-4 pb-6 pt-6">
+            <div className="flex flex-col gap-6 pb-6 pt-6">
               <TrendingSection />
               <PersonalizedMatchesSection />
               <SurpriseMeSection />

@@ -6,7 +6,7 @@ const DAY_COLORS = ["#4F7DF3", "#8B5CF6", "#0EA5A4"];
  *  (באנר המפה/מסלול האמיתי מ-day-trip result) יחד עם קטע "הטיולים שלי". */
 export function Slide5Route() {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
+    <div className="relative flex flex-1 flex-col items-center justify-start gap-7 px-6 pt-6">
       <OnboardingVisual>
         <div className="p-4">
           <div className="relative h-28 w-full overflow-hidden rounded-card">

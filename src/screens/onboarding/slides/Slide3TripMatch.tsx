@@ -8,7 +8,7 @@ import { OnboardingVisual, RealPhoto } from "./OnboardingVisual";
  *  עצמה (יד + חצים) על גבי הכרטיס, כדי שהמשתמש יבין מיד איך זה עובד. */
 export function Slide3TripMatch() {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
+    <div className="relative flex flex-1 flex-col items-center justify-start gap-7 px-6 pt-6">
       <OnboardingVisual>
         <div className="p-4">
           <div className="relative overflow-hidden rounded-3xl bg-white shadow-lg">

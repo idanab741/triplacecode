@@ -8,7 +8,7 @@
  *  האמיתי מודגש כדי להסביר למשתמש לאן ללחוץ. */
 export function Slide2Profile() {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
+    <div className="relative flex flex-1 flex-col items-center justify-start gap-7 px-6 pt-6">
       <div className="relative w-full max-w-[340px] overflow-hidden rounded-[28px] shadow-soft" style={{ border: "1px solid rgba(26,26,46,0.06)" }}>
         <div className="relative w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}

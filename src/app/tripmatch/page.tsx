@@ -1087,6 +1087,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 onOpenFilters={() => setFiltersOpen(true)}
                 activeFilterCount={countActiveFilters(filters)}
                 onFinish={handleFinish}
+                hideTopBar={embedded}
               />
             )}
 
@@ -1096,8 +1097,14 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 שוליים לבנים. ה-padding-bottom (112px) שומר בדיוק על אותו
                 מרווח בטוח שהיה קודם קבוע ב-Screen (pb-28) כדי שהכרטיס
                 יגיע בדיוק עד קצה ה-BottomNav הצף, בלי חפיפה ובלי רווח
-                מיותר. */}
-            <div className="min-h-0 flex-1 pt-3" style={{ paddingBottom: 112 }}>
+                מיותר.
+                *** תיקון (Audit - "רווח גדול מדי בין הכפתורים לבר
+                התחתון!"): כש-embedded=true, ה-112px האלה מצטברים *מעל*
+                ה-pb-28 (=112px) שכבר קיים על ה-container החיצוני של
+                Home עצמו (לצורך ה-MainBottomNav שלה) - שתי הזזות
+                כפולות באותו כיוון, לא אחת. embedded מקבל padding קטן
+                בהרבה (24px, "אוויר" בלבד) כי Home כבר דואגת לשאר. */}
+            <div className="min-h-0 flex-1 pt-3" style={{ paddingBottom: embedded ? 24 : 112 }}>
               {!currentCandidate ? (
                 <p className="pt-16 text-center text-ink-secondary">
                   {candidates.length === 0

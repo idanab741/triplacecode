@@ -6,7 +6,7 @@ const OPTIONS = ["טיול בארץ", "חופשה בחו\"ל", "סופ\"ש זו�
  *  האמיתי (ChatHeader עם פס התקדמות ואווטאר טריפי האמיתי, בועת צ'אט, צ'יפים). */
 export function Slide4Ai() {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center gap-7 px-6">
+    <div className="relative flex flex-1 flex-col items-center justify-start gap-7 px-6 pt-6">
       <OnboardingVisual>
         <div className="flex items-center gap-2.5 border-b border-ink-secondary/10 px-4 pt-3 pb-2.5">
           <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-sm">
