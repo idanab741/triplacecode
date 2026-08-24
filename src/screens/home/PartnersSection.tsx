@@ -5,14 +5,15 @@ import useEmblaCarousel from "embla-carousel-react";
 
 interface Partner {
   id: string;
-  name: string;
+  imageUrl: string;
+  alt: string;
 }
 
 const PLACEHOLDER_PARTNERS: Partner[] = [
-  { id: "1", name: "בקרוב" },
-  { id: "2", name: "בקרוב" },
-  { id: "3", name: "בקרוב" },
-  { id: "4", name: "בקרוב" },
+  { id: "1", imageUrl: "/images/partners/mascot-skeptical.png", alt: "שותף בקרוב" },
+  { id: "2", imageUrl: "/images/partners/mascot-shocked.png", alt: "שותף בקרוב" },
+  { id: "3", imageUrl: "/images/partners/mascot-happy.png", alt: "שותף בקרוב" },
+  { id: "4", imageUrl: "/images/partners/mascot-sad.png", alt: "שותף בקרוב" },
 ];
 
 export function PartnersSection() {
@@ -36,8 +37,14 @@ export function PartnersSection() {
         <div className="flex">
           {PLACEHOLDER_PARTNERS.map((partner) => (
             <div key={partner.id} className="min-w-0 shrink-0 grow-0" style={{ flexBasis: "45%", marginInlineEnd: 12 }}>
-              <div className="flex h-32 w-full flex-col items-center justify-center overflow-hidden rounded-card bg-white text-center shadow-soft">
-                <p className="text-sm font-semibold text-ink-secondary">{partner.name}</p>
+              <div className="relative h-32 w-full overflow-hidden rounded-card bg-white shadow-soft">
+                <Image
+                  src={partner.imageUrl}
+                  alt={partner.alt}
+                  fill
+                  sizes="45vw"
+                  className="object-cover"
+                />
               </div>
             </div>
           ))}
