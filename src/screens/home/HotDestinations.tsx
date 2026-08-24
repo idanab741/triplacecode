@@ -15,6 +15,9 @@ export interface Destination {
 
 interface HotDestinationsProps {
   title: string;
+  /** תת-כותרת אופציונלית מתחת לכותרת - ברירת מחדל undefined, לא מוצג
+   *  בכלל ואין שינוי בהתנהגות בשום מקום אחר שכבר משתמש ברכיב. */
+  subtitle?: string;
   destinations: Destination[];
 }
 
@@ -22,7 +25,7 @@ interface HotDestinationsProps {
  *  יותר סביבו. הגלילה/ההצמדה/הלולאה עצמן מנוהלות ע"י Embla Carousel
  *  (ספרייה בדוקה) — אנחנו רק שואלים אותה "איזה כרטיס במרכז עכשיו"
  *  ומוסיפים לו קלאס שמגדיל אותו. */
-export function HotDestinations({ title, destinations }: HotDestinationsProps) {
+export function HotDestinations({ title, subtitle, destinations }: HotDestinationsProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: destinations.length > 1,
     direction: "rtl",
@@ -65,7 +68,10 @@ export function HotDestinations({ title, destinations }: HotDestinationsProps) {
 
   return (
     <div className="px-6">
-      <h3 className="mb-3 text-lg font-semibold tracking-tight text-ink">{title}</h3>
+      <h3 className="mb-3 text-lg font-semibold tracking-tight text-ink">
+        {title}
+        {subtitle && <span className="mt-0.5 block text-sm font-normal text-ink-secondary">{subtitle}</span>}
+      </h3>
 
       {destinations.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-card bg-bg-secondary px-6 py-10 text-center">

@@ -121,6 +121,17 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
           placeholder="מה ה־match שלכם היום?"
           className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
         />
+        {/* לוגו TripMatch קטן ומעומעם בצד שמאל של השורה (בקשה מפורשת) -
+            filter: grayscale מוריד ממנו את הצבע, opacity מעדן אותו עוד -
+            לא לחיץ, רק רמז ויזואלי עדין שהחיפוש הזה קשור ל-TripMatch. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/trip-tripmatch-logo.png"
+          alt=""
+          aria-hidden="true"
+          className="h-6 w-auto shrink-0 object-contain"
+          style={{ filter: "grayscale(1)", opacity: 0.35 }}
+        />
       </div>
 
       {!destinationMode && open && placeSuggestions.length > 0 && (

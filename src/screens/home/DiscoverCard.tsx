@@ -65,7 +65,7 @@ export function DiscoverCard() {
           clickable: true,
         }}
         onClick={handleClick}
-        className="aspect-[2142/734] rounded-[30px] shadow-xl"
+        className="aspect-[2112/1408] rounded-[30px] shadow-xl"
       >
         {SLIDES.map((slide) => (
           <SwiperSlide key={slide.href} className="relative cursor-pointer">
