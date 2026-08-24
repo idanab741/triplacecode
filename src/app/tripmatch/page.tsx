@@ -164,6 +164,21 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   // בפועל קורית דרך SaveTripIconButton (אותו רכיב ששאר האפליקציה
   // משתמשת בו), לא כפתור נפרד פה.
   const [tripRecordId, setTripRecordId] = useState<string | null>(null);
+  // *** ref מקביל ל-tripRecordId (לא רק ה-state) - נחוץ כדי שאפקט הסנכרון
+  // למטה תמיד יקרא את ה-id העדכני ביותר, גם כשהוא מופעל שוב לפני שה-re-render
+  // עם ה-state המעודכן הספיק לקרות (ראו syncQueueRef).
+  const tripRecordIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    tripRecordIdRef.current = tripRecordId;
+  }, [tripRecordId]);
+  // *** תיקון (יעד נשמר פעמיים ב"הטיולים שלי"): ברגע שמגיעים לתוצאות עם
+  // יעד חדש, שני אפקטים עלולים לרוץ כמעט בו-זמנית - זה שמסמן את הקטגוריה
+  // כ"הושלמה" (למטה) גורם ל-re-render שמפעיל את אפקט הסנכרון פעמיים לפני
+  // שהקריאה הראשונה הספיקה לחזור עם sessionId. בלי תור, שתי הקריאות יוצאות
+  // עם sessionId=null ויוצרות שתי שורות נפרדות ב-DB. syncQueueRef משרשר כל
+  // קריאת סנכרון אחרי הקודמת - כך שהשנייה תמיד משתמשת ב-tripRecordId שכבר
+  // נוצר ע"י הראשונה (UPDATE), במקום ליצור שורה כפולה (INSERT).
+  const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [syncingTrip, setSyncingTrip] = useState(false);
   const [justShared, setJustShared] = useState(false);
   // *** true מהרגע שמתחילים לטעון טיול שמור עם resumeSessionId, עד
@@ -670,39 +685,54 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
 
     let cancelled = false;
     setSyncingTrip(true);
-    fetch("/api/trip-builder/sessions/from-tripmatch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // *** cityValue (הערך הגולמי, "דובאי" - לא "דובאי, איחוד האמירויות")
-      // חייב להישמר בנפרד מ-city (התווית לתצוגה) - ראו הסבר מפורט
-      // ב-from-tripmatch/route.ts. בלי זה, "המשך לקטגוריה הבאה" מטיול
-      // שמור מחפש עם התווית המלאה ותמיד מוצא 0 תוצאות.
-      body: JSON.stringify({
-        city,
-        cityValue: selectedCity,
-        places: sessionLikedPlaces,
-        sessionId: tripRecordId ?? undefined,
-        completedCategories,
-      }),
-    })
-      .then(async (res) => {
+
+    // *** תופסים snapshot של הרשימות כרגע (לא סומכים על closure מאוחר
+    // יותר) - ה-run מוסיף לתור ועשוי לרוץ רק אחרי שהאפקט הבא כבר הופעל,
+    // אז חייבים לשמור בדיוק את הערכים ששייכים להפעלה הזו של האפקט.
+    const placesSnapshot = sessionLikedPlaces;
+    const completedSnapshot = completedCategories;
+
+    const run = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch("/api/trip-builder/sessions/from-tripmatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // *** cityValue (הערך הגולמי, "דובאי" - לא "דובאי, איחוד האמירויות")
+          // חייב להישמר בנפרד מ-city (התווית לתצוגה) - ראו הסבר מפורט
+          // ב-from-tripmatch/route.ts. בלי זה, "המשך לקטגוריה הבאה" מטיול
+          // שמור מחפש עם התווית המלאה ותמיד מוצא 0 תוצאות.
+          // *** sessionId נלקח מה-ref (לא מ-state/closure) - כדי שאם קריאת
+          // סנכרון קודמת בתור כבר יצרה את השורה, הקריאה הזו תעדכן אותה
+          // (UPDATE) במקום ליצור שורה חדשה (INSERT) ולגרום לכפילות.
+          body: JSON.stringify({
+            city,
+            cityValue: selectedCity,
+            places: placesSnapshot,
+            sessionId: tripRecordIdRef.current ?? undefined,
+            completedCategories: completedSnapshot,
+          }),
+        });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error ?? "יצירת הטיול נכשלה");
-        return data;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (data?.sessionId) setTripRecordId(data.sessionId);
-      })
-      .catch((err) => {
+        if (!cancelled && data?.sessionId) {
+          tripRecordIdRef.current = data.sessionId;
+          setTripRecordId(data.sessionId);
+        }
+      } catch (err) {
         // *** לא מציגים שגיאה חוסמת (זה סנכרון רקע, לא פעולה שהמשתמש
         // ביקש במפורש) - אבל כן רושמים ל-console, כדי שכשל בשקט (למשל
         // constraint שדוחה את ה-insert) לא ייעלם בלי עקבות כמו שקרה כאן.
         if (!cancelled) console.error("tripmatch trip sync failed:", err);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setSyncingTrip(false);
-      });
+      }
+    };
+
+    // *** משרשרים אחרי כל קריאה קודמת שעוד לא הסתיימה, במקום להפעיל
+    // fetch מקביל - זה בדיוק מה שמונע את המצב של שתי בקשות יוצאות
+    // כשעדיין אין sessionId משותף ביניהן.
+    syncQueueRef.current = syncQueueRef.current.then(run);
 
     return () => {
       cancelled = true;

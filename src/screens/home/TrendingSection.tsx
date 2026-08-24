@@ -83,7 +83,16 @@ export function TrendingSection() {
   return (
     <section className="px-6">
       <h3 className="mb-3 text-lg font-semibold tracking-tight text-ink">🔥 כולם מחפשים עכשיו</h3>
-      <div className="-mx-6 flex gap-3 overflow-x-auto px-6 pb-1" style={{ scrollbarWidth: "none" }}>
+      {/* תיקון (שוליים נחתכים בסוף הגלילה): padding בצד ה"סוף" של קונטיינר
+          overflow-x-auto לא תמיד נשמר עד סוף ה-scrollWidth (בולט
+          ב-RTL, כי כיוון הגלילה הפוך מה-DOM) - השוליים הימניים (תחילת
+          הגלילה, ps-6) עובדים כי הם padding שלפני הפריט הראשון, אבל
+          ה"שוליים" השמאליים בפועל היו padding בסוף שנחתך. פותרים ע"י
+          spacer אמיתי (פריט flex, לא padding) בסוף הרשימה - הוא תמיד
+          נשמר ב-scrollWidth. w-3 (לא w-6) כי ה-gap-3 שכבר קיים בין
+          הפריט האחרון לספייסר תורם עוד 12px משלו - יחד הם משלימים
+          בדיוק ל-24px, כמו השוליים הרגילים של העמוד (px-6). */}
+      <div className="-mx-6 flex gap-3 overflow-x-auto ps-6 pb-1" style={{ scrollbarWidth: "none" }}>
         {cards.map((c) => {
           const content = (
             <>
@@ -110,6 +119,7 @@ export function TrendingSection() {
             </div>
           );
         })}
+        <div aria-hidden className="w-3 shrink-0" />
       </div>
     </section>
   );

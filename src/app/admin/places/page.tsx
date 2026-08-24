@@ -8,8 +8,44 @@ import { CUISINE_TAGS, PLACE_TYPE_TAGS, TRIPMATCH_TAGS, DNA_TAGS } from "@/const
 import { DataTable, SearchInput, FilterSelect, type Column } from "@/screens/admin/shared/DataTable";
 import { Drawer, AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { Badge } from "@/screens/admin/shared/Primitives";
-import { DISCOVERY_BUCKETS } from "@/services/admin/discoveryConfigV2";
+import { QUICK_CATEGORIES, type QuickCategoryId } from "@/constants/quickCategories";
+import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
+import { ADMIN_DISCOVERY_SECTIONS, type AdminDiscoverySection } from "@/constants/adminDiscoverySections";
+import { WORLDWIDE_VACATION_CATEGORIES, WORLDWIDE_DESTINATION_REGISTRY, type WorldwideDestinationRef } from "@/constants/worldwideVacationCategories";
 import Link from "next/link";
+
+/** "ישראל" - הערך היחיד שנשמר בפועל בעמודת country למקומות בארץ (ר'
+ *  discoveryService.ts DEFAULT_DISCOVERY_COUNTRY / destinationsService.ts). */
+const ISRAEL_COUNTRY = "ישראל";
+
+/** בדיוק לפי הלוגיקה האמיתית בשרת (services/places/discoveryService.ts
+ *  buildCategoryOrFilter + fetchDiscoveryPlaces): category/categories של
+ *  סקשן מתאימים מול trip_type_tags.ov (חפיפת מערך), לא מול עמודת
+ *  category (5 הערכים הגסים - זו רק categoryColumnEquals, ר' "מלונות").
+ *  subcategories מתאימים מול עמודת subcategory (ומספיקים לבד, גם בלי
+ *  חפיפת trip_type_tags - ר' ההערה בקובץ המקור). requiredAnyTags/
+ *  requiredAnyCuisineTags הם תנאי-AND נוספים מעל ההתאמה הבסיסית. */
+function placeMatchesSection(place: Place, section: AdminDiscoverySection): boolean {
+  if (section.categoryColumnEquals) {
+    const columnMatch = place.category === section.categoryColumnEquals;
+    if (section.requiredAnyTags?.length) {
+      return columnMatch || section.requiredAnyTags.some((t) => (place.tags ?? []).includes(t));
+    }
+    return columnMatch;
+  }
+
+  const groupIds = section.categories ?? (section.category ? [section.category] : []);
+  if (groupIds.length > 0 || section.subcategories?.length) {
+    const groupMatch = groupIds.some((c) => (place.trip_type_tags ?? []).includes(c));
+    const subcatMatch = !!section.subcategories?.length && !!place.subcategory && section.subcategories.includes(place.subcategory);
+    if (!groupMatch && !subcatMatch) return false;
+  }
+
+  if (section.requiredAnyTags?.length && !section.requiredAnyTags.some((t) => (place.tags ?? []).includes(t))) return false;
+  if (section.requiredAnyCuisineTags?.length && !section.requiredAnyCuisineTags.some((t) => (place.cuisine_tags ?? []).includes(t))) return false;
+
+  return true;
+}
 
 interface Place {
   id: string;
@@ -143,12 +179,46 @@ export default function AdminPlacesPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [filterCity, setFilterCity] = useState("");
   const [filterCountry, setFilterCountry] = useState("");
-  const [filterTripType, setFilterTripType] = useState("");
+  const [filterTripType, setFilterTripType] = useState<QuickCategoryId | "">("");
+  // "חופשה בחו״ל" - בדיוק כמו באפליקציה (WorldwideCategorySection.tsx):
+  // קודם בוחרים "סוג חופשה עולמי" (worldwideCategoryFilter), ואז יעד ספציפי
+  // מתוך כרטיסי היעדים שלו (destinationFilter, slug מתוך הרשימה הקבועה).
+  // לא בורר מדינה גנרי - האפליקציה לא עובדת ככה בחו"ל, היא עובדת לפי יעדים
+  // אוצרים (worldwideVacationCategories.ts).
+  const [worldwideCategoryFilter, setWorldwideCategoryFilter] = useState("");
+  const [destinationFilter, setDestinationFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [missingFilter, setMissingFilter] = useState<MissingFilter>(null);
 
   const uniqueCities = Array.from(new Set(places.map((p) => p.city).filter(Boolean))) as string[];
   const uniqueCountries = Array.from(new Set(places.map((p) => p.country).filter(Boolean))) as string[];
+
+  // סקשני הקטגוריה האמיתיים של סוג הטיול הנבחר, בדיוק כמו באפליקציה
+  // (adminDiscoverySections.ts - עותק מדויק של מה שכל עמוד Discovery
+  // מציג בפועל). "abroad" לא כלול: אין לו סקשני תוכן - הוא מאורגן לפי
+  // יעד (worldwideVacationCategories.ts), לא לפי קטגוריה.
+  const activeSections: AdminDiscoverySection[] = filterTripType && filterTripType !== "abroad" ? (ADMIN_DISCOVERY_SECTIONS[filterTripType] ?? []) : [];
+
+  // רשימת כרטיסי היעדים להצגה תחת "חו״ל": אם נבחר "סוג חופשה עולמי" -
+  // היעדים שלו בלבד (לפי הסדר שלהם, בדיוק כמו בסקשן באפליקציה). אם לא
+  // נבחר כלום - *כל* היעדים מכל הקטגוריות ביחד, ללא כפילויות (בקשה
+  // מפורשת: "כל היעדים שמופיעים שם בחופשה בחו'''ל", לא רק 6-9 מקטגוריה
+  // אחת) - דה-דופ לפי slug כי אותו יעד חוזר במספר קטגוריות.
+  const abroadDestinationRefs: WorldwideDestinationRef[] = (() => {
+    if (worldwideCategoryFilter) {
+      return WORLDWIDE_VACATION_CATEGORIES.find((c) => c.id === worldwideCategoryFilter)?.destinations ?? [];
+    }
+    const seenSlugs = new Set<string>();
+    const all: WorldwideDestinationRef[] = [];
+    for (const category of WORLDWIDE_VACATION_CATEGORIES) {
+      for (const ref of category.destinations) {
+        if (seenSlugs.has(ref.slug)) continue;
+        seenSlugs.add(ref.slug);
+        all.push(ref);
+      }
+    }
+    return all;
+  })();
 
   const hasMatching = (p: Place) => Object.keys(p.tripmatch_scores ?? {}).length > 0 || Object.keys(p.dna_scores ?? {}).length > 0;
 
@@ -165,19 +235,32 @@ export default function AdminPlacesPage() {
 
   const filteredPlaces = places.filter((p) => {
     if (searchText && !p.name.toLowerCase().includes(searchText.toLowerCase())) return false;
-    // "כשר" הוא ערך מיוחד ברשימת הקטגוריות של "מסעדה" (ר' discoveryConfigV2.ts) -
-    // בניגוד לשאר תתי-הקטגוריות שם, זה לא נשמר בשדה category/subcategory של
-    // המקום, אלא בשדה הבוליאני kosher (אותו שדה שנאכף באופן מחייב במאגר
-    // המועמדים למשתמש קצה - ר' candidatePoolService.ts). לכן כשבוחרים אותו כאן
-    // מסננים לפי kosher===true, לא לפי השוואת category רגילה.
-    if (filterCategory === "kosher") {
-      if (p.kosher !== true) return false;
-    } else if (filterCategory && p.category !== filterCategory) {
-      return false;
+
+    // סוג הטיול: "חופשה בארץ" (weekend) - רק ישראל.
+    if (filterTripType === "weekend" && p.country !== ISRAEL_COUNTRY) return false;
+    if (filterTripType === "abroad") {
+      if (!p.country || p.country === ISRAEL_COUNTRY) return false;
+      // יעד ספציפי שנבחר מתוך כרטיסי היעדים (worldwideVacationCategories.ts) -
+      // מקום שייך ליעד אם העיר או המדינה שלו תואמת לשם היעד (חלק
+      // מהיעדים הם ערים/איים ספציפיים כמו "מיקונוס", חלק הם מדינות
+      // שלמות כמו "תאילנד" בקטגוריית טיולי תרמילאים).
+      if (destinationFilter) {
+        const entry = WORLDWIDE_DESTINATION_REGISTRY[destinationFilter];
+        if (entry && p.city !== entry.name && p.country !== entry.name) return false;
+      }
     }
+
+    // הקטגוריה/הסקשן הנבחר - מסונן לפי הסקשנים האמיתיים של סוג הטיול
+    // הנבחר (placeMatchesSection), לא לפי עמודת category הגסה. "abroad"
+    // אין לו סקשנים בכלל, אז filterCategory לא רלוונטי שם (ה-UI מסתיר
+    // את הבורר עבורו - ר' למטה).
+    if (filterCategory && filterTripType && filterTripType !== "abroad") {
+      const section = activeSections.find((s) => s.id === filterCategory);
+      if (section && !placeMatchesSection(p, section)) return false;
+    }
+
     if (filterCity && p.city !== filterCity) return false;
     if (filterCountry && p.country !== filterCountry) return false;
-    if (filterTripType && !(p.trip_type_tags ?? []).includes(filterTripType)) return false;
     if (missingFilter === "tags" && (p.tags ?? []).length > 0) return false;
     if (missingFilter === "description" && p.short_description && p.short_description.trim()) return false;
     if (missingFilter === "matching" && hasMatching(p)) return false;
@@ -668,20 +751,42 @@ export default function AdminPlacesPage() {
         <FilterSelect
           value={filterTripType}
           onChange={(v) => {
-            setFilterTripType(v);
+            setFilterTripType(v as QuickCategoryId | "");
             setFilterCategory(""); // איפוס קטגוריה כשמחליפים סוג טיול - הרשימה תלויה בו
+            setFilterCountry("");
+            setWorldwideCategoryFilter("");
+            setDestinationFilter("");
           }}
-          placeholder="הכל"
-          options={DISCOVERY_BUCKETS.map((t) => ({ value: t.key, label: `${t.emoji} ${t.label}` }))}
+          placeholder="כל סוגי הטיול"
+          options={QUICK_CATEGORIES.map((t) => ({ value: t.id, label: QUICK_CATEGORY_LABELS[t.id] }))}
         />
-        <FilterSelect
-          value={filterCategory}
-          onChange={setFilterCategory}
-          placeholder="כל הקטגוריות"
-          options={(DISCOVERY_BUCKETS.find((t) => t.key === filterTripType)?.categories ?? []).map((c) => ({ value: c.key, label: `${c.emoji} ${c.label}` }))}
-        />
-        <FilterSelect value={filterCountry} onChange={setFilterCountry} placeholder="כל המדינות" options={uniqueCountries.map((c) => ({ value: c, label: c }))} />
-        <FilterSelect value={filterCity} onChange={setFilterCity} placeholder="כל הערים" options={uniqueCities.map((c) => ({ value: c, label: c }))} />
+        {/* קטגוריה/סקשן - תלוי בסוג הטיול הנבחר, עם הסקשנים האמיתיים שלו
+            בדיוק כמו באפליקציה (ADMIN_DISCOVERY_SECTIONS). "abroad" אין לו
+            סקשנים - הוא מוצג למטה כשורת יעדים משלו, לא כאן. */}
+        {filterTripType && filterTripType !== "abroad" && (
+          <FilterSelect
+            value={filterCategory}
+            onChange={setFilterCategory}
+            placeholder="כל הקטגוריות"
+            options={activeSections.map((s) => ({ value: s.id, label: `${s.emoji} ${s.title}` }))}
+          />
+        )}
+        {/* מדינה - "חופשה בארץ" קבועה לישראל בלבד (אין טעם בבורר). "חופשה
+            בחו״ל" לא עובדת עם בורר מדינה בכלל באפליקציה - ר' שורת היעדים
+            למטה. שאר סוגי הטיול - בורר מדינה רגיל כמו היום. */}
+        {filterTripType === "weekend" ? (
+          <span
+            className="rounded-[var(--admin-radius-sm)] border px-3 py-2 text-[13.5px]"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink-secondary)" }}
+          >
+            🇮🇱 ישראל בלבד
+          </span>
+        ) : filterTripType !== "abroad" ? (
+          <FilterSelect value={filterCountry} onChange={setFilterCountry} placeholder="כל המדינות" options={uniqueCountries.map((c) => ({ value: c, label: c }))} />
+        ) : null}
+        {filterTripType !== "abroad" && (
+          <FilterSelect value={filterCity} onChange={setFilterCity} placeholder="כל הערים" options={uniqueCities.map((c) => ({ value: c, label: c }))} />
+        )}
         <span className="flex-1" />
         <button
           type="button"
@@ -697,7 +802,99 @@ export default function AdminPlacesPage() {
         >
           {filteredPlaces.length > 0 && filteredPlaces.every((p) => selectedIds.has(p.id)) ? "נקה בחירה" : `בחר הכל בתצוגה (${filteredPlaces.length})`}
         </button>
+
       </div>
+
+      {/* "חופשה בחו״ל" - בדיוק כמו באפליקציה (screens/discovery/
+          WorldwideCategorySection.tsx): שורת "סוגי חופשה" כפתורים אחד
+          ליד השני (לא בורר <select>!), ומתחת כרטיסי היעדים של הקטגוריה
+          הנבחרת בגלילה אופקית אחד אחרי השני. בלי בחירת סוג חופשה - מוצגים
+          *כל* היעדים מכל הקטגוריות ביחד (ללא כפילויות), כמו שהתבקש. */}
+      {filterTripType === "abroad" && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setWorldwideCategoryFilter("");
+                setDestinationFilter("");
+              }}
+              className="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition"
+              style={{
+                borderColor: worldwideCategoryFilter === "" ? "var(--admin-accent)" : "var(--admin-border)",
+                background: worldwideCategoryFilter === "" ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                color: worldwideCategoryFilter === "" ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+              }}
+            >
+              🌍 כל היעדים
+            </button>
+            {WORLDWIDE_VACATION_CATEGORIES.map((c) => {
+              const active = worldwideCategoryFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setWorldwideCategoryFilter(active ? "" : c.id);
+                    setDestinationFilter("");
+                  }}
+                  className="rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition"
+                  style={{
+                    borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                    background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                    color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                  }}
+                >
+                  {c.emoji} {c.title}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* גריד שנשבר לשורות (לא גלילה אופקית!) - "הכל באותו עמוד, אחד
+              מתחת לשני" - כל 9/92 היעדים גלויים בבת אחת בלי צורך לגלול
+              הצידה כדי לראות את השאר. */}
+          <div className="flex flex-wrap gap-3">
+            {destinationFilter && (
+              <button
+                type="button"
+                onClick={() => setDestinationFilter("")}
+                className="flex h-[130px] w-[110px] shrink-0 flex-col items-center justify-center gap-1 rounded-[var(--admin-radius-lg)] border text-[12.5px] font-medium"
+                style={{ borderColor: "var(--admin-accent)", color: "var(--admin-accent)" }}
+              >
+                ✕<span>נקה יעד</span>
+              </button>
+            )}
+            {abroadDestinationRefs.map((ref, i) => {
+              const entry = WORLDWIDE_DESTINATION_REGISTRY[ref.slug];
+              if (!entry) return null;
+              const active = destinationFilter === ref.slug;
+              return (
+                <button
+                  key={`${ref.slug}-${i}`}
+                  type="button"
+                  onClick={() => setDestinationFilter(active ? "" : ref.slug)}
+                  className="relative block h-[130px] w-[110px] shrink-0 overflow-hidden rounded-[var(--admin-radius-lg)]"
+                  style={{ outline: active ? "2px solid var(--admin-accent)" : "none", outlineOffset: 2 }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ref.imageUrl ?? entry.imageUrl} alt={entry.name} className="h-full w-full object-cover" loading="lazy" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2 pt-8">
+                    <p className="truncate text-[12.5px] font-bold leading-tight text-white">
+                      {entry.flag} {entry.name}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+            {destinationFilter
+              ? `מציג רק מקומות מהיעד שנבחר`
+              : `${abroadDestinationRefs.length} יעדים${worldwideCategoryFilter ? "" : " (כל הקטגוריות, ללא כפילויות)"} - בחר יעד כדי לסנן`}
+          </p>
+        </div>
+      )}
 
       <DataTable
         columns={columns}

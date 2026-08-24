@@ -206,6 +206,17 @@ interface FetchDiscoveryPlacesParams {
    *  רק בסקשן שבאמת מבקש nightlife (לא דולף לשום סקשן אחר, כי ההתאמה
    *  עדיין trip_type_tags.ov מדויק, לא Fallback רחב). */
   allowNightlife?: boolean;
+  /** *** תוספת (Admin Places - "כל האטרקציות, כל המדינות, לא רק ליד
+   *  המשתמש"): כשאין location בכלל, ברירת המחדל הקיימת (queryPlaces
+   *  למטה) מגבילה ל-country="ישראל" - נכון לצרכן באפליקציה (שם "כללי"
+   *  תמיד אומר "בישראל"), לא נכון לאדמין שרוצה לדפדף בכל מדינה. שני
+   *  שדות חדשים, אופציונליים לגמרי - קריאות קיימות (day-trip/nature-trip/
+   *  ...discovery routes) לא מעבירות אותם, אז ההתנהגות שלהן לא משתנה
+   *  כלל. country דורס את ברירת המחדל "ישראל" למדינה ספציפית; worldwide
+   *  מבטל לגמרי את סינון המדינה (כל העולם). country גובר אם שניהם
+   *  הועברו בטעות. */
+  country?: string;
+  worldwide?: boolean;
 }
 
 /** בונה שאילתת bounding box + city fallback - אותו דפוס בדיוק כמו
@@ -280,6 +291,12 @@ async function queryPlaces(
       .lte("longitude", location.lng + lngDelta);
   } else if (location.city) {
     query = query.eq("city", location.city);
+  } else if (params.country) {
+    // *** Admin Places - מדינה ספציפית שנבחרה בפילטר, לא ברירת המחדל
+    // "ישראל" (ר' ההערה על country/worldwide ב-FetchDiscoveryPlacesParams).
+    query = query.eq("country", params.country);
+  } else if (params.worldwide) {
+    // *** Admin Places - "כל האטרקציות" בלי הגבלת מדינה כלל.
   } else {
     query = query.eq("country", DEFAULT_DISCOVERY_COUNTRY);
   }

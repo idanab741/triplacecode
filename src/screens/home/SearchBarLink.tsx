@@ -130,7 +130,7 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
           onKeyDown={(e) => {
             if (e.key === "Enter") handleEnter();
           }}
-          placeholder="מה ה־match שלכם היום?"
+          placeholder="מה הmatch שלך ליעד הבא?"
           className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
         />
         {/* לוגו TripMatch קטן ומעומעם בצד שמאל של השורה - filter: grayscale

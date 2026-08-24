@@ -59,7 +59,7 @@ export function QuickCategories() {
   return (
     <div
       ref={scrollRef}
-      className="flex gap-4 overflow-x-auto px-6 pb-1"
+      className="flex gap-4 overflow-x-auto ps-6 pb-1"
       style={{ scrollbarWidth: "none" }}
     >
       {QUICK_CATEGORIES.map((category) => (
@@ -82,6 +82,14 @@ className="flex h-15 w-15 items-center justify-center overflow-hidden rounded-fu
           </span>
         </Link>
       ))}
+      {/* תיקון (הטיול האחרון נחתך בסוף הגלילה, לא בשוליים של העמוד):
+          אותו באג בדיוק כמו ב-TrendingSection/CommunitySection - padding
+          בסוף קונטיינר overflow-x-auto (כאן זה היה px-6 הרגיל, בלי אפילו
+          bleed) לא נשמר עד סוף ה-scrollWidth ב-RTL. ps-6 שומר על התחלת
+          הגלילה (עבד תקין), וספייסר אמיתי בסוף (w-2, שיחד עם ה-gap-4
+          הטבעי בין הפריט האחרון לספייסר משלים ל-24px) מחליף את ה-padding
+          שנחתך - תמיד נספר ב-scrollWidth כי הוא איבר flex אמיתי. */}
+      <div aria-hidden className="w-2 shrink-0" />
     </div>
   );
 }

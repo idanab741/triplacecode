@@ -36,7 +36,13 @@ export function CommunitySection() {
       <h3 className="text-lg font-semibold tracking-tight text-ink">👥 ה-Matches של הקהילה</h3>
       <p className="mt-0.5 text-sm text-ink-secondary">מקומות שאנשים בוחרים עכשיו</p>
 
-      <div className="mt-3 -mx-6 flex gap-3 overflow-x-auto px-6 pb-1" style={{ scrollbarWidth: "none" }}>
+      {/* תיקון (שוליים נחתכים בסוף הגלילה) - ראו הסבר מפורט ב-TrendingSection
+          (אותו באג, אותה קטגוריית קונטיינר overflow-x-auto): padding בסוף
+          קונטיינר גלילה לא תמיד נשמר עד סוף ה-scrollWidth, בולט ב-RTL.
+          ps-6 שומר על השוליים בתחילת הגלילה (עבדו תקין), וספייסר אמיתי
+          (w-3, שיחד עם ה-gap-3 הטבעי משלים ל-24px) מחליף את ה-padding
+          שנחתך בסוף. */}
+      <div className="mt-3 -mx-6 flex gap-3 overflow-x-auto ps-6 pb-1" style={{ scrollbarWidth: "none" }}>
         {highlights === null
           ? Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-40 w-56 shrink-0 animate-pulse rounded-card bg-bg-secondary" />
@@ -59,6 +65,7 @@ export function CommunitySection() {
                 </div>
               </div>
             ))}
+        {highlights !== null && highlights.length > 0 && <div aria-hidden className="w-3 shrink-0" />}
       </div>
     </section>
   );
