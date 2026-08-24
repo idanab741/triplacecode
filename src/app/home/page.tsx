@@ -189,7 +189,7 @@ export default function HomePage() {
                 הקבוע של העמוד"): gap-7 -> gap-6, אותו מרווח בדיוק כמו
                 הבלוק שמעל (gap-6) - עקבי לכל אורך העמוד, לא רווח גדול
                 יותר במיוחד כאן. */}
-            <div className="flex flex-col gap-6 pb-6 pt-6">
+            <div className="flex flex-col gap-4 pb-6 pt-6">
               <TrendingSection />
               <PersonalizedMatchesSection />
               <SurpriseMeSection />

@@ -48,7 +48,7 @@ export function TrendingSection() {
     ]).then(([worldwideData, featured]) => {
       const idBySlug: Record<string, string | null> = worldwideData.matches ?? {};
 
-      const worldwideCards: TrendingCard[] = CURATED_WORLDWIDE.map((ref) => {
+      const worldwideCards = CURATED_WORLDWIDE.map((ref): TrendingCard | null => {
         const entry = WORLDWIDE_DESTINATION_REGISTRY[ref.slug];
         if (!entry) return null;
         return {
