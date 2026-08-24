@@ -175,7 +175,14 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   // שחזור מצב מסך התוצאות מ-sessionStorage בטעינה ראשונה (אחרי חזרה
   // ל-TripMatch מעמוד אחר) - רק אם יש תוצאות משמעותיות לשחזר. לא רץ אם
   // מגיעים עם resumeSessionId (ראו האפקט הבא) - אז טוענים מהשרת במקום.
+  // *** תיקון (בקשה מפורשת - "כשמקלידים שוב זה צריך לחזור לדף הראשון
+  // של TripMatch, לא לעמוד האחרון שהיינו בו"): במצב מוטמע (embedded),
+  // כל חיפוש חדש מ-Home אמור להתחיל נקי לגמרי מבחירת קטגוריה - לא
+  // "לקפוץ" אחורה לתוצאות של חיפוש קודם ששמורות ב-sessionStorage. שחזור
+  // כזה נשאר רלוונטי רק לעמוד /tripmatch העצמאי (למשל רענון דף/חזרה
+  // אחרי ניווט), לא כשנכנסים מחדש מתוך Home.
   useEffect(() => {
+    if (embedded) return;
     if (searchParams.get("resumeSessionId")) return;
     try {
       const raw = sessionStorage.getItem(RESULTS_STATE_STORAGE_KEY);

@@ -52,14 +52,16 @@ export default function HomePage() {
   }
 
   // *** תיקון (בקשה מפורשת - "ברגע שגוללים למעלה זה מאפשר חזרה לעמוד
-  // הבית"): כשכבר בראש הדף (scrollY=0) וממשיכים "לגלול למעלה" - יוצאים
-  // בחזרה למצב ה-Home הרגיל, בדיוק כמו מחיקת הטקסט.
-  // *** תיקון נוסף (Audit - "כתבתי יעד, זה נכנס ויצא מיד חזרה הביתה!"):
-  // התנועה של האצבע/העכבר *באותה לחיצה* שבוחרת את היעד (ה-tap עצמו,
-  // הרמת האצבע מהמסך) יכולה להיראות בדיוק כמו "משיכה למטה בראש הדף" -
-  // גרם ליציאה אוטומטית מיד אחרי הכניסה. עכשיו יש "צינון" של 900ms
-  // אחרי הכניסה לפני שהמחווה בכלל מופעלת, וסף הרגישות עלה משמעותית
-  // (40px -> 90px) כדי שרק משיכה מכוונת וברורה תפעיל את זה.
+  // הבית"): כשכבר בראש הדף (scrollY=0) וממשיכים "לגלול למעלה" בעכבר -
+  // יוצאים בחזרה למצב ה-Home הרגיל, בדיוק כמו מחיקת הטקסט.
+  // *** תיקון (Audit - "יש מנגנון קפיצה לדף הבית באמצע ההחלקה!"):
+  // הגרסה הקודמת האזינה גם ל-touchmove ברמת הדף - אבל זו **בדיוק** אותה
+  // סוג תנועה שה-Swipe Card עצמו משתמש בה כדי לגרור כרטיס ימינה/שמאלה!
+  // כל swipe אמיתי על כרטיס (שכמעט תמיד כולל גם קצת תנועה אנכית, לא
+  // רק אופקית טהורה) נקלט בטעות גם ע"י ה-listener הזה ברמת ה-window,
+  // וגרם ליציאה אוטומטית **תוך כדי** ההחלקה עצמה. הוסר לגמרי - נשאר רק
+  // המחווה בעכבר/trackpad (wheel), שלא מתנגשת עם swipe במגע בכלל
+  // (input שונה לחלוטין).
   useEffect(() => {
     if (!inTripMatchMode) return;
 
@@ -68,31 +70,14 @@ export default function HomePage() {
       gestureEnabled = true;
     }, 900);
 
-    let touchStartY: number | null = null;
-
     function handleWheel(e: WheelEvent) {
       if (gestureEnabled && window.scrollY <= 0 && e.deltaY < -8) handleExitTripMatch();
     }
-    function handleTouchStart(e: TouchEvent) {
-      touchStartY = e.touches[0]?.clientY ?? null;
-    }
-    function handleTouchMove(e: TouchEvent) {
-      if (!gestureEnabled || touchStartY == null || window.scrollY > 0) return;
-      const currentY = e.touches[0]?.clientY ?? touchStartY;
-      if (currentY - touchStartY > 90) {
-        handleExitTripMatch();
-        touchStartY = null;
-      }
-    }
 
     window.addEventListener("wheel", handleWheel, { passive: true });
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
     return () => {
       clearTimeout(enableTimer);
       window.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inTripMatchMode]);
