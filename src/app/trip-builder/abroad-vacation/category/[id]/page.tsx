@@ -18,6 +18,12 @@ import { WORLDWIDE_VACATION_CATEGORIES, WORLDWIDE_DESTINATION_REGISTRY, CRUISE_L
  * שיכנס לגריד, לא כקטגוריה נפרדת"): אין קטגוריה כזו ב-
  * WORLDWIDE_VACATION_CATEGORIES (זו רשימת חברות ספנות, CRUISE_LINES,
  * לא יעדים גיאוגרפיים) - מטופל בנפרד למטה, לפני החיפוש הרגיל.
+ *
+ * תיקון Product נוסף ("הכותרת נדחסת לתוך הבר העליון עם הלוגו"): הכותרת
+ * לא עוברת דרך prop ה-title של SimpleAppHeader (זה מה שגרם לצפיפות
+ * בצילום המסך) - במקום זה שורה נפרדת מתחתיו, אותו דפוס בדיוק כמו
+ * "חופשה בחו''ל" בעמוד הראשי: אייקון עגול עם תמונה אמיתית (category.iconUrl,
+ * לא אימוג'י) בצד ימין + טקסט לידו.
  */
 export default function AbroadVacationCategoryPage() {
   const router = useRouter();
@@ -35,7 +41,14 @@ export default function AbroadVacationCategoryPage() {
   if (params.id === "cruise") {
     return (
       <div className="min-h-screen bg-bg pb-36">
-        <SimpleAppHeader onBack={() => router.back()} title="קרוזים ושייט" />
+        <SimpleAppHeader onBack={() => router.back()} />
+        <div className="flex items-center gap-2 px-6 pt-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/vacation-type-icons/cruise.png" alt="" className="h-full w-full object-cover" />
+          </span>
+          <span className="text-lg font-bold text-ink">קרוזים ושייט</span>
+        </div>
         <div className="grid grid-cols-2 gap-3 px-6 pt-5">
           {CRUISE_LINES.map((line) => (
             <div
@@ -82,7 +95,21 @@ export default function AbroadVacationCategoryPage() {
 
   return (
     <div className="min-h-screen bg-bg pb-36">
-      <SimpleAppHeader onBack={() => router.back()} title={`${category.emoji} ${category.title}`} />
+      <SimpleAppHeader onBack={() => router.back()} />
+      <div className="flex items-center gap-2 px-6 pt-4">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={category.iconUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </span>
+        <span className="text-lg font-bold text-ink">{category.title}</span>
+      </div>
 
       <div className="grid grid-cols-2 gap-3 px-6 pt-5">
         {category.destinations.map((ref, i) => {
