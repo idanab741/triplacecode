@@ -145,6 +145,10 @@ export const WORLDWIDE_DESTINATION_REGISTRY: Record<string, WorldwideDestination
   prague: { name: "פראג", flag: "🇨🇿", imageUrl: "/images/destination/prague.png" },
   berlin: { name: "ברלין", flag: "🇩🇪", imageUrl: "/images/worldwide-destinations/berlin.png" },
   "ayia-napa": { name: "איה נאפה", flag: "🇨🇾", imageUrl: "/images/worldwide-destinations/ayia-napa.png" },
+  goa: { name: "גואה", flag: "🇮🇳", imageUrl: "/images/worldwide-destinations/goa.png" },
+  "koh-phangan": { name: "קו פנגן", flag: "🇹🇭", imageUrl: "/images/worldwide-destinations/koh-phangan.png" },
+  krabi: { name: "קראבי", flag: "🇹🇭", imageUrl: "/images/worldwide-destinations/krabi.png" },
+  "sella-ronda": { name: "סלה רונדה", flag: "🇮🇹", imageUrl: "/images/worldwide-destinations/sella-ronda.png" },
 };
 
 export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
@@ -156,6 +160,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     destinations: [
       { slug: "paphos" }, { slug: "crete" }, { slug: "mykonos" }, { slug: "phuket" },
       { slug: "santorini" }, { slug: "rhodes" }, { slug: "kos" }, { slug: "montenegro" }, { slug: "larnaca" },
+      { slug: "krabi" },
     ],
   },
   {
@@ -213,15 +218,16 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     title: "הופעות חיות ופסטיבלים",
     iconUrl: "/images/vacation-type-icons/live-music-festivals.png",
     destinations: [
-      { slug: "budapest", subtitle: "Sziget Festival" },
-      { slug: "barcelona", subtitle: "Primavera Sound" },
-      { slug: "london", subtitle: "הופעות ווסט אנד" },
-      { slug: "new-york", subtitle: "Broadway" },
-      { slug: "brussels", subtitle: "Tomorrowland" },
-      { slug: "amsterdam", subtitle: "Amsterdam Dance Event" },
+      { slug: "budapest", subtitle: "Sziget Festival", imageUrl: "/images/destination/budapest-sziget.png" },
+      { slug: "barcelona", subtitle: "Primavera Sound", imageUrl: "/images/destination/barcelona-primavera.png" },
+      { slug: "london", subtitle: "הופעות ווסט אנד", imageUrl: "/images/destination/london-westend.png" },
+      { slug: "new-york", subtitle: "Broadway", imageUrl: "/images/destination/newyork-broadway.png" },
+      { slug: "brussels", subtitle: "Tomorrowland", imageUrl: "/images/destination/brussels-tomorrowland.png" },
+      { slug: "amsterdam", subtitle: "Amsterdam Dance Event", imageUrl: "/images/destination/amsterdam-festival.png" },
       { slug: "las-vegas", subtitle: "מופעי ענק" },
       { slug: "munich", subtitle: "Oktoberfest" },
-      { slug: "rio-de-janeiro", subtitle: "Carnival" },
+      { slug: "berlin", subtitle: "אוקטוברפסט", imageUrl: "/images/destination/berlin-oktoberfest.png" },
+      { slug: "rio-de-janeiro", subtitle: "Carnival", imageUrl: "/images/destination/rio-carnival.png" },
       { slug: "ibiza", subtitle: "פסטיבלי ומסיבות קיץ" },
     ],
   },
@@ -262,7 +268,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     iconUrl: "/images/vacation-type-icons/ski-winter-sports.png",
     destinations: [
       { slug: "val-thorens" }, { slug: "bansko" }, { slug: "gudauri" }, { slug: "ischgl" }, { slug: "solden" },
-      { slug: "chamonix" }, { slug: "meribel" }, { slug: "kitzbuhel" }, { slug: "zermatt" },
+      { slug: "chamonix" }, { slug: "meribel" }, { slug: "kitzbuhel" }, { slug: "zermatt" }, { slug: "sella-ronda" },
     ],
   },
   {
@@ -276,11 +282,12 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
       { slug: "madrid", subtitle: "ריאל מדריד", imageUrl: "/images/destination/madrid-sports.png" },
       { slug: "london", subtitle: "פרמייר ליג", imageUrl: "/images/destination/london-premierleague.png" },
       { slug: "paris", subtitle: "רולאן גארוס" },
-      { slug: "new-york", subtitle: "US Open" },
-      { slug: "los-angeles", subtitle: "NBA" },
-      { slug: "munich", subtitle: "באיירן מינכן" },
-      { slug: "belgrade", subtitle: "דרבי הכוכב האדום ופרטיזן" },
-      { slug: "milan", subtitle: "דרבי מילאנו" },
+      { slug: "paris", subtitle: "כדורגל", imageUrl: "/images/destination/paris-football.png" },
+      { slug: "new-york", subtitle: "US Open", imageUrl: "/images/destination/newyork-usopen.png" },
+      { slug: "los-angeles", subtitle: "NBA", imageUrl: "/images/destination/losangeles-nba.png" },
+      { slug: "munich", subtitle: "באיירן מינכן", imageUrl: "/images/destination/munich-bayern.png" },
+      { slug: "belgrade", subtitle: "דרבי הכוכב האדום ופרטיזן", imageUrl: "/images/destination/belgrade-derby.png" },
+      { slug: "milan", subtitle: "דרבי מילאנו", imageUrl: "/images/destination/milan-derby.png" },
       { slug: "monza", subtitle: "פורמולה 1" },
       { slug: "abu-dhabi", subtitle: "פורמולה 1", imageUrl: "/images/destination/abudhabi-f1.png" },
     ],
@@ -304,7 +311,8 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     destinations: [
       { slug: "zanzibar" }, { slug: "seychelles" }, { slug: "mauritius" }, { slug: "philippines" },
       { slug: "koh-samui" }, { slug: "bali" }, { slug: "maldives" }, { slug: "sri-lanka" }, { slug: "tulum" },
-      { slug: "costa-rica" }, { slug: "fiji" }, { slug: "phu-quoc" },
+      { slug: "costa-rica" }, { slug: "fiji" }, { slug: "phu-quoc" }, { slug: "goa" }, { slug: "koh-phangan" },
+      { slug: "krabi" },
     ],
   },
   {
@@ -326,7 +334,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     destinations: [
       { slug: "mykonos" }, { slug: "bucharest" }, { slug: "budapest" }, { slug: "barcelona" },
       { slug: "ibiza" }, { slug: "belgrade" }, { slug: "athens" }, { slug: "ayia-napa" }, { slug: "berlin" },
-      { slug: "amsterdam" }, { slug: "sofia" }, { slug: "dubai" },
+      { slug: "amsterdam" }, { slug: "sofia" }, { slug: "dubai" }, { slug: "goa" }, { slug: "koh-phangan" },
     ],
   },
 ];
