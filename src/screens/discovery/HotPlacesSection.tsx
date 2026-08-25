@@ -37,7 +37,7 @@ export function HotPlacesSection({
           </a>
         )}
       </div>
-      <p className="mb-3 text-sm text-ink-secondary">{description}</p>
+      {description && <p className="mb-3 text-sm text-ink-secondary">{description}</p>}
       {places.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 rounded-card bg-bg-secondary px-6 py-8 text-center">
           <span className="text-2xl">🔥</span>

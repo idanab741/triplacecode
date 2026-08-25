@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import {
   fetchDiscoveryPlaces,
-  fetchHotPlaces,
   type DiscoveryLocation,
 } from "@/services/places/discoveryService";
 
@@ -88,17 +87,16 @@ const DEFAULT_SECTION_ORDER = [
   "shopping",
 ];
 
-/** קטגוריות ל"הכי חמים עכשיו" הספציפי לחופשה בארץ - שונה מ"טיול יומי"
- *  (כולל beaches_pools/spa_relaxation, שלא רלוונטיים לטיול יומי רגיל). */
-const VACATION_HOT_CATEGORIES = [
-  "beaches_pools",
-  "spa_relaxation",
-  "attractions_activities",
-  "nature_trails",
-  "wineries_dining",
-  "culture_history",
-  "viewpoints",
-];
+/** תיקון Product מפורש ("בהכי חמים עכשיו צריך להופיע בעיקר מלונות/
+ *  צימרים/וילות - לא סתם אטרקציות שיכולות להופיע בטיול יומי"): "הכי
+ *  חמים עכשיו" בעמוד חופשה בארץ עבר מ-fetchHotPlaces (סריקת קטגוריות
+ *  כלליות + מכסה-2-לקטגוריה, שהציפה אטרקציות/נוף על חשבון לינה) ל-
+ *  fetchDiscoveryPlaces עם אותו סינון בדיוק כמו סקשן "hotels" למעלה
+ *  (categoryColumnEquals="hotels" + tags) - פשוט עם requiredAnyTags
+ *  מורחב שכולל גם צימרים/גלמפינג/קמפינג/וילות, לא רק hotel/resort,
+ *  כדי שתוצאת "הכי חם" תהיה כולה סוגי לינה, בלי מכסת-קטגוריה שמדללת
+ *  אותה עם אטרקציות אחרות. */
+const VACATION_HOT_REQUIRED_ANY_TAGS = ["hotel", "resort", "cabin", "glamping", "camping", "villa"];
 
 function parseLocation(searchParams: URLSearchParams): DiscoveryLocation {
   const lat = searchParams.get("lat");
@@ -122,7 +120,12 @@ export async function GET(request: Request) {
   // "ראה הכל" - סקשן בודד, limit גדול. תיקון (Audit - "ראה עוד בכל
   // קטגוריה"): "hot" הוא פסאודו-קטגוריה מיוחדת ל"🔥 הכי חמים עכשיו".
   if (categoryParam === "hot") {
-    const places = await fetchHotPlaces(supabase, location, limitParam ? Number(limitParam) : 40, VACATION_HOT_CATEGORIES);
+    const places = await fetchDiscoveryPlaces(supabase, {
+      location,
+      categoryColumnEquals: "hotels",
+      requiredAnyTags: VACATION_HOT_REQUIRED_ANY_TAGS,
+      limit: limitParam ? Number(limitParam) : 40,
+    });
     return NextResponse.json({ title: "הכי חמים עכשיו", emoji: "🔥", places });
   }
 
@@ -152,7 +155,12 @@ export async function GET(request: Request) {
   const PREVIEW_LIMIT = 10;
 
   const [hotPlaces, sectionResults] = await Promise.all([
-    fetchHotPlaces(supabase, location, PREVIEW_LIMIT, VACATION_HOT_CATEGORIES),
+    fetchDiscoveryPlaces(supabase, {
+      location,
+      categoryColumnEquals: "hotels",
+      requiredAnyTags: VACATION_HOT_REQUIRED_ANY_TAGS,
+      limit: PREVIEW_LIMIT,
+    }),
     Promise.all(
       DEFAULT_SECTION_ORDER.map(async (id) => {
         const section = DISCOVERY_SECTIONS[id];

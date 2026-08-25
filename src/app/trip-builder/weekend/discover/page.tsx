@@ -12,8 +12,8 @@ import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { ISRAEL_VACATION_DESTINATIONS } from "@/constants/israelVacationDestinations";
 import { VacationDestinationsCarousel } from "@/screens/discovery/VacationDestinationsCarousel";
-import { DiscoverySection } from "@/screens/discovery/DiscoverySection";
 import { HotPlacesSection } from "@/screens/discovery/HotPlacesSection";
+import { DealsComingSoonCard } from "@/screens/discovery/DealsComingSoonCard";
 import type { DiscoveryPlace } from "@/services/places/discoveryService";
 
 interface VacationApiResponse {
@@ -51,22 +51,27 @@ function writeStoredAddress(address: UserAddress) {
 }
 
 /**
- * עמוד Discovery של "חופשה בארץ" (Audit מול "אני רוצה להמשיך את מערכת
- * ה-Discovery... ולבנות ממנה עמוד נפרד לחלוטין... זה לא שינוי קוסמטי
- * של טיול יומי"): מוצר Discovery **נפרד** - Shell/רכיבים ממוחזרים
- * במלואם מ-day-trip/discover (SimpleAppHeader, HotPlacesSection,
- * DiscoverySection, ChooseLocationSheet), אבל:
- * - API נפרד (`/api/discovery/vacation-il`, לא `/day-trip`).
- * - רשימת קטגוריות שונה לגמרי (מלונות/ספא/זוגי/משפחתי/צימרים... -
- *   לא מעתיק את קטגוריות טיול יומי, סעיף 21 מפורש).
- * - סקשן "🔥 היעדים החמים" - רשימה סטטית וקבועה (9 יעדים מוגדרים
- *   מראש, לא DB), ר' constants/israelVacationDestinations.ts - כל יעד
- *   מוביל לעמוד יעד ייעודי (destination/[slug]) עם אותם סקשני Discovery
- *   עצמם, ממוקדים לאזור של אותו יעד.
- * - בלי אירועים/רחובות ומרכזי בילוי (שייכים ל"טיול יומי" בלבד).
+ * עמוד Discovery של "חופשה בארץ".
+ *
+ * תיקון Product מפורש - עמוד מצומצם ל-3 סקשנים בלבד, "וזהו":
+ * 1. "🔥 היעדים החמים" - קרוסלת DESTINATIONS סטטית וקבועה (9 יעדים
+ *    מוגדרים מראש, לא DB - ר' constants/israelVacationDestinations.ts).
+ *    כל יעד מוביל עכשיו לעמוד היעד הכללי /destination/[id] - **אותו
+ *    סגנון בדיוק** כמו יעדי "חופשה בחו''ל" (hero, מזג אוויר, אטרקציות) -
+ *    לא לעמוד ה-Discovery הישן (weekend/discover/destination/[slug],
+ *    שנשאר קיים בקוד בלי שינוי, פשוט אף כרטיס לא מצביע אליו יותר).
+ *    התאמה בפועל ל-UUID לפי שם, דרך /api/discovery/israel-vacation-destinations.
+ * 2. "🔥 הכי חמים עכשיו" (HotPlacesSection) - בלי הטקסט המסביר הקטן
+ *    מתחת לכותרת (description="") - חוץ מזה בנוי בדיוק כמו שהיה.
+ * 3. triplacedeals (DealsComingSoonCard) - אותה קומפוננטה בדיוק כמו
+ *    בעמוד "חופשה בחו''ל".
+ *
+ * הוסרו: כל שאר סקשני ה-DiscoverySection שהיו כאן קודם (מלונות/ספא/
+ * זוגי/משפחתי/צימרים...) - ה-API (`/api/discovery/vacation-il`) עדיין
+ * מחזיר אותם, פשוט אין להם יותר תצוגה בעמוד הזה.
  *
  * ה-route הישן /trip-builder/weekend (Trip Builder) לא נמחק/משתנה -
- * רק QuickCategories.tsx מפנה עכשיו ל-Discovery החדש הזה.
+ * רק QuickCategories.tsx מפנה עכשיו ל-Discovery הזה.
  */
 export default function VacationIlDiscoverPage() {
   const { user, loading: authLoading } = useAuth();
@@ -159,7 +164,8 @@ export default function VacationIlDiscoverPage() {
         </button>
       </div>
 
-      {/* 4. קטגוריות ה-Discovery. */}
+      {/* 4. עמוד מצומצם (תיקון Product מפורש - "וזהו", בלי שאר הסקשנים
+          שהיו כאן קודם): קרוסלת יעדים / הכי חם עכשיו / triplacedeals. */}
       <div className="mt-5 flex flex-col gap-6">
         {/* 🔥 היעדים החמים - DESTINATIONS סטטיים וקבועים (לא Places, לא
             DB), מוצג מיד - לא תלוי בטעינת ה-API של שאר הסקשנים. */}
@@ -170,22 +176,19 @@ export default function VacationIlDiscoverPage() {
             <div className="h-40 animate-pulse rounded-card bg-bg-secondary" />
           </div>
         ) : (
-          <>
-            {/* 🔥 הכי חמים עכשיו - PLACES/אטרקציות (הבדל ברור מהסקשן הקודם). */}
-            <HotPlacesSection places={data.hotPlaces} from="vacation-il-discover" seeAllHref={buildSeeAllHref("hot")} />
-
-            {data.sections.map((section) => (
-              <DiscoverySection
-                key={section.id}
-                emoji={section.emoji}
-                title={section.title}
-                places={section.places}
-                seeAllHref={buildSeeAllHref(section.id)}
-                discoverySlug={section.id}
-              />
-            ))}
-          </>
+          // בלי טקסט מסביר קטן מתחת לכותרת (תיקון Product מפורש) - הכל
+          // אחרת בנוי בדיוק כמו שהיה.
+          <HotPlacesSection
+            places={data.hotPlaces}
+            from="vacation-il-discover"
+            description=""
+            seeAllHref={buildSeeAllHref("hot")}
+          />
         )}
+
+        {/* triplacedeals - נוסף כאן (תיקון Product מפורש), אותה קומפוננטה
+            בדיוק כמו בעמוד "חופשה בחו''ל". */}
+        <DealsComingSoonCard />
       </div>
 
       {locationSheetOpen && (
