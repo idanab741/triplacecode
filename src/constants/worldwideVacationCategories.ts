@@ -170,7 +170,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     iconUrl: "/images/vacation-type-icons/casino-gambling.png",
     destinations: [
       { slug: "bucharest" }, { slug: "budapest" }, { slug: "batumi" }, { slug: "sofia" },
-      { slug: "belgrade" }, { slug: "monte-carlo" }, { slug: "cyprus" }, { slug: "macau" }, { slug: "las-vegas" },
+      { slug: "belgrade" }, { slug: "monte-carlo" }, { slug: "macau" }, { slug: "las-vegas" },
     ],
   },
   {
@@ -193,10 +193,10 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
       { slug: "tokyo", subtitle: "בסאקורה", imageUrl: "/images/destination/tokyo-sakura.png" },
       { slug: "paris", subtitle: "בכריסמס", imageUrl: "/images/destination/paris-christmas.png" },
       { slug: "vienna", subtitle: "בכריסמס" },
-      { slug: "london", subtitle: "בכריסמס" },
+      { slug: "london", subtitle: "בכריסמס", imageUrl: "/images/destination/london-christmas.png" },
       { slug: "amsterdam", subtitle: "בעונת הצבעונים", imageUrl: "/images/destination/amsterdam-tulips.png" },
       { slug: "lapland", subtitle: "בחורף" },
-      { slug: "munich", subtitle: "באוקטוברפסט" },
+      { slug: "munich", subtitle: "באוקטוברפסט", imageUrl: "/images/destination/munich-oktoberfest.png" },
       { slug: "kyoto", subtitle: "בעונת השלכת" },
     ],
   },
@@ -225,7 +225,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
       { slug: "brussels", subtitle: "Tomorrowland", imageUrl: "/images/destination/brussels-tomorrowland.png" },
       { slug: "amsterdam", subtitle: "Amsterdam Dance Event", imageUrl: "/images/destination/amsterdam-festival.png" },
       { slug: "las-vegas", subtitle: "מופעי ענק" },
-      { slug: "munich", subtitle: "Oktoberfest" },
+      { slug: "munich", subtitle: "Oktoberfest", imageUrl: "/images/destination/munich-oktoberfest.png" },
       { slug: "berlin", subtitle: "אוקטוברפסט", imageUrl: "/images/destination/berlin-oktoberfest.png" },
       { slug: "rio-de-janeiro", subtitle: "Carnival", imageUrl: "/images/destination/rio-carnival.png" },
       { slug: "ibiza", subtitle: "פסטיבלי ומסיבות קיץ" },
@@ -238,7 +238,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     iconUrl: "/images/vacation-type-icons/digital-nomad.png",
     destinations: [
       { slug: "barcelona" }, { slug: "lisbon" }, { slug: "bangkok" }, { slug: "bali" }, { slug: "tbilisi" },
-      { slug: "medellin" }, { slug: "madeira" }, { slug: "da-nang" }, { slug: "athens" },
+      { slug: "medellin" }, { slug: "madeira" }, { slug: "da-nang" }, { slug: "athens" }, { slug: "goa" },
     ],
   },
   {
@@ -267,8 +267,7 @@ export const WORLDWIDE_VACATION_CATEGORIES: WorldwideVacationCategory[] = [
     title: "סקי וספורט חורף",
     iconUrl: "/images/vacation-type-icons/ski-winter-sports.png",
     destinations: [
-      { slug: "val-thorens" }, { slug: "bansko" }, { slug: "gudauri" }, { slug: "ischgl" }, { slug: "solden" },
-      { slug: "chamonix" }, { slug: "meribel" }, { slug: "kitzbuhel" }, { slug: "zermatt" }, { slug: "sella-ronda" },
+      { slug: "val-thorens" }, { slug: "bansko" }, { slug: "gudauri" }, { slug: "sella-ronda" },
     ],
   },
   {
