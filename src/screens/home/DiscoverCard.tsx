@@ -10,18 +10,37 @@ import type { Swiper as SwiperInstance } from "swiper";
 import "swiper/css";
 import "swiper/css/pagination";
 
-const SLIDES = [
+import { SurpriseMeSection } from "@/screens/home/SurpriseMeSection";
+
+type Slide =
+  | { kind: "link"; href: string; image: string; alt: string }
+  | { kind: "surprise" };
+
+/**
+ * תיקון Product מפורש ("אפשר שהחלק הזה יופיע ב'גלה עוד'?"): שקופית
+ * "בא לכם לצאת עכשיו?" (SurpriseMeSection, variant="embedded") הועברה
+ * לכאן מסקשן עצמאי בעמוד הבית - ראשונה ברשימה. בשונה משאר השקופיות
+ * (תמונה סטטית + ניווט ב-href), זו שקופית **אינטראקטיבית** עם הלוגיקה
+ * שלה (מבקשת מיקום, בוחרת מקום רנדומלי ומנווטת) - ולכן הקליק עליה
+ * מטופל ע"י הכפתור הפנימי שלה, לא ע"י handleClick הכללי של ה-Swiper
+ * (ר' למטה - מדלג עליה כי אין לה href).
+ */
+const SLIDES: Slide[] = [
+  { kind: "surprise" },
   {
+    kind: "link",
     href: "/deals",
     image: "/images/discover/discover-triplacedeals.png",
     alt: "TripLace Deals - הדילים והמבצעים המשתלמים ביותר עבורכם",
   },
   {
+    kind: "link",
     href: "/community",
     image: "/images/discover/discover-places-social.png",
     alt: "Place's - משתפים, יוצאים לדרך",
   },
   {
+    kind: "link",
     href: "/test-game",
     image: "/images/discover/discover-runtrippy.png",
     alt: "RunTrippy - המשחק שלנו",
@@ -42,8 +61,11 @@ export function DiscoverCard() {
     const slideEl = target?.closest("[data-swiper-slide-index]") as HTMLElement | null;
     const indexAttr = slideEl?.getAttribute("data-swiper-slide-index");
     if (indexAttr == null) return;
-    const href = SLIDES[Number(indexAttr)]?.href;
-    if (href) router.push(href);
+    const slide = SLIDES[Number(indexAttr)];
+    // שקופית "surprise" מטפלת בקליק שלה בעצמה (כפתור פנימי) - אין כאן
+    // מה לנווט אליו ברמת ה-Swiper.
+    if (!slide || slide.kind !== "link") return;
+    router.push(slide.href);
   }
 
   return (
@@ -67,9 +89,13 @@ export function DiscoverCard() {
         onClick={handleClick}
         className="aspect-[2112/1408] rounded-[30px] shadow-xl"
       >
-        {SLIDES.map((slide) => (
-          <SwiperSlide key={slide.href} className="relative cursor-pointer">
-            <Image src={slide.image} alt={slide.alt} fill sizes="100vw" priority className="object-cover" />
+        {SLIDES.map((slide, i) => (
+          <SwiperSlide key={slide.kind === "link" ? slide.href : "surprise"} className="relative cursor-pointer">
+            {slide.kind === "surprise" ? (
+              <SurpriseMeSection variant="embedded" />
+            ) : (
+              <Image src={slide.image} alt={slide.alt} fill sizes="100vw" priority={i === 0} className="object-cover" />
+            )}
           </SwiperSlide>
         ))}
       </Swiper>

@@ -87,7 +87,15 @@ export function MyTripsSection() {
       )}
 
       {trips !== null && trips.length > 0 && (
-        <div className="overflow-x-hidden overflow-y-visible px-6" ref={emblaRef}>
+        // תיקון Product מפורש ("ההחלקה לא טובה בטלפון - נבלע עם הגלילה
+        // למטה"): embla-carousel מגדיר touch-action על ה-viewport שלו
+        // דרך JS אחרי mount - יש לזה חלון קצר שבו הדפדפן (בעיקר iOS
+        // Safari) עדיין לא "יודע" שיש כאן גרירה אופקית, ומחליט "לנעול"
+        // scroll אנכי רגיל על מגע ראשוני. touchAction: "pan-y" מפורש כאן
+        // ב-CSS (לא רק JS) מבטל את חוסר הוודאות הזה - "מותר scroll אנכי
+        // טבעי, אבל לא אופקי" ידוע לדפדפן מהרגע הראשון, בלי תלות בתזמון
+        // effect. תואם בדיוק להנחה שכבר קיימת בהערה ב-SwipeUpToDeleteCard.tsx.
+        <div className="overflow-x-hidden overflow-y-visible px-6" style={{ touchAction: "pan-y" }} ref={emblaRef}>
           <div className="flex">
             {trips.map((trip) => (
               <div

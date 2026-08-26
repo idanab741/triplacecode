@@ -15,7 +15,6 @@ import { QuickCategories } from "@/screens/home/QuickCategories";
 import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { TrendingSection } from "@/screens/home/TrendingSection";
 import { PersonalizedMatchesSection } from "@/screens/home/PersonalizedMatchesSection";
-import { SurpriseMeSection } from "@/screens/home/SurpriseMeSection";
 import { NearbySection } from "@/screens/home/NearbySection";
 import { CommunitySection } from "@/screens/home/CommunitySection";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
@@ -185,7 +184,6 @@ export default function HomePage() {
               <MyTripsSection />
               <TrendingSection />
               <PersonalizedMatchesSection />
-              <SurpriseMeSection />
               <NearbySection />
               <CommunitySection />
               <PartnersSection />
