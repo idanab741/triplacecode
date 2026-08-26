@@ -156,8 +156,8 @@ function AuthPageContent() {
 
   async function handleVerifyOtp(e: FormEvent) {
     e.preventDefault();
-    if (otpCode.trim().length < 8) {
-      setOtpError("יש להזין קוד בן 8 ספרות");
+    if (otpCode.trim().length < 6) {
+      setOtpError("יש להזין קוד בן 6 ספרות");
       return;
     }
     setOtpLoading(true);

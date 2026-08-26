@@ -8,7 +8,7 @@ interface OtpInputProps {
   length?: number;
 }
 
-export function OtpInput({ value, onChange, length = 8 }: OtpInputProps) {
+export function OtpInput({ value, onChange, length = 6 }: OtpInputProps) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
 

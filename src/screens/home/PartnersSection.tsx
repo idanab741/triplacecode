@@ -30,6 +30,7 @@ export function PartnersSection() {
         <h3 className="flex items-center gap-1 text-lg font-semibold tracking-tight text-ink">
           <span>השותפים של</span>
           <Image src="/images/triplace-logo-black.png" alt="Triplace" width={100} height={18} className="h-[30px] w-auto object-contain" />
+          <span className="text-ink-secondary">(בקרוב)</span>
         </h3>
       </div>
 

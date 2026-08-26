@@ -217,7 +217,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthDay}
                 onChange={(e) => setBirthDay(e.target.value)}
-                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
+                className="h-12 w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 text-sm text-ink"
               >
                 <option value="">יום</option>
                 {BIRTH_DAYS.map((d) => (
@@ -229,7 +229,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthMonth}
                 onChange={(e) => setBirthMonth(e.target.value)}
-                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
+                className="h-12 w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 text-sm text-ink"
               >
                 <option value="">חודש</option>
                 {HEBREW_MONTHS.map((m, i) => (
@@ -241,7 +241,7 @@ export default function ProfileSetupPage() {
               <select
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink"
+                className="h-12 w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 text-sm text-ink"
               >
                 <option value="">שנה</option>
                 {BIRTH_YEARS.map((y) => (

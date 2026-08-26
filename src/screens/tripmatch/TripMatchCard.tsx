@@ -132,10 +132,21 @@ export function TripMatchCard({ candidate, matchPercent, onLike, onNope, disable
 
       {/* שכבת ה-goo - רק צורות לבנות אחידות (מלבן + שני עיגולים), בלי
           טקסט/תמונה, כדי שהטשטוש לא יפגע בשום תוכן. היא זו שיוצרת את
-          האפקט של "הכרטיס מוליד את שתי הבליטות". */}
+          האפקט של "הכרטיס מוליד את שתי הבליטות".
+          *** תיקון ביצועים (בלי לשנות שום דבר ויזואלי): translateZ(0)+
+          willChange מבטיחים שהדפדפן יקדם את השכבה הזו (עם ה-SVG filter
+          היקר - blur+colorMatrix) לשכבת GPU נפרדת ומרונדרת-פעם-אחת,
+          במקום לחשב מחדש את הטשטוש בכל פריים תוך כדי שהכרטיס ההורה
+          זז/נגרר (transform על ה-SwipeCard מעליו) - זו בדיוק הסיבה
+          הנפוצה ל"תקיעות" בגרירה כשיש SVG filter על תוכן שנמצא בתוך
+          עץ עם transform פעיל. אותה תוצאה ויזואלית בדיוק, רק חלקה יותר. */}
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ filter: "url(#tripmatch-card-goo) drop-shadow(0 4px 16px rgba(16,24,40,0.10))" }}
+        style={{
+          filter: "url(#tripmatch-card-goo) drop-shadow(0 4px 16px rgba(16,24,40,0.10))",
+          transform: "translateZ(0)",
+          willChange: "filter",
+        }}
         aria-hidden="true"
       >
         <div className="absolute inset-x-0 top-0 bg-white" style={{ height: bodyHeight, borderRadius: CARD_RADIUS }} />
@@ -300,6 +311,14 @@ export function TripMatchCard({ candidate, matchPercent, onLike, onNope, disable
           -webkit-mask-composite: xor;
           mask-composite: exclude;
           animation: tm-ring-spin 2.2s linear infinite;
+          /* תיקון ביצועים (בלי לשנות שום דבר ויזואלי): שני העיגולים האלה
+             מסתובבים ברציפות לנצח (גם כשלא גוררים) - will-change מבטיח
+             שהדפדפן ירונדר אותם פעם אחת כשכבת GPU ויסובב רק את השכבה
+             (compositor thread), במקום לצייר מחדש את ה-mask+gradient
+             בכל פריים על ה-main thread - זו בדיוק התחרות על משאבים
+             שגרמה לגרירה להרגיש פחות חלקה. אותה אנימציה, אותה מהירות,
+             רק זול יותר לדפדפן. */
+          will-change: transform;
         }
         @keyframes tm-ring-spin {
           to {

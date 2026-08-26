@@ -9,7 +9,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { HotDestinations } from "@/screens/home/HotDestinations";
-import { DealsComingSoonCard } from "@/screens/discovery/DealsComingSoonCard";
+import { DiscoverCard } from "@/screens/home/DiscoverCard";
 import { AbroadPreferencesCategoryGrid } from "@/screens/discovery/AbroadPreferencesCategoryGrid";
 
 // אותה קטגוריה קיימת ("abroad") מדף הבית - ר' constants/quickCategories.ts.
@@ -20,7 +20,12 @@ const ABROAD_CATEGORY = QUICK_CATEGORIES.find((c) => c.id === "abroad")!;
  * - קרוסלת "מותאם בשבילך" - הועברה (לא שוכפלה) מדף הבית - ר'
  *   usePersonalizedDestinations.ts. משתמשת ב-HotDestinations.tsx הקיים
  *   כמו שהוא.
- * - כרטיסיית דילים (בקרוב) - כרטיס סטטי, לא Places.
+ * - "גלה עוד" (DiscoverCard) - תיקון Product מפורש ("חופשה בחו''ל צריך
+ *   להיות אחרת, מה שיש בעמוד הבית"): **לא** הכרטיסייה הסטטית של
+ *   triplacedeals (DealsComingSoonCard - זו שייכת רק לעמוד "חופשה
+ *   בארץ") - כאן ממוחזר ה-DiscoverCard **האמיתי** מדף הבית עצמו, אותה
+ *   קומפוננטה בדיוק (לא Duplicate/גרסה דומה) - Swiper עם 3 השקופיות
+ *   (Deals/Place's/RunTrippy).
  * - גריד "בחר לפי סוג חופשה" (AbroadPreferencesCategoryGrid) - תיקון
  *   Product מפורש: "רשימת ההעדפות שלך כתמונות קטנות, לחיצה נכנסת
  *   לעמוד עם כל היעדים של אותה קטגוריה". מציג אריח לכל קטגוריה
@@ -40,7 +45,7 @@ export default function AbroadVacationDiscoverPage() {
   const { user, preferences } = useAuth();
   const isGuest = Boolean(user?.is_anonymous);
 
-  const { destinations, personalized } = usePersonalizedDestinations({
+  const { destinations } = usePersonalizedDestinations({
     isGuest,
     userId: user?.id,
     preferencesComplete: isPreferencesComplete(preferences),
@@ -67,11 +72,18 @@ export default function AbroadVacationDiscoverPage() {
       </div>
 
       <div className="mt-5 flex flex-col gap-6">
-        {/* 4. "מותאם בשבילך" - הועבר מדף הבית. */}
-        <HotDestinations title={personalized ? "מותאם בשבילך" : "יעדים חמים"} destinations={destinations} />
+        {/* 4. "מותאם בשבילך" - הועבר מדף הבית. תיקון Product מפורש
+            ("שים לב בקרוסלה... היא משתנה אחרי הטעינה! אני מעדיף שישאר
+            מותאם בשבילך"): קודם הכותרת הייתה מותנית ב-personalized
+            (מתחיל false בזמן טעינה = "יעדים חמים", הופך true אחרי
+            שהנתונים נטענים = "מותאם בשבילך") - זה גרם להחלפת טקסט
+            נראית-לעין אחרי הטעינה. עכשיו קבועה תמיד ל"מותאם בשבילך",
+            בלי תלות ב-personalized. */}
+        <HotDestinations title="מותאם בשבילך" destinations={destinations} />
 
-        {/* 5. דילים (בקרוב). */}
-        <DealsComingSoonCard />
+        {/* 5. "גלה עוד" - אותה קומפוננטה בדיוק מדף הבית (DiscoverCard),
+            לא הכרטיסייה הסטטית של triplacedeals. */}
+        <DiscoverCard />
 
         {/* 6. גריד "בחר לפי סוג חופשה" - אריחים לפי vacation_preferences של
             המשתמש, קליק פותח עמוד קטגוריה נפרד עם כל היעדים שלה.

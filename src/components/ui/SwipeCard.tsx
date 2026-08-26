@@ -56,7 +56,12 @@ export function SwipeCard({ children, onSwipeLeft, onSwipeRight, disabled }: Swi
     // *** תיקון קצב: 0.3s+250ms היה מרגיש איטי כשמצטבר לאורך הרבה
     // swipes ברצף - קוצר ל-0.22s+180ms, קצב עקבי ומהיר יותר אך עדיין חלק.
     el.style.transition = withTransition ? "transform 0.22s ease, opacity 0.22s ease" : "none";
-    el.style.transform = `translateX(${x}px) rotate(${x / 20}deg)`;
+    // *** תיקון ביצועים (בלי לשנות שום דבר ויזואלי): translate3d במקום
+    // translateX מבטיח בעקביות רבה יותר (בעיקר ב-iOS Safari) שהדפדפן
+    // מקדם את השכבה הזו לשכבת GPU נפרדת לאורך כל הגרירה, במקום לצייר
+    // מחדש ב-CPU בכל פריים - אותה תוצאה ויזואלית בדיוק (translate3d עם
+    // z=0 שקול מתמטית ל-translateX), רק מהיר/חלק יותר על המכשיר.
+    el.style.transform = `translate3d(${x}px, 0, 0) rotate(${x / 20}deg)`;
     el.style.opacity = `${Math.max(0, 1 - Math.abs(x) / (FLY_OUT_DISTANCE_PX * 1.5))}`;
     setStamps(x);
   }
