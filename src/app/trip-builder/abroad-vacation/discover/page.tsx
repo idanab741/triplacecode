@@ -9,7 +9,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { HotDestinations } from "@/screens/home/HotDestinations";
-import { DiscoverCard } from "@/screens/home/DiscoverCard";
+import { DealsComingSoonCard } from "@/screens/discovery/DealsComingSoonCard";
 import { AbroadPreferencesCategoryGrid } from "@/screens/discovery/AbroadPreferencesCategoryGrid";
 
 // אותה קטגוריה קיימת ("abroad") מדף הבית - ר' constants/quickCategories.ts.
@@ -20,12 +20,11 @@ const ABROAD_CATEGORY = QUICK_CATEGORIES.find((c) => c.id === "abroad")!;
  * - קרוסלת "מותאם בשבילך" - הועברה (לא שוכפלה) מדף הבית - ר'
  *   usePersonalizedDestinations.ts. משתמשת ב-HotDestinations.tsx הקיים
  *   כמו שהוא.
- * - "גלה עוד" (DiscoverCard) - תיקון Product מפורש ("חופשה בחו''ל צריך
- *   להיות אחרת, מה שיש בעמוד הבית"): **לא** הכרטיסייה הסטטית של
- *   triplacedeals (DealsComingSoonCard - זו שייכת רק לעמוד "חופשה
- *   בארץ") - כאן ממוחזר ה-DiscoverCard **האמיתי** מדף הבית עצמו, אותה
- *   קומפוננטה בדיוק (לא Duplicate/גרסה דומה) - Swiper עם 3 השקופיות
- *   (Deals/Place's/RunTrippy).
+ * - triplacedeals (DealsComingSoonCard) - תיקון Product מפורש
+ *   ("אמור להיות פה אך ורק triplacedeals! לא כל הבלוק של גלה עוד! בעמוד
+ *   הבית עמוד להיות כל העמוד של גלה עוד"): **רק** הבאנר הסטטי - לא
+ *   ה"גלה עוד" המלא (DiscoverCard, עם השקופיות הנוספות: Surprise Me/
+ *   Place's/RunTrippy) - זה נשאר בלעדי לעמוד הבית.
  * - גריד "בחר לפי סוג חופשה" (AbroadPreferencesCategoryGrid) - תיקון
  *   Product מפורש: "רשימת ההעדפות שלך כתמונות קטנות, לחיצה נכנסת
  *   לעמוד עם כל היעדים של אותה קטגוריה". מציג אריח לכל קטגוריה
@@ -81,9 +80,9 @@ export default function AbroadVacationDiscoverPage() {
             בלי תלות ב-personalized. */}
         <HotDestinations title="מותאם בשבילך" destinations={destinations} />
 
-        {/* 5. "גלה עוד" - אותה קומפוננטה בדיוק מדף הבית (DiscoverCard),
-            לא הכרטיסייה הסטטית של triplacedeals. */}
-        <DiscoverCard />
+        {/* 5. triplacedeals - רק הבאנר הסטטי, לא "גלה עוד" המלא. תמונת
+            הבאנר הספציפית לחו"ל (סנטוריני), לא זו של חופשה בארץ. */}
+        <DealsComingSoonCard variant="abroad" />
 
         {/* 6. גריד "בחר לפי סוג חופשה" - אריחים לפי vacation_preferences של
             המשתמש, קליק פותח עמוד קטגוריה נפרד עם כל היעדים שלה.

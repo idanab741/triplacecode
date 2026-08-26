@@ -74,8 +74,14 @@ export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
       <MapContainer center={positions[0]} zoom={12} scrollWheelZoom={false} className="h-full w-full" attributionControl={false}>
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          // *** תיקון Product מפורש ("מה זה הכיתוב 'API KEY REQUIRED' על
+          // *** המפה??"): זו לא בעיה בקוד שלנו - זה שרת ה-tiles של CARTO
+          // *** עצמו (basemaps.cartocdn.com) שהתחיל לדרוש מפתח API
+          // *** לשימוש, וה-watermark הזה מגיע ישירות מהם. עברנו לשרת ה-
+          // *** tiles הרשמי של OpenStreetMap עצמו - עדיין חינמי לגמרי,
+          // *** בלי צורך במפתח/הרשמה כלשהי.
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           subdomains="abcd"
           maxZoom={19}
         />

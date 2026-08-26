@@ -110,8 +110,10 @@ export function ResultMap({ stops }: ResultMapProps) {
             תנאי שמחליף ספק לפי מיקום (ישראל -> OSM, אחרת -> Voyager). */}
         <AttributionControl position="bottomright" prefix={false} />
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          // *** ר' הערה מפורטת ב-DiscoveryPlacesMap.tsx - אותו תיקון
+          // *** בדיוק, אותה סיבה (CARTO דורש מפתח API עכשיו).
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           subdomains="abcd"
           maxZoom={19}
         />

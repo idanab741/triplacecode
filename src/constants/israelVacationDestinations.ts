@@ -24,7 +24,7 @@ export interface IsraelVacationDestination {
 }
 
 export const ISRAEL_VACATION_DESTINATIONS: IsraelVacationDestination[] = [
-  { slug: "tel-aviv", name: "תל אביב", lat: 32.0853, lng: 34.7818, imageUrl: "/images/vacation-destinations/telaviv.png" },
+  { slug: "tel-aviv", name: "תל אביב-יפו", lat: 32.0853, lng: 34.7818, imageUrl: "/images/vacation-destinations/telaviv.png" },
   { slug: "jerusalem", name: "ירושלים", lat: 31.7683, lng: 35.2137, imageUrl: "/images/vacation-destinations/jerusalem.png" },
   { slug: "eilat", name: "אילת", lat: 29.5581, lng: 34.9482, imageUrl: "/images/vacation-destinations/eilat.png" },
   { slug: "dead-sea", name: "ים המלח", lat: 31.2, lng: 35.3839, imageUrl: "/images/vacation-destinations/deadsea.png" },

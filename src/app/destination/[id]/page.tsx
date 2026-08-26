@@ -1,7 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getDestinationById, getDestinationEditionSection } from "@/services/destinations/destinationsServerService";
-import { getPlacesByCityAndCategory } from "@/services/places/placesServerService";
+import {
+  getPlacesByCityAndCategory,
+  getPlacesByCityAndKeywords,
+  RESTAURANT_CATEGORY_KEYWORDS,
+  ATTRACTION_CATEGORY_KEYWORDS,
+  NATURE_CATEGORY_KEYWORDS,
+  NIGHTLIFE_CATEGORY_KEYWORDS,
+} from "@/services/places/placesServerService";
 import { getWeeklyForecast } from "@/services/weather/weatherService";
 import { getUpcomingEvents } from "@/services/events/ticketmasterService";
 import { Screen } from "@/components/ui";
@@ -38,9 +45,11 @@ export default async function DestinationPage({ params, searchParams }: Destinat
 
   const hasCoords = destination.latitude != null && destination.longitude != null;
 
-  const [restaurants, attractions, hotels, forecast, events, editionSection] = await Promise.all([
-    getPlacesByCityAndCategory(destination.name, "restaurants_culinary"),
-    getPlacesByCityAndCategory(destination.name, "attractions"),
+  const [restaurants, attractions, nature, nightlife, hotels, forecast, events, editionSection] = await Promise.all([
+    getPlacesByCityAndKeywords(destination.name, RESTAURANT_CATEGORY_KEYWORDS),
+    getPlacesByCityAndKeywords(destination.name, ATTRACTION_CATEGORY_KEYWORDS),
+    getPlacesByCityAndKeywords(destination.name, NATURE_CATEGORY_KEYWORDS),
+    getPlacesByCityAndKeywords(destination.name, NIGHTLIFE_CATEGORY_KEYWORDS),
     getPlacesByCityAndCategory(destination.name, "hotels"),
     hasCoords ? getWeeklyForecast(destination.latitude!, destination.longitude!) : Promise.resolve([]),
     hasCoords ? getUpcomingEvents(destination.latitude!, destination.longitude!) : Promise.resolve([]),
@@ -109,13 +118,32 @@ export default async function DestinationPage({ params, searchParams }: Destinat
           title="מסעדות"
           places={restaurants}
           emptyMessage="עוד לא אספנו מסעדות ליעד הזה"
+          seeAllHref={`/destination/${destination.id}/places?type=restaurants`}
         />
         <PlaceRow
           title="אטרקציות"
           places={attractions}
           emptyMessage="עוד לא אספנו אטרקציות ליעד הזה"
+          seeAllHref={`/destination/${destination.id}/places?type=attractions`}
         />
-        <PlaceRow title="מלונות" places={hotels} emptyMessage="עוד לא אספנו מלונות ליעד הזה" />
+        <PlaceRow
+          title="טבע"
+          places={nature}
+          emptyMessage="עוד לא אספנו אתרי טבע ליעד הזה"
+          seeAllHref={`/destination/${destination.id}/places?type=nature`}
+        />
+        <PlaceRow
+          title="מלונות"
+          places={hotels}
+          emptyMessage="עוד לא אספנו מלונות ליעד הזה"
+          seeAllHref={`/destination/${destination.id}/places?type=hotels`}
+        />
+        <PlaceRow
+          title="חיי לילה"
+          places={nightlife}
+          emptyMessage="עוד לא אספנו חיי לילה ליעד הזה"
+          seeAllHref={`/destination/${destination.id}/places?type=nightlife`}
+        />
 
         <BusinessOwnersRow />
       </div>

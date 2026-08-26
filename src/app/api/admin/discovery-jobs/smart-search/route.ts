@@ -193,7 +193,14 @@ export async function POST(request: Request) {
         continue; // 0 קריאות גוגל למקום הזה
       }
 
-      const searchQuery = city ? `${item.name}, ${city}` : item.name;
+      // *** התיקון המרכזי: המדינה שהאדמין כן מילא ("ישראל" למשל) הייתה
+      // *** נופלת בשקט לגמרי - אם שדה העיר ריק, נשלח לגוגל את השם
+      // *** בלבד ("לונה פארק"), בלי שום הקשר גיאוגרפי, אפילו שהמדינה
+      // *** כן צוינה. "לונה פארק" הוא שם גנרי (יש כזה בעשרות ערים בעולם)
+      // *** - בלי שום רמז מיקום, חיפוש הטקסט של גוגל לא מצליח להתמקד
+      // *** ולעיתים לא מחזיר כלום. עכשיו כוללים גם city וגם country,
+      // *** כל מה שסופק בפועל - לא רק city.
+      const searchQuery = [item.name, city, country].filter(Boolean).join(", ");
       const result = await findPlaceStatusAndPhoto(searchQuery);
 
       if (!result.exists) {

@@ -159,6 +159,19 @@ function buildCategoryOrFilter(categoryIds: string[]): string {
   return clauses.join(",");
 }
 
+/**
+ * *** הוסר לגמרי (תיקון Product מפורש - "איך זה קשור פה??? אני רוצה
+ * שהכל יהיה מדויק... הכל צריך להיות 100% דיוק!!"): נסיתי כאן קודם
+ * Fallback עם מילות-מפתח מטושטשות/מיפוי לקטגוריה גסה כשההתאמה המדויקת
+ * חוזרת עם מעט תוצאות - זה גרם ל"ספא" להראות חופים, ו"יקב או בר יין"
+ * להראות מסעדות רגילות לגמרי לא קשורות (שתיהן category="attractions"/
+ * "restaurants" הגס, אבל לא ספא/יקב באמת). המשתמש דחה את זה בפירוש -
+ * דיוק גובר על כיסוי. במקום זאת, כשההתאמה המדויקת חוזרת עם מעט
+ * תוצאות, מרחיבים את **רדיוס החיפוש** (לא את הקטגוריה!) - ר'
+ * fetchDiscoveryPlaces למטה. "אם אין לך מיקום - אפשר להתרחק מהיעד" -
+ * בדיוק ההנחיה שניתנה.
+ */
+
 interface FetchDiscoveryPlacesParams {
   location: DiscoveryLocation;
   /** מזהה קטגוריה/trip_type_tag (תואם ל-tripTaxonomy.ts) - חובה, אלא
@@ -220,13 +233,17 @@ interface FetchDiscoveryPlacesParams {
 }
 
 /** בונה שאילתת bounding box + city fallback - אותו דפוס בדיוק כמו
- *  candidatePoolService.ts (queryPool), לא מנגנון מיקום חדש. */
+ *  candidatePoolService.ts (queryPool), לא מנגנון מיקום חדש.
+ *  radiusOverrideKm (אופציונלי): כשמועבר, משמש במקום params.radiusKm/
+ *  DEFAULT_DISCOVERY_RADIUS_KM - ר' fetchDiscoveryPlaces להסבר (הרחבת
+ *  רדיוס כ-fallback, לא הרחבת קטגוריה - ר' הערה שם). */
 async function queryPlaces(
   supabase: SupabaseClient,
-  params: FetchDiscoveryPlacesParams
+  params: FetchDiscoveryPlacesParams,
+  radiusOverrideKm?: number
 ): Promise<PlaceRow[]> {
   const { location } = params;
-  const radiusKm = Math.min(params.radiusKm ?? DEFAULT_DISCOVERY_RADIUS_KM, MAX_DISCOVERY_RADIUS_KM);
+  const radiusKm = Math.min(radiusOverrideKm ?? params.radiusKm ?? DEFAULT_DISCOVERY_RADIUS_KM, MAX_DISCOVERY_RADIUS_KM);
 
   let query = supabase
     .from("places")
@@ -245,6 +262,13 @@ async function queryPlaces(
     query = query.neq("category", "nightlife");
   }
 
+  // *** ההתאמה כאן היא **תמיד** מדויקת (trip_type_tags.ov/subcategory.in/
+  // category.eq) - שום מצב "מטושטש" בעמודה הזו. תיקון Product מפורש
+  // ("אני רוצה שהכל יהיה מדויק... 100% דיוק!!") - ניסיתי בעבר Fallback
+  // עם קטגוריה גסה יותר כשתוצאות היו מעטות, וזה גרם ל"ספא" להראות
+  // חופים ול"יקב" להראות מסעדות סתמיות - הוסר לגמרי. הפתרון היחיד
+  // שנשאר ל"תוצאות מעטות" הוא הרחבת **רדיוס החיפוש** (radiusOverrideKm
+  // למעלה), לא שינוי הקטגוריה.
   if (params.categoryColumnEquals && params.requiredAnyTags && params.requiredAnyTags.length > 0) {
     query = query.or(`category.eq.${params.categoryColumnEquals},tags.ov.{${params.requiredAnyTags.join(",")}}`);
   } else if (params.categoryColumnEquals) {
@@ -326,11 +350,28 @@ export async function fetchDiscoveryPlaces(
   params: FetchDiscoveryPlacesParams
 ): Promise<DiscoveryPlace[]> {
   const rows = await queryPlaces(supabase, params);
+
+  // *** Fallback: הרחבת רדיוס בלבד, לא קטגוריה (תיקון Product מפורש -
+  // "אם אין לך מיקום - אפשר להתרחק מהיעד! לא לשים סתם דברים ולמחזר...
+  // הכל צריך להיות 100% דיוק"). כשההתאמה המדויקת (עם רדיוס החיפוש
+  // הרגיל) חזרה עם מעט תוצאות, ומדובר בחיפוש עם מיקום geo אמיתי (לא
+  // city fallback טקסטואלי, שאין לו "רדיוס" בכלל) - מנסים שוב עם
+  // MAX_DISCOVERY_RADIUS_KM, **אותה קטגוריה בדיוק**. אם עדיין אין
+  // מספיק - מוצג פחות, לא מוצג לא-רלוונטי.
+  let combinedRows = rows;
+  const hasGeoLocation = params.location.lat != null && params.location.lng != null;
+  const currentRadiusKm = Math.min(params.radiusKm ?? DEFAULT_DISCOVERY_RADIUS_KM, MAX_DISCOVERY_RADIUS_KM);
+  if (hasGeoLocation && rows.length < (params.limit ?? 12) && currentRadiusKm < MAX_DISCOVERY_RADIUS_KM) {
+    const widerRows = await queryPlaces(supabase, params, MAX_DISCOVERY_RADIUS_KM);
+    const seenIds = new Set(rows.map((r) => r.id));
+    combinedRows = [...rows, ...widerRows.filter((r) => !seenIds.has(r.id))];
+  }
+
   const origin: LatLng | null = params.location.lat != null && params.location.lng != null
     ? { lat: params.location.lat, lng: params.location.lng }
     : null;
 
-  return rows
+  return combinedRows
     .filter((row) => row.latitude != null && row.longitude != null || !origin)
     .map((row) => rowToDiscoveryPlace(row, origin))
     .sort((a, b) => computeWeightedScore(b) - computeWeightedScore(a))

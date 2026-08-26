@@ -21,31 +21,42 @@ import { fetchDiscoveryPlaces, fetchHotPlaces, type DiscoveryLocation } from "@/
 interface CuisineSection {
   emoji: string;
   title: string;
-  /** ערך cuisine_tags אמיתי (taxonomy_terms, group='cuisine') - ברירת המחדל. */
-  cuisineTag?: string;
-  /** ליוצאי-הדופן (גלידריות/אוכל מקומי) - subcategory במקום cuisine_tags. */
+  /** *** תיקון Product מפורש ("למה הוא אומר שאין בשרים על האש?? יש
+   *  הכל! זה צריך להיות גורף! להשתמש אך ורק ב-ADMIN PLACES"): בדקתי -
+   *  cuisine_tags בפועל ב-DB **לא** תואם את הערכים התיאורטיים מ-
+   *  taxonomy_terms (שכמעט ולא בשימוש בפועל בעמודה הזו). לדוגמה: 91
+   *  מקומות מתויגים "bbq" (לא "meat_bbq"!), 78 מתויגים "brunch" (לא
+   *  "breakfast_brunch"), 57 "israeli" (לא "israeli_middle_eastern"),
+   *  62 "desserts" (לא "desserts_sweets"), 522(!) "local_food". מערך
+   *  cuisineTags (לא cuisineTag יחיד) - כל הערכים האמיתיים שנמצאו
+   *  בפועל ב-DB, לצד הערך התיאורטי - OR ביניהם (מספיק אחד). */
+  cuisineTags?: string[];
+  /** ליוצאי-הדופן (גלידריות) - subcategory במקום cuisine_tags. */
   category?: "coffee_carts_cafes" | "wineries_dining";
   subcategory?: string;
 }
 
 const DISCOVERY_SECTIONS: Record<string, CuisineSection> = {
-  israeli: { emoji: "🥙", title: "ישראלי", cuisineTag: "israeli_middle_eastern" },
-  italian: { emoji: "🍝", title: "איטלקי", cuisineTag: "italian" },
-  asian: { emoji: "🥢", title: "אסייתי", cuisineTag: "asian" },
-  meat_bbq: { emoji: "🍖", title: "בשרים ועל האש", cuisineTag: "meat_bbq" },
-  burger_diner: { emoji: "🍔", title: "המבורגר ודיינר אמריקאי", cuisineTag: "burger_diner" },
-  mexican: { emoji: "🌮", title: "מקסיקני", cuisineTag: "mexican" },
-  greek: { emoji: "🫓", title: "יווני", cuisineTag: "greek" },
-  french_bistro: { emoji: "🥖", title: "ביסטרו צרפתי", cuisineTag: "french_bistro" },
-  indian: { emoji: "🍛", title: "הודי", cuisineTag: "indian" },
-  mediterranean: { emoji: "🫒", title: "ים־תיכוני", cuisineTag: "mediterranean" },
-  seafood: { emoji: "🐟", title: "דגים ופירות ים", cuisineTag: "seafood" },
-  pizza: { emoji: "🍕", title: "פיצה", cuisineTag: "pizza" },
-  breakfast_brunch: { emoji: "🥐", title: "ארוחת בוקר ובראנץ׳", cuisineTag: "breakfast_brunch" },
-  cafe: { emoji: "☕", title: "בית קפה", cuisineTag: "cafe" },
-  fine_dining: { emoji: "👨‍🍳", title: "מסעדות שף", cuisineTag: "fine_dining" },
-  local_food: { emoji: "🍴", title: "אוכל מקומי", category: "wineries_dining", subcategory: "local_restaurant" },
-  desserts_sweets: { emoji: "🍰", title: "מאנצ׳ים ומתוקים", cuisineTag: "desserts_sweets" },
+  israeli: { emoji: "🥙", title: "ישראלי", cuisineTags: ["israeli_middle_eastern", "israeli", "middle_eastern"] },
+  italian: { emoji: "🍝", title: "איטלקי", cuisineTags: ["italian"] },
+  asian: { emoji: "🥢", title: "אסייתי", cuisineTags: ["asian"] },
+  meat_bbq: { emoji: "🍖", title: "בשרים ועל האש", cuisineTags: ["meat_bbq", "bbq", "meat_grill", "steakhouse"] },
+  burger_diner: { emoji: "🍔", title: "המבורגר ודיינר אמריקאי", cuisineTags: ["burger_diner", "burger"] },
+  mexican: { emoji: "🌮", title: "מקסיקני", cuisineTags: ["mexican"] },
+  greek: { emoji: "🫓", title: "יווני", cuisineTags: ["greek"] },
+  french_bistro: { emoji: "🥖", title: "ביסטרו צרפתי", cuisineTags: ["french_bistro"] },
+  indian: { emoji: "🍛", title: "הודי", cuisineTags: ["indian"] },
+  mediterranean: { emoji: "🫒", title: "ים־תיכוני", cuisineTags: ["mediterranean", "Mediterranean"] },
+  seafood: { emoji: "🐟", title: "דגים ופירות ים", cuisineTags: ["seafood"] },
+  pizza: { emoji: "🍕", title: "פיצה", cuisineTags: ["pizza"] },
+  breakfast_brunch: { emoji: "🥐", title: "ארוחת בוקר ובראנץ׳", cuisineTags: ["breakfast_brunch", "brunch"] },
+  cafe: { emoji: "☕", title: "בית קפה", cuisineTags: ["cafe"] },
+  fine_dining: { emoji: "👨‍🍳", title: "מסעדות שף", cuisineTags: ["fine_dining", "chef_restaurant"] },
+  // *** תיקון: "אוכל מקומי" עבר מ-subcategory (אין בכלל שורות עם
+  // subcategory="local_restaurant" בפועל) ל-cuisineTags - "local_food"
+  // הוא בפועל אחד מתגי המטבח הכי נפוצים ב-DB (522 מקומות!).
+  local_food: { emoji: "🍴", title: "אוכל מקומי", cuisineTags: ["local_food", "local_authentic"] },
+  desserts_sweets: { emoji: "🍰", title: "מאנצ׳ים ומתוקים", cuisineTags: ["desserts_sweets", "desserts"] },
   ice_cream: { emoji: "🍦", title: "גלידריות", category: "wineries_dining", subcategory: "ice_cream_shop" },
 };
 
@@ -96,13 +107,15 @@ async function fetchSectionPlaces(
   return fetchDiscoveryPlaces(supabase, {
     location,
     category: section.category,
-    // ליוצאי-הדופן (category+subcategory) לא מוגדר cuisineTag כלל - שאר
-    // הסקשנים לא מגדירים category, ולכן חייבים category כלשהו כדי
-    // ש-queryPlaces ידע היכן לחפש: cuisine_tags קיים גם על wineries_dining
-    // וגם על coffee_carts_cafes יחד, אז לסקשן מטבח רגיל מחפשים בשתיהן.
-    categories: section.cuisineTag ? HOT_CULINARY_CATEGORIES : undefined,
+    // *** תיקון Product מפורש ("להשתמש אך ורק ב-ADMIN PLACES"): לסקשני
+    // cuisineTags (17 מתוך 18) - במקום categories:HOT_CULINARY_CATEGORIES
+    // (שמתאים trip_type_tags.ov, כמעט תמיד ריק בפועל) - categoryColumnEquals
+    // "restaurants" תואם ישירות את עמודת ה-category הגסה, האמינה, שבאמת
+    // מאוכלסת נכון בכל השורות (ר' placeCategories.ts - 5 הערכים היחידים
+    // המותרים). לא חוצה קטגוריה גסה אחרת בשום מקרה - תמיד "restaurants" בלבד.
+    categoryColumnEquals: section.cuisineTags ? "restaurants" : undefined,
     subcategories: section.subcategory ? [section.subcategory] : undefined,
-    requiredAnyCuisineTags: section.cuisineTag ? [section.cuisineTag] : undefined,
+    requiredAnyCuisineTags: section.cuisineTags,
     limit,
   });
 }
