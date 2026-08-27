@@ -2,86 +2,314 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChipGroup, Field, Screen, Slider } from "@/components/ui";
+import { Screen } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { QUICK_CATEGORIES, type QuickCategoryId } from "@/constants/quickCategories";
-import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
-import { TRIP_TYPE_RULES } from "@/services/tripBuilder/rules";
-import type { TripType } from "@/services/tripBuilder/types";
+import { useAuth } from "@/hooks/useAuth";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import type { AbroadVacationAnswers } from "@/services/tripBuilder/types";
+import type { ExtractedVacationIntent } from "@/services/tripBuilder/vacationIntentExtractionService";
 import { AnswerOptions } from "./AnswerOptions";
-import { CategoryOptions } from "./CategoryOptions";
 import { ChatBubble } from "./ChatBubble";
 import { ChatHeader } from "./ChatHeader";
+import { RuntrippyPromptBubble } from "./RuntrippyPromptBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { UserBubble } from "./UserBubble";
 
-const INTRO = "שלום! אני טריפי AI 👋\n\nסוכן ה-AI האישי של TRIPLACE.\n\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\n\nאז בואו נתחיל!";
-const TYPES: Partial<Record<QuickCategoryId, TripType>> = { day_trip: "day_trip", weekend: "weekend", romantic_date: "romantic_date", nature_trip: "nature_trip", abroad: "abroad_vacation", nightlife: "nightlife", restaurants_cafes: "restaurants_cafes" };
-type Message = { id: number; role: "assistant" | "user"; text: string };
-const label = (options: { value: string; label: string }[], value: string) => options.find((option) => option.value === value)?.label ?? value;
+const INTRO =
+  "שלום! אני טריפי AI 👋\n\nסוכן ה-AI האישי של TRIPLACE.\n\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\n\nאז בואו נתחיל!";
+const FOLLOW_UP_WITH_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 לאן בדיוק בא לכם לצאת? הצעתי כמה יעדים שיכולים להתאים:";
+const FOLLOW_UP_NO_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 יש לכם יעד ספציפי בראש, או שתרצו שאני אבחר בשבילכם?";
+const SURPRISE_LABEL = "תפתיעו אותי 🎁";
 
-/** Renders the existing rule descriptors in one persistent chat surface. */
+type Stage = "compose" | "followUp" | "building";
+type Message = { id: number; role: "assistant" | "user" | "runtrippy"; text: string };
+type DestinationChoice = { type: "single"; value: string } | { type: "multi"; values: string[] } | { type: "surprise" };
+
+const DEFAULT_ANSWERS: AbroadVacationAnswers = {
+  companions: ["couple"],
+  childAgeBands: [],
+  startDate: "",
+  endDate: "",
+  hasBookedFlightAndHotel: false,
+  flightPreference: null,
+  flights: [],
+  hotels: [],
+  lodgingType: null,
+  budgetPerPerson: "2500-7500",
+  vacationTypes: [],
+  destination: null,
+  destinations: [],
+  surpriseMe: false,
+  pace: "balanced",
+  travelStyle: "single_destination",
+  freeText: "",
+};
+
+/** תאריכי ברירת מחדל - בעוד שבועיים, 4 לילות - כשלא נשאלו תאריכים בכלל
+ *  בזרימה המקוצרת הזו (רק שאלת המשך אחת, ממוקדת יעד בלבד). */
+function defaultDateRange(): { startDate: string; endDate: string } {
+  const start = new Date();
+  start.setDate(start.getDate() + 14);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 4);
+  const toIso = (d: Date) => d.toISOString().slice(0, 10);
+  return { startDate: toIso(start), endDate: toIso(end) };
+}
+
+function buildAnswers(
+  freeText: string,
+  extracted: ExtractedVacationIntent | null,
+  destinationChoice: DestinationChoice
+): AbroadVacationAnswers {
+  const { startDate, endDate } = defaultDateRange();
+  return {
+    ...DEFAULT_ANSWERS,
+    startDate,
+    endDate,
+    freeText,
+    companions: extracted?.companions.length ? extracted.companions : DEFAULT_ANSWERS.companions,
+    childAgeBands: extracted?.childAgeBands ?? [],
+    hasBookedFlightAndHotel: extracted?.hasBookedFlightAndHotel ?? false,
+    lodgingType: extracted?.lodgingType ?? null,
+    budgetPerPerson: extracted?.budgetPerPerson ?? DEFAULT_ANSWERS.budgetPerPerson,
+    vacationTypes: extracted?.vacationTypes.length ? extracted.vacationTypes : [],
+    pace: extracted?.pace ?? DEFAULT_ANSWERS.pace,
+    travelStyle: destinationChoice.type === "multi" ? "multi_destination" : "single_destination",
+    destination: destinationChoice.type === "single" ? destinationChoice.value : null,
+    destinations: destinationChoice.type === "multi" ? destinationChoice.values : [],
+    surpriseMe: destinationChoice.type === "surprise",
+  };
+}
+
+function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
+  return getCurrentPositionSafe("יש לאשר גישה למיקום ולנסות שוב");
+}
+
+/** צ'אט חופשי אחד: אינטרו קבוע -> מלל חופשי -> שאלת המשך אחת (ממוקדת
+ *  יעד, עם צ'יפים שחולצו מאותה קריאת AI יחידה - ר' vacationIntentExtractionService)
+ *  -> בניית "חופשה בחו"ל" ומעבר לעמוד התוצאה שלה. */
 export function TrippyConversation() {
   const router = useRouter();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([{ id: 1, role: "assistant", text: INTRO }]);
-  const [type, setType] = useState<TripType | null>(null);
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [value, setValue] = useState<string | null>(null);
-  const [values, setValues] = useState<string[]>([]);
+  const [stage, setStage] = useState<Stage>("compose");
   const [text, setText] = useState("");
-  const [followUp, setFollowUp] = useState(false);
   const [typing, setTyping] = useState(false);
-  const id = useRef(1); const bottom = useRef<HTMLDivElement>(null);
-  const questions = type ? TRIP_TYPE_RULES[type]?.questions ?? [] : [];
-  const step = questions[index];
+  const [error, setError] = useState<string | null>(null);
+  const id = useRef(1);
+  const bottom = useRef<HTMLDivElement>(null);
+  const freeTextRef = useRef("");
+  const extractedRef = useRef<ExtractedVacationIntent | null>(null);
+  const sessionPromiseRef = useRef<Promise<string> | null>(null);
+  const manualGameRequestedRef = useRef(false);
+  const navigatedToResultRef = useRef(false);
+
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing, type, index, followUp]);
-  const add = (role: Message["role"], message: string) => { id.current += 1; setMessages((all) => [...all, { id: id.current, role, text: message }]); };
-  const save = (key: string, answer: unknown) => ({ ...answers, [key]: answer });
-  function next(nextAnswers: Record<string, unknown>) {
-    setAnswers(nextAnswers); setValue(null); setValues([]); setText(""); setFollowUp(false);
-    if (index + 1 === questions.length) { add("assistant", "מעולה, קיבלתי את כל הפרטים. אני בונה עבורכם את המסלול עכשיו."); return; }
-    setTyping(true); window.setTimeout(() => { setTyping(false); setIndex((current) => current + 1); add("assistant", questions[index + 1].title); }, 400);
-  }
-function choose(category: QuickCategoryId) {
-    const tripType = TYPES[category]; const rule = tripType ? TRIP_TYPE_RULES[tripType] : undefined; if (!tripType || !rule) return;
-    setType(tripType); setIndex(0); setAnswers({}); add("user", QUICK_CATEGORY_LABELS[category]); setTyping(true);
-    window.setTimeout(() => { setTyping(false); add("assistant", rule.questions[0].title); }, 400);
-  }
-  function confirm() {
-    if (!step) return;
-    if (step.type === "companions") {
-      if (followUp) { add("user", values.map((item) => label(step.childAgeOptions, item)).join(", ")); next(save(step.childAgeKey, values)); return; }
-      if (!value) return; add("user", label(step.options, value)); const nextAnswers = save(step.key, value);
-      if (value === step.childAgeTriggerValue) { setAnswers(nextAnswers); setFollowUp(true); add("assistant", step.childAgeTitle); return; }
-      next({ ...nextAnswers, [step.childAgeKey]: null }); return;
-    }
-    if (step.type === "date") { if (!text) return; add("user", text); next(save(step.otherDateKey, text)); return; }
-    if (step.type === "slider") { const selected = value ?? step.steps[0]?.value; if (!selected) return; add("user", label(step.steps, selected)); next(save(step.key, selected)); return; }
-    if (step.type === "multi-emoji") { add("user", values.map((item) => label(step.options, item)).join(", ")); next(save(step.key, values)); return; }
-    if (step.type === "text") { if (!text) return; add("user", text); next(save(step.key, text)); }
-  }
-  const availableCategoryIds = QUICK_CATEGORIES.filter((category) => TYPES[category.id] && TRIP_TYPE_RULES[TYPES[category.id]!]).map((category) => category.id);
+  }, [messages, typing, stage]);
 
-  return <Screen withBottomNavSpacing>
-    <div className="-mx-5 -mt-8">
-      <ChatHeader current={type ? index + 1 : 0} total={type ? questions.length : 0} onBack={() => router.push("/home")} />
-    </div>
-    <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
-    {messages.map((message) => message.role === "assistant" ? <ChatBubble key={message.id}>{message.text}</ChatBubble> : <UserBubble key={message.id}>{message.text}</UserBubble>)}
-    {!type && <CategoryOptions categoryIds={availableCategoryIds} onSelect={choose} />}
-    {typing && <TypingIndicator />}
-    {step && !typing && <div className="flex flex-col gap-3">
-      {step.type === "single" && <AnswerOptions options={step.options} onSelect={(selected) => { add("user", label(step.options, selected)); next(save(step.key, selected)); }} />}
-      {step.type === "companions" && (followUp ? <ChipGroup options={step.childAgeOptions} selected={values} onChange={setValues} /> : <AnswerOptions options={step.options} selected={value} onSelect={setValue} />)}
-      {step.type === "date" && <Field label="בחרו תאריך"><input type="date" value={text} onChange={(event) => setText(event.target.value)} className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm" /></Field>}
-      {step.type === "slider" && <Slider steps={step.steps} value={value ?? step.steps[0]?.value} onChange={setValue} />}
-      {step.type === "multi-emoji" && <ChipGroup options={step.options} selected={values} onChange={setValues} />}
-      {step.type === "text" && <textarea value={text} placeholder={step.placeholder} onChange={(event) => setText(event.target.value)} rows={3} className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm" />}
-      {step.type !== "single" && <button type="button" onClick={confirm} className="rounded-pill py-2 text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}>המשך</button>}
-    </div>}
-    <div ref={bottom} />
-  </div><MainBottomNav active="ai" /></Screen>;
+  const add = (role: Message["role"], message: string) => {
+    id.current += 1;
+    setMessages((all) => [...all, { id: id.current, role, text: message }]);
+  };
+
+  async function fetchExtractedIntent(freeText: string): Promise<ExtractedVacationIntent | null> {
+    try {
+      const res = await fetch("/api/trip-builder/abroad-vacation/parse-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeText }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.extracted as ExtractedVacationIntent) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function submitFreeText() {
+    const trimmed = text.trim();
+    if (!trimmed || typing) return;
+    add("user", trimmed);
+    setText("");
+    freeTextRef.current = trimmed;
+    setTyping(true);
+
+    const extracted = await fetchExtractedIntent(trimmed);
+    extractedRef.current = extracted;
+    setTyping(false);
+
+    if (extracted?.destination) {
+      startBuild({ type: "single", value: extracted.destination });
+      return;
+    }
+    if (extracted?.destinations.length) {
+      startBuild({ type: "multi", values: extracted.destinations });
+      return;
+    }
+
+    setStage("followUp");
+    add("assistant", extracted?.suggestedDestinations.length ? FOLLOW_UP_WITH_SUGGESTIONS : FOLLOW_UP_NO_SUGGESTIONS);
+  }
+
+  function chooseDestination(value: string) {
+    add("user", value);
+    startBuild({ type: "single", value });
+  }
+
+  function chooseSurprise() {
+    add("user", SURPRISE_LABEL);
+    startBuild({ type: "surprise" });
+  }
+
+  function startBuild(destinationChoice: DestinationChoice) {
+    setStage("building");
+    setTyping(true);
+    window.setTimeout(() => {
+      setTyping(false);
+      add("assistant", "בונים עבורכם את הטיול המושלם!");
+      add("runtrippy", "");
+      autoBuildAndWaitThenNavigate(destinationChoice);
+    }, 500);
+  }
+
+  function ensureSessionCreated(destinationChoice: DestinationChoice): Promise<string> {
+    if (!sessionPromiseRef.current) {
+      sessionPromiseRef.current = createSessionAndStartBuild(destinationChoice);
+    }
+    return sessionPromiseRef.current;
+  }
+
+  async function createSessionAndStartBuild(destinationChoice: DestinationChoice): Promise<string> {
+    const answers = buildAnswers(freeTextRef.current, extractedRef.current, destinationChoice);
+    const origin = await getCurrentPosition();
+    const response = await fetch("/api/trip-builder/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tripType: "abroad_vacation", answers, origin }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "יצירת הטיול נכשלה");
+
+    const sessionId = data.session.id;
+    fetch(`/api/trip-builder/sessions/${sessionId}/auto-build`, { method: "POST" }).catch(() => {});
+    return sessionId;
+  }
+
+  async function handleRuntrippyClick() {
+    if (manualGameRequestedRef.current) return;
+    manualGameRequestedRef.current = true;
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    try {
+      const sessionId = await ensureSessionCreated({ type: "surprise" });
+      if (navigatedToResultRef.current) return;
+      navigatedToResultRef.current = true;
+      router.push(`/trip-builder/abroad-vacation/result?sessionId=${sessionId}&game=1`);
+    } catch (buildError) {
+      setError(buildError instanceof Error ? buildError.message : "לא הצלחנו לבנות את הטיול. נסו שוב.");
+    }
+  }
+
+  /** יוצר session, מפעיל auto-build ברקע, וממתין (polling) לסטטוס
+   *  completed בלבד - אותו עיקרון בדיוק כמו weekend/abroad-vacation:
+   *  או שנמצאים בצ'אט, או שנמצאים בעמוד התוצאה, שום מסך ביניים שלישי. */
+  async function autoBuildAndWaitThenNavigate(destinationChoice: DestinationChoice) {
+    if (!user) return;
+    setError(null);
+    try {
+      const sessionId = await ensureSessionCreated(destinationChoice);
+      if (manualGameRequestedRef.current) return;
+
+      const MAX_WAIT_MS = 90000;
+      const POLL_INTERVAL_MS = 1000;
+      const startedAt = Date.now();
+      let completed = false;
+      while (Date.now() - startedAt < MAX_WAIT_MS) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+        if (manualGameRequestedRef.current) return;
+        try {
+          const pollRes = await fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`);
+          const pollData = await pollRes.json();
+          if (pollData?.session?.status === "completed") {
+            completed = true;
+            break;
+          }
+        } catch {
+          // שגיאת רשת חד-פעמית - ממשיכים לנסות
+        }
+      }
+
+      if (manualGameRequestedRef.current || navigatedToResultRef.current) return;
+
+      if (completed) {
+        navigatedToResultRef.current = true;
+        router.push(`/trip-builder/abroad-vacation/result?sessionId=${sessionId}`);
+        return;
+      }
+
+      setTyping(false);
+      add("assistant", "זה לוקח קצת יותר זמן מהרגיל... אפשר להמשיך להמתין כאן, או ללחוץ על הלוגו למעלה כדי לעבור למסך הבנייה.");
+    } catch (buildError) {
+      sessionPromiseRef.current = null;
+      setError(buildError instanceof Error ? buildError.message : "לא הצלחנו לבנות את הטיול. נסו שוב.");
+    }
+  }
+
+  const suggestions = extractedRef.current?.suggestedDestinations ?? [];
+
+  return (
+    <Screen withBottomNavSpacing>
+      <div className="-mx-5 -mt-8">
+        <ChatHeader current={stage === "compose" ? 0 : 1} total={stage === "compose" ? 0 : 2} onBack={() => router.push("/home")} />
+      </div>
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
+        {messages.map((message) => {
+          if (message.role === "assistant") return <ChatBubble key={message.id}>{message.text}</ChatBubble>;
+          if (message.role === "runtrippy") return <RuntrippyPromptBubble key={message.id} onClick={handleRuntrippyClick} />;
+          return <UserBubble key={message.id}>{message.text}</UserBubble>;
+        })}
+
+        {typing && <TypingIndicator />}
+
+        {stage === "compose" && !typing && (
+          <div className="flex flex-col gap-3">
+            <textarea
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
+              rows={3}
+              className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+            />
+            <button
+              type="button"
+              onClick={submitFreeText}
+              disabled={!text.trim()}
+              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              המשך
+            </button>
+          </div>
+        )}
+
+        {stage === "followUp" && !typing && (
+          <AnswerOptions
+            options={[
+              ...suggestions.map((destination) => ({ value: destination, label: destination })),
+              { value: "__surprise__", label: SURPRISE_LABEL },
+            ]}
+            onSelect={(value) => (value === "__surprise__" ? chooseSurprise() : chooseDestination(value))}
+          />
+        )}
+
+        {error && <p className="text-center text-sm text-danger">{error}</p>}
+        <div ref={bottom} />
+      </div>
+      <MainBottomNav active="ai" />
+    </Screen>
+  );
 }

@@ -15,6 +15,13 @@ export interface ExtractedVacationIntent {
   destination: string | null;
   /** כמה יעדים מפורשים (travelStyle multi) - כל אחד מהם מאומת מול הרשימה. */
   destinations: string[];
+  /**
+   * בקשה מפורשת (זרימת "טריפי AI" - שאלת המשך אחת שממוקדת ביעד): עד 3
+   * הצעות יעד (מתוך אותה קריאת Claude היחידה - בלי קריאה נוספת/טוקנים
+   * נוספים) שמתאימות לתיאור החופשי, לשימוש כצ'יפים בשאלת ההמשך כשלא
+   * חולץ יעד מפורש. כל אחת מאומתת בדיוק כמו destination/destinations.
+   */
+  suggestedDestinations: string[];
   companions: ("couple" | "family" | "family_no_kids" | "friends" | "solo")[];
   childAgeBands: ChildAgeBand[];
   hasBookedFlightAndHotel: boolean | null;
@@ -28,6 +35,7 @@ const EMPTY_RESULT: ExtractedVacationIntent = {
   travelStyle: null,
   destination: null,
   destinations: [],
+  suggestedDestinations: [],
   companions: [],
   childAgeBands: [],
   hasBookedFlightAndHotel: null,
@@ -69,6 +77,10 @@ null/ריק מאשר לחלץ ערך לא בטוח.
   לא ברשימה, או שלא הוזכר יעד - null.
 - destinations: אותו עיקרון, מערך של כמה יעדים (רק אם travelStyle=multi_destination
   והם מופיעים ברשימה) - אחרת מערך ריק.
+- suggestedDestinations: **רק אם לא הוזכר יעד מפורש בכלל** (destination ו-destinations
+  שניהם ריקים/null) - עד 3 יעדים מתוך רשימת היעדים הזמינים למטה שהכי מתאימים לתיאור
+  (לפי אווירה/סוג חופשה/מה שמשתמע מהטקסט, למשל "ים ומסעדות טובות" -> יעדי חוף/קולינריה).
+  **חובה** להעתיק כל שם *בדיוק* כפי שהוא מופיע ברשימה. אם כבר הוזכר יעד מפורש - מערך ריק.
 - companions: מערך מתוך "couple" (זוג) | "family" (משפחה עם ילדים) | "family_no_kids"
   (משפחה בלי ילדים) | "friends" (חברים) | "solo" (לבד) - כל מי שנאמר במפורש שנוסע
   איתם, אפשר כמה יחד (למשל זוג עם חברים = ["couple","friends"]), אחרת מערך ריק.
@@ -95,6 +107,7 @@ ${candidateList}
   "travelStyle": "single_destination" | "multi_destination" | null,
   "destination": "string או null",
   "destinations": ["..."],
+  "suggestedDestinations": ["..."],
   "companions": ["couple" | "family" | "family_no_kids" | "friends" | "solo", ...],
   "childAgeBands": ["..."],
   "hasBookedFlightAndHotel": true | false | null,
@@ -141,7 +154,8 @@ export async function extractVacationIntent(freeText: string): Promise<Extracted
 
   // 800 טוקנים - התשובה כאן היא JSON קומפקטי עם כמה שדות קצרים בלבד
   // (לא summary/priorities חופשיים כמו ב-tripIntentService), אין סיבה
-  // לתקציב גדול יותר שרק יאט את הקריאה.
+  // לתקציב גדול יותר שרק יאט את הקריאה. suggestedDestinations (עד 3
+  // שמות קצרים) נכלל באותה קריאה בדיוק - לא קריאת Claude נוספת.
   const { text, error } = await callClaude(prompt, 800);
   if (error || !text) {
     logAiError("חילוץ כוונת חופשה מהמלל החופשי נכשל - ממשיכים בלי חילוץ", { error });
@@ -168,6 +182,12 @@ export async function extractVacationIntent(freeText: string): Promise<Extracted
       travelStyle,
       destination: travelStyle === "multi_destination" ? null : validateDestinationName(parsed.destination, candidates),
       destinations: travelStyle === "multi_destination" ? destinations : [],
+      suggestedDestinations: Array.isArray(parsed.suggestedDestinations)
+        ? (parsed.suggestedDestinations as unknown[])
+            .map((d) => validateDestinationName(d, candidates))
+            .filter((d): d is string => d != null)
+            .slice(0, 3)
+        : [],
       companions: Array.isArray(parsed.companions)
         ? (parsed.companions as unknown[]).filter(
             (v): v is ExtractedVacationIntent["companions"][number] => typeof v === "string" && COMPANION_VALUES.has(v)
