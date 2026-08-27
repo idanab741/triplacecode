@@ -16,7 +16,7 @@ import { TypingIndicator } from "./TypingIndicator";
 import { UserBubble } from "./UserBubble";
 
 const INTRO =
-  "שלום! אני טריפי AI 👋\n\nסוכן ה-AI האישי של TRIPLACE.\n\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם חופשה שתוכננה במיוחד בשבילכם — מהיעדים ועד המסלול המושלם.\n\nאז בואו נתחיל!";
+  "שלום! אני טריפי AI 👋\n\nסוכן ה-AI האישי של TRIPLACE.\n\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם את החופשה - מהיעדים והאטרקציות ועד המסלול המושלם.\n\nאז בואו נתחיל! מה תרצו לחפש היום?";
 const FOLLOW_UP_WITH_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 לאן בדיוק בא לכם לצאת? הצעתי כמה יעדים שיכולים להתאים:";
 const FOLLOW_UP_NO_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 יש לכם יעד ספציפי בראש, או שתרצו שאני אבחר בשבילכם?";
 const SURPRISE_LABEL = "תפתיעו אותי 🎁";
@@ -67,6 +67,7 @@ function buildAnswers(
     startDate,
     endDate,
     freeText,
+    requestedPlaceCount: extracted?.requestedPlaceCount ?? null,
     companions: extracted?.companions.length ? extracted.companions : DEFAULT_ANSWERS.companions,
     childAgeBands: extracted?.childAgeBands ?? [],
     hasBookedFlightAndHotel: extracted?.hasBookedFlightAndHotel ?? false,
@@ -95,6 +96,13 @@ export function TrippyConversation() {
   const [stage, setStage] = useState<Stage>("compose");
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
+  // *** תוספת (בקשה מפורשת - "טעינה של שלוש נקודות שחושבות עד שמגיעים
+  // למסלול, מעל RUNTRIPPY"): true בדיוק בזמן ה-polling האמיתי ב-
+  // autoBuildAndWaitThenNavigate (לא רק 500ms הפתיחה הקצרים כמו typing
+  // הרגיל) - כפתור ה-runtrippy עצמו נשאר גלוי/פעיל תמיד (עדיין אפשר
+  // ללחוץ ולעבור למסך הבנייה ידנית), רק מציגים גם אינדיקציה חזותית
+  // שמשהו קורה ברקע בינתיים.
+  const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const id = useRef(1);
   const bottom = useRef<HTMLDivElement>(null);
@@ -170,6 +178,7 @@ export function TrippyConversation() {
       setTyping(false);
       add("assistant", "בונים עבורכם את הטיול המושלם!");
       add("runtrippy", "");
+      setBuilding(true);
       autoBuildAndWaitThenNavigate(destinationChoice);
     }, 500);
   }
@@ -251,9 +260,11 @@ export function TrippyConversation() {
         return;
       }
 
+      setBuilding(false);
       setTyping(false);
       add("assistant", "זה לוקח קצת יותר זמן מהרגיל... אפשר להמשיך להמתין כאן, או ללחוץ על הלוגו למעלה כדי לעבור למסך הבנייה.");
     } catch (buildError) {
+      setBuilding(false);
       sessionPromiseRef.current = null;
       setError(buildError instanceof Error ? buildError.message : "לא הצלחנו לבנות את הטיול. נסו שוב.");
     }
@@ -262,39 +273,30 @@ export function TrippyConversation() {
   const suggestions = extractedRef.current?.suggestedDestinations ?? [];
 
   return (
-    <Screen withBottomNavSpacing>
+    <Screen withBottomNavSpacing className="pb-0">
       <div className="-mx-5 -mt-8">
         <ChatHeader current={stage === "compose" ? 0 : 1} total={stage === "compose" ? 0 : 2} onBack={() => router.push("/home")} />
       </div>
-      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-6">
+      {/* *** תיקון (בקשה מפורשת - "להחזיר את הבר התחתון - שהחיפוש
+          והכפתור המשך יהיו מעליו"): MainBottomNav חזר (בקשה קודמת
+          ביקשה להסיר אותו, זו ביקשה להחזיר) - Screen חזר ל-
+          withBottomNavSpacing. ה-footer הקבוע כבר לא bottom-0 - עכשיו
+          bottom-20, מעל גובה הבר התחתון (BottomNav.tsx: כ-80px).
+          pb-56 ברשימת ההודעות מפנה מקום גם ל-footer וגם לבר יחד. */}
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-56">
         {messages.map((message) => {
           if (message.role === "assistant") return <ChatBubble key={message.id}>{message.text}</ChatBubble>;
-          if (message.role === "runtrippy") return <RuntrippyPromptBubble key={message.id} onClick={handleRuntrippyClick} />;
+          if (message.role === "runtrippy")
+            return (
+              <div key={message.id} className="flex flex-col gap-2">
+                {building && <TypingIndicator />}
+                <RuntrippyPromptBubble onClick={handleRuntrippyClick} />
+              </div>
+            );
           return <UserBubble key={message.id}>{message.text}</UserBubble>;
         })}
 
         {typing && <TypingIndicator />}
-
-        {stage === "compose" && !typing && (
-          <div className="flex flex-col gap-3">
-            <textarea
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
-              rows={3}
-              className="w-full rounded-card border border-ink-secondary/25 bg-bg p-4 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            />
-            <button
-              type="button"
-              onClick={submitFreeText}
-              disabled={!text.trim()}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-            >
-              המשך
-            </button>
-          </div>
-        )}
 
         {stage === "followUp" && !typing && (
           <AnswerOptions
@@ -309,6 +311,30 @@ export function TrippyConversation() {
         {error && <p className="text-center text-sm text-danger">{error}</p>}
         <div ref={bottom} />
       </div>
+
+      {stage === "compose" && !typing && (
+        <div className="fixed inset-x-0 bottom-24 z-40 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3">
+          <div className="mx-auto flex max-w-md flex-col gap-2">
+            <button
+              type="button"
+              onClick={submitFreeText}
+              disabled={!text.trim()}
+              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+            >
+              המשך
+            </button>
+            <textarea
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
+              rows={1}
+              autoFocus
+              className="w-full rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+            />
+          </div>
+        </div>
+      )}
       <MainBottomNav active="ai" />
     </Screen>
   );

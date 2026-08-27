@@ -53,49 +53,70 @@ interface DiscoveryPlacesMapProps {
  * הניווט לעמוד המקום (router.push) הועבר מה-Marker עצמו לתוך תוכן
  * הבועה (PlacePreview) - כך שהוא קורה רק בלחיצה שנייה, על הבועה עצמה.
  */
+/**
+ * *** תיקון (בקשת המשתמש - "כשנכנסים לאפליקציה זה מציג מרחוק
+ * יותר!!!!"): קודם MapContainer תמיד התחיל בזום קבוע מראש (12, סתם
+ * מרכז על המקום הראשון ברשימה) - ורק אחרי שהמפה כבר נטענה, FitBounds
+ * (useEffect נפרד) "קפץ" ותיקן לזום/מרכז הנכונים. זה יצר רגע אמיתי
+ * (לא רק רושם) של תצוגה לא-נכונה כשנכנסים למסך - בדיוק מה שהמשתמש
+ * תיאר. התיקון: לחשב את אותו חישוב-אשכול *מראש* (פונקציה טהורה, לא
+ * בתוך useEffect) ולהעביר אותו ישירות כ-center/zoom ההתחלתיים של
+ * MapContainer - כך שאין בכלל רגע של "לא נכון" לפני שה-JS "מתקן".
+ * FitBounds נשאר בנוסף (useEffect), לכיסוי המקרה שבו places משתנה
+ * *אחרי* שהמפה כבר על המסך (למשל מעבר בין קטגוריות/טאבים) - אז כן
+ * צריך תיקון תגובתי, אבל בטעינה הראשונית כבר לא צריך "לתקן" כלום.
+ */
+/**
+ * *** תיקון (בקשת המשתמש - "עדיין אותו מרחק תצוגה!!!"): הגילוי -
+ * fitBounds *תמיד* מתרחק כמה שצריך כדי שכל האשכול ייכנס לתוך הקונטיינר
+ * (גובה 224px בלבד) - maxZoom מגביל רק כמה *קרוב* מותר, לא מונע
+ * התרחקות כשהאשכול עדיין רחב (גם באשכול "הצפוף ביותר", אם הוא מתפרש
+ * על עשרות ק"מ). זו הסיבה שהזום נשאר "רחוק" גם אחרי כל התיקונים
+ * הקודמים - הם כולם עדיין השתמשו ב-fitBounds בסוף. הפתרון האמיתי:
+ * להפסיק להשתמש ב-fitBounds בכלל. קופצים ישירות למרכז האשכול הצפוף
+ * (אותו אלגוריתם איתור-אשכול כמו קודם) ב-**זום קבוע** (FIXED_ZOOM),
+ * בלי שום ניסיון "להכיל הכל" - בדיוק העדיפות שהמשתמש ביקש שוב ושוב
+ * (קרוב > מכיל את כל הפינים). פינים שנופלים מחוץ לתצוגה זו בחירה
+ * מודעת, לא באג.
+ */
+const FIXED_ZOOM = 13;
+
+function findClusterCenter(places: ValidMapPlace[]): [number, number] {
+  if (places.length === 1) return [places[0].latitude, places[0].longitude];
+
+  const RADIUS_KM = 15;
+  function distanceKm(a: ValidMapPlace, b: ValidMapPlace): number {
+    const R = 6371;
+    const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+    const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
+    const lat1 = (a.latitude * Math.PI) / 180;
+    const lat2 = (b.latitude * Math.PI) / 180;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  let clusterCenter = places[0];
+  let bestNeighborCount = -1;
+  for (const candidate of places) {
+    const neighborCount = places.filter((p) => distanceKm(candidate, p) <= RADIUS_KM).length;
+    if (neighborCount > bestNeighborCount) {
+      bestNeighborCount = neighborCount;
+      clusterCenter = candidate;
+    }
+  }
+  return [clusterCenter.latitude, clusterCenter.longitude];
+}
+
+function computeClusterView(places: ValidMapPlace[]): { center: [number, number]; zoom: number } {
+  if (places.length === 0) return { center: [31.5, 34.9], zoom: 8 }; // מרכז ישראל, גיבוי בלבד
+  return { center: findClusterCenter(places), zoom: FIXED_ZOOM };
+}
+
 function FitBounds({ places }: { places: ValidMapPlace[] }) {
   const map = useMap();
   useEffect(() => {
     if (places.length === 0) return;
-    if (places.length === 1) {
-      map.setView([places[0].latitude, places[0].longitude], 13, { animate: false });
-      return;
-    }
-
-    // *** תיקון (בקשת המשתמש - "המפה צריכה להיות איפה שיש את כל
-    // הדקירות!!"): שני הניסיונות הקודמים (מרכז גיאומטרי / פין בודד
-    // הכי קרוב למרכז) לא באמת פתרו את הבעיה - שניהם התמקדו בנקודה
-    // *אחת*, בלי שום ערבות שרוב הפינים בכלל נראים סביבה. הפתרון הנכון:
-    // איתור האשכול הצפוף בפועל (לא נקודה תיאורטית) - לכל מקום סופרים
-    // כמה מקומות אחרים נמצאים בטווח סביר ממנו (15 ק"מ), בוחרים את
-    // המקום עם הכי הרבה "שכנים" כמוקד האשכול, ואז מציירים את הגבולות
-    // (fitBounds) רק סביב האשכול הזה - לא סביב כל הפינים. פינים בודדים
-    // רחוקים (outliers) נשארים מחוץ לתצוגה בכוונה, כי הם אלה שגרמו
-    // למפה להתרחק/להתמקד באמצע ריק.
-    const RADIUS_KM = 15;
-    function distanceKm(a: ValidMapPlace, b: ValidMapPlace): number {
-      const R = 6371;
-      const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
-      const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
-      const lat1 = (a.latitude * Math.PI) / 180;
-      const lat2 = (b.latitude * Math.PI) / 180;
-      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(h));
-    }
-
-    let clusterCenter = places[0];
-    let bestNeighborCount = -1;
-    for (const candidate of places) {
-      const neighborCount = places.filter((p) => distanceKm(candidate, p) <= RADIUS_KM).length;
-      if (neighborCount > bestNeighborCount) {
-        bestNeighborCount = neighborCount;
-        clusterCenter = candidate;
-      }
-    }
-    const cluster = places.filter((p) => distanceKm(clusterCenter, p) <= RADIUS_KM);
-
-    const bounds = L.latLngBounds(cluster.map((p) => [p.latitude, p.longitude]));
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
+    map.setView(findClusterCenter(places), FIXED_ZOOM, { animate: false });
   }, [places, map]);
   return null;
 }
@@ -148,13 +169,19 @@ export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
   );
   if (validPlaces.length === 0) return null;
 
-  const positions: [number, number][] = validPlaces.map((p) => [p.latitude, p.longitude]);
+  const initialView = computeClusterView(validPlaces);
 
   return (
     <div
       className={`relative isolate z-0 h-56 w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
     >
-      <MapContainer center={positions[0]} zoom={12} scrollWheelZoom={false} className="h-full w-full" attributionControl={false}>
+      <MapContainer
+        center={initialView.center}
+        zoom={initialView.zoom}
+        scrollWheelZoom={false}
+        className="h-full w-full"
+        attributionControl={false}
+      >
         <AttributionControl position="bottomright" prefix={false} />
         {IS_USING_FALLBACK_TILES ? (
           <TileLayer

@@ -102,6 +102,22 @@ export function buildTripStrategy(context: VacationContext): TripStrategy {
     reasons.push(`אין תינוק בטיול - קיבולת היום נגזרת ישירות מה-Pace שנבחר (${context.trip.pace}): ${activityDensity} אטרקציות.`);
   }
 
+  // *** תוספת (בקשה מפורשת - "המערכת מתעלמת ממספר, בונה כמו שלא נאמר
+  // כלום" + "להתאים את כמות התוצאות לפי המלל החופשי"): אם המשתמש ציין
+  // מפורשות כמות מקומות רצויה (ר' vacationIntentExtractionService.ts),
+  // זה גובר על ה-Pace הרגיל - מחלקים את הסה"כ שווה בשווה בין ימי הטיול
+  // (clampAttractionsCount שומר על אותו טווח סביר [2,7] ליום כמו תמיד,
+  // כדי לא לייצר יום עם 0 או 40 אטרקציות אם המספר שהוזכר לא הגיוני
+  // ביחס למספר הימים). לא חל כש-hasInfant=true - בטיחות/קצב "רגוע"
+  // עם תינוק גוברים גם על בקשה מפורשת למספר.
+  if (context.trip.requestedPlaceCount != null && !hasInfant) {
+    const perDay = Math.round(context.trip.requestedPlaceCount / Math.max(1, context.trip.numDays));
+    activityDensity = clampAttractionsCount(perDay);
+    reasons.push(
+      `המשתמש ציין מפורשות ${context.trip.requestedPlaceCount} מקומות בסך הכל - חלוקה שווה על פני ${context.trip.numDays} ימים נותנת ${activityDensity} אטרקציות ליום (גובר על ברירת המחדל של ה-Pace).`
+    );
+  }
+
   const maxFoodStopsPerDay = isCulinaryFocused ? CULINARY_RESTAURANT_STOPS_PER_DAY : DEFAULT_RESTAURANT_STOPS_PER_DAY;
   reasons.push(
     isCulinaryFocused

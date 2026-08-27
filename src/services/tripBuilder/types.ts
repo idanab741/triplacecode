@@ -66,6 +66,10 @@ export interface VacationContext {
     pace: string;
     vacationTypes: string[];
     freeText: string;
+    /** *** תוספת (בקשה מפורשת - "להתאים את כמות התוצאות לפי המלל
+     *  החופשי"): ר' vacationIntentExtractionService.ts + tripStrategyService.ts
+     *  (buildTripStrategy - שם נעשה בפועל השימוש, override ל-activityDensity). */
+    requestedPlaceCount: number | null;
   };
   logistics: {
     hasFlights: boolean;
@@ -480,6 +484,11 @@ export interface AbroadVacationAnswers {
   pace: VacationPace;
   travelStyle: TravelStyle;
   freeText: string;
+  /** *** תוספת (בקשה מפורשת - "להתאים את כמות התוצאות לפי המלל
+   *  החופשי"): ר' vacationIntentExtractionService.ts. אופציונלי -
+   *  זרימות ישנות שלא שולחות את זה ממשיכות לעבוד כרגיל (undefined =
+   *  כמו null, שום דבר לא משתנה). */
+  requestedPlaceCount?: number | null;
 }
 export interface WeekendAnswers {
   companions: VacationCompanionType[];

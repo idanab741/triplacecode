@@ -40,6 +40,7 @@ export function buildVacationContext(params: BuildVacationContextParams): Vacati
       pace: answers.pace,
       vacationTypes: answers.vacationTypes ?? [],
       freeText: answers.freeText ?? "",
+      requestedPlaceCount: answers.requestedPlaceCount ?? null,
     },
     logistics: {
       hasFlights: (answers.flights ?? []).length > 0,

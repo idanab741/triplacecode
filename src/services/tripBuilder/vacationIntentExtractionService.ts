@@ -29,6 +29,12 @@ export interface ExtractedVacationIntent {
   budgetPerPerson: string | null;
   vacationTypes: string[];
   pace: VacationPace | null;
+  /** *** תוספת (בקשה מפורשת - "להתאים את כמות התוצאות לפי המלל
+   *  החופשי"): מספר מקומות מפורש שהמשתמש ציין (למשל "5 מקומות",
+   *  "3 אטרקציות ביום") - סה"כ למסלול, לא ליום בודד (מתחלק בין הימים
+   *  ב-tripStrategyService.ts). null אם לא צוין מספר מפורש - במקרה
+   *  הזה שום דבר לא משתנה, ה-Pace הרגיל עדיין קובע. */
+  requestedPlaceCount: number | null;
 }
 
 const EMPTY_RESULT: ExtractedVacationIntent = {
@@ -43,6 +49,7 @@ const EMPTY_RESULT: ExtractedVacationIntent = {
   budgetPerPerson: null,
   vacationTypes: [],
   pace: null,
+  requestedPlaceCount: null,
 };
 
 const COMPANION_VALUES = new Set(["couple", "family", "family_no_kids", "friends", "solo"]);
@@ -98,6 +105,10 @@ null/ריק מאשר לחלץ ערך לא בטוח.
   "spa_wellness","ski" - רק סוגים שברור שרלוונטיים מהטקסט, אחרת מערך ריק.
 - pace: "relaxed" (רגוע) | "balanced" (מאוזן) | "packed" (מתוכנן/עמוס) -
   רק אם קצב הטיול הרצוי ברור, אחרת null.
+- requestedPlaceCount: מספר שלם אם המשתמש ציין **מפורשות** כמות מקומות/
+  אטרקציות רצויה לכל הטיול (למשל "5 מקומות", "רוצה בערך 8 אטרקציות",
+  "2-3 דברים ליום" - במקרה של טווח/ליום, תחשב סה"כ משוער לכל הטיול) -
+  אחרת null. אל תנחש/תמציא מספר שלא נאמר - ברירת המחדל הבטוחה היא null.
 
 רשימת היעדים הזמינים (ל-destination/destinations בלבד):
 ${candidateList}
@@ -114,7 +125,8 @@ ${candidateList}
   "lodgingType": "string או null",
   "budgetPerPerson": "string או null",
   "vacationTypes": ["..."],
-  "pace": "relaxed" | "balanced" | "packed" | null
+  "pace": "relaxed" | "balanced" | "packed" | null,
+  "requestedPlaceCount": מספר שלם או null
 }`;
 }
 
@@ -207,6 +219,10 @@ export async function extractVacationIntent(freeText: string): Promise<Extracted
         ? (parsed.vacationTypes as unknown[]).filter((v): v is string => typeof v === "string" && VACATION_TYPE_VALUES.has(v))
         : [],
       pace: typeof parsed.pace === "string" && PACE_VALUES.has(parsed.pace) ? (parsed.pace as VacationPace) : null,
+      requestedPlaceCount:
+        typeof parsed.requestedPlaceCount === "number" && Number.isFinite(parsed.requestedPlaceCount) && parsed.requestedPlaceCount > 0
+          ? Math.round(parsed.requestedPlaceCount)
+          : null,
     };
   } catch (parseError) {
     logAiError("כשל בפענוח חילוץ כוונת חופשה", {
