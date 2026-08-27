@@ -92,7 +92,19 @@ export function DiscoveryCategoryPageContent({ apiEndpoint, heroSrc, from }: Dis
           </div>
         ) : (
           <>
-            <DiscoveryPlacesMap places={data.places} />
+            {/* mb-5 עבר לכאן מתוך DiscoveryPlacesMap עצמו (Audit -
+                "רווח גדול מידי בין המפה לבלוק שמתחת, בעמוד הבית"):
+                ב-NearbySection (עמוד הבית) המפה יושבת בתוך flex עם
+                gap-6 אחיד בין כל הסקשנים - mb-5 שהיה קבוע *בתוך*
+                הרכיב המשותף נוסף *מעל* ה-gap-6 של ההורה וייצר רווח
+                כפול, שונה משאר העמוד. כאן, לעומת זאת (עמוד "ראה
+                הכל"), אין gap חיצוני - המפה והגריד שמתחתיה נמצאים
+                באותו div ישירות, אז הרווח כן נדרש - רק שעכשיו הוא
+                מוגדר במקום הנכון (כאן, ליד מי שבאמת צריך אותו),
+                לא כברירת מחדל גורפת בתוך רכיב משותף. */}
+            <div className="mb-5">
+              <DiscoveryPlacesMap places={data.places} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {data.places.map((place) => (
                 <DiscoveryPlaceCard key={place.id} place={place} from={from} fixedWidth={false} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * "👥 ה-Matches של הקהילה" (Audit - "מאיפה הנתונים?" - בצדק). עכשיו
@@ -8,6 +9,11 @@ import { useEffect, useState } from "react";
  * favorites אמיתית מטבלת favorites הקיימת) - לא mock. תמונות מגיעות
  * מ-place.image_urls האמיתי (אותו מקור שכל שאר האפליקציה כבר מציגה),
  * לא מתמונות סטטיות שאולי לא קיימות ב-public.
+ *
+ * *** תיקון (Audit - "למה האטרקציות כאן לא עובדות? אי אפשר להגיע
+ * לעמוד של היעד?"): הכרטיסים מעולם לא קיבלו onClick - היו רק תמונה
+ * סטטית עם oveylay טקסט, בלי שום ניווט. עכשיו קליק על כרטיס מנווט
+ * ל-`/place/{id}`, בדיוק כמו כל שאר כרטיסי המקום באפליקציה.
  */
 interface CommunityHighlight {
   id: string;
@@ -18,6 +24,7 @@ interface CommunityHighlight {
 }
 
 export function CommunitySection() {
+  const router = useRouter();
   const [highlights, setHighlights] = useState<CommunityHighlight[] | null>(null);
 
   useEffect(() => {
@@ -48,7 +55,12 @@ export function CommunitySection() {
               <div key={i} className="h-40 w-56 shrink-0 animate-pulse rounded-card bg-bg-secondary" />
             ))
           : highlights.map((h) => (
-              <div key={h.id} className="relative h-40 w-56 shrink-0 overflow-hidden rounded-card shadow-soft">
+              <div
+                key={h.id}
+                role="button"
+                onClick={() => router.push(`/place/${h.id}`)}
+                className="relative h-40 w-56 shrink-0 cursor-pointer overflow-hidden rounded-card shadow-soft"
+              >
                 {h.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={h.imageUrl} alt={h.name} className="h-full w-full object-cover" />

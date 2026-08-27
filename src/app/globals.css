@@ -39,3 +39,35 @@ body {
   height: 100vh;
   height: 100dvh;
 }
+
+/* *** תוספת (בקשת המשתמש - בועת תצוגה מקדימה עם תמונה בלחיצה על פין
+   במפה): מבטלת את ה-padding/margin שברירת המחדל של Leaflet מוסיפה
+   סביב תוכן הבועה, כדי שהתמונה תיצמד לקצוות ולפינות המעוגלות. */
+.place-preview-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: var(--radius-card, 14px);
+  overflow: hidden;
+}
+.place-preview-popup .leaflet-popup-content {
+  margin: 0;
+  width: 128px !important;
+}
+.place-preview-popup .leaflet-popup-tip {
+  background: white;
+}
+.place-preview-popup .leaflet-popup-close-button {
+  z-index: 1;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* *** תוספת (בקשת המשתמש - "לשנות רק את העיצוב של המפה" ואז "כחול
+   תכלת - אפור - לבן, בצבעי triplace"): שלב 1 מתוך 2 (שלב 2 - שכבת
+   הגוון עם mix-blend-mode - יושב ישירות ב-DiscoveryPlacesMap.tsx,
+   ליד ה-<MapContainer>). כאן רק מכינים "בסיס" נקי לגוון: grayscale
+   כמעט מלא מסיר את הירוק/החום המקוריים של OSM, brightness/contrast
+   שומרים על בסיס בהיר ורך שהגוון הכחול-תכלת (בקובץ ה-tsx) "נדבק"
+   עליו יפה - בלי ספרייה חדשה, בלי ספק חיצוני בתשלום, רק CSS. */
+.map-branded .leaflet-tile-pane {
+  filter: grayscale(0.85) brightness(1.12) contrast(0.92);
+}

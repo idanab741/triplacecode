@@ -57,6 +57,12 @@ interface NearbyPlace {
   name: string;
   latitude: number | null;
   longitude: number | null;
+  // *** תיקון (בקשת המשתמש - תמונה בבועה בלחיצה על פין): השדות האלה
+  // כבר חוזרים מכל ה-API-ים ב-CATEGORY_ENDPOINTS (day-trip/
+  // restaurants-cafes/nightlife מחזירים DiscoveryPlace מלא) - רק לא
+  // היו מוגדרים בטיפוס המקומי כאן, אז לא זרמו הלאה ל-DiscoveryPlacesMap.
+  imageUrls?: string[] | null;
+  subcategoryLabel?: string | null;
 }
 
 export function NearbySection() {
