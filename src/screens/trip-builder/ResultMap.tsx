@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, AttributionControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { IS_USING_FALLBACK_TILES, FALLBACK_TILE_URL, FALLBACK_TILE_SUBDOMAINS, FALLBACK_TILE_ATTRIBUTION, FALLBACK_TILE_MAX_ZOOM } from "@/constants/mapTiles";
+import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 
 interface MapStop {
   stopId: string;
@@ -90,7 +92,9 @@ export function ResultMap({ stops }: ResultMapProps) {
   }
 
   return (
-    <div className="tm-result-map relative isolate z-0 h-64 w-full overflow-hidden rounded-card shadow-soft">
+    <div
+      className={`tm-result-map relative isolate z-0 h-64 w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
+    >
       <MapContainer
         center={positions[0]}
         zoom={13}
@@ -100,23 +104,23 @@ export function ResultMap({ stops }: ResultMapProps) {
       >
         {/* prefix={false} מסיר את התוספת של Leaflet עצמו לשליטה (כולל דגל
             שהם הוסיפו ל"קרדיט" שלהם) - נשאר רק הקרדיט המשפטי הנדרש בפועל
-            (CARTO/OpenStreetMap), לא המותג של Leaflet. */}
-        {/* *** שינוי: עברנו מ-OSM סטנדרטי (+ CSS filter שניסה "לצבוע
-            מחדש") ל-CARTO Voyager - בסיס מפה איכותי ומעוצב בפועל (לא
-            טריק CSS), עם פלטה נקייה ומודרנית שמתאימה הרבה יותר לזהות
-            האפליקציה. *** טרייד-אוף מודע: ב-Voyager שמות מקומות בישראל
-            מוצגים בתעתיק אנגלי במקום עברית (זו הסיבה שבעבר נשארנו עם
-            OSM סטנדרטי) - אם זה מפריע במסכי טיולים בארץ, אפשר להחזיר
-            תנאי שמחליף ספק לפי מיקום (ישראל -> OSM, אחרת -> Voyager). */}
+            (OpenStreetMap), לא המותג של Leaflet. */}
+        {/* *** תיקון (בקשת המשתמש - "יותר מדי מקומות לא רלוונטיים" +
+            "לוקח יותר מדי זמן להיטען"): לא CSS - זה סגנון האריחים עצמו.
+            עוברים לסגנון הוקטורי "Base" של MapTiler דרך MapTilerBaseLayer
+            (ר' src/constants/mapTiles.ts), עם fallback זמני ל-OSM
+            הרגיל אם עדיין אין מפתח מוגדר. */}
         <AttributionControl position="bottomright" prefix={false} />
-        <TileLayer
-          // *** ר' הערה מפורטת ב-DiscoveryPlacesMap.tsx - אותו תיקון
-          // *** בדיוק, אותה סיבה (CARTO דורש מפתח API עכשיו).
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        {IS_USING_FALLBACK_TILES ? (
+          <TileLayer
+            attribution={FALLBACK_TILE_ATTRIBUTION}
+            url={FALLBACK_TILE_URL}
+            subdomains={FALLBACK_TILE_SUBDOMAINS}
+            maxZoom={FALLBACK_TILE_MAX_ZOOM}
+          />
+        ) : (
+          <MapTilerBaseLayer />
+        )}
         {Array.from(dayGroups.entries()).map(([day, dayStops]) => (
           <Polyline
             key={day}
@@ -135,9 +139,6 @@ export function ResultMap({ stops }: ResultMapProps) {
         ))}
         <FitBounds stops={validStops} />
       </MapContainer>
-
-      {/* Voyager (CARTO) כבר מגיע בפלטה מעוצבת ונקייה מהקופסה - אין צורך
-          יותר בשכבת overlay/filter ידני מעל האריחים. */}
     </div>
   );
 }

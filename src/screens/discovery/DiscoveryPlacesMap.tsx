@@ -5,6 +5,9 @@ import { MapContainer, TileLayer, Marker, Popup, AttributionControl, useMap } fr
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect } from "react";
+import { IS_USING_FALLBACK_TILES, FALLBACK_TILE_URL, FALLBACK_TILE_SUBDOMAINS, FALLBACK_TILE_ATTRIBUTION, FALLBACK_TILE_MAX_ZOOM } from "@/constants/mapTiles";
+import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 
 interface MapPlace {
   id: string;
@@ -12,7 +15,13 @@ interface MapPlace {
   latitude: number | null;
   longitude: number | null;
   imageUrls?: string[] | null;
-  subcategoryLabel?: string | null;
+  /** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים... על בסיס מסך
+   *  התגיות... לא שום דבר אחר!!"): category (נערך במסך התגיות, "קטגוריה
+   *  ראשית") במקום subcategory (שדה טקסט חופשי נפרד, יכול "להיתקע"
+   *  עם ערך ישן - ר' src/app/place/[id]/page.tsx להסבר המלא). מוצג
+   *  מתורגם בקומפוננטה עצמה, לא כאן - ר' PlacePreview למטה.
+   */
+  category?: string | null;
 }
 
 interface ValidMapPlace {
@@ -21,7 +30,7 @@ interface ValidMapPlace {
   latitude: number;
   longitude: number;
   imageUrls?: string[] | null;
-  subcategoryLabel?: string | null;
+  category?: string | null;
 }
 
 interface DiscoveryPlacesMapProps {
@@ -49,11 +58,44 @@ function FitBounds({ places }: { places: ValidMapPlace[] }) {
   useEffect(() => {
     if (places.length === 0) return;
     if (places.length === 1) {
-      map.setView([places[0].latitude, places[0].longitude], 14, { animate: false });
+      map.setView([places[0].latitude, places[0].longitude], 13, { animate: false });
       return;
     }
-    const bounds = L.latLngBounds(places.map((p) => [p.latitude, p.longitude]));
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: false });
+
+    // *** תיקון (בקשת המשתמש - "המפה צריכה להיות איפה שיש את כל
+    // הדקירות!!"): שני הניסיונות הקודמים (מרכז גיאומטרי / פין בודד
+    // הכי קרוב למרכז) לא באמת פתרו את הבעיה - שניהם התמקדו בנקודה
+    // *אחת*, בלי שום ערבות שרוב הפינים בכלל נראים סביבה. הפתרון הנכון:
+    // איתור האשכול הצפוף בפועל (לא נקודה תיאורטית) - לכל מקום סופרים
+    // כמה מקומות אחרים נמצאים בטווח סביר ממנו (15 ק"מ), בוחרים את
+    // המקום עם הכי הרבה "שכנים" כמוקד האשכול, ואז מציירים את הגבולות
+    // (fitBounds) רק סביב האשכול הזה - לא סביב כל הפינים. פינים בודדים
+    // רחוקים (outliers) נשארים מחוץ לתצוגה בכוונה, כי הם אלה שגרמו
+    // למפה להתרחק/להתמקד באמצע ריק.
+    const RADIUS_KM = 15;
+    function distanceKm(a: ValidMapPlace, b: ValidMapPlace): number {
+      const R = 6371;
+      const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+      const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
+      const lat1 = (a.latitude * Math.PI) / 180;
+      const lat2 = (b.latitude * Math.PI) / 180;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(h));
+    }
+
+    let clusterCenter = places[0];
+    let bestNeighborCount = -1;
+    for (const candidate of places) {
+      const neighborCount = places.filter((p) => distanceKm(candidate, p) <= RADIUS_KM).length;
+      if (neighborCount > bestNeighborCount) {
+        bestNeighborCount = neighborCount;
+        clusterCenter = candidate;
+      }
+    }
+    const cluster = places.filter((p) => distanceKm(clusterCenter, p) <= RADIUS_KM);
+
+    const bounds = L.latLngBounds(cluster.map((p) => [p.latitude, p.longitude]));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
   }, [places, map]);
   return null;
 }
@@ -92,8 +134,8 @@ function PlacePreview({ place }: { place: ValidMapPlace }) {
       </div>
       <div className="px-1.5 py-0.5 space-y-0.5">
         <p className="line-clamp-1 text-xs font-semibold leading-none text-ink">{place.name}</p>
-        {place.subcategoryLabel && (
-          <p className="line-clamp-1 text-[10px] leading-none text-ink-secondary">{place.subcategoryLabel}</p>
+        {place.category && (
+          <p className="line-clamp-1 text-[10px] leading-none text-ink-secondary">{getCategoryLabel(place.category)}</p>
         )}
       </div>
     </div>
@@ -109,15 +151,21 @@ export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
   const positions: [number, number][] = validPlaces.map((p) => [p.latitude, p.longitude]);
 
   return (
-    <div className="map-branded relative isolate z-0 h-56 w-full overflow-hidden rounded-card shadow-soft">
+    <div
+      className={`relative isolate z-0 h-56 w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
+    >
       <MapContainer center={positions[0]} zoom={12} scrollWheelZoom={false} className="h-full w-full" attributionControl={false}>
         <AttributionControl position="bottomright" prefix={false} />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        {IS_USING_FALLBACK_TILES ? (
+          <TileLayer
+            attribution={FALLBACK_TILE_ATTRIBUTION}
+            url={FALLBACK_TILE_URL}
+            subdomains={FALLBACK_TILE_SUBDOMAINS}
+            maxZoom={FALLBACK_TILE_MAX_ZOOM}
+          />
+        ) : (
+          <MapTilerBaseLayer />
+        )}
         {validPlaces.map((place) => (
           <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
             <Popup className="place-preview-popup" minWidth={128} maxWidth={128}>
@@ -127,15 +175,6 @@ export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
         ))}
         <FitBounds places={validPlaces} />
       </MapContainer>
-      {/* *** תוספת (בקשה מפורשת - "כחול תכלת - אפור - לבן"): שכבת גוון
-          שקופה בצבע המותג מעל אריחי המפה (שהופכו ל-grayscale למטה ב-
-          globals.css), עם mix-blend-mode:color. זו הטכניקה הנכונה
-          ל"דו-גוני" אמיתי - היא לוקחת רק את הגוון+הרוויה מהשכבה הזו,
-          אבל שומרת על הבהירות המקורית של כל אריח (ים כהה יותר, יבשה
-          בהירה יותר) - כך מתקבל בפועל טווח אמיתי של כחול-תכלת/אפור/
-          לבן, לא צבע כחול אחיד שטוח. pointer-events-none כדי לא לחסום
-          קליקים על הפינים/זום שמתחת. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-[350] mix-blend-color bg-primary-start/40" />
     </div>
   );
 }

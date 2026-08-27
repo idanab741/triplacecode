@@ -62,7 +62,10 @@ interface NearbyPlace {
   // restaurants-cafes/nightlife מחזירים DiscoveryPlace מלא) - רק לא
   // היו מוגדרים בטיפוס המקומי כאן, אז לא זרמו הלאה ל-DiscoveryPlacesMap.
   imageUrls?: string[] | null;
-  subcategoryLabel?: string | null;
+  // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים... על בסיס
+  // מסך התגיות... לא שום דבר אחר!!"): category במקום subcategoryLabel -
+  // ר' הסבר מלא ב-DiscoveryPlacesMap.tsx ו-src/app/place/[id]/page.tsx.
+  category?: string | null;
 }
 
 export function NearbySection() {
@@ -82,9 +85,15 @@ export function NearbySection() {
     setPlaces(null);
     const { urls } = CATEGORY_ENDPOINTS[selected];
     const controller = new AbortController();
+    // *** תיקון (בקשת המשתמש - "אין הרבה בכל האפשרויות!!"): לא בעיה
+    // של כמות מקומות במסד הנתונים (יש רדיוס חיפוש שכבר מתרחב אוטומטית
+    // עד 120 ק"מ ב-discoveryService אם נמצא מעט - ר' שם) - זו הייתה
+    // תקרה נמוכה מבחירה כאן בקוד: limit=8 לכל בקשת API, ועוד חיתוך
+    // ל-12 אחרי איחוד. הועלה ל-20/30 בהתאמה, כדי שהמפה תציג משמעותית
+    // יותר פינים בפועל.
     Promise.all(
       urls.map((url) =>
-        fetch(`${url}&lat=${coords.lat}&lng=${coords.lng}&limit=8`, { signal: controller.signal })
+        fetch(`${url}&lat=${coords.lat}&lng=${coords.lng}&limit=20`, { signal: controller.signal })
           .then((res) => res.json())
           .then((data) => data.places ?? [])
           .catch(() => [])
@@ -105,7 +114,7 @@ export function NearbySection() {
             seenNames.add(normalizedName);
           }
         }
-        setPlaces(Array.from(mergedById.values()).slice(0, 12));
+        setPlaces(Array.from(mergedById.values()).slice(0, 30));
       })
       .catch(() => setPlaces([]));
     return () => controller.abort();

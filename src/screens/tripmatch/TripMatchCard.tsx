@@ -45,9 +45,13 @@ const TAG_LABELS: Record<string, string> = {
  *  שתמיד יהיו מספיק תגיות למילוי השורה בלי שהיא תיראה ריקה מדי, מגבילים
  *  ל-4 תגיות במקום 5 (תגית חמישית ממילא כמעט אף פעם לא נכנסה לשורה). */
 function deriveTags(candidate: CandidatePlace): string[] {
+  // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים... על בסיס
+  // מסך התגיות... לא שום דבר אחר!!"): הוסר candidate.subcategory -
+  // אותה בעיה כמו בעמוד המקום ובכרטיסים האחרים: שדה טקסט חופשי נפרד
+  // לגמרי ממסך התגיות, יכול "להיתקע" עם ערך ישן/שגוי.
   const baseTags = Array.from(
     new Set(
-      [candidate.category, candidate.subcategory]
+      [candidate.category]
         .filter((t): t is string => !!t && hasHebrewLabel(t))
         .map((t) => getCategoryLabel(t))
     )

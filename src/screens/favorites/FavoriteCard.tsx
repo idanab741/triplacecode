@@ -2,7 +2,11 @@ import Link from "next/link";
 import type { UnifiedPlace } from "@/services/places/unifiedPlaceService";
 
 export function FavoriteCard({ place }: { place: UnifiedPlace }) {
-  const subtitle = [place.subcategory, place.category, place.country].filter(Boolean)[0];
+  // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים... על בסיס
+  // מסך התגיות... לא שום דבר אחר!!"): הוסר place.subcategory מהעדיפות -
+  // אותה בעיה כמו בעמוד המקום (ר' src/app/place/[id]/page.tsx): שדה
+  // טקסט חופשי נפרד לגמרי ממסך התגיות, יכול "להיתקע" עם ערך ישן.
+  const subtitle = [place.category, place.country].filter(Boolean)[0];
 
   const content = (
     <>

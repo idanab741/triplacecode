@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { DiscoveryPlace } from "@/services/places/discoveryService";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 
 interface DiscoveryPlaceCardProps {
   place: DiscoveryPlace;
@@ -23,7 +24,13 @@ interface DiscoveryPlaceCardProps {
  * "פתוח" יחיד במרכז).
  */
 export function DiscoveryPlaceCard({ place, from, fixedWidth = true }: DiscoveryPlaceCardProps) {
-  const subtitle = [place.subcategoryLabel, place.city].filter(Boolean).join(" · ") || null;
+  // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים... על בסיס
+  // מסך התגיות... לא שום דבר אחר!!"): הוחלף place.subcategoryLabel
+  // ב-getCategoryLabel(place.category) - אותה בעיה כמו בעמוד המקום:
+  // subcategory הוא שדה טקסט חופשי נפרד ממסך התגיות, יכול "להיתקע"
+  // עם ערך ישן/שגוי. category הוא השדה שבאמת נערך במסך התגיות
+  // ("קטגוריה ראשית (חובה)").
+  const subtitle = [getCategoryLabel(place.category), place.city].filter(Boolean).join(" · ") || null;
   const href = from ? `/place/${place.id}?from=${encodeURIComponent(from)}` : `/place/${place.id}`;
 
   return (

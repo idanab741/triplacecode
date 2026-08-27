@@ -43,10 +43,19 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
     );
   }
 
+  // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים צריכים
+  // להתעדכן על בסיס מסך התגיות... לא שום דבר אחר!!"): הוסר
+  // place.subcategory מרשימת הצ'יפים. זה שדה טקסט חופשי נפרד לגמרי,
+  // בעמוד עריכה אחר באדמין (/admin/places/[id], לא מסך התגיות/
+  // cuisine_tags/tags/TripMatch) - התברר שהוא יכול "להיתקע" עם ערך
+  // ישן/שגוי (למשל "cafe") גם אחרי שהמקום סווג מחדש דרך מסך התגיות,
+  // כי שני השדות לא מסונכרנים. מעכשיו הצ'יפים בעמוד המקום מבוססים
+  // אך ורק על מה שבאמת נערך במסך התגיות: הקטגוריה הראשית (category)
+  // + כל קבוצות התגיות (trip_type_tags/cuisine_tags/tags) - בדיוק
+  // מקור האמת שהמשתמש ביקש, בלי שום שדה צדדי נוסף.
   const categoryChips = Array.from(
     new Set(
       [
-        place.subcategory,
         getCategoryLabel(place.category),
         ...(place.trip_type_tags ?? []),
         ...(place.cuisine_tags ?? []),

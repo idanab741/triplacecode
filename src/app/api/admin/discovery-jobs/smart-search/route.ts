@@ -145,11 +145,22 @@ export async function POST(request: Request) {
     restaurants: "restaurants",
     hotels: "hotels",
   };
-  const BUCKET_DEFAULT_SUBCATEGORY: Record<string, string> = {
+  // *** תיקון (בקשת המשתמש - "מסעדות בבתי קפה?? מה נסגר?"): הערך "cafe"
+  // כברירת מחדל ל-bucket "מסעדות" היה שגוי - הוא הודבק על **כל** מסעדה
+  // שנוספה דרך smart-search (סטייקהאוס, סושי, הכל), בלי קשר לסוג האוכל
+  // האמיתי. מסך "☕ קפה" ב-Nearby מסנן בדיוק לפי subcategory הזה (ר'
+  // discoveryService.ts, CATEGORY_ALL_SUBCATEGORIES["coffee_carts_cafes"]
+  // כולל "cafe") - זו הסיבה שכל המסעדות "נטבעו" כבתי קפה. אין דרך
+  // אמינה להסיק את סוג המטבח האמיתי מכאן בלי לשאול את גוגל שוב לכל
+  // מקום - עדיף להשאיר את subcategory ריק (null) על שגוי במפורש.
+  // "מלונות"/"אטרקציות"/"טבע"/"חיי לילה" נשארו כמו שהיו - הבאג היה
+  // ספציפי ל"מסעדות" (הערך היחיד שבמקרה גם היה תת-קטגוריה אמיתית
+  // ב-taxonomy אחר, אז הוא "דלף" לשם בלי שאף אחד שם לב).
+  const BUCKET_DEFAULT_SUBCATEGORY: Record<string, string | null> = {
     attractions: "general_attractions",
     nature: "nature_trails",
     nightlife: "cocktail_bar",
-    restaurants: "cafe",
+    restaurants: null,
     hotels: "hotel",
   };
   const resolvedCategory: PlaceCategoryKey = isValidPlaceCategory(BUCKET_TO_CATEGORY[bucket] ?? "")
