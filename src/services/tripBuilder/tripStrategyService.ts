@@ -69,8 +69,13 @@ export function detectsExplicitFoodEmphasis(freeText: string): boolean {
 }
 
 function clampAttractionsCount(value: unknown): number {
-  const n = typeof value === "number" ? Math.round(value) : 4;
-  return Math.min(7, Math.max(2, n));
+  const n = typeof value === "number" ? Math.round(value) : 3;
+  // *** תיקון (בקשה מפורשת - "3 אטרקציות מקסימום!!! לא מעבר"): התקרה
+  // ירדה מ-7 ל-3 - זו התקרה הקשיחה בפועל, בלי קשר ל-Pace/למספר
+  // שהמשתמש ציין במלל חופשי (ר' requestedPlaceCount למטה - גם הוא
+  // עובר דרך clampAttractionsCount, אז גם בקשה מפורשת ל"10 מקומות"
+  // לא תחרוג מ-3 ליום).
+  return Math.min(3, Math.max(2, n));
 }
 
 /**

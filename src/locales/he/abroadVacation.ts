@@ -89,13 +89,20 @@ export function getVacationTypeLabel(value: string): string {
  * (context.trip.vacationTypes.includes("culinary")) יכול להעלות אותו
  * ל-CULINARY_RESTAURANT_STOPS_PER_DAY, לא ה-pace עצמו.
  */
+/**
+ * *** תיקון (בקשה מפורשת - "עד יום אחד - 3 מסעדות ו-3 אטרקציות
+ * מקסימום!!! לא מעבר"): תקרה קשיחה ליום - 3 אטרקציות לכל היותר,
+ * בלי קשר ל-Pace שנבחר (relaxed/balanced/packed). packed/balanced
+ * עדיין "שואפים" ליותר בערכים למטה (לתיעוד/הגיון פנימי), אבל
+ * clampAttractionsCount תמיד עוצר ב-3 בפועל.
+ */
 export const VACATION_PACE_DAILY_COUNTS: Record<
   "relaxed" | "balanced" | "packed",
   { attractions: number }
 > = {
   relaxed: { attractions: 2 }, // בוקר + 1-2 פעילויות + צהריים + זמן חופשי/פעילות + ערב
-  balanced: { attractions: 4 }, // בוקר + 2-3 פעילויות + צהריים + 1-2 פעילויות נוספות + ערב
-  packed: { attractions: 6 }, // בוקר + 3-5 פעילויות + צהריים + פעילויות נוספות + ערב
+  balanced: { attractions: 3 }, // בוקר + 2-3 פעילויות + צהריים + ערב (הורד מ-4, ר' תקרה למעלה)
+  packed: { attractions: 3 }, // תקרה קשיחה - הורד מ-6, ר' תקרה למעלה
 };
 
 /** ברירת מחדל: צהריים+ערב = 2 עצירות Restaurant אמיתיות ליום "רגיל" -
@@ -103,7 +110,9 @@ export const VACATION_PACE_DAILY_COUNTS: Record<
  *  כאן בכלל - היא coffee/breakfast, לא Restaurant. */
 export const DEFAULT_RESTAURANT_STOPS_PER_DAY = 2;
 /** Culinary Intent מפורש בלבד - תוספת עצירת אוכל/יין אחת (למשל טעימות
- *  יין/סיור קולינרי), עדיין תקרה קשיחה - לעולם לא "כל היום מסעדות". */
+ *  יין/סיור קולינרי), עדיין תקרה קשיחה - לעולם לא "כל היום מסעדות".
+ *  *** תיקון (בקשה מפורשת - "3 מסעדות מקסימום!!! לא מעבר"): כבר היה 3
+ *  לפני הבקשה הזו - נשאר כמו שהוא, זו כבר התקרה הנכונה. */
 export const CULINARY_RESTAURANT_STOPS_PER_DAY = 3;
 
 /** מיפוי מסוג החופשה (מה שהמשתמש בוחר) לקטגוריית ה-DB בפועל (trip_type_tags group). */

@@ -553,7 +553,14 @@ function AbroadVacationResultContent() {
           }))}
         />
 
-        {(!hasHotel && !hotelSaved) || editingHotel ? (
+        {/* *** תיקון (בקשה מפורשת - "עד יום אחד בלבד!! שלא יראה כמו
+            עמוד המסלול של חופשה בחו''ל"): כרטיס "איפה תישנו?" רלוונטי
+            רק לטיול רב-ימי אמיתי - בטיול יום אחד (expectedTotalDays===1,
+            הזרימה הפשוטה של TrippyConversation) הוא לא רלוונטי בכלל
+            ומזכיר "עמוד חופשה" יותר מדי. מוסתר לגמרי בטיול יום-אחד,
+            בלי קשר אם יש/אין מלון שמור (hasHotel ממילא false תמיד
+            בזרימה הזו, כי היא לא שואלת על מלון). */}
+        {expectedTotalDays > 1 && ((!hasHotel && !hotelSaved) || editingHotel ? (
           <div className="flex flex-col gap-2 rounded-card bg-white p-4 shadow-md">
             <p className="text-sm font-semibold text-ink">איפה תישנו? (אופציונלי)</p>
             <p className="text-xs text-ink-secondary">
@@ -607,7 +614,7 @@ function AbroadVacationResultContent() {
               </button>
             </div>
           )
-        )}
+        ))}
 
         {/* הקשר גרירה אחד משותף לכל הימים (לא אחד נפרד לכל יום) - זה מה
             שמאפשר לגרור תחנה מיום אחד לתוך יום אחר. items כולל את כל

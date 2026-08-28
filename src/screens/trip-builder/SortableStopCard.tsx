@@ -280,8 +280,10 @@ export function SortableStopCard({
             </button>
           )}
 
-          {/* TRIPPY - נקודת הכניסה היחידה לשינוי התחנה. מוסתר כשהתיבה כבר פתוחה, כדי לא להתנגש איתה */}
-          {!instructOpen && (
+          {/* TRIPPY - נקודת הכניסה היחידה לשינוי התחנה. מוסתר כשהתיבה כבר פתוחה, כדי לא להתנגש איתה.
+              *** תוספת (שימוש חדש בעמוד trippy-quick, בלי session בכלל): אם אין sessionId,
+              אין דרך לשלוח בקשת שינוי לשרת - מסתירים את הכפתור לגמרי, לא משאירים כפתור מת. */}
+          {sessionId && !instructOpen && (
             <button
               type="button"
               onClick={() => setInstructOpen(true)}

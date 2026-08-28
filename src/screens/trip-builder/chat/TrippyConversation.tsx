@@ -47,13 +47,21 @@ const DEFAULT_ANSWERS: AbroadVacationAnswers = {
 
 /** תאריכי ברירת מחדל - בעוד שבועיים, 4 לילות - כשלא נשאלו תאריכים בכלל
  *  בזרימה המקוצרת הזו (רק שאלת המשך אחת, ממוקדת יעד בלבד). */
+/**
+ * *** תיקון (בקשה מפורשת - "אני רוצה כללי! לפי מלל חופשי! עד יום אחד
+ * של מסלול"): הוחלט (אחרי בירור מפורש) להישאר על אותו מנגנון בנייה
+ * בדיוק (חופשה בחו"ל - יעד כללי כלשהו, לא רק "ליד הבית") ולא לעבור
+ * למנגנון "טיול יומי" הנפרד (שמבוסס על GPS/מיקום נוכחי, לא מתאים ליעד
+ * כמו "חאניה, יוון"). הדרך הפשוטה והבטוחה להגביל ליום אחד בלי לגעת
+ * בכל שרשרת ה-AI: startDate===endDate נותן countDays()=1 באופן טבעי
+ * (ר' categoryPlanService.ts) - בלי "לשקר" לשום שירות במורד הזרימה.
+ */
 function defaultDateRange(): { startDate: string; endDate: string } {
   const start = new Date();
   start.setDate(start.getDate() + 14);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 4);
   const toIso = (d: Date) => d.toISOString().slice(0, 10);
-  return { startDate: toIso(start), endDate: toIso(end) };
+  const iso = toIso(start);
+  return { startDate: iso, endDate: iso };
 }
 
 function buildAnswers(
@@ -136,29 +144,17 @@ export function TrippyConversation() {
     }
   }
 
-  async function submitFreeText() {
+  /**
+   * *** תיקון (בקשה מפורשת - "מלל חופשי... משם ישר הולכים לעמוד מסלול
+   * ייחודי שלא היה באפליקציה"): קודם זה חילץ יעד/הציע יעדים והמשיך
+   * לשאלת המשך + מנגנון "חופשה בחו"ל" המלא. עכשיו - ניווט ישיר לעמוד
+   * המסלול המהיר החדש (trippy-quick/result) עם המלל החופשי כפי שהוא -
+   * אין יותר extraction/followUp/startBuild בזרימה הזו כלל.
+   */
+  function submitFreeText() {
     const trimmed = text.trim();
     if (!trimmed || typing) return;
-    add("user", trimmed);
-    setText("");
-    freeTextRef.current = trimmed;
-    setTyping(true);
-
-    const extracted = await fetchExtractedIntent(trimmed);
-    extractedRef.current = extracted;
-    setTyping(false);
-
-    if (extracted?.destination) {
-      startBuild({ type: "single", value: extracted.destination });
-      return;
-    }
-    if (extracted?.destinations.length) {
-      startBuild({ type: "multi", values: extracted.destinations });
-      return;
-    }
-
-    setStage("followUp");
-    add("assistant", extracted?.suggestedDestinations.length ? FOLLOW_UP_WITH_SUGGESTIONS : FOLLOW_UP_NO_SUGGESTIONS);
+    router.push(`/trip-builder/trippy-quick/result?freeText=${encodeURIComponent(trimmed)}`);
   }
 
   function chooseDestination(value: string) {
