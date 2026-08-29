@@ -14,6 +14,15 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(`${origin}/auth`);
 
+  // אם המשתמש הגיע דרך לינק הזמנה אישי (/join/<code> -> /auth?ref=<code> ->
+  // כאן דרך redirectTo של ה-OAuth), פודים את הקוד עם ה-client המחובר -
+  // redeem_invite() כותב רק לשורת הפרופיל של המשתמש עצמו (auth.uid()),
+  // ולא-פעולה בטוחה אם הקוד לא תקין/כבר נפדה/הזמנה עצמית.
+  const ref = searchParams.get("ref");
+  if (ref) {
+    await supabase.rpc("redeem_invite", { p_code: ref });
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, main_onboarding_completed_at, intro_completed_at")

@@ -25,11 +25,15 @@ export async function signInAsGuest() {
   return supabase.auth.signInAnonymously();
 }
 
-export async function signInWithOAuth(provider: "google" | "apple") {
+/** inviteCode, אם קיים, מצטרף לכתובת ה-callback כדי לשרוד את סבב ה-OAuth
+ *  (ר' /auth/callback/route.ts, שקורא אותו ומריץ redeem_invite). */
+export async function signInWithOAuth(provider: "google" | "apple", inviteCode?: string | null) {
   const supabase = createClient();
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+  if (inviteCode) callbackUrl.searchParams.set("ref", inviteCode);
   return supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
+    options: { redirectTo: callbackUrl.toString() },
   });
 }
 

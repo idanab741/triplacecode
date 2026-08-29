@@ -11,6 +11,10 @@ export interface Profile {
   intro_completed_at?: string | null;
   tripmatch_onboarding_completed_at: string | null;
   tripbuilding_onboarding_completed_at: string | null;
+  /** קוד ההזמנה האישי והייחודי של המשתמש (ר' migration 0061). הלינק הציבורי הוא /join/<invite_code>. */
+  invite_code: string;
+  /** ה-id של המשתמש שהזמין את המשתמש הזה, אם הצטרף דרך לינק הזמנה אישי. */
+  referred_by: string | null;
   created_at: string;
   updated_at: string;
 }

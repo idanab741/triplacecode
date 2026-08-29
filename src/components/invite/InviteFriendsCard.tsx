@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
+import { buildInviteUrl } from "@/services/invite/inviteService";
 
 interface InviteFriendsCardProps {
-  /** קישור ההזמנה. אם לא מועבר, נגזר מכתובת האתר הנוכחית (origin/). */
+  /** קישור הזמנה חיצוני, לשימוש בבדיקות/תצוגה בלבד. כברירת מחדל
+   *  הכרטיס בונה את הקישור האישי האמיתי מ-invite_code של המשתמש המחובר
+   *  (ר' migration 0061 + inviteService.ts) - לעולם לא קישור כללי לעמוד הבית. */
   inviteUrl?: string;
   /** אם מועבר - הכרטיס מוצג בתוך פופאפ (InviteFriendsModal) ומקבל כפתור סגירה צף. */
   onClose?: () => void;
@@ -24,18 +28,31 @@ const SHARE_TEXT = "בואו לגלות את הטיול הבא שלנו יחד �
  * *** תיקון (משוב מפורש): הוויזואל משתמש בתמונת ה-HERO האמיתית של
  * triplace (hero-tripmatch.png, כבר קיימת ב-public/images ומשמשת גם
  * ב-tripmatch/page.tsx וב-LikedDialog.tsx) - לא איור SVG מאולתר.
+ *
+ * *** תיקון (הפיכת הפיצ'ר לאמיתי): הקישור כבר לא origin/ כללי - הוא
+ * נבנה מ-profile.invite_code האישי והייחודי של המשתמש המחובר. כל עוד
+ * הפרופיל עדיין נטען, כל פעולות השיתוף מושבתות (ולא נופלות לקישור דמה) -
+ * ר' requireUrl/isReady למטה. הלינק מוביל בפועל ל-/join/<code>, שבו
+ * TRIPLACE מזהה את מקור ההזמנה ושומרת את הקשר בין המזמין למוזמן
+ * (redeem_invite, נקרא מ-/auth אחרי הרשמה/התחברות מוצלחת).
  */
 export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps) {
+  const { user, profile, profileLoading } = useAuth();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
-  function resolveUrl() {
-    if (inviteUrl) return inviteUrl;
-    if (typeof window !== "undefined") return window.location.origin;
-    return process.env.NEXT_PUBLIC_APP_URL ?? "https://triplace.app";
+  const resolvedUrl = inviteUrl ?? (profile?.invite_code ? buildInviteUrl(profile.invite_code) : null);
+  const isReady = Boolean(resolvedUrl);
+  const isLoading = !inviteUrl && Boolean(user) && profileLoading;
+
+  /** לעולם לא מחזירה קישור דמה/כללי - אם הקוד האישי עוד לא נטען, הפעולות
+   *  שמשתמשות בה פשוט לא מתבצעות (הכפתורים גם מושבתים ויזואלית - ר' JSX). */
+  function requireUrl(): string | null {
+    return resolvedUrl;
   }
 
   async function handleWhatsApp() {
-    const url = resolveUrl();
+    const url = requireUrl();
+    if (!url) return;
     const text = encodeURIComponent(`${SHARE_TEXT}\n${url}`);
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   }
@@ -50,7 +67,8 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
    * מוצג "הועתק" מזויף בשום מקרה.
    */
   async function handleCopyLink() {
-    const url = resolveUrl();
+    const url = requireUrl();
+    if (!url) return;
 
     try {
       await navigator.clipboard.writeText(url);
@@ -85,7 +103,8 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
   }
 
   async function handleShare() {
-    const url = resolveUrl();
+    const url = requireUrl();
+    if (!url) return;
     if (navigator.share) {
       try {
         await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url });
@@ -124,13 +143,15 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
           שתפו את Triplace עם החברים שלכם והזמינו אותם להצטרף לחוויית הטיולים.
         </p>
 
-        {/* אזור שיתוף - שלוש פעולות בלבד, בלי היררכיה מתחרה עם הכותרת/ויזואל */}
+        {/* אזור שיתוף - שלוש פעולות בלבד, בלי היררכיה מתחרה עם הכותרת/ויזואל.
+            מושבתות כל עוד הקישור האישי לא נטען - לעולם לא שולחות קישור דמה. */}
         <div className="mt-5 flex items-center justify-center gap-3">
           <button
             type="button"
             onClick={handleWhatsApp}
+            disabled={!isReady}
             aria-label="שיתוף בוואטסאפ"
-            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96]"
+            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-soft">
               <WhatsAppIcon />
@@ -141,8 +162,9 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
           <button
             type="button"
             onClick={handleCopyLink}
+            disabled={!isReady}
             aria-label="העתקת קישור הזמנה"
-            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96]"
+            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-soft">
               {copyState === "copied" ? <CheckIcon /> : <LinkIcon />}
@@ -155,8 +177,9 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
           <button
             type="button"
             onClick={handleShare}
+            disabled={!isReady}
             aria-label="שיתוף"
-            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96]"
+            className="flex flex-1 flex-col items-center gap-1.5 rounded-2xl bg-bg-secondary py-3.5 transition active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-soft">
               <ShareIcon />
@@ -164,6 +187,33 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
             <span className="text-xs font-semibold text-ink-secondary">שיתוף</span>
           </button>
         </div>
+
+        {/* "קישור ההזמנה שלך" - אזור קטן ונקי (דרישה #9), עם הקישור האמיתי
+            ופעולת העתקה משלו. לא מוצג בכלל אם המשתמש לא מחובר. */}
+        {user && (
+          <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-bg-secondary px-4 py-3 text-start">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-ink-secondary">קישור ההזמנה שלך</p>
+              {isLoading ? (
+                <div className="mt-1 h-4 w-32 animate-pulse rounded-full bg-white/70" />
+              ) : (
+                <p className="mt-0.5 truncate text-sm font-medium text-ink" dir="ltr">
+                  {resolvedUrl ?? "—"}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              disabled={!isReady}
+              aria-label="העתקת קישור ההזמנה שלך"
+              className="flex shrink-0 items-center gap-1.5 rounded-pill bg-white px-3 py-2 text-xs font-semibold text-ink shadow-soft transition active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
+            >
+              {copyState === "copied" ? <CheckIcon /> : <LinkIcon />}
+              {copyState === "copied" ? "הועתק!" : "העתק"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

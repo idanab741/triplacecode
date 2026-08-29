@@ -18,6 +18,12 @@ import { getProfile } from "@/services/profile/profileService";
 import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
 import { OtpInput } from "@/screens/auth/OtpInput";
+import {
+  consumePendingInviteCode,
+  peekPendingInviteCode,
+  redeemInviteCode,
+  storePendingInviteCode,
+} from "@/services/invite/inviteService";
 
 type Tab = "signup" | "signin";
 
@@ -65,6 +71,28 @@ function AuthPageContent() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [forgotMode, setForgotMode] = useState(false);
 
+  // קוד הזמנה (ר' /join/<code>): קודם מה-URL (?ref=...), אחרת מה-localStorage
+  // ששמור מהביקור ב-/join/<code> - ר' inviteService.ts. נפדה בפועל רק אחרי
+  // הרשמה/התחברות מוצלחת (redeemPendingInvite למטה), לא סתם בטעינת העמוד.
+  const [inviteCode] = useState<string | null>(() => {
+    const fromUrl = searchParams.get("ref");
+    if (fromUrl) {
+      // שומרים גם ב-localStorage: אם המשתמש עובר דרך שלב אימות OTP (שאין
+      // בו את הפרמטר ב-URL) או רענון עמוד, הקוד לא יאבד.
+      storePendingInviteCode(fromUrl);
+      return fromUrl;
+    }
+    return peekPendingInviteCode();
+  });
+
+  /** מנסה לפדות את קוד ההזמנה הממתין (אם יש) - לא-פעולה בטוחה אם אין קוד,
+   *  אם הקוד לא תקין, אם המשתמש כבר משויך למזמין, או בהזמנה עצמית. */
+  async function redeemPendingInvite() {
+    if (!inviteCode) return;
+    await redeemInviteCode(inviteCode);
+    consumePendingInviteCode();
+  }
+
   const [suEmail, setSuEmail] = useState("");
   const [suPassword, setSuPassword] = useState("");
   const [suConfirm, setSuConfirm] = useState("");
@@ -108,6 +136,7 @@ function AuthPageContent() {
       return;
     }
     if (data.user) {
+      await redeemPendingInvite();
       router.push("/home");
     }
   }
@@ -116,7 +145,7 @@ function AuthPageContent() {
     if (oauthLoading) return;
     setSocialMessage(null);
     setOauthLoading(provider);
-    const { error } = await signInWithOAuth(provider);
+    const { error } = await signInWithOAuth(provider, inviteCode);
     if (error) {
       setOauthLoading(null);
       setSocialMessage(translateAuthError(error.message));
@@ -148,6 +177,7 @@ function AuthPageContent() {
       return;
     }
     if (data.session && data.user) {
+      await redeemPendingInvite();
       await redirectAfterAuth(data.user.id, router);
     } else {
       setAwaitingOtp(true);
@@ -170,6 +200,7 @@ function AuthPageContent() {
       return;
     }
     if (data.user) {
+      await redeemPendingInvite();
       await redirectAfterAuth(data.user.id, router);
     }
   }
