@@ -36,6 +36,11 @@ export interface DiscoveryPlace {
    *  חשוף קודם על DiscoveryPlace (רק בשימוש פנימי לחישוב distanceKm). */
   latitude: number | null;
   longitude: number | null;
+  /** *** תוספת (בקשת המשתמש - "ג'סמינו בכלל סגור בשבת" - trippy-quick
+   *  הציע מסעדה סגורה ביום שהמשתמש ביקש טיול בו): שעות פתיחה גולמיות
+   *  (כמו ב-finalizeService.ts/validationService.ts) - שדה נוסף בלבד,
+   *  לא משנה התנהגות לאף צרכן קיים של DiscoveryPlace שלא משתמש בו. */
+  openingHours: string[] | null;
 }
 
 export interface DiscoveryLocation {
@@ -60,7 +65,7 @@ const MAX_DISCOVERY_RADIUS_KM = 120;
 const DEFAULT_DISCOVERY_COUNTRY = "ישראל";
 
 const PLACE_COLUMNS =
-  "id,name,category,subcategory,short_description,image_urls,rating,rating_count,city,latitude,longitude,tags";
+  "id,name,category,subcategory,short_description,image_urls,rating,rating_count,city,latitude,longitude,tags,opening_hours";
 
 interface PlaceRow {
   id: string;
@@ -75,6 +80,7 @@ interface PlaceRow {
   latitude: number | null;
   longitude: number | null;
   tags: string[] | null;
+  opening_hours: string[] | null;
 }
 
 function rowToDiscoveryPlace(row: PlaceRow, origin: LatLng | null): DiscoveryPlace {
@@ -97,6 +103,7 @@ function rowToDiscoveryPlace(row: PlaceRow, origin: LatLng | null): DiscoveryPla
     tags: row.tags ?? [],
     latitude: row.latitude,
     longitude: row.longitude,
+    openingHours: row.opening_hours ?? null,
   };
 }
 

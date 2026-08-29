@@ -6,12 +6,24 @@ import { useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Skeleton, SwipeUpToDeleteCard } from "@/components/ui";
 
+/**
+ * *** תיקון אדריכלי (ר' migration 0057 - trippy_ai_results): עד עכשיו
+ * "הטיולים שלי" שלף רק מ-trip_builder_sessions (טיולי יום/חופשה
+ * מהאשף המלא). עכשיו מאחד שני מקורות **נפרדים לגמרי**: הטבלה הישנה
+ * (via /api/trip-builder/sessions/saved) + הטבלה החדשה הייעודית
+ * לצ'אט המהיר (via /api/trippy-ai) - לא מערבבים אותן ב-DB, רק
+ * בתצוגה, וכל כרטיס "trippy AI" מסומן בבירור (תג עם הגלובוס המהבהב -
+ * אותו רכיב/אנימציה בדיוק כמו כפתור "trippy AI" בתפריט התחתון).
+ */
 interface TripPreview {
-  sessionId: string;
-  tripType: string;
+  id: string;
+  tripType: string | null;
   destinationLabel: string;
   imageUrl: string | null;
   stopCount: number;
+  createdAt: string;
+  isTrippyAi: boolean;
+  shareToken?: string;
 }
 
 const TRIP_TYPE_ROUTE: Record<string, string> = {
@@ -21,9 +33,14 @@ const TRIP_TYPE_ROUTE: Record<string, string> = {
   nightlife: "nightlife",
 };
 
-function tripResultPath(tripType: string, sessionId: string): string {
-  const routeSegment = TRIP_TYPE_ROUTE[tripType] ?? tripType.replace(/_/g, "-");
-  return `/trip-builder/${routeSegment}/result?sessionId=${sessionId}`;
+function tripResultPath(trip: TripPreview): string {
+  if (trip.isTrippyAi) return `/trip-builder/trippy-quick/result?savedId=${trip.id}`;
+  const routeSegment = TRIP_TYPE_ROUTE[trip.tripType ?? ""] ?? (trip.tripType ?? "day-trip").replace(/_/g, "-");
+  return `/trip-builder/${routeSegment}/result?sessionId=${trip.id}`;
+}
+
+function deleteTripPath(trip: TripPreview): string {
+  return trip.isTrippyAi ? `/api/trippy-ai/${trip.id}` : `/api/trip-builder/sessions/${trip.id}`;
 }
 
 const PREVIEW_LIMIT = 10;
@@ -39,15 +56,47 @@ export function MyTripsSection() {
   });
 
   useEffect(() => {
-    fetch(`/api/trip-builder/sessions/saved?all=true&limit=${PREVIEW_LIMIT}`)
-      .then((res) => res.json())
-      .then((data) => setTrips(data.trips ?? []))
-      .catch(() => setTrips([]));
+    Promise.all([
+      fetch(`/api/trip-builder/sessions/saved?all=true&limit=${PREVIEW_LIMIT}`)
+        .then((res) => res.json())
+        .catch(() => ({ trips: [] })),
+      fetch(`/api/trippy-ai?limit=${PREVIEW_LIMIT}`)
+        .then((res) => res.json())
+        .catch(() => ({ results: [] })),
+    ]).then(([sessionsData, trippyAiData]) => {
+      const fromSessions: TripPreview[] = (sessionsData.trips ?? []).map(
+        (t: { sessionId: string; tripType: string; destinationLabel: string; imageUrl: string | null; stopCount: number; createdAt: string }) => ({
+          id: t.sessionId,
+          tripType: t.tripType,
+          destinationLabel: t.destinationLabel,
+          imageUrl: t.imageUrl,
+          stopCount: t.stopCount,
+          createdAt: t.createdAt,
+          isTrippyAi: false,
+        })
+      );
+      const fromTrippyAi: TripPreview[] = (trippyAiData.results ?? []).map(
+        (r: { id: string; title: string; imageUrl: string | null; stopCount: number; createdAt: string; shareToken: string }) => ({
+          id: r.id,
+          tripType: null,
+          destinationLabel: r.title,
+          imageUrl: r.imageUrl,
+          stopCount: r.stopCount,
+          createdAt: r.createdAt,
+          isTrippyAi: true,
+          shareToken: r.shareToken,
+        })
+      );
+      const merged = [...fromSessions, ...fromTrippyAi].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      setTrips(merged.slice(0, PREVIEW_LIMIT));
+    });
   }, []);
 
-  async function handleDeleteTrip(sessionId: string) {
-    setTrips((prev) => (prev ? prev.filter((t) => t.sessionId !== sessionId) : prev));
-    await fetch(`/api/trip-builder/sessions/${sessionId}`, { method: "DELETE" }).catch(() => {});
+  async function handleDeleteTrip(trip: TripPreview) {
+    setTrips((prev) => (prev ? prev.filter((t) => t.id !== trip.id) : prev));
+    await fetch(deleteTripPath(trip), { method: "DELETE" }).catch(() => {});
   }
 
   return (
@@ -99,14 +148,14 @@ export function MyTripsSection() {
           <div className="flex">
             {trips.map((trip) => (
               <div
-                key={trip.sessionId}
+                key={`${trip.isTrippyAi ? "ai" : "session"}-${trip.id}`}
                 className="min-w-0 shrink-0 grow-0"
                 style={{ flexBasis: "45%", marginInlineEnd: 12 }}
               >
-                <SwipeUpToDeleteCard onDelete={() => handleDeleteTrip(trip.sessionId)}>
+                <SwipeUpToDeleteCard onDelete={() => handleDeleteTrip(trip)}>
                   <button
                     type="button"
-                    onClick={() => router.push(tripResultPath(trip.tripType, trip.sessionId))}
+                    onClick={() => router.push(tripResultPath(trip))}
                     className="relative block h-32 w-full overflow-hidden rounded-card bg-bg-secondary text-right shadow-soft"
                   >
                     {trip.imageUrl ? (

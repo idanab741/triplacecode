@@ -6,13 +6,20 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { Screen, Skeleton } from "@/components/ui";
+import { Screen } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { downloadIcsFile } from "@/utils/downloadIcsFile";
-import type { TrippyQuickStop } from "@/app/api/trip-builder/trippy-quick/route";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import type { TrippyQuickStop } from "@/services/tripBuilder/trippyQuickShared";
 import type { FinalItineraryStop } from "@/services/tripBuilder/types";
+
+interface SearchContext {
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+}
 
 /**
  * *** עמוד חדש (בקשה מפורשת - "מלל חופשי... משם ישר הולכים לעמוד
@@ -60,10 +67,34 @@ function toFinalItineraryStop(stop: TrippyQuickStop, index: number): FinalItiner
 function TrippyQuickResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const requestId = searchParams.get("requestId");
   const freeText = searchParams.get("freeText") ?? "";
+  // *** תוספת (ר' migration 0057 - trippy_ai_results): פתיחה מחדש של
+  // תוצאה שמורה מ"הטיולים שלי" (MyTripsSection.tsx) - שם, בניגוד לזרימת
+  // requestId/sessionStorage, אין state בזיכרון הדפדפן בכלל (זה טאב/
+  // טעינה חדשים), אז שולפים ישירות מ-DB לפי savedId.
+  const savedId = searchParams.get("savedId");
 
   const [stops, setStops] = useState<TrippyQuickStop[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
+  const [searchContext, setSearchContext] = useState<SearchContext | null>(null);
+  // *** תוספת (בקשה מפורשת - "אפשרות לשמירה ושיתוף"): טוקן קישור
+  // ציבורי read-only (ר' migration 0058) - מגיע או מתגובת ה-POST
+  // המקורית (זרימת requestId/sessionStorage) או משליפת /api/trippy-ai/[id]
+  // (זרימת savedId, פתיחה מחדש מ"הטיולים שלי"). null כשלא נשמר בכלל
+  // (משתמש לא מחובר) - במקרה כזה לא מציגים את כפתור השיתוף.
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  // *** תוספת (בקשת המשתמש - "שיניתי את האטרקציה... אם אני נכנס שוב
+  // דרך הטיולים שלי - זה עדיין האטרקציה שהחלפתי לפני ששיניתי"): swap/
+  // מחיקה/סידור-מחדש/הוספה עדכנו עד עכשיו רק את ה-state המקומי של
+  // העמוד - לא את trippy_ai_results ב-DB. persistId מזהה אם יש בכלל
+  // מה לשמור עליו (null = לא נשמר מלכתחילה, למשל משתמש לא מחובר).
+  // מגיע או מ-savedId ב-URL (פתיחה מחדש) או מתגובת ה-POST המקורית
+  // (יצירה טרייה - ר' שני ה-useEffect branches למטה).
+  const [persistId, setPersistId] = useState<string | null>(savedId);
+  const [swappingId, setSwappingId] = useState<string | null>(null);
+  const [swapConfirmStop, setSwapConfirmStop] = useState<TrippyQuickStop | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(() => {
@@ -79,16 +110,80 @@ function TrippyQuickResultContent() {
   );
 
   useEffect(() => {
+    // *** תיקון (בקשה מפורשת - "זה אמור להיות רק בצ'אט!! עד שעולה
+    // הטיול המלא"): הנתונים כבר נטענו *לפני* הניווט (ר'
+    // TrippyConversation.tsx - submitFreeText), בזמן שהרצף המלא
+    // (בונים.../runtrippy/שלוש נקודות) עוד מוצג בצ'אט. הם נשמרו זמנית
+    // ב-sessionStorage לפי requestId, וכאן רק קוראים אותם - בלי שום
+    // fetch, בלי שום מסך טעינה נוסף. freeText (הישן) נשאר רק כ-fallback
+    // אם מישהו הגיע לעמוד הזה ישירות (רענון/קישור ישן) בלי requestId.
+    // *** תיקון (בקשת המשתמש - "המסלול כבר לא זמין" מופיע תמיד): מחיקת
+    // sessionStorage מיד אחרי הקריאה לא עמידה מול React Strict Mode
+    // (במצב dev, React מריץ useEffect פעמיים בכוונה כדי לתפוס קוד לא-
+    // טהור - הריצה הראשונה קראה ומחקה בהצלחה, השנייה כבר לא מצאה כלום
+    // ותפסה את זה כשגיאה). הפתרון: לא מוחקים בכלל - sessionStorage
+    // ממילא מתנקה לבד כשהטאב/חלון נסגר, אין סיבה אמיתית למחוק ידנית,
+    // וזה מבטל את כל הבעיה בלי סיכון.
+    if (savedId) {
+      let cancelled = false;
+      fetch(`/api/trippy-ai/${savedId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.result || !Array.isArray(data.result.stops) || data.result.stops.length === 0) {
+            setError("המסלול לא נמצא - ייתכן שנמחק.");
+            return;
+          }
+          setStops(data.result.stops);
+          setTitle(typeof data.result.title === "string" ? data.result.title : null);
+          if (data.result.search_context) setSearchContext(data.result.search_context);
+          if (typeof data.result.share_token === "string") setShareToken(data.result.share_token);
+        })
+        .catch(() => {
+          if (!cancelled) setError("משהו השתבש - נסו שוב.");
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (requestId) {
+      const raw = sessionStorage.getItem(`trippy-quick:${requestId}`);
+      if (!raw) {
+        setError("המסלול כבר לא זמין - נסו לבנות מסלול חדש.");
+        return;
+      }
+      try {
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data.stops) || data.stops.length === 0) {
+          setError("לא הצלחנו למצוא מקומות מתאימים לבקשה הזו - נסו לנסח אחרת.");
+          return;
+        }
+        setStops(data.stops);
+        setTitle(typeof data.title === "string" ? data.title : null);
+        if (data.searchContext) setSearchContext(data.searchContext);
+        if (typeof data.shareToken === "string") setShareToken(data.shareToken);
+        if (typeof data.savedId === "string") setPersistId(data.savedId);
+      } catch {
+        setError("משהו השתבש - נסו שוב.");
+      }
+      return;
+    }
+
     if (!freeText) {
       setError("לא התקבל מלל חופשי");
       return;
     }
     let cancelled = false;
-    fetch("/api/trip-builder/trippy-quick", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ freeText }),
-    })
+    getCurrentPositionSafe()
+      .catch(() => null)
+      .then((c) =>
+        fetch("/api/trip-builder/trippy-quick", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ freeText, lat: c?.lat ?? null, lng: c?.lng ?? null }),
+        })
+      )
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -98,6 +193,9 @@ function TrippyQuickResultContent() {
         }
         setStops(data.stops);
         setTitle(typeof data.title === "string" ? data.title : null);
+        if (data.searchContext) setSearchContext(data.searchContext);
+        if (typeof data.shareToken === "string") setShareToken(data.shareToken);
+        if (typeof data.savedId === "string") setPersistId(data.savedId);
       })
       .catch(() => {
         if (!cancelled) setError("משהו השתבש - נסו שוב.");
@@ -105,7 +203,24 @@ function TrippyQuickResultContent() {
     return () => {
       cancelled = true;
     };
-  }, [freeText]);
+  }, [requestId, freeText, savedId]);
+
+  /** שולח את מערך התחנות המעודכן ל-DB (ר' PATCH ב-/api/trippy-ai/[id]) -
+   *  "כשל שקט": אם אין persistId (לא נשמר מלכתחילה) או אם הבקשה נכשלת,
+   *  לא חוסמים את חוויית העמוד - המשתמש כבר רואה את השינוי ב-state
+   *  המקומי בכל מקרה, זו רק שכבת "לזכור לפעם הבאה". */
+  async function persistStops(newStops: TrippyQuickStop[]) {
+    if (!persistId) return;
+    try {
+      await fetch(`/api/trippy-ai/${persistId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stops: newStops }),
+      });
+    } catch {
+      // כשל שקט - ר' הערה למעלה
+    }
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -113,11 +228,97 @@ function TrippyQuickResultContent() {
     const oldIndex = stops.findIndex((s) => s.id === active.id);
     const newIndex = stops.findIndex((s) => s.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-    setStops(arrayMove(stops, oldIndex, newIndex));
+    const reordered = arrayMove(stops, oldIndex, newIndex);
+    setStops(reordered);
+    persistStops(reordered);
   }
 
   function handleDelete(id: string) {
-    setStops((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+    setStops((prev) => {
+      const next = prev ? prev.filter((s) => s.id !== id) : prev;
+      if (next) persistStops(next);
+      return next;
+    });
+  }
+
+  /** *** תיקון (בקשת המשתמש - "ההחלפה צריכה להיות זהה!!! לאותה
+   *  קטגוריה שביקשתי מלכתחילה"): searchTags נלקח **מהתחנה עצמה**
+   *  (stop.searchTags) - לא מ-state נפרד בעמוד שעלול להיות ריק/לא-
+   *  מסונכרן. ר' trippyQuickShared.ts להסבר המלא.
+   *  *** תוספת (בקשה מפורשת - "הכפתור צריך להבהב - ואז לקפוץ פופ אפ
+   *  ...כן/לא"): ה-fetch בפועל קורה רק אחרי אישור בפופאפ (handleSwap
+   *  נקרא מ-handleConfirmSwap למטה, לא ישירות מהכפתור). */
+  async function handleSwap(stop: TrippyQuickStop) {
+    if (!stops) return;
+    setSwappingId(stop.id);
+    try {
+      const res = await fetch("/api/trip-builder/trippy-quick/swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: stop.category,
+          searchTags: stop.searchTags,
+          nameKeyword: stop.nameKeyword,
+          city: searchContext?.city ?? null,
+          lat: searchContext?.lat ?? null,
+          lng: searchContext?.lng ?? null,
+          excludeIds: stops.map((s) => s.id),
+        }),
+      });
+      const data = await res.json();
+      if (data.stop) {
+        setStops((prev) => {
+          const next = prev ? prev.map((s) => (s.id === stop.id ? data.stop : s)) : prev;
+          if (next) persistStops(next);
+          return next;
+        });
+      }
+    } catch {
+      // כשל שקט - התחנה הקיימת פשוט נשארת כמו שהיא, לא מציגים שגיאה חוסמת על פעולה משנית כזו
+    } finally {
+      setSwappingId(null);
+    }
+  }
+
+  function handleConfirmSwap() {
+    if (!swapConfirmStop) return;
+    handleSwap(swapConfirmStop);
+    setSwapConfirmStop(null);
+  }
+
+  const [addingStop, setAddingStop] = useState(false);
+
+  /** *** תכונה חדשה (בקשה מפורשת - "אפשר להוסיף עוד איזה עצירה אחרי
+   *  המסלול, תהיה יצירתי!! ומדויק"): ר' add-stop/route.ts להסבר המלא. */
+  async function handleAddStop() {
+    if (!stops) return;
+    setAddingStop(true);
+    try {
+      const res = await fetch("/api/trip-builder/trippy-quick/add-stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          existingNames: stops.map((s) => s.name),
+          freeText,
+          city: searchContext?.city ?? null,
+          lat: searchContext?.lat ?? null,
+          lng: searchContext?.lng ?? null,
+          excludeIds: stops.map((s) => s.id),
+        }),
+      });
+      const data = await res.json();
+      if (data.stop) {
+        setStops((prev) => {
+          const next = prev ? [...prev, data.stop] : prev;
+          if (next) persistStops(next);
+          return next;
+        });
+      }
+    } catch {
+      // כשל שקט - זו הוספה משנית, לא חוסמים את שאר העמוד
+    } finally {
+      setAddingStop(false);
+    }
   }
 
   function handleConfirmAddToCalendar() {
@@ -144,8 +345,16 @@ function TrippyQuickResultContent() {
       <div className="-mx-5 -mt-8">
         <ChatHeader current={1} total={1} onBack={() => router.push("/ai")} />
 
-        <div className="relative h-44 w-full">
-          <Image src="/images/trippy-hero-calendar.png" alt="" fill className="object-cover" priority />
+        <div className="w-full">
+          <Image
+            src="/images/trippy-hero-calendar.png"
+            alt=""
+            width={0}
+            height={0}
+            sizes="100vw"
+            className="h-auto w-full"
+            priority
+          />
         </div>
       </div>
 
@@ -168,11 +377,14 @@ function TrippyQuickResultContent() {
         )}
 
         {!error && !stops && (
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-40 w-full rounded-card" />
-            <Skeleton className="h-24 w-full rounded-card" />
-            <Skeleton className="h-24 w-full rounded-card" />
-            <Skeleton className="h-24 w-full rounded-card" />
+          // *** תיקון (בקשה מפורשת - "העמוד הזה לא צריך להופיע בכלל!!!
+          // רק בצ'אט כמו שאמרנו"): רצף הצ'אט (ChatBubble/
+          // RuntrippyPromptBubble/TypingIndicator) כבר מוצג *בעמוד
+          // הצ'אט* לפני הניווט לכאן (ר' TrippyConversation.tsx) -
+          // הצגתו שוב כאן הייתה כפילות. כאן, בזמן שהעמוד הזה בעצמו
+          // טוען, מספיק ספינר פשוט - בלי שום רכיב מהצ'אט.
+          <div className="flex items-center justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
           </div>
         )}
 
@@ -191,11 +403,22 @@ function TrippyQuickResultContent() {
                       onItineraryUpdate={() => {}}
                       onDelete={() => handleDelete(stop.id)}
                       draggable={stops.length > 1}
+                      onSwap={() => setSwapConfirmStop(stop)}
+                      swapLoading={swappingId === stop.id}
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
+
+            <button
+              type="button"
+              onClick={handleAddStop}
+              disabled={addingStop}
+              className="w-full rounded-pill border border-dashed border-accent/40 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+            >
+              {addingStop ? "מוסיפים עצירה..." : "+ הוסיפו עצירה למסלול"}
+            </button>
 
             <button
               type="button"
@@ -205,6 +428,39 @@ function TrippyQuickResultContent() {
             >
               {addedToCalendar ? "✓ נוסף - הוספה שוב?" : "הוספה ליומן"}
             </button>
+
+            {/* *** תוספת (בקשה מפורשת - "אפשרות לשמירה ושיתוף"): קישור
+                ציבורי read-only (ר' migration 0058) - מוצג רק כש-
+                shareToken קיים (כלומר המסלול באמת נשמר; משתמש לא
+                מחובר לא רואה את הכפתור, כי אין מה לשתף). Web Share API
+                כשקיים (בעיקר מובייל) - נופל בחזרה להעתקה ללוח. */}
+            {shareToken && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const url = `${window.location.origin}/trip-builder/trippy-quick/shared/${shareToken}`;
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({ title: title ?? "המסלול שלי מ-trippy AI", url });
+                      return;
+                    } catch {
+                      // המשתמש ביטל את השיתוף - לא שגיאה אמיתית, פשוט לא ממשיכים לפולבאק
+                      return;
+                    }
+                  }
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    setShareCopied(true);
+                    setTimeout(() => setShareCopied(false), 2000);
+                  } catch {
+                    // אין גישה ללוח - אין מה לעשות יותר, לא קריטי
+                  }
+                }}
+                className="w-full rounded-pill border border-accent/40 py-2.5 text-sm font-semibold text-accent"
+              >
+                {shareCopied ? "✓ הקישור הועתק" : "שתפו את המסלול"}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -242,6 +498,43 @@ function TrippyQuickResultContent() {
             >
               ביטול
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* פופאפ אישור החלפת תחנה - "הכפתור צריך להבהב ואז לקפוץ פופ אפ
+          החלפת אטרקציה - האם אתה בטוח? כן/לא עם התמונה של trippy AI" */}
+      {swapConfirmStop && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6"
+          onClick={() => setSwapConfirmStop(null)}
+        >
+          <div
+            className="flex w-full max-w-sm flex-col items-center gap-3 rounded-card bg-white p-6 text-center shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative h-16 w-16 overflow-hidden rounded-full ring-2 ring-white shadow-md">
+              <Image src="/images/tripy.png" alt="" fill className="object-cover" />
+            </div>
+            <p className="text-base font-bold text-ink">החלפת אטרקציה</p>
+            <p className="text-sm text-ink-secondary">האם אתה בטוח?</p>
+            <div className="mt-2 flex w-full gap-3">
+              <button
+                type="button"
+                onClick={() => setSwapConfirmStop(null)}
+                className="flex-1 rounded-pill border border-ink-secondary/25 py-2.5 text-sm font-semibold text-ink"
+              >
+                לא
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSwap}
+                className="flex-1 rounded-pill py-2.5 text-sm font-semibold text-white shadow-md"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              >
+                כן
+              </button>
+            </div>
           </div>
         </div>
       )}

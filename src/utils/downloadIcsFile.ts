@@ -1,4 +1,4 @@
-import type { TrippyQuickStop } from "@/app/api/trip-builder/trippy-quick/route";
+import type { TrippyQuickStop } from "@/services/tripBuilder/trippyQuickShared";
 
 /** מפיק ומוריד קובץ .ics עצמאי (בלי session/DB) עם אירוע נפרד לכל
  *  תחנה, ברצף, החל מ-09:00 ביום שנבחר - כל תחנה 90 דקות. תומך ב-

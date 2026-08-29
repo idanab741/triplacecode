@@ -22,7 +22,7 @@ const FOLLOW_UP_NO_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 
 const SURPRISE_LABEL = "תפתיעו אותי 🎁";
 
 type Stage = "compose" | "followUp" | "building";
-type Message = { id: number; role: "assistant" | "user" | "runtrippy"; text: string };
+type Message = { id: string; role: "assistant" | "user" | "runtrippy"; text: string };
 type DestinationChoice = { type: "single"; value: string } | { type: "multi"; values: string[] } | { type: "surprise" };
 
 const DEFAULT_ANSWERS: AbroadVacationAnswers = {
@@ -100,7 +100,7 @@ function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
 export function TrippyConversation() {
   const router = useRouter();
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([{ id: 1, role: "assistant", text: INTRO }]);
+  const [messages, setMessages] = useState<Message[]>([{ id: "intro", role: "assistant", text: INTRO }]);
   const [stage, setStage] = useState<Stage>("compose");
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
@@ -112,7 +112,6 @@ export function TrippyConversation() {
   // שמשהו קורה ברקע בינתיים.
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const id = useRef(1);
   const bottom = useRef<HTMLDivElement>(null);
   const freeTextRef = useRef("");
   const extractedRef = useRef<ExtractedVacationIntent | null>(null);
@@ -124,9 +123,14 @@ export function TrippyConversation() {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing, stage]);
 
+  // *** תיקון (בקשת המשתמש - "Encountered two children with the same
+  // key, `4`" - קריסת React חוזרת): id.current += 1 (מונה פשוט) לא
+  // אמין מספיק - במקרים מסוימים (למשל שתי קריאות add() רצופות בתוך
+  // אותו setTimeout/batch) נוצרו שני הודעות עם אותו מזהה. crypto.
+  // randomUUID() מבטל את כל המחלקה הזו של באגים - כל הודעה מקבלת
+  // מזהה ייחודי אמיתי, בלי תלות בתזמון רינדור.
   const add = (role: Message["role"], message: string) => {
-    id.current += 1;
-    setMessages((all) => [...all, { id: id.current, role, text: message }]);
+    setMessages((all) => [...all, { id: crypto.randomUUID(), role, text: message }]);
   };
 
   async function fetchExtractedIntent(freeText: string): Promise<ExtractedVacationIntent | null> {
@@ -145,16 +149,47 @@ export function TrippyConversation() {
   }
 
   /**
-   * *** תיקון (בקשה מפורשת - "מלל חופשי... משם ישר הולכים לעמוד מסלול
-   * ייחודי שלא היה באפליקציה"): קודם זה חילץ יעד/הציע יעדים והמשיך
-   * לשאלת המשך + מנגנון "חופשה בחו"ל" המלא. עכשיו - ניווט ישיר לעמוד
-   * המסלול המהיר החדש (trippy-quick/result) עם המלל החופשי כפי שהוא -
-   * אין יותר extraction/followUp/startBuild בזרימה הזו כלל.
+   * *** תיקון (בקשה מפורשת - שלישית ומדויקת: "אחרי שממלאים את התשובה
+   * של המשתמש - יש את מה שביקשתי... ואז זה מופיע שוב בעמוד של הטיול
+   * כבר!!! זה אמור להיות רק בצ'אט!! עד שעולה הטיול המלא"): הבעיה
+   * האמיתית - הרצף בצ'אט היה מוצג לזמן *קבוע* (setTimeout), לא לזמן
+   * שבאמת לוקח להביא את התוצאות - אז כשה-fetch בעמוד התוצאה עדיין
+   * רץ (כמה שניות), המשתמש ראה שם עוד מסך טעינה, "שוב". התיקון: קוראים
+   * ל-API **כאן, מתוך הצ'אט**, ומחכים שהוא *באמת* יסתיים (לא זמן קבוע)
+   * לפני שמנווטים בכלל - כך שברגע שמגיעים לעמוד התוצאה, הנתונים כבר
+   * מוכנים לגמרי ואין שם שום מסך טעינה נוסף. התוצאה נשמרת ב-
+   * sessionStorage (לא ב-URL - יכולה להיות ארוכה מדי) ועמוד התוצאה
+   * קורא אותה משם ישירות, בלי fetch משלו בכלל.
    */
-  function submitFreeText() {
+  async function submitFreeText() {
     const trimmed = text.trim();
     if (!trimmed || typing) return;
-    router.push(`/trip-builder/trippy-quick/result?freeText=${encodeURIComponent(trimmed)}`);
+    add("user", trimmed);
+    setText("");
+    setStage("building");
+    setTyping(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    setTyping(false);
+    add("assistant", "בונים עבורכם את המסלול המושלם!");
+    add("runtrippy", "");
+    setBuilding(true);
+
+    try {
+      const coords = await getCurrentPositionSafe().catch(() => null);
+      const res = await fetch("/api/trip-builder/trippy-quick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ freeText: trimmed, lat: coords?.lat ?? null, lng: coords?.lng ?? null }),
+      });
+      const data = await res.json();
+      const requestId = crypto.randomUUID();
+      sessionStorage.setItem(`trippy-quick:${requestId}`, JSON.stringify(data));
+      router.push(`/trip-builder/trippy-quick/result?requestId=${requestId}`);
+    } catch {
+      setBuilding(false);
+      add("assistant", "משהו השתבש בבניית המסלול - נסו שוב.");
+      setStage("compose");
+    }
   }
 
   function chooseDestination(value: string) {

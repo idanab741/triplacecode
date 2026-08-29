@@ -232,7 +232,7 @@ export default function ProfilePage() {
           >
             <div className="text-start">
               <p className="font-bold text-ink">הזמן חברים</p>
-              <p className="text-xs text-ink-secondary">שתף ותזכה בהטבות</p>
+              <p className="text-xs text-ink-secondary">שתפו את Triplace עם החברים שלכם</p>
             </div>
             <ChevronLeft />
           </button>

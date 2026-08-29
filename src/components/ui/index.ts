@@ -23,3 +23,4 @@ export { BottomSheet } from "./BottomSheet";
 export { SwipeToDeleteRow } from "./SwipeToDeleteRow";
 export { SwipeUpToDeleteCard } from "./SwipeUpToDeleteCard";
 export { BackButton } from "./BackButton";
+export { AiGlobeIcon } from "./AiGlobeIcon";

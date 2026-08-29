@@ -26,6 +26,14 @@ interface SortableStopCardProps {
    *  לקישור לעמוד האטרקציה המלא (/place/[id]). אופציונלי כדי לא לשבור
    *  שימושים קיימים בלי צורך אמיתי בניווט. */
   placeHref?: string;
+  /** *** תוספת (בקשת המשתמש - "העיגול של טריפי AI צריך להיות חלק
+   *  מהמשבצת! ולא נפרד או חתוך"): משמש trippy-quick (בלי sessionId) -
+   *  עיגול "החלף" נפרד מכפתור "שנה" (שדורש sessionId/chat-edit אמיתי).
+   *  קריטי: מוצג **בתוך** התוכן הניתן-לסוויפ (לא כ-sibling חיצוני של
+   *  הכרטיס כמו קודם) - כך שהוא זז יחד עם הכרטיס בזמן סוויפ למחיקה,
+   *  ולא נשאר "תקוע" במקומו כשהכרטיס מתחתיו זז. */
+  onSwap?: () => void;
+  swapLoading?: boolean;
 }
 
 const SWIPE_REVEAL_PX = 84;
@@ -46,6 +54,8 @@ export function SortableStopCard({
   onDelete,
   draggable = true,
   placeHref,
+  onSwap,
+  swapLoading = false,
 }: SortableStopCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stop.stopId });
   // active !== null כשאיזשהו כרטיס (לא בהכרח זה) נמצא כרגע באמצע גרירת-סידור.
@@ -292,6 +302,26 @@ export function SortableStopCard({
             >
               <Image src="/images/tripy.png" alt="" width={22} height={22} className="rounded-full" />
               <span className="text-[10px] font-medium text-ink-secondary">שנה</span>
+            </button>
+          )}
+
+          {/* *** תוספת (בקשת המשתמש - "העיגול של טריפי AI צריך להיות
+              חלק מהמשבצת! ולא נפרד או חתוך"): עיגול "החלף" ל-trippy-
+              quick (בלי sessionId) - בכוונה **בתוך** אותו div שמקבל את
+              טרנספורם הסוויפ (ר' ההערה למעלה על swipeX) - כך שהוא זז
+              ביחד עם שאר תוכן הכרטיס בזמן סוויפ למחיקה, ולא נשאר מאחור
+              "תקוע" במקומו כמו קודם (כשהיה sibling חיצוני של הכרטיס
+              כולו, בעמוד result/page.tsx). */}
+          {onSwap && (
+            <button
+              type="button"
+              onClick={onSwap}
+              disabled={swapLoading}
+              data-no-swipe
+              className="absolute bottom-2 left-2 h-9 w-9 animate-pulse overflow-hidden rounded-full ring-2 ring-white shadow-md disabled:opacity-50"
+              aria-label="החלף למקום אחר מאותו סוג"
+            >
+              <Image src="/images/tripy.png" alt="" fill className="object-cover" />
             </button>
           )}
         </div>
