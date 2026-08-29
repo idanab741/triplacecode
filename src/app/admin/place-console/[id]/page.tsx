@@ -9,6 +9,13 @@ import { QUICK_CATEGORIES, type QuickCategoryId } from "@/constants/quickCategor
 import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 import { PLACE_CATEGORIES } from "@/constants/placeCategories";
 import { getCategoryLabel } from "@/utils/categoryLabels";
+import {
+  RESTAURANT_CATEGORY_KEYWORDS,
+  ATTRACTION_CATEGORY_KEYWORDS,
+  NATURE_CATEGORY_KEYWORDS,
+  NIGHTLIFE_CATEGORY_KEYWORDS,
+  HOTEL_CATEGORY_VALUE,
+} from "@/constants/destinationCategoryKeywords";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
@@ -16,11 +23,40 @@ interface Place {
   id: string;
   name: string;
   category: string;
+  subcategory: string | null;
   short_description: string | null;
   city: string | null;
   image_urls: string[];
   rating: number | null;
+  tags: string[] | null;
+  trip_type_tags: string[] | null;
+  cuisine_tags: string[] | null;
+  /** true = קושר במפורש (destination_edition_places), false = נמצא
+   *  אוטומטית לפי התאמת city/region למאגר (ר' API - אותה שאילתה בדיוק
+   *  שהעמוד הציבורי /destination/[id] משתמש בה). קובע אם "הסרה" רלוונטית. */
+  curated: boolean;
 }
+
+/**
+ * *** תיקון (באג אמיתי - "למה הכל לא מסווג?"): ADMIN_DISCOVERY_SECTIONS
+ * מכיל סקשנים רק ל-5 סוגי טיול ספציפיים (יומי/טבע/מסעדות וקפה/דייט/
+ * חיי לילה) + weekend בנפרד - **אין בו בכלל ערך ל-"abroad"**. כל
+ * destination_edition עם quick_category="abroad" קיבל ADMIN_DISCOVERY_
+ * SECTIONS["abroad"]===undefined, כלומר "[]" - אף מקום לא יכול היה
+ * להתאים לאף סקשן, אז הכול נפל תמיד ל"לא מסווג". התיקון: יעדים
+ * (כמו כל היעדים בעמוד הזה) לא משתמשים ב-ADMIN_DISCOVERY_SECTIONS
+ * בכלל - הם משתמשים בטקסונומיה שהעמוד הציבורי /destination/[id] כבר
+ * משתמש בה בפועל לכל יעד: 5 קבוצות לפי מילות-מפתח ב-category
+ * (מסעדות/אטרקציות/טבע/חיי לילה) + מלונות (category מדויק) - ר'
+ * constants/destinationCategoryKeywords.ts, מקור אמת יחיד.
+ */
+const DESTINATION_SECTIONS: { id: string; emoji: string; title: string; matches: (place: Place) => boolean }[] = [
+  { id: "hotels", emoji: "🏨", title: "מלונות", matches: (p) => p.category === HOTEL_CATEGORY_VALUE },
+  { id: "restaurants", emoji: "🍽️", title: "מסעדות", matches: (p) => RESTAURANT_CATEGORY_KEYWORDS.some((kw) => p.category?.toLowerCase().includes(kw)) },
+  { id: "attractions", emoji: "🎯", title: "אטרקציות", matches: (p) => ATTRACTION_CATEGORY_KEYWORDS.some((kw) => p.category?.toLowerCase().includes(kw)) },
+  { id: "nature", emoji: "🌿", title: "טבע", matches: (p) => NATURE_CATEGORY_KEYWORDS.some((kw) => p.category?.toLowerCase().includes(kw)) },
+  { id: "nightlife", emoji: "🌙", title: "חיי לילה", matches: (p) => NIGHTLIFE_CATEGORY_KEYWORDS.some((kw) => p.category?.toLowerCase().includes(kw)) },
+];
 
 interface Edition {
   id: string;
@@ -237,7 +273,7 @@ export default function DestinationEditionPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[13px]" style={{ color: "var(--admin-ink-secondary)" }}>
           <Link href="/admin/place-console" className="hover:underline">
-            Admin Places
+            סוגי מסלול
           </Link>
           <span>/</span>
           <span style={{ color: "var(--admin-ink)" }}>{edition.title}</span>
@@ -417,45 +453,43 @@ export default function DestinationEditionPage() {
             </DrawerSection>
           </div>
 
-          {/* אטרקציות - ניהול הרשימה: מחיקה (הסרת שיוך), לחיצה לעריכה
-              מלאה, והוספת אטרקציה קיימת ממאגר. */}
+          {/* אטרקציות - מקובצות לפי קטגוריה (Sections ויזואליים, דרישה
+              מפורשת #7/#8) - לא רשימה שטוחה אחת. מקומות שלא תואמים אף
+              סקשן מוכר של סוג הטיול הזה מופיעים תחת "לא מסווג" - כדי
+              שאף אטרקציה משויכת לא "תיעלם" רק כי היא לא תויגה כראוי. */}
+          <div className="flex flex-col gap-6">
+            {edition &&
+              (() => {
+                const grouped = DESTINATION_SECTIONS
+                  .map((section) => ({ section, items: places.filter((p) => section.matches(p)) }))
+                  .filter((g) => g.items.length > 0);
+                const groupedIds = new Set(grouped.flatMap((g) => g.items.map((p) => p.id)));
+                const unclassified = places.filter((p) => !groupedIds.has(p.id));
+
+                return (
+                  <>
+                    {grouped.map(({ section, items }) => (
+                      <PlaceSection key={section.id} title={`${section.emoji} ${section.title}`} places={items} onUnlink={handleUnlinkPlace} />
+                    ))}
+                    {unclassified.length > 0 && <PlaceSection title="⚪ לא מסווג" places={unclassified} onUnlink={handleUnlinkPlace} />}
+                    {places.length === 0 && (
+                      <p className="text-[13px]" style={{ color: "var(--admin-ink-faint)" }}>
+                        אין עדיין אטרקציות משויכות ליעד הזה.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+          </div>
+
+          {/* הוספת אטרקציה קיימת ממאגר */}
           <div
             className="flex flex-col gap-3 rounded-[var(--admin-radius-lg)] border p-5"
             style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}
           >
             <h3 className="text-[14px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-              אטרקציות ({places.length})
+              הוספת אטרקציה קיימת
             </h3>
-
-            <div className="flex flex-col divide-y" style={{ borderColor: "var(--admin-border)" }}>
-              {places.map((place) => (
-                <div key={place.id} className="flex items-center gap-3 py-2.5">
-                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[var(--admin-radius-sm)]" style={{ background: "var(--admin-bg-sunken)" }}>
-                    {place.image_urls[0] && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={place.image_urls[0]} alt="" className="h-full w-full object-cover" />
-                    )}
-                  </div>
-                  <Link href={`/admin/places/${place.id}`} className="min-w-0 flex-1 hover:underline">
-                    <p className="truncate text-[13.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
-                      {place.name}
-                    </p>
-                    <p className="truncate text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-                      {getCategoryLabel(place.category)}
-                    </p>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleUnlinkPlace(place.id)}
-                    aria-label="הסר מהיעד"
-                    className="shrink-0 rounded-[var(--admin-radius-sm)] px-2.5 py-1.5 text-[12px] font-medium transition"
-                    style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}
-                  >
-                    הסרה
-                  </button>
-                </div>
-              ))}
-            </div>
 
             <div className="relative">
               <input
@@ -553,6 +587,68 @@ export default function DestinationEditionPage() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** סקשן קטגוריה בודד בעמוד יעד - כותרת + גריד כרטיסים ויזואליים (תמונה
+ *  גדולה, לא רשימת טקסט) - כל כרטיס לוחצים עליו לעריכה מלאה (Place
+ *  Editor הקיים), עם כפתור "הסרה" (הסרת שיוך בלבד, לא מוחק את ה-Place). */
+function PlaceSection({ title, places, onUnlink }: { title: string; places: Place[]; onUnlink: (placeId: string) => void | Promise<void> }) {
+  return (
+    <div>
+      <h3 className="mb-3 text-[14px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+        {title}
+        <span className="mr-2 text-[12px] font-normal" style={{ color: "var(--admin-ink-faint)" }}>
+          · {places.length}
+        </span>
+      </h3>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        {places.map((place) => (
+          <div key={place.id} className="group relative aspect-[3/4] overflow-hidden rounded-[var(--admin-radius-md)] border" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-sunken)" }}>
+            <Link href={`/admin/places/${place.id}`} className="absolute inset-0">
+              {place.image_urls[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={place.image_urls[0]} alt={place.name} className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-2xl" style={{ color: "var(--admin-ink-faint)" }}>
+                  🖼️
+                </div>
+              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2 pt-8">
+                <p className="truncate text-[12.5px] font-bold leading-tight text-white">{place.name}</p>
+                <p className="truncate text-[10.5px] text-white/75">
+                  {place.city ?? getCategoryLabel(place.category)}
+                  {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
+                </p>
+              </div>
+              {!place.curated && (
+                <span
+                  className="pointer-events-none absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                  style={{ background: "var(--admin-bg-surface)", color: "var(--admin-ink-secondary)" }}
+                  title="נמצא אוטומטית לפי עיר - לא קושר במפורש"
+                >
+                  אוטומטי
+                </span>
+              )}
+            </Link>
+            {place.curated && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onUnlink(place.id);
+                }}
+                aria-label="הסר מהיעד"
+                className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold opacity-0 transition group-hover:opacity-100"
+                style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 import { AdminButton, AdminField, adminInputClass, adminInputStyle } from "@/screens/admin/shared/Drawer";
 import { ADMIN_DISCOVERY_SECTIONS } from "@/constants/adminDiscoverySections";
 import { WORLDWIDE_VACATION_CATEGORIES, WORLDWIDE_DESTINATION_REGISTRY } from "@/constants/worldwideVacationCategories";
+import { ISRAEL_VACATION_DESTINATIONS } from "@/constants/israelVacationDestinations";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
@@ -40,10 +41,25 @@ async function parseJsonResponse(res: Response): Promise<any> {
  *   אמיתיים משלה ב-vacation-il/route.ts, לא רק קרוסלת 9 הערים) -
  *   הפילים הם ADMIN_DISCOVERY_SECTIONS, הגריד מציג אטרקציות חיות.
  */
-type Mode = "curated" | "sections";
+/**
+ * *** תיקון (בקשה מפורשת - "חופשה בארץ" צריכה מבנה Trip Type → Destinations
+ * → Destination → Categories → Places, בדיוק כמו "טיול בחו״ל" - לא
+ * מבנה שטוח של קטגוריות בלבד): "weekend" קיבל עד כה mode="sections"
+ * (בדיוק כמו day_trip/nature_trip/וכו') - בלי שכבת יעדים בכלל. עכשיו
+ * "weekend" מקבל mode="domestic" משלו: 9 היעדים הקבועים
+ * (ISRAEL_VACATION_DESTINATIONS, אותה רשימה בדיוק שהאפליקציה עצמה
+ * משתמשת בה ב-destination/[slug]/page.tsx) מוצגים כ-Destination Cards,
+ * ולחיצה על יעד פותחת עמוד יעד עם סקשני קטגוריה חיים (ר'
+ * /admin/place-console/domestic/[slug]) - בדיוק מבנה A, בלי DB חדש
+ * (אין "edition" לייבא/ליצור - זו רשימה סטטית + שאילתת רדיוס חיה,
+ * אותו מנגנון בדיוק שהאפליקציה כבר משתמשת בו לחופשה בארץ).
+ */
+type Mode = "curated" | "domestic" | "sections";
 
 function modeOf(category: QuickCategoryId): Mode {
-  return category === "abroad" ? "curated" : "sections";
+  if (category === "abroad") return "curated";
+  if (category === "weekend") return "domestic";
+  return "sections";
 }
 
 interface DestinationRef {
@@ -284,10 +300,10 @@ export default function PlaceConsolePage() {
     <div dir="rtl" className="admin-fade-in flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          Admin Places
+          סוגי מסלול
         </h1>
         <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-          בניית תוכן ליעדים - בדיוק כמו שהם נראים באפליקציה, רק בפריסת עבודה רחבה
+          התוכן שהמשתמשים רואים באפליקציה - בדיוק כמו שהם רואים אותו, רק בפריסת עבודה רחבה
         </p>
       </div>
 
@@ -330,38 +346,42 @@ export default function PlaceConsolePage() {
 
       {/* 2. שורת פילים (תת-קטגוריות) - המנגנון האחיד: תמיד למעלה, תמיד
           אותו מבנה, בין אם המקור הוא curated (חו״ל) או sections (כל
-          השאר, כולל חופשה בארץ). שורה אחת שנגללת אופקית (לא נשברת
-          לכמה שורות/קבוצות) - כל הפילים אחד אחרי השני, בדיוק כמו
-          שורת סוגי הטיול מעליה. */}
-      <div className="-mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-1" style={{ scrollbarWidth: "none" }}>
-        {pills.map((p) => {
-          const active = p.key === activePillKey;
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setActivePillKey(p.key)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition"
-              style={{
-                background: active ? "var(--admin-accent)" : "var(--admin-bg-sunken)",
-                color: active ? "#fff" : "var(--admin-ink-secondary)",
-              }}
-            >
-              {p.emoji} {p.title}
-            </button>
-          );
-        })}
-      </div>
+          השאר). לא מוצגת ב-domestic (חופשה בארץ) - שם היעדים עצמם הם
+          השכבה הראשונה (Structure B), הקטגוריות מופיעות רק *בתוך* יעד
+          ספציפי (ר' /admin/place-console/domestic/[slug]). */}
+      {mode !== "domestic" && (
+        <div className="-mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-1" style={{ scrollbarWidth: "none" }}>
+          {pills.map((p) => {
+            const active = p.key === activePillKey;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setActivePillKey(p.key)}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition"
+                style={{
+                  background: active ? "var(--admin-accent)" : "var(--admin-bg-sunken)",
+                  color: active ? "#fff" : "var(--admin-ink-secondary)",
+                }}
+              >
+                {p.emoji} {p.title}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* 3. כותרת + פעולות (מספר תוצאות, פילטר מדינה / כפתור יעד חדש) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          {activePill ? `${activePill.emoji} ${activePill.title}` : QUICK_CATEGORY_LABELS[activeCategoryData.id]}
+          {mode === "domestic" ? "יעדים" : activePill ? `${activePill.emoji} ${activePill.title}` : QUICK_CATEGORY_LABELS[activeCategoryData.id]}
           <span className="mr-2 text-[13px] font-normal" style={{ color: "var(--admin-ink-faint)" }}>
             {mode === "curated"
               ? `· ${staticDestinations.length} יעדים`
-              : sectionPlaces
-                ? `· ${sectionPlaces.length} אטרקציות`
+              : mode === "domestic"
+                ? `· ${ISRAEL_VACATION_DESTINATIONS.length} יעדים`
+                : sectionPlaces
+                  ? `· ${sectionPlaces.length} אטרקציות`
                 : ""}
           </span>
         </h2>
@@ -437,7 +457,30 @@ export default function PlaceConsolePage() {
           כרטיס שכבר יובא ל-DB (יש לו edition תואם) הוא קישור רגיל
           לניהול; כרטיס שעדיין לא - לחיצה מייבאת רק אותו באותו רגע
           ואז מנווטת פנימה (אין יותר ייבוא גורף ברקע לכל הקטגוריה). */}
-      {mode === "curated" ? (
+      {mode === "domestic" ? (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+          {ISRAEL_VACATION_DESTINATIONS.map((dest) => (
+            <Link
+              key={dest.slug}
+              href={`/admin/place-console/domestic/${dest.slug}`}
+              className="group relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-[var(--admin-radius-md)] border transition hover:opacity-95"
+              style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-sunken)" }}
+            >
+              {dest.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={dest.imageUrl} alt={dest.name} className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-2xl" style={{ color: "var(--admin-ink-faint)" }}>
+                  🖼️
+                </div>
+              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2 pt-8">
+                <p className="truncate text-[12.5px] font-bold leading-tight text-white">🇮🇱 {dest.name}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : mode === "curated" ? (
         staticDestinations.length === 0 ? (
           <div
             className="flex flex-col items-center gap-3 rounded-[var(--admin-radius-lg)] border py-16 text-center"

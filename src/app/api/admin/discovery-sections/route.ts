@@ -26,6 +26,14 @@ export async function GET(request: Request) {
   const sectionId = searchParams.get("sectionId");
   const country = searchParams.get("country") || undefined;
   const limit = Number(searchParams.get("limit") ?? 200);
+  // *** תוספת ("חופשה בארץ" - Structure B, ר' ISRAEL_VACATION_DESTINATIONS):
+  // כשמסופקים lat/lng, מסננים לרדיוס סביב היעד הישראלי הספציפי - אותו
+  // מנגנון בדיוק ש-destination/[slug]/page.tsx באפליקציה כבר משתמש בו
+  // (fetchDiscoveryPlaces + location.lat/lng + radiusKm), לא מנגנון חדש.
+  // כשלא מסופקים (המקרה הקיים, שאר סוגי הטיול) - ההתנהגות בדיוק כמו קודם.
+  const lat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
+  const lng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
+  const radiusKm = searchParams.get("radiusKm") ? Number(searchParams.get("radiusKm")) : undefined;
 
   if (!quickCategory || !sectionId) {
     return NextResponse.json({ error: "יש לספק quickCategory ו-sectionId" }, { status: 400 });
@@ -39,7 +47,8 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
   const places = await fetchDiscoveryPlaces(supabase, {
-    location: { lat: null, lng: null, city: null },
+    location: { lat, lng, city: null },
+    radiusKm,
     category: section.category,
     categories: section.categories,
     subcategories: section.subcategories,
@@ -48,7 +57,7 @@ export async function GET(request: Request) {
     categoryColumnEquals: section.categoryColumnEquals,
     allowNightlife: section.allowNightlife ?? true, // אדמין רוצה לראות הכל, כולל nightlife, גם בסקשנים שלא ביקשו את זה במפורש
     country,
-    worldwide: !country,
+    worldwide: !country && lat === null,
     limit,
   });
 

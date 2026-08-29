@@ -1,66 +1,12 @@
 import { createClient } from "@/services/supabase/server";
+import {
+  RESTAURANT_CATEGORY_KEYWORDS,
+  ATTRACTION_CATEGORY_KEYWORDS,
+  NATURE_CATEGORY_KEYWORDS,
+  NIGHTLIFE_CATEGORY_KEYWORDS,
+} from "@/constants/destinationCategoryKeywords";
 
-export const RESTAURANT_CATEGORY_KEYWORDS = [
-  "restaurant",
-  "dining",
-  "cafe",
-  "café",
-  "bistro",
-  "taverna",
-  "cuisine",
-  "seafood",
-  "tapas",
-  "bakery",
-  "pastry",
-  "dessert",
-  "brunch",
-  "steakhouse",
-  "brewery",
-  "brewpub",
-  "gelato",
-  "coffee",
-  "culinary",
-  "osteria",
-  "enoteca",
-];
-export const ATTRACTION_CATEGORY_KEYWORDS = [
-  "attraction",
-  "museum",
-  "landmark",
-  "monument",
-  "historic",
-  "viewpoint",
-  "square",
-  "temple",
-  "castle",
-  "palace",
-  "archaeolog",
-  "cultural",
-  "architecture",
-  "theater",
-  "church",
-  "aquarium",
-  "amusement",
-];
-// תיקון Product מפורש ("יש חלוקה מוגדרת: מסעדות/אטרקציות/חיי לילה/
-// טבע/מלונות") - "טבע" הוא סקשן חמישי נפרד, לא חלק מ"אטרקציות". הוצאתי
-// nature/garden/park/beach/forest/hiking/canyon/desert/spring מרשימת
-// האטרקציות והפכתי אותם לרשימה עצמאית משלהם.
-export const NATURE_CATEGORY_KEYWORDS = [
-  "nature",
-  "garden",
-  "park",
-  "beach",
-  "forest",
-  "hiking",
-  "canyon",
-  "desert",
-  "spring",
-  "trail",
-  "waterfall",
-  "reserve",
-];
-export const NIGHTLIFE_CATEGORY_KEYWORDS = ["nightlife", "bar", "club", "pub"];
+export { RESTAURANT_CATEGORY_KEYWORDS, ATTRACTION_CATEGORY_KEYWORDS, NATURE_CATEGORY_KEYWORDS, NIGHTLIFE_CATEGORY_KEYWORDS };
 
 export interface PlaceSummary {
   id: string;

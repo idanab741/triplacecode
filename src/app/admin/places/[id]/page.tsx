@@ -8,6 +8,7 @@ import { AdminField, AdminButton, adminInputClass, adminInputStyle } from "@/scr
 import { TRIP_TYPE_GROUPS } from "@/services/places/tripTaxonomy";
 import { PLACE_CATEGORIES, CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS, type PlaceCategoryKey } from "@/constants/placeCategories";
 import { CUISINE_TAGS, PLACE_TYPE_TAGS, TRIPMATCH_TAGS, DNA_TAGS } from "@/constants/placeTagOptions";
+import { getCategoryLabel } from "@/utils/categoryLabels";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
@@ -261,27 +262,32 @@ export default function PlaceWorkspacePage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b px-6" style={{ borderColor: "var(--admin-border)" }}>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className="px-3 py-2.5 text-[13.5px] font-medium transition"
-            style={{
-              color: tab === t.key ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
-              borderBottom: tab === t.key ? "2px solid var(--admin-accent)" : "2px solid transparent",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Tabs + Content (רחב) + Preview חי (צר, קבוע) - הדרישה המפורשת:
+          "Place Preview שמבוסס על איך שהמקום מופיע באפליקציה", בלי
+          לוותר על עריכה - אז זה עמודה קבועה לצד הטאבים, לא מסך נפרד. */}
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Tabs */}
+          <div className="flex gap-1 border-b px-6" style={{ borderColor: "var(--admin-border)" }}>
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className="px-3 py-2.5 text-[13.5px] font-medium transition"
+                style={{
+                  color: tab === t.key ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                  borderBottom: tab === t.key ? "2px solid var(--admin-accent)" : "2px solid transparent",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
 
-      {/* Content */}
-      <div className="admin-scrollbar flex-1 overflow-y-auto p-6">
-        {tab === "general" && (
+          {/* Content */}
+          <div className="admin-scrollbar flex-1 overflow-y-auto p-6">
+            {tab === "general" && (
           <div className="grid max-w-2xl grid-cols-2 gap-4">
             <AdminField label="שם המקום">
               <input className={adminInputClass} style={adminInputStyle} value={place.name} onChange={(e) => update("name", e.target.value)} />
@@ -758,6 +764,91 @@ export default function PlaceWorkspacePage() {
             )}
           </div>
         )}
+          </div>
+        </div>
+
+        {/* עמודת Preview - קבועה, חיה (מתעדכנת מיד עם כל שינוי בטפסים
+            משמאל), בלי scroll עצמאי מעבר לתוכן שלה. */}
+        <div className="admin-scrollbar w-[360px] shrink-0 overflow-y-auto border-r p-5" style={{ borderColor: "var(--admin-border)" }}>
+          <PlaceAppPreview place={place} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Preview חי - בדיוק מבנה ה-HERO/דירוג/שם/תיאור/כתובת/צ'יפים של מסך
+ * האטרקציה האמיתי באפליקציה (ר' src/app/place/[id]/page.tsx) - לא
+ * המצאה חדשה. צ'יפי הקטגוריה נבנים באותה שיטה בדיוק: category +
+ * trip_type_tags + cuisine_tags + tags, מכופלים ומתורגמים דרך
+ * getCategoryLabel - מקור האמת היחיד למה שהמשתמש רואה בפועל.
+ */
+function PlaceAppPreview({ place }: { place: Place }) {
+  const categoryChips = Array.from(
+    new Set(
+      [getCategoryLabel(place.category), ...(place.trip_type_tags ?? []), ...(place.cuisine_tags ?? []), ...(place.tags ?? [])]
+        .filter((v): v is string => !!v)
+        .map((v) => getCategoryLabel(v))
+    )
+  );
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-faint)" }}>
+        תצוגה מקדימה - כך זה נראה באפליקציה
+      </p>
+      <div className="overflow-hidden rounded-[var(--admin-radius-lg)] border" style={{ borderColor: "var(--admin-border)", background: "#ffffff" }}>
+        <div className="relative h-40 w-full bg-gray-100">
+          {place.image_urls?.[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={place.image_urls[0]} alt={place.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl text-gray-300">🖼️</div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 py-4">
+          {place.rating != null && (
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+              <span className="text-amber-500">★</span>
+              <span>{place.rating.toFixed(1)}</span>
+              {place.rating_count != null && <span className="font-normal text-gray-400">({place.rating_count})</span>}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-lg font-extrabold text-gray-900">{place.name || "ללא שם"}</h2>
+            {place.short_description && <p className="text-[13px] leading-relaxed text-gray-500">{place.short_description}</p>}
+            {(place.address || place.city) && <p className="text-[12.5px] text-gray-500">{[place.address, place.city].filter(Boolean).join(" · ")}</p>}
+          </div>
+
+          {categoryChips.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {categoryChips.slice(0, 8).map((chip) => (
+                <span key={chip} className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-500">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5 border-t pt-3 text-[12.5px] text-gray-500" style={{ borderColor: "#eee" }}>
+            {place.phone && <p>📞 {place.phone}</p>}
+            {place.website && (
+              <p className="truncate">
+                🌐{" "}
+                <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {place.website}
+                </a>
+              </p>
+            )}
+            {place.opening_hours && place.opening_hours.length > 0 && <p>🕒 {place.opening_hours[0]}</p>}
+            {(place.price_level != null || place.average_price != null) && (
+              <p>💰 {place.average_price != null ? `₪${place.average_price} בממוצע` : "₪".repeat(place.price_level ?? 1)}</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

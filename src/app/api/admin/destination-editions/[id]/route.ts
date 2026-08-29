@@ -6,9 +6,23 @@ function checkAuth(request: Request): boolean {
   return Boolean(secret) && secret === process.env.ADMIN_API_SECRET;
 }
 
-/** מהדורת יעד בודדת, כולל כל האטרקציות המשויכות (שורות places מלאות,
- *  לא רק id) - זה מה שממלא את ה-preview (צד שמאל) ואת רשימת "אטרקציות"
- *  בפאנל העריכה (צד ימין) בעמוד /admin/place-console/[id]. */
+/** מהדורת יעד בודדת, כולל כל האטרקציות - **גם** אלה שקושרו במפורש
+ *  (destination_edition_places) **וגם** כל מקום שקיים כבר במאגר עם
+ *  city/region תואם לשם היעד - אותה שאילתה בדיוק (city.ilike/region.ilike,
+ *  is_legacy=false) שהעמוד הציבורי /destination/[id] כבר משתמש בה
+ *  (ר' services/places/placesServerService.ts getPlacesByCityAndKeywords).
+ *
+ *  *** תיקון (באג אמיתי - "יש אטרקציות משויכות!! מאיפה אתה לוקח את
+ *  המאגר???"): הגרסה הקודמת הציגה *רק* מקומות שמישהו קישר במפורש
+ *  ל-edition הזה. אבל האפליקציה עצמה (העמוד הציבורי) לא עובדת ככה
+ *  בכלל - היא שולפת לפי city/region תואם, בלי שום צורך בקישור ידני.
+ *  זו בדיוק ההפרה של דרישה #31 ("האפליקציה וה-ADMIN צריכים להשתמש
+ *  באותו מקור DATA") - האדמין הראה "0" בזמן שבפועל יש מקומות אמיתיים
+ *  במאגר עם city="פאפוס" (או דומה), שהאפליקציה כן הייתה מציגה. עכשיו
+ *  שני המקורות ממוזגים (curated קודם, כדי לשמר sort_order ידני), עם
+ *  דגל curated לכל מקום כדי שה-UI ידע אם "הסרה" רלוונטית (רק למקושר
+ *  במפורש - מקום שנמצא אוטומטית לפי עיר לא "מקושר" שאפשר להסיר קישור
+ *  שלו; כדי להוציא אותו יש לתקן את שדה העיר של המקום עצמו). */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!checkAuth(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,7 +47,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (linksError) return NextResponse.json({ error: linksError.message }, { status: 500 });
 
-  const places = (links ?? []).map((l) => l.places).filter(Boolean);
+  const curatedPlaces = (links ?? []).map((l) => l.places).filter(Boolean) as Record<string, unknown>[];
+  const curatedIds = new Set(curatedPlaces.map((p) => p.id as string));
+
+  const cityName = (edition as { destinations?: { name?: string } }).destinations?.name;
+  let discoveredPlaces: Record<string, unknown>[] = [];
+  if (cityName) {
+    const { data: byCity } = await supabase
+      .from("places")
+      .select("*")
+      .eq("is_legacy", false)
+      .or(`city.ilike.%${cityName}%,region.ilike.%${cityName}%`)
+      .limit(500);
+    discoveredPlaces = (byCity ?? []).filter((p) => !curatedIds.has(p.id));
+  }
+
+  const places = [
+    ...curatedPlaces.map((p) => ({ ...p, curated: true })),
+    ...discoveredPlaces.map((p) => ({ ...p, curated: false })),
+  ];
 
   return NextResponse.json({ edition, places });
 }
