@@ -11,6 +11,7 @@ import { INTERESTS, VACATION_PREFERENCES, type PreferenceOption } from "@/locale
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { toggleFavorite } from "@/services/favorites/favoritesService";
+import { TOKEN_COSTS } from "@/constants/tokenCosts";
 import { listAddresses } from "@/services/addresses/addressesService";
 import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
 import { TripMatchCard } from "@/screens/tripmatch/TripMatchCard";
@@ -45,6 +46,7 @@ const CONTINUE_CATEGORY_VALUES: string[] = ["nightlife", "restaurants", "attract
 // שומרים את מצב מסך התוצאות ב-sessionStorage (נמחק כשסוגרים את הטאב,
 // לא נשאר "תקוע" לתמיד) כדי שחזרה ל-TripMatch תשחזר בדיוק איפה שהפסיקו.
 const RESULTS_STATE_STORAGE_KEY = "tripmatch:results-state";
+const TOKEN_COST_LIKE = TOKEN_COSTS.tripmatch_like;
 
 /** "אחר" ב"קרוב אליי" - השלמה אוטומטית מתוך תחומי עניין + העדפות חופשות
  *  בחו"ל (אותן רשימות מההתאמה האישית) - לא קשור ל-4 הדליים הראשיים. */
@@ -148,6 +150,12 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   const [totalDecisions, setTotalDecisions] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // *** מערכת "טריפים": כשלייק נדחה בגלל יתרה לא מספיקה, הכרטיס כבר
+  // "עף" ויזואלית (אנימציית SwipeCard רצה לפני שהתשובה מהשרת חוזרת -
+  // ר' handleDecision למטה) - בלי שינוי ה-key, React ישאיר את אותו
+  // instance עם ה-transform הישן (מחוץ למסך). מעלים tick משנה את ה-key
+  // ומכריחים remount נקי, כדי שהכרטיס יחזור למרכז במקום להיעלם.
+  const [swipeResetTick, setSwipeResetTick] = useState(0);
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -782,35 +790,67 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
    *  ולא אחידה (תלוי ברשת). עכשיו העדכון קורה אופטימית ומיידית: מסירים
    *  את המועמד מהרשימה המקומית ומציגים את הפופאפ/כרטיס הבא מייד עם
    *  סיום אנימציית ה-swipe, ושליחת ההחלטה לשרת קורית ברקע. */
+  /** *** תיקון (מערכת "טריפים" - דרישה מפורשת): Skip (liked=false) לא
+   *  עולה כלום - ממשיך בדיוק כמו קודם, אופטימי ומיידי. Like (liked=true)
+   *  עולה 10 טריפים, אז חייבים לחכות לתשובת השרת *לפני* שמזיזים את
+   *  הכרטיס/מציגים את דיאלוג "אהבתי" - אחרת משתמש בלי מספיק טריפים
+   *  היה רואה לייק "מצליח" ויזואלית שבפועל לא נשמר ולא חויב. */
   async function handleDecision(liked: boolean) {
     if (!sessionId || !currentCandidate) return;
     const decidedPlace = currentCandidate;
 
-    setHasSwipedAny(true);
-    setTotalDecisions((n) => n + 1);
-    setCandidates((prev) => prev.filter((c) => c.id !== decidedPlace.id));
-    setCandidateIndex(0);
-    if (liked) {
-      // *** תיקון: מקום עלול להופיע שוב במחזור קטגוריה אחרת (למשל
-      // מסעדות ואטרקציות חופפות חלקית) - בלי בדיקת כפילות, לייק חוזר על
-      // אותו מקום היה יוצר שני איברים עם אותו id ברשימה, וזה גרם לשגיאת
-      // React "two children with the same key" במסך התוצאות.
-      setSessionLikedPlaces((prev) => (prev.some((p) => p.id === decidedPlace.id) ? prev : [...prev, decidedPlace]));
-      setLikedPlace(decidedPlace);
+    if (!liked) {
+      setHasSwipedAny(true);
+      setTotalDecisions((n) => n + 1);
+      setCandidates((prev) => prev.filter((c) => c.id !== decidedPlace.id));
+      setCandidateIndex(0);
+      try {
+        const response = await fetch(`/api/tripmatch/sessions/${sessionId}/decide`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ placeId: decidedPlace.id, liked: false }),
+        });
+        const data = await response.json();
+        if (response.ok) setCandidates(data.candidates ?? []);
+      } catch {
+        // העדכון האופטימי כבר בוצע - שגיאת רשת לא חוסמת את הזרימה.
+      }
+      return;
     }
 
+    setBusy(true);
+    setError(null);
     try {
       const response = await fetch(`/api/tripmatch/sessions/${sessionId}/decide`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placeId: decidedPlace.id, liked }),
+        body: JSON.stringify({ placeId: decidedPlace.id, liked: true }),
       });
       const data = await response.json();
-      // מסנכרן ברקע עם הרשימה הרשמית מהשרת (כולל favorites חיצוניים
-      // וכו') - בלי לגעת ב-candidateIndex, כדי לא "לקפוץ" ויזואלית.
-      if (response.ok) setCandidates(data.candidates ?? []);
+
+      if (!response.ok) {
+        // הכרטיס כבר "עף" ויזואלית (אנימציית SwipeCard) - מכריחים remount
+        // כדי שיחזור למרכז, כי בפועל שום Like לא בוצע.
+        setSwipeResetTick((t) => t + 1);
+        if (data?.error === "INSUFFICIENT_TOKENS") {
+          setError(`אין לכם מספיק טריפים לביצוע לייק · לייק ב-TripMatch עולה ${data.cost ?? 10} טריפים · נשארו לכם ${data.remainingTokens ?? 0} טריפים`);
+        } else {
+          setError(data?.error ?? "שמירת הלייק נכשלה - נסו שוב.");
+        }
+        return;
+      }
+
+      setHasSwipedAny(true);
+      setTotalDecisions((n) => n + 1);
+      setCandidates(data.candidates ?? []);
+      setCandidateIndex(0);
+      setSessionLikedPlaces((prev) => (prev.some((p) => p.id === decidedPlace.id) ? prev : [...prev, decidedPlace]));
+      setLikedPlace(decidedPlace);
     } catch {
-      // העדכון האופטימי כבר בוצע - שגיאת רשת לא חוסמת את הזרימה.
+      setSwipeResetTick((t) => t + 1);
+      setError("שמירת הלייק נכשלה - נסו שוב.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -1128,6 +1168,13 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
               />
             )}
 
+            {/* דרישה מפורשת (מערכת "טריפים") - העלות צריכה להיות ברורה
+                *לפני* ביצוע הפעולה, לא רק אחרי שכבר נוכו טריפים. */}
+            {currentCandidate && (
+              <p className="px-5 pt-1 text-center text-[11px] font-medium text-ink-secondary">♥ לייק — {TOKEN_COST_LIKE} טריפים</p>
+            )}
+            {error && <p className="px-5 pt-1 text-center text-sm text-danger">{error}</p>}
+
             {/* אזור הכרטיס - flex-1 סופג את כל הגובה הפנוי בין ה-header
                 לתחתית המסך. בלי padding אופקי - הכרטיס נצמד לשני קצוות
                 המסך ומהווה "עמוד מלא" (edge-to-edge), לא כרטיס צף בתוך
@@ -1151,7 +1198,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       : "נגמרו המועמדים כרגע."}
                 </p>
               ) : (
-                <SwipeCard key={currentCandidate.id} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
+                <SwipeCard key={`${currentCandidate.id}-${swipeResetTick}`} onSwipeLeft={() => handleDecision(false)} onSwipeRight={() => handleDecision(true)} disabled={busy}>
                   {({ onLike, onNope, disabled: swipeDisabled }) => (
                     <TripMatchCard
                       candidate={currentCandidate}

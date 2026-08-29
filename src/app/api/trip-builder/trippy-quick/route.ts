@@ -15,8 +15,11 @@ import {
   fetchPlacesByNameKeyword,
   pickCompactCluster,
 } from "@/services/tripBuilder/trippyQuickShared";
+import { consumeTokens, refundTokens, TOKEN_COSTS } from "@/services/tokens/tokenService";
 
 export type { TrippyQuickStop };
+
+const TRIPPY_AI_COST = TOKEN_COSTS.trippy_ai_generation;
 
 /**
  * *** תוספת (בקשת המשתמש - "ג'סמינו בכלל סגור בשבת" - הוצע מקום סגור
@@ -309,24 +312,59 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  let dnaContext = "";
-  let userId: string | null = null;
+  // *** מערכת "טריפים" (ר' migration 0063): "בניית טיול חדש באמצעות
+  // Trippy AI" = הקריאה הזו בדיוק (POST הראשי כאן) - לא add-stop/swap
+  // (routes נפרדים לגמרי, לא נוגעים בהם, ר' דרישה מפורשת #11 - "פעולות
+  // פנימיות לא מחייבות שוב"). דורש התחברות (דרישה מפורשת #10 שלב 1) -
+  // מכיוון ש-/ai מוגן ב-proxy.ts ממילא (אין guest allowed), זה לא משנה
+  // שום flow אמיתי דרך ה-UI, רק סוגר קריאת API ישירה בלי חשבון.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
+  const userId = user.id;
+
+  // חיוב אטומי *לפני* כל עבודה יקרה (Claude + שאילתות DB) - זה מה שסוגר
+  // את חלון המרוץ: שתי בקשות מקבילות עם רק 20 טריפים ביחד ינעלו זו את
+  // זו על אותה שורת יתרה ב-Postgres (ר' consume_tokens), ורק אחת תצליח.
+  // אם הפעולה בפועל תיכשל (Claude נכשל / 0 תוצאות) - מחזירים (refund)
+  // למטה, בדיוק לפי הדרישה "לא לחייב אם הפעולה נכשלה".
+  const chargeReferenceId = `trippy_ai_generation:${crypto.randomUUID()}`;
+  let charge;
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      userId = user.id;
-      const dna = await getTravelDna(supabase, user.id);
-      dnaContext = buildDnaContext(dna);
+    charge = await consumeTokens(userId, TRIPPY_AI_COST, "trippy_ai_generation", chargeReferenceId);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "שגיאה בבדיקת יתרת הטריפים" }, { status: 500 });
+  }
+  if (!charge.success) {
+    return NextResponse.json(
+      { error: "INSUFFICIENT_TOKENS", cost: TRIPPY_AI_COST, remainingTokens: charge.balance },
+      { status: 402 }
+    );
+  }
+
+  /** מחזירה את הטריפים (best-effort, לא חוסמת את התגובה) - נקראת מכל
+   *  נקודת יציאה שבה בפועל לא הופק טיול שימושי אחרי חיוב מוצלח. */
+  async function refundCharge() {
+    try {
+      await refundTokens(userId, TRIPPY_AI_COST, "trippy_ai_generation_refund", `${chargeReferenceId}:refund`);
+    } catch (refundError) {
+      console.error("[trippy-quick] refund failed:", refundError);
     }
+  }
+
+  let dnaContext = "";
+  try {
+    const dna = await getTravelDna(supabase, userId);
+    dnaContext = buildDnaContext(dna);
   } catch {
     // לא קריטי - ממשיכים בלי הקשר פרופיל אם זה נכשל
   }
 
   const criteria = await extractCriteria(freeText, dnaContext);
   if (!criteria) {
-    return NextResponse.json({ stops: [], title: null });
+    await refundCharge();
+    return NextResponse.json({ stops: [], title: null, tokenBalance: charge.balance + TRIPPY_AI_COST });
   }
 
   console.log("[trippy-quick DEBUG] קריטריונים שחולצו", { freeText, criteria, clientLat, clientLng });
@@ -429,9 +467,16 @@ export async function POST(request: NextRequest) {
   // עכשיו: טבלה נפרדת לגמרי (trippy_ai_results, ר' migration 0057),
   // עם המבנה הפשוט שבאמת מתאים כאן - מערך התחנות השטוח (stops) כמו
   // שהוא, בלי "להתחפש" ל-FinalItinerary עם שדות מזויפים.
+  // *** מערכת "טריפים": 0 תוצאות = שום טיול לא הופק בפועל (גם savedId
+  // תמיד יישאר null במקרה הזה, ר' התנאי stops.length > 0 למטה) - נחשב
+  // "הפעולה נכשלה", אז מחזירים את החיוב.
+  if (stops.length === 0) {
+    await refundCharge();
+  }
+
   let savedId: string | null = null;
   let shareToken: string | null = null;
-  if (userId && stops.length > 0) {
+  if (stops.length > 0) {
     try {
       const { data: saved } = await supabase
         .from("trippy_ai_results")
@@ -447,7 +492,9 @@ export async function POST(request: NextRequest) {
       savedId = saved?.id ?? null;
       shareToken = saved?.share_token ?? null;
     } catch (saveError) {
-      // כשל שמירה לא אמור לחסום את התוצאה עצמה מלהגיע למשתמש - רק לוג
+      // כשל שמירה לא אמור לחסום את התוצאה עצמה מלהגיע למשתמש - רק לוג.
+      // ה-stops עצמם כבר הופקו בהצלחה, אז החיוב *לא* מוחזר במקרה הזה -
+      // המשתמש קיבל טיול אמיתי לצפייה, רק לא ישמר ל"הטיולים שלי".
       logAiError("trippy-quick: שמירת trippy_ai_results נכשלה", { error: saveError instanceof Error ? saveError.message : saveError });
     }
   }
@@ -473,5 +520,8 @@ export async function POST(request: NextRequest) {
     // *נעשה בו שימוש* בחיפוש (location, לא רק city) - כך שה-swap
     // תמיד מחפש באותו אזור בדיוק שהחיפוש המקורי מצא בו תוצאות.
     searchContext: { city: criteria.city, lat: location.lat, lng: location.lng },
+    // *** מערכת "טריפים": היתרה המעודכנת אחרי החיוב (או אחרי refund אם
+    // stops.length===0, ר' למעלה) - כדי שהלקוח יוכל לעדכן תצוגה בלי fetch נוסף.
+    tokenBalance: stops.length === 0 ? charge.balance + TRIPPY_AI_COST : charge.balance,
   });
 }

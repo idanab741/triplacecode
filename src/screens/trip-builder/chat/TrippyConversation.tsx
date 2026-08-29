@@ -14,6 +14,9 @@ import { ChatHeader } from "./ChatHeader";
 import { RuntrippyPromptBubble } from "./RuntrippyPromptBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { UserBubble } from "./UserBubble";
+import { TOKEN_COSTS } from "@/constants/tokenCosts";
+
+const TRIPPY_AI_COST = TOKEN_COSTS.trippy_ai_generation;
 
 const INTRO =
   "שלום! אני טריפי AI 👋\n\nסוכן ה-AI האישי של TRIPLACE.\n\nאני כאן כדי להכיר אתכם, להבין בדיוק מה אתם מחפשים, ולבנות עבורכם את החופשה - מהיעדים והאטרקציות ועד המסלול המושלם.\n\nאז בואו נתחיל! מה תרצו לחפש היום?";
@@ -182,6 +185,25 @@ export function TrippyConversation() {
         body: JSON.stringify({ freeText: trimmed, lat: coords?.lat ?? null, lng: coords?.lng ?? null }),
       });
       const data = await res.json();
+
+      // *** מערכת "טריפים" (דרישה מפורשת): בניית טיול עולה 20 טריפים -
+      // אם אין מספיק, השרת לא ביצע (ולא חייב) שום דבר. לא מנווטים לעמוד
+      // תוצאה של טיול שלא נוצר - מציגים הודעה ברורה בצ'אט וחוזרים למצב
+      // כתיבה, כדי שהמשתמש יבין בדיוק למה ולא "יתקע" על מסך טעינה.
+      if (!res.ok) {
+        setBuilding(false);
+        if (data?.error === "INSUFFICIENT_TOKENS") {
+          add(
+            "assistant",
+            `אין לכם מספיק טריפים 😕\nבניית טיול באמצעות Trippy AI עולה ${data.cost ?? 20} טריפים.\nנשארו לכם ${data.remainingTokens ?? 0} טריפים.`
+          );
+        } else {
+          add("assistant", "משהו השתבש בבניית המסלול - נסו שוב.");
+        }
+        setStage("compose");
+        return;
+      }
+
       const requestId = crypto.randomUUID();
       sessionStorage.setItem(`trippy-quick:${requestId}`, JSON.stringify(data));
       router.push(`/trip-builder/trippy-quick/result?requestId=${requestId}`);
@@ -346,6 +368,7 @@ export function TrippyConversation() {
       {stage === "compose" && !typing && (
         <div className="fixed inset-x-0 bottom-24 z-40 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3">
           <div className="mx-auto flex max-w-md flex-col gap-2">
+            <p className="text-center text-[11px] font-medium text-ink-secondary">בניית טיול — {TRIPPY_AI_COST} טריפים</p>
             <button
               type="button"
               onClick={submitFreeText}

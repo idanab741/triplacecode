@@ -8,6 +8,7 @@ import { signOut } from "@/services/auth/authService";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { InviteFriendsModal } from "@/components/invite/InviteFriendsModal";
+import { TokenBalancePill } from "@/screens/profile/TokenBalancePill";
 import { Button, Field, Input, Skeleton } from "@/components/ui";
 import { updateProfile, uploadAvatar } from "@/services/profile/profileService";
 
@@ -135,6 +136,9 @@ export default function ProfilePage() {
             <div>
               <h1 className="text-xl font-bold text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
               <p className="text-sm text-ink-secondary">{profile?.city || "—"}</p>
+              <div className="mt-2 flex justify-center">
+                <TokenBalancePill />
+              </div>
             </div>
 
             <div className="flex w-full flex-col gap-2">
