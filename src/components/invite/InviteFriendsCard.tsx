@@ -53,11 +53,22 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
     return resolvedUrl;
   }
 
+  /**
+   * *** תיקון (באג אמיתי - "פותח את וואטסאפ אבל לא את מסך בחירת איש
+   * קשר"): window.open(url, "_blank") היה הבעיה. בנייד (ובמיוחד בתוך
+   * WebView מוטמע), פתיחת wa.me בחלון/טאב חדש גורמת למערכת ההפעלה
+   * לפעמים "לזרוק" למשתמש רק את האפליקציה עצמה (cold-launch) בלי למסור
+   * את ה-deep link המלא (עם טקסט ההודעה) שמוביל למסך בחירת איש הקשר/
+   * שליחה. ניווט ישיר באותו טאב (location.href) הוא הדרך התקינה
+   * והנפוצה למימוש כפתורי wa.me - ה-handoff ל-app מתבצע כניווט אמיתי,
+   * לא כפתיחת חלון, ולכן מגיע ל-WhatsApp עם כל הפרמטרים ופותח את מסך
+   * הבחירה/שליחה בפועל.
+   */
   async function handleWhatsApp() {
     const url = requireUrl();
     if (!url) return;
     const text = encodeURIComponent(`${SHARE_TEXT}\n${url}`);
-    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
+    window.location.href = `https://wa.me/?text=${text}`;
   }
 
   /**

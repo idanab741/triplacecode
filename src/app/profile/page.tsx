@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth/authService";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { InviteFriendsModal } from "@/components/invite/InviteFriendsModal";
 import { Button, Field, Input, Skeleton } from "@/components/ui";
 import { updateProfile, uploadAvatar } from "@/services/profile/profileService";
 
@@ -21,6 +22,9 @@ export default function ProfilePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // "הזמן חברים" נפתח כבועה (InviteFriendsModal) מעל המסך הנוכחי - לא
+  // ניווט לעמוד /invite נפרד (ר' בקשה מפורשת: "בועה נפתחת, לא עמוד נפרד").
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   async function handleSignOut() {
     await signOut();
@@ -227,7 +231,7 @@ export default function ProfilePage() {
 
           <button
             type="button"
-            onClick={() => router.push("/invite")}
+            onClick={() => setShowInviteModal(true)}
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
             <div className="text-start">
@@ -273,6 +277,8 @@ export default function ProfilePage() {
       </div>
 
       <MainBottomNav active="profile" />
+
+      {showInviteModal && <InviteFriendsModal onClose={() => setShowInviteModal(false)} />}
     </div>
   );
 }
