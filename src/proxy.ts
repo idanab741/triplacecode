@@ -6,6 +6,7 @@ const PROTECTED_PATHS = [
   "/profile-setup",
   "/preferences",
   "/profile",
+  "/support",
   "/favorites",
   "/community",
   "/ai",

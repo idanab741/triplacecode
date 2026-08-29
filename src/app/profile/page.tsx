@@ -213,10 +213,6 @@ export default function ProfilePage() {
                 <span className="text-ink">שיתוף מסלול בין חברים</span>
                 <span className="rounded-pill bg-bg-secondary px-2 py-0.5 text-xs text-ink-secondary">בקרוב</span>
               </div>
-              <div className="flex items-center justify-between py-1.5 opacity-50">
-                <span className="text-ink">צ'אט עם שירות הלקוחות</span>
-                <span className="rounded-pill bg-bg-secondary px-2 py-0.5 text-xs text-ink-secondary">בקרוב</span>
-              </div>
             </div>
           </div>
 
@@ -226,6 +222,18 @@ export default function ProfilePage() {
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
             <span className="text-ink">מדיניות פרטיות ותנאי שימוש</span>
+            <ChevronLeft />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/support")}
+            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+          >
+            <div className="text-start">
+              <p className="font-bold text-ink">שירות לקוחות</p>
+              <p className="text-xs text-ink-secondary">יש לכם שאלה? כתבו לנו</p>
+            </div>
             <ChevronLeft />
           </button>
 
