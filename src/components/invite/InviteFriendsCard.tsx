@@ -1,11 +1,13 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { InviteTravelScene } from "./InviteTravelScene";
+import Image from "next/image";
 
 interface InviteFriendsCardProps {
   /** קישור ההזמנה. אם לא מועבר, נגזר מכתובת האתר הנוכחית (origin/). */
   inviteUrl?: string;
+  /** אם מועבר - הכרטיס מוצג בתוך פופאפ (InviteFriendsModal) ומקבל כפתור סגירה צף. */
+  onClose?: () => void;
 }
 
 const SHARE_TITLE = "Triplace";
@@ -18,14 +20,18 @@ const SHARE_TEXT = "בואו לגלות את הטיול הבא שלנו יחד �
  * תגמול, מונה חברים שהוזמנו, Progress bar, טאבים/ניווט, או קוד הזמנה
  * שמופיע באופן בולט. מערכת תגמול תתווסף בעתיד בנפרד - זה פיצ'ר חברתי
  * טבעי בלבד: "בוא איתי", לא "הורד את האפליקציה".
+ *
+ * *** תיקון (משוב מפורש): הוויזואל משתמש בתמונת ה-HERO האמיתית של
+ * triplace (hero-tripmatch.png, כבר קיימת ב-public/images ומשמשת גם
+ * ב-tripmatch/page.tsx וב-LikedDialog.tsx) - לא איור SVG מאולתר.
  */
-export function InviteFriendsCard({ inviteUrl }: InviteFriendsCardProps) {
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   function resolveUrl() {
     if (inviteUrl) return inviteUrl;
     if (typeof window !== "undefined") return window.location.origin;
-    return "https://tripmatch.app";
+    return process.env.NEXT_PUBLIC_APP_URL ?? "https://triplace.app";
   }
 
   async function handleWhatsApp() {
@@ -34,14 +40,47 @@ export function InviteFriendsCard({ inviteUrl }: InviteFriendsCardProps) {
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   }
 
+  /**
+   * *** תיקון (באג אמיתי): הגרסה הקודמת "בלעה" בשקט כל כשל של
+   * navigator.clipboard והציגה "הועתק!" גם כשכלום לא הועתק בפועל -
+   * זה קורה למשל בכל דף שרץ על http (לא https) ולא ב-localhost עצמו,
+   * למשל בדיקה ב-IP מקומי מהנייד. עכשיו יש שרשרת fallback אמיתית:
+   * Clipboard API -> execCommand הישן (עובד גם ב-http) -> אם גם זה
+   * נכשל, prompt עם הקישור כדי שהמשתמש עדיין יוכל להעתיק ידנית - לא
+   * מוצג "הועתק" מזויף בשום מקרה.
+   */
   async function handleCopyLink() {
     const url = resolveUrl();
+
     try {
       await navigator.clipboard.writeText(url);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 1800);
+      return;
     } catch {
-      // אם ה-Clipboard API חסום - עדיין נראה משוב חיובי למשתמש, הקישור בכל זאת זמין ידנית
+      // ה-Clipboard API לא זמין/נכשל (למשל http לא מאובטח) - ננסה fallback
     }
-    setCopyState("copied");
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (!ok) throw new Error("execCommand copy failed");
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 1800);
+      return;
+    } catch {
+      // גם ה-fallback נכשל - נציג את הקישור ישירות למשתמש להעתקה ידנית
+    }
+
+    setCopyState("error");
+    window.prompt("העתיקו את הקישור:", url);
     setTimeout(() => setCopyState("idle"), 1800);
   }
 
@@ -60,14 +99,26 @@ export function InviteFriendsCard({ inviteUrl }: InviteFriendsCardProps) {
 
   return (
     <div className="overflow-hidden rounded-card bg-white shadow-soft">
-      {/* אזור ויזואלי מרכזי - הדמות הרשמית בסצנת טיול, בלי לגלוש לעומס */}
-      <div className="bg-[linear-gradient(180deg,#eaf3ff_0%,#f9fbff_100%)] px-6 pt-6">
-        <div className="mx-auto max-w-[280px]">
-          <InviteTravelScene />
-        </div>
+      {/* אזור ויזואלי מרכזי - תמונת ה-HERO האמיתית של triplace */}
+      <div className="relative h-44 w-full overflow-hidden">
+        <Image src="/images/hero-tripmatch.png" alt="קמע triplace" fill priority className="object-cover" />
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 45%)" }}
+        />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="סגירה"
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-soft backdrop-blur-sm"
+          >
+            <CloseIcon />
+          </button>
+        )}
       </div>
 
-      <div className="px-6 pb-6 pt-4 text-center">
+      <div className="px-6 pb-6 pt-1 text-center">
         <h2 className="text-xl font-bold text-ink">הזמן חברים</h2>
         <p className="mx-auto mt-1.5 max-w-[280px] text-sm leading-relaxed text-ink-secondary">
           שתפו את Triplace עם החברים שלכם והזמינו אותם להצטרף לחוויית הטיולים.
@@ -97,7 +148,7 @@ export function InviteFriendsCard({ inviteUrl }: InviteFriendsCardProps) {
               {copyState === "copied" ? <CheckIcon /> : <LinkIcon />}
             </span>
             <span className="text-xs font-semibold text-ink-secondary">
-              {copyState === "copied" ? "הועתק!" : "העתק קישור"}
+              {copyState === "copied" ? "הועתק!" : copyState === "error" ? "העתיקו ידנית" : "העתק קישור"}
             </span>
           </button>
 
@@ -159,6 +210,14 @@ function ShareIcon() {
       <circle cx="18" cy="19" r="3" />
       <line x1="8.6" y1="10.5" x2="15.4" y2="6.5" />
       <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   );
 }

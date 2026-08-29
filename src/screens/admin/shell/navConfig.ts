@@ -56,7 +56,7 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     title: "מערכת",
-    items: [{ href: "/admin/notifications", label: "התראות מערכת", icon: "◔" }],
+    items: [{ href: "/admin/notifications", label: "התראות מערכת", icon: "◔", status: "ready" }],
   },
 ];
 
