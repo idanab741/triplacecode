@@ -12,6 +12,7 @@ interface TrippyQuickStopCardProps {
 const CATEGORY_LABEL: Record<TrippyQuickStop["category"], string> = {
   attraction: "🎡 אטרקציה",
   restaurant: "🍽️ מסעדה",
+  nightlife: "🍸 חיי לילה",
 };
 
 /** כרטיס תחנה פשוט לעמוד המסלול המהיר החדש - גרירה + מחיקה בכפתור
