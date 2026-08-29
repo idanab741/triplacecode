@@ -64,11 +64,21 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
    * לא כפתיחת חלון, ולכן מגיע ל-WhatsApp עם כל הפרמטרים ופותח את מסך
    * הבחירה/שליחה בפועל.
    */
+  /**
+   * *** תיקון (באג אמיתי - "מגיע לעמוד הראשי, לא לרשימת אנשי קשר"):
+   * wa.me/?text=... הוא לא הכתובת הנכונה למקרה הזה. wa.me מתועד ע"י
+   * וואטסאפ כ-"Click to Chat" עם *מספר טלפון ידוע* בנתיב עצמו
+   * (wa.me/<number>?text=...) - כשאין מספר בנתיב, אין יעד מוגדר וההתנהגות
+   * לא עקבית (לרוב פשוט פותח את האפליקציה/הצ'אטים, בלי לפתוח את מסך
+   * בחירת איש הקשר). הכתובת המתועדת של וואטסאפ בדיוק למקרה של "שתף
+   * טקסט הזה, תן למשתמש לבחור למי לשלוח" (בלי מספר ידוע מראש) היא
+   * api.whatsapp.com/send - זו הכתובת שבאמת פותחת את מסך בחירת איש הקשר.
+   */
   async function handleWhatsApp() {
     const url = requireUrl();
     if (!url) return;
     const text = encodeURIComponent(`${SHARE_TEXT}\n${url}`);
-    window.location.href = `https://wa.me/?text=${text}`;
+    window.location.href = `https://api.whatsapp.com/send?text=${text}`;
   }
 
   /**
