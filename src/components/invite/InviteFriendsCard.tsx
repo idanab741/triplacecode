@@ -15,7 +15,7 @@ interface InviteFriendsCardProps {
 }
 
 const SHARE_TITLE = "Triplace";
-const SHARE_TEXT = "בואו לגלות את הטיול הבא שלנו יחד ב-Triplace 🧳✈️";
+const SHARE_TEXT = "היי! 👋 מצאתי את TRIPLACE ובא לי להזמין אותך להצטרף אליי - בואו נתכנן את הטיול הבא שלנו יחד ✈️🧳";
 
 /**
  * כרטיסיית "הזמן חברים".
@@ -25,9 +25,12 @@ const SHARE_TEXT = "בואו לגלות את הטיול הבא שלנו יחד �
  * שמופיע באופן בולט. מערכת תגמול תתווסף בעתיד בנפרד - זה פיצ'ר חברתי
  * טבעי בלבד: "בוא איתי", לא "הורד את האפליקציה".
  *
- * *** תיקון (משוב מפורש): הוויזואל משתמש בתמונת ה-HERO האמיתית של
- * triplace (hero-tripmatch.png, כבר קיימת ב-public/images ומשמשת גם
- * ב-tripmatch/page.tsx וב-LikedDialog.tsx) - לא איור SVG מאולתר.
+ * *** תיקון (התמונה הלא נכונה הוצגה בכרטיס): hero-tripmatch.png הוא
+ * צילום מסך של ממשק ה-Swipe/TripMatch (שני טלפונים, X אדום, לב כחול) -
+ * מתאים להקשר של Tripmatch, לא להזמנת חברים. הכרטיס עכשיו משתמש בנכס
+ * הוויזואלי הייעודי שסופק לפיצ'ר הזה - hero-invite-friends.jpg (קמע
+ * triplace עם מזוודה מול נוף סנטוריני, public/images) - לא איור SVG
+ * מאולתר ולא תמונת HERO ממקור לא קשור.
  *
  * *** תיקון (הפיכת הפיצ'ר לאמיתי): הקישור כבר לא origin/ כללי - הוא
  * נבנה מ-profile.invite_code האישי והייחודי של המשתמש המחובר. כל עוד
@@ -120,7 +123,7 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
     <div className="overflow-hidden rounded-card bg-white shadow-soft">
       {/* אזור ויזואלי מרכזי - תמונת ה-HERO האמיתית של triplace */}
       <div className="relative h-44 w-full overflow-hidden">
-        <Image src="/images/hero-tripmatch.png" alt="קמע triplace" fill priority className="object-cover" />
+        <Image src="/images/hero-invite-friends.jpg" alt="קמע triplace עם מזוודה" fill priority className="object-cover" />
         <div
           className="absolute inset-0"
           style={{ background: "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 45%)" }}
