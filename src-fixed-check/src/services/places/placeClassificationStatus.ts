@@ -1,4 +1,7 @@
-﻿import { ADMIN_DISCOVERY_SECTIONS, type AdminDiscoverySection } from "@/constants/adminDiscoverySections";
+﻿import {
+  ADMIN_DISCOVERY_SECTIONS,
+  type AdminDiscoverySection,
+} from "@/constants/adminDiscoverySections";
 import { QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES } from "@/constants/placeCategories";
 
 export interface ClassifiablePlaceRow {
@@ -13,32 +16,83 @@ export interface ClassifiablePlaceRow {
 /** אותה לוגיקה בדיוק בכל מקום שבודק "האם המקום הזה כבר סווג לסקשן
  *  הזה" (characterization-stats, discovery-sections/all, כאן) - מקור
  *  אמת יחיד, לא שלוש גרסאות מקורבות. */
-export function matchesSection(p: ClassifiablePlaceRow, section: AdminDiscoverySection): boolean {
+export function matchesSection(
+  p: ClassifiablePlaceRow,
+  section: AdminDiscoverySection
+): boolean {
   if (section.categoryColumnEquals) {
     const columnMatch = p.category === section.categoryColumnEquals;
-    if (section.requiredAnyTags?.length) return columnMatch || section.requiredAnyTags.some((t) => (p.tags ?? []).includes(t));
+
+    if (section.requiredAnyTags?.length) {
+      return (
+        columnMatch ||
+        section.requiredAnyTags.some((t) => (p.tags ?? []).includes(t))
+      );
+    }
+
     return columnMatch;
   }
-  const groupIds = section.categories ?? (section.category ? [section.category] : []);
+
+  const groupIds =
+    section.categories ?? (section.category ? [section.category] : []);
+
   if (groupIds.length > 0 || section.subcategories?.length) {
-    const groupMatch = groupIds.some((c) => (p.trip_type_tags ?? []).includes(c));
-    const subcatMatch = !!section.subcategories?.length && !!p.subcategory && section.subcategories.includes(p.subcategory);
+    const groupMatch = groupIds.some((c) =>
+      (p.trip_type_tags ?? []).includes(c)
+    );
+
+    const subcatMatch =
+      !!section.subcategories?.length &&
+      !!p.subcategory &&
+      section.subcategories.includes(p.subcategory);
+
     if (!groupMatch && !subcatMatch) return false;
   }
-  if (section.requiredAnyTags?.length && !section.requiredAnyTags.some((t) => (p.tags ?? []).includes(t))) return false;
-  if (section.requiredAnyCuisineTags?.length && !section.requiredAnyCuisineTags.some((t) => (p.cuisine_tags ?? []).includes(t))) return false;
+
+  if (
+    section.requiredAnyTags?.length &&
+    !section.requiredAnyTags.some((t) => (p.tags ?? []).includes(t))
+  ) {
+    return false;
+  }
+
+  if (
+    section.requiredAnyCuisineTags?.length &&
+    !section.requiredAnyCuisineTags.some((t) =>
+      (p.cuisine_tags ?? []).includes(t)
+    )
+  ) {
+    return false;
+  }
+
   return true;
 }
+
+/**
+ * טיפוס המפתחות של ADMIN_DISCOVERY_SECTIONS.
+ * כך quickCategory תמיד תואם בדיוק למפתחות שהאובייקט מקבל,
+ * בלי להסתמך על QuickCategoryId שלא מיוצא מ-placeCategories.
+ */
+type AdminDiscoveryQuickCategory = keyof typeof ADMIN_DISCOVERY_SECTIONS;
 
 /** category -> אילו quickCategory ids "שם" הוא רלוונטי אליהם (ההופכי
  *  של QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES). "hotels" לא מופיע בשום
  *  quickCategory (המנגנון הזה מכסה רק את 5 סוגי הטיול מבוססי-הסקשנים -
  *  day_trip/nature_trip/restaurants_cafes/romantic_date/nightlife;
  *  מלונות/abroad/weekend עובדים אחרת לגמרי, לא חלק מהבדיקה הזו). */
-const CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES: Record<string, string[]> = {};
-for (const [quickCategory, categories] of Object.entries(QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES)) {
+const CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES: Record<
+  string,
+  AdminDiscoveryQuickCategory[]
+> = {};
+
+for (const [quickCategory, categories] of Object.entries(
+  QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES
+)) {
   for (const category of categories ?? []) {
-    CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] = [...(CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] ?? []), quickCategory];
+    CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] = [
+      ...(CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] ?? []),
+      quickCategory as AdminDiscoveryQuickCategory,
+    ];
   }
 }
 
@@ -51,11 +105,17 @@ for (const [quickCategory, categories] of Object.entries(QUICK_CATEGORY_FALLBACK
  * שהוא בכלל רלוונטי אליהם** (לפי category) - בדיוק אותה שאלה שקובעת
  * needsClassification בתצוגת "הכל". זו עכשיו ההגדרה היחידה בכל המערכת.
  */
-export function isGenuinelyUnclassified(p: ClassifiablePlaceRow): boolean {
-  const eligibleQuickCategories = CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[p.category ?? ""] ?? [];
-  if (eligibleQuickCategories.length === 0) return false; // מלונות וכו' - לא חלק מהמנגנון הזה בכלל
+export function isGenuinelyUnclassified(
+  p: ClassifiablePlaceRow
+): boolean {
+  const eligibleQuickCategories =
+    CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[p.category ?? ""] ?? [];
+
+  if (eligibleQuickCategories.length === 0) return false;
+
   return eligibleQuickCategories.every((quickCategory) => {
     const sections = ADMIN_DISCOVERY_SECTIONS[quickCategory] ?? [];
+
     return !sections.some((section) => matchesSection(p, section));
   });
 }
