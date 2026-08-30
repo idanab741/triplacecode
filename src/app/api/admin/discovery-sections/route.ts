@@ -46,9 +46,16 @@ export async function GET(request: Request) {
   }
 
   const supabase = createAdminClient();
+  // *** תיקון (באג אמיתי - "תל אביב מציגה מלונות מירושלים/ים המלח"):
+  // כשיש lat/lng (עמוד יעד ספציפי - domestic/[slug]) חייב סינון הדוק:
+  // רדיוס קטן משמעותית מברירת המחדל הכללית של האפליקציה (שנועדה ל"קרוב
+  // אליי" רחב), ובלי שום הרחבת רדיוס אוטומטית - עדיף פחות תוצאות
+  // ומדויקות מאשר תוצאות מיעד אחר לגמרי שנראות כאילו הן שייכות לכאן.
+  const hasLocation = lat !== null && lng !== null;
   const places = await fetchDiscoveryPlaces(supabase, {
     location: { lat, lng, city: null },
-    radiusKm,
+    radiusKm: radiusKm ?? (hasLocation ? 15 : undefined),
+    disableRadiusExpansion: hasLocation,
     category: section.category,
     categories: section.categories,
     subcategories: section.subcategories,

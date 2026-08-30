@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
@@ -144,6 +144,10 @@ export default function PlaceConsolePage() {
   const [newTitle, setNewTitle] = useState("");
   const [newCountry, setNewCountry] = useState("");
   const [newSubtitle, setNewSubtitle] = useState("");
+  // *** בעבר נגזר משתמעית מ-activePillKey (הפיל שנבחר). עכשיו שכל
+  // הקבוצות מוצגות ביחד במקום מוצג-בזמן-אחד (בקשה מפורשת - "לא גלילה,
+  // הקטגוריות אחד אחרי השני") - צריך בחירה מפורשת בטופס עצמו.
+  const [newGroupKey, setNewGroupKey] = useState<string>(ABROAD_GROUP_PILLS[0]?.key ?? "");
 
   // ייבוא "עצל" ליעד בודד - בדיוק ברגע שלוחצים עליו, לא ברקע לכל
   // הקטגוריה מראש (זו הייתה הבעיה השברירית - ר' הערה על הגריד למטה).
@@ -159,25 +163,57 @@ export default function PlaceConsolePage() {
   const [sectionPlaces, setSectionPlaces] = useState<SectionPlace[] | null>(null);
   const [countries, setCountries] = useState<string[] | null>(null);
   const [countryFilter, setCountryFilter] = useState<string>("");
+  // *** תוספת (בקשה מפורשת - "כשאני משנה אטרקציה זה לא מתעדכן בעמודים"):
+  // כפתור רענון ידני - שינוי בעריכת מקום (בעמוד /admin/places/[id] נפרד)
+  // לא בהכרח מפעיל מחדש את ה-useEffect כאן אם Next.js משתמש ב-client
+  // router cache על המסך הזה. מונה שמופיע גם בתלויות ה-fetch, כדי
+  // שלחיצה תמיד תכריח בקשה טרייה, בלי תלות בהתנהגות ה-cache.
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // *** דשבורד "כמה אטרקציות לא מאופיינות" (דרישה מפורשת) - נטען פעם
+  // אחת, לא תלוי בטאב/פיל נבחר (זו סטטיסטיקה על *כל* המאגר).
+  const [charStats, setCharStats] = useState<{
+    total: number;
+    uncharacterized: { count: number; pct: number };
+    noSubcategory: { count: number; pct: number };
+    perGroup: { id: string; emoji: string; label: string; count: number }[];
+  } | null>(null);
+  const [charStatsOpen, setCharStatsOpen] = useState(false);
+  useEffect(() => {
+    if (!adminSecret) return;
+    fetch("/api/admin/places/characterization-stats", { headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
+      .then((res) => parseJsonResponse(res))
+      .then((data) => {
+        if (!data.error) setCharStats(data);
+      })
+      .catch(() => {});
+  }, [adminSecret, refreshTick]);
   // "weekend" - כל התוכן ישראלי מטבעו (vacation-il), פילטר מדינה שם לא
   // מוסיף ערך (תמיד יחזיר אותה תוצאה) - מוצג רק לקטגוריות הבינלאומיות.
   const showCountryFilter = mode === "sections" && activeCategory !== "weekend";
 
+  const editionsRequestId = useRef(0);
   function loadEditions() {
     if (!adminSecret || mode !== "curated") return;
+    const requestId = ++editionsRequestId.current;
     setEditions(null);
+    setError(null);
     fetch(`/api/admin/destination-editions?quickCategory=${activeCategory}`, {
       headers: { [ADMIN_SECRET_HEADER]: adminSecret },
     })
       .then((res) => parseJsonResponse(res))
       .then((data) => {
+        if (requestId !== editionsRequestId.current) return; // בקשה ישנה שהוחלפה - מתעלמים
         if (data.error) throw new Error(data.error);
         setEditions(data.editions ?? []);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "שגיאה בטעינת היעדים"));
+      .catch((e) => {
+        if (requestId !== editionsRequestId.current) return;
+        setError(e instanceof Error ? e.message : "שגיאה בטעינת היעדים");
+      });
   }
 
-  useEffect(loadEditions, [adminSecret, activeCategory, mode]);
+  useEffect(loadEditions, [adminSecret, activeCategory, mode, refreshTick]);
 
   // בחירת פיל ברירת מחדל (הראשון) בכל מעבר טאב.
   useEffect(() => {
@@ -199,20 +235,39 @@ export default function PlaceConsolePage() {
       .catch(() => setCountries([]));
   }, [adminSecret, countries]);
 
-  // טעינת האטרקציות של הפיל הנבחר (מצב sections בלבד).
+  /**
+   * *** תיקון (באג אמיתי - "עדיין מופיע 'סקשן לא מוכר'"): לא הספיק
+   * לנקות error בתחילת כל ניסיון (מה שכבר תוקן קודם) - היה עוד מרוץ:
+   * כשמעבירים פילים/טאבים מהר, כל שינוי תלות מפעיל fetch חדש בלי
+   * לבטל את הקודם. אם הבקשה *הישנה* הייתה איטית וסיימה (בהצלחה או
+   * בכישלון) *אחרי* שהחדשה כבר הצליחה, ה-.catch/.then הישן עדיין
+   * "יורה" ודורס את ה-state העדכני עם שגיאה לא רלוונטית יותר. עכשיו
+   * כל אפקט שומר דגל "ignore" מקומי דרך ה-cleanup של useEffect - ברגע
+   * שהתלות משתנה (בקשה חדשה מתחילה), הבקשה הקודמת מסומנת ignore=true
+   * ותוצאותיה (איזה שיגיעו) יתעלמו לגמרי, לא משנה מתי הן חוזרות.
+   */
   useEffect(() => {
     if (!adminSecret || mode !== "sections" || !activePillKey) return;
+    let ignore = false;
     setSectionPlaces(null);
+    setError(null);
     const params = new URLSearchParams({ quickCategory: activeCategory, sectionId: activePillKey });
     if (showCountryFilter && countryFilter) params.set("country", countryFilter);
     fetch(`/api/admin/discovery-sections?${params.toString()}`, { headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
       .then((res) => parseJsonResponse(res))
       .then((data) => {
+        if (ignore) return;
         if (data.error) throw new Error(data.error);
         setSectionPlaces(data.places ?? []);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "שגיאה בטעינת אטרקציות"));
-  }, [adminSecret, mode, activeCategory, activePillKey, countryFilter, showCountryFilter]);
+      .catch((e) => {
+        if (ignore) return;
+        setError(e instanceof Error ? e.message : "שגיאה בטעינת אטרקציות");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [adminSecret, mode, activeCategory, activePillKey, countryFilter, showCountryFilter, refreshTick]);
 
 
   async function handleCreate() {
@@ -228,7 +283,7 @@ export default function PlaceConsolePage() {
           destinationName: newTitle.trim(),
           country: newCountry.trim(),
           subtitle: newSubtitle.trim() || undefined,
-          groupLabel: activePillKey,
+          groupLabel: newGroupKey,
         }),
       });
       const data = await parseJsonResponse(res);
@@ -262,12 +317,11 @@ export default function PlaceConsolePage() {
     return map;
   }, [mode, editions]);
 
-  const staticDestinations = mode === "curated" && activePillKey ? (ABROAD_STATIC_DESTINATIONS[activePillKey] ?? []) : [];
 
   /** ייבוא יעד בודד ל-DB ברגע הלחיצה עליו (אין עוד ייבוא גורף ברקע),
    *  ואז ניווט לעמוד היעד שנוצר - בדיוק כמו שהיה קורה אילו כבר יובא. */
   async function importDestination(dest: StaticDestination) {
-    if (!adminSecret || !activePillKey || importingKeys.has(dest.key)) return;
+    if (!adminSecret || importingKeys.has(dest.key)) return;
     setImportingKeys((prev) => new Set(prev).add(dest.key));
     setError(null);
     try {
@@ -306,6 +360,62 @@ export default function PlaceConsolePage() {
           התוכן שהמשתמשים רואים באפליקציה - בדיוק כמו שהם רואים אותו, רק בפריסת עבודה רחבה
         </p>
       </div>
+
+      {/* דשבורד "כמה אטרקציות לא מאופיינות לשום יעד/סוג טיול" (דרישה
+          מפורשת). trip_type_tags ריק = המקום לא יכול להופיע בשום מקום
+          במסך הזה, גם אם יש לו category/subcategory - זו ההסברה
+          הסבירה ביותר לסקשנים ריקים ("דייט רומנטי"/"טיול בטבע" וכו') -
+          פער באפיון הנתונים, לא באג בקוד. מתקפל כברירת מחדל, כדי לא
+          להעמיס על מסך שהמטרה שלו להיות ויזואלי. */}
+      {charStats && (
+        <div className="rounded-[var(--admin-radius-lg)] border" style={{ borderColor: charStats.uncharacterized.count > 0 ? "var(--admin-warning)" : "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+          <button type="button" onClick={() => setCharStatsOpen((v) => !v)} className="flex w-full items-center justify-between p-4 text-right">
+            <div>
+              <p className="text-[13.5px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                📊 דשבורד אפיון: {charStats.uncharacterized.count.toLocaleString()} מתוך {charStats.total.toLocaleString()} אטרקציות ({charStats.uncharacterized.pct}%) לא מאופיינות לשום סוג טיול
+              </p>
+              <p className="mt-0.5 text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
+                אלה לעולם לא יופיעו בשום יעד/קטגוריה בעמוד הזה - חסר להן trip_type_tags בכלל
+              </p>
+            </div>
+            <span className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
+              {charStatsOpen ? "▲ הסתר פירוט" : "▼ הצג פירוט"}
+            </span>
+          </button>
+          {charStatsOpen && (
+            <div className="border-t p-4" style={{ borderColor: "var(--admin-border)" }}>
+              <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
+                כמות אטרקציות לפי סוג טיול (מסביר סקשנים ריקים - סוג עם 0/מעט = סקשנים שלו ריקים בכל מקום)
+              </p>
+              <div className="flex flex-col gap-1">
+                {charStats.perGroup.map((g) => (
+                  <div key={g.id} className="flex items-center gap-2">
+                    <span className="w-40 shrink-0 truncate text-[12px]" style={{ color: g.count === 0 ? "var(--admin-danger)" : "var(--admin-ink-secondary)" }}>
+                      {g.emoji} {g.label}
+                    </span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: "var(--admin-bg-sunken)" }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${Math.min(100, (g.count / Math.max(1, charStats.perGroup[charStats.perGroup.length - 1]?.count ?? 1)) * 100)}%`, background: g.count === 0 ? "var(--admin-danger)" : "var(--admin-accent)" }}
+                      />
+                    </div>
+                    <span className="w-10 shrink-0 text-left text-[12px] admin-mono" style={{ color: "var(--admin-ink-faint)" }}>
+                      {g.count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11.5px]" style={{ color: "var(--admin-ink-faint)" }}>
+                {charStats.noSubcategory.count.toLocaleString()} אטרקציות ({charStats.noSubcategory.pct}%) גם ללא קטגוריית-משנה. תיקון: פתחו את המקום ב-{" "}
+                <Link href="/admin/places" className="underline">
+                  מקומות ואטרקציות
+                </Link>
+                , או השתמשו בכפתור &quot;השלם עם Google&quot; בעמוד המקום.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && (
         <p
@@ -349,7 +459,7 @@ export default function PlaceConsolePage() {
           השאר). לא מוצגת ב-domestic (חופשה בארץ) - שם היעדים עצמם הם
           השכבה הראשונה (Structure B), הקטגוריות מופיעות רק *בתוך* יעד
           ספציפי (ר' /admin/place-console/domestic/[slug]). */}
-      {mode !== "domestic" && (
+      {mode !== "domestic" && mode !== "curated" && (
         <div className="-mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-1" style={{ scrollbarWidth: "none" }}>
           {pills.map((p) => {
             const active = p.key === activePillKey;
@@ -374,10 +484,10 @@ export default function PlaceConsolePage() {
       {/* 3. כותרת + פעולות (מספר תוצאות, פילטר מדינה / כפתור יעד חדש) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          {mode === "domestic" ? "יעדים" : activePill ? `${activePill.emoji} ${activePill.title}` : QUICK_CATEGORY_LABELS[activeCategoryData.id]}
+          {mode === "domestic" ? "יעדים" : mode === "curated" ? "כל הקטגוריות" : activePill ? `${activePill.emoji} ${activePill.title}` : QUICK_CATEGORY_LABELS[activeCategoryData.id]}
           <span className="mr-2 text-[13px] font-normal" style={{ color: "var(--admin-ink-faint)" }}>
             {mode === "curated"
-              ? `· ${staticDestinations.length} יעדים`
+              ? `· ${ABROAD_GROUP_PILLS.length} קטגוריות`
               : mode === "domestic"
                 ? `· ${ISRAEL_VACATION_DESTINATIONS.length} יעדים`
                 : sectionPlaces
@@ -386,6 +496,15 @@ export default function PlaceConsolePage() {
           </span>
         </h2>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRefreshTick((t) => t + 1)}
+            title="רענון - אם ערכתם מקום בעמוד אחר וזה לא מתעדכן כאן"
+            className="rounded-[var(--admin-radius-sm)] border px-2.5 py-1.5 text-[12.5px] font-medium transition"
+            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink-secondary)" }}
+          >
+            ↻ רענון
+          </button>
           {showCountryFilter && (
             <select
               value={countryFilter}
@@ -410,6 +529,17 @@ export default function PlaceConsolePage() {
           className="flex flex-wrap items-end gap-3 rounded-[var(--admin-radius-lg)] border p-4"
           style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}
         >
+          <div className="w-44">
+            <AdminField label="קטגוריה">
+              <select value={newGroupKey} onChange={(e) => setNewGroupKey(e.target.value)} className={adminInputClass} style={adminInputStyle}>
+                {ABROAD_GROUP_PILLS.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.emoji} {p.title}
+                  </option>
+                ))}
+              </select>
+            </AdminField>
+          </div>
           <div className="w-48">
             <AdminField label="שם היעד (עיר)">
               <input
@@ -444,7 +574,7 @@ export default function PlaceConsolePage() {
             </AdminField>
           </div>
           <AdminButton onClick={handleCreate} disabled={creating || !newTitle.trim() || !newCountry.trim()}>
-            {creating ? "יוצר..." : `צור תחת "${activePill?.title}"`}
+            {creating ? "יוצר..." : "צור יעד"}
           </AdminButton>
         </div>
       )}
@@ -481,76 +611,82 @@ export default function PlaceConsolePage() {
           ))}
         </div>
       ) : mode === "curated" ? (
-        staticDestinations.length === 0 ? (
-          <div
-            className="flex flex-col items-center gap-3 rounded-[var(--admin-radius-lg)] border py-16 text-center"
-            style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink-secondary)" }}
-          >
-            <p className="text-[13.5px]">אין יעדים מוגדרים תחת &quot;{activePill?.title}&quot; - אפשר להוסיף ידנית.</p>
-            <AdminButton onClick={() => setShowCreateForm(true)}>+ יעד ידני</AdminButton>
-          </div>
-        ) : (
-          <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
-            {staticDestinations.map((dest) => {
-              const edition = editionByKey.get(dest.key);
-              const importing = importingKeys.has(dest.key);
-              const cardInner = (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={dest.imageUrl}
-                    alt={dest.name}
-                    className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
-                  />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2 pt-8">
-                    <p className="truncate text-[12.5px] font-bold leading-tight text-white">
-                      {dest.flag} {dest.name}
-                    </p>
-                    {dest.subtitle && <p className="truncate text-[10.5px] text-white/85">{dest.subtitle}</p>}
-                    <p className="mt-0.5 text-[10px] text-white/70">
-                      {edition ? `${edition.placesCount} אטרקציות` : importing ? "מייבא..." : "לחצו לייבוא"}
-                    </p>
-                  </div>
-                  {edition && !edition.is_published && (
-                    <span
-                      className="absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                      style={{ background: "var(--admin-warning-soft)", color: "var(--admin-warning)" }}
-                    >
-                      טיוטה
-                    </span>
-                  )}
-                  {!edition && (
-                    <span
-                      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold"
-                      style={{ background: "var(--admin-bg-surface)", color: "var(--admin-ink-secondary)" }}
-                    >
-                      {importing ? "…" : "+"}
-                    </span>
-                  )}
-                </>
-              );
-              const className =
-                "group relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-[var(--admin-radius-md)] border transition hover:opacity-95";
-              const style = { borderColor: "var(--admin-border)", background: "var(--admin-bg-sunken)" };
-              return edition ? (
-                <Link key={dest.key} href={`/admin/place-console/${edition.id}`} className={className} style={style}>
-                  {cardInner}
-                </Link>
-              ) : (
-                <button
-                  key={dest.key}
-                  type="button"
-                  disabled={importing}
-                  onClick={() => importDestination(dest)}
-                  className={`${className} text-right disabled:opacity-70`}
-                  style={style}
-                >
-                  {cardInner}
-                </button>
-              );
-            })}
-          </div>
-        )
+        <div className="flex flex-col gap-8">
+          {ABROAD_GROUP_PILLS.map((group) => {
+            const groupDestinations = ABROAD_STATIC_DESTINATIONS[group.key] ?? [];
+            if (groupDestinations.length === 0) return null;
+            return (
+              <div key={group.key}>
+                <h3 className="mb-3 text-[14px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                  {group.emoji} {group.title}
+                  <span className="mr-2 text-[12px] font-normal" style={{ color: "var(--admin-ink-faint)" }}>
+                    · {groupDestinations.length}
+                  </span>
+                </h3>
+                <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+                  {groupDestinations.map((dest) => {
+                    const edition = editionByKey.get(dest.key);
+                    const importing = importingKeys.has(dest.key);
+                    const cardInner = (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={dest.imageUrl}
+                          alt={dest.name}
+                          className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-105"
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(0deg,rgba(0,0,0,.8)_0%,rgba(0,0,0,.35)_55%,transparent_100%)] p-2 pt-8">
+                          <p className="truncate text-[12.5px] font-bold leading-tight text-white">
+                            {dest.flag} {dest.name}
+                          </p>
+                          {dest.subtitle && <p className="truncate text-[10.5px] text-white/85">{dest.subtitle}</p>}
+                          <p className="mt-0.5 text-[10px] text-white/70">
+                            {edition ? `${edition.placesCount} אטרקציות` : importing ? "מייבא..." : "לחצו לייבוא"}
+                          </p>
+                        </div>
+                        {edition && !edition.is_published && (
+                          <span
+                            className="absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
+                            style={{ background: "var(--admin-warning-soft)", color: "var(--admin-warning)" }}
+                          >
+                            טיוטה
+                          </span>
+                        )}
+                        {!edition && (
+                          <span
+                            className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold"
+                            style={{ background: "var(--admin-bg-surface)", color: "var(--admin-ink-secondary)" }}
+                          >
+                            {importing ? "…" : "+"}
+                          </span>
+                        )}
+                      </>
+                    );
+                    const className =
+                      "group relative flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-[var(--admin-radius-md)] border transition hover:opacity-95";
+                    const style = { borderColor: "var(--admin-border)", background: "var(--admin-bg-sunken)" };
+                    return edition ? (
+                      <Link key={dest.key} href={`/admin/place-console/${edition.id}`} className={className} style={style}>
+                        {cardInner}
+                      </Link>
+                    ) : (
+                      <button
+                        key={dest.key}
+                        type="button"
+                        disabled={importing}
+                        onClick={() => importDestination(dest)}
+                        className={`${className} text-right disabled:opacity-70`}
+                        style={style}
+                      >
+                        {cardInner}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : sectionPlaces === null ? (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {Array.from({ length: 12 }).map((_, i) => (

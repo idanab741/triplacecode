@@ -237,6 +237,16 @@ interface FetchDiscoveryPlacesParams {
    *  הועברו בטעות. */
   country?: string;
   worldwide?: boolean;
+  /** *** תוספת (באג אמיתי - "תל אביב מציגה מלונות מירושלים/ים המלח"):
+   *  ה-Fallback הקיים למטה (הרחבת רדיוס ל-MAX_DISCOVERY_RADIUS_KM=120
+   *  ק"מ כשיש מעט תוצאות) הוא בכוונה תכונת מוצר לצרכן באפליקציה ("עדיף
+   *  להראות משהו רחוק מלהראות ריק") - לא לגעת בו שם. אבל בעמוד יעד
+   *  ספציפי באדמין ("חופשה בארץ" → תל אביב) המטרה היא בדיוק הפוכה:
+   *  להראות *רק* מה שבאמת ביעד הזה, גם אם זה אומר פחות תוצאות. true
+   *  מבטל את ההרחבה לגמרי עבור הקריאה הזו בלבד - קריאות קיימות
+   *  (day-trip/nature-trip/vacation-il/TripMatch...) לא מעבירות את זה,
+   *  אז ההתנהגות שלהן לא משתנה כלל. */
+  disableRadiusExpansion?: boolean;
 }
 
 /** בונה שאילתת bounding box + city fallback - אותו דפוס בדיוק כמו
@@ -368,7 +378,7 @@ export async function fetchDiscoveryPlaces(
   let combinedRows = rows;
   const hasGeoLocation = params.location.lat != null && params.location.lng != null;
   const currentRadiusKm = Math.min(params.radiusKm ?? DEFAULT_DISCOVERY_RADIUS_KM, MAX_DISCOVERY_RADIUS_KM);
-  if (hasGeoLocation && rows.length < (params.limit ?? 12) && currentRadiusKm < MAX_DISCOVERY_RADIUS_KM) {
+  if (!params.disableRadiusExpansion && hasGeoLocation && rows.length < (params.limit ?? 12) && currentRadiusKm < MAX_DISCOVERY_RADIUS_KM) {
     const widerRows = await queryPlaces(supabase, params, MAX_DISCOVERY_RADIUS_KM);
     const seenIds = new Set(rows.map((r) => r.id));
     combinedRows = [...rows, ...widerRows.filter((r) => !seenIds.has(r.id))];

@@ -12,6 +12,12 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 
+/** אותם 10 מפתחות בדיוק כמו ADMIN_DISCOVERY_SECTIONS.nightlife
+ *  (requiredAnyTags) - אלה קובעים אם מקום מופיע בסקשני "חיי לילה"
+ *  בפועל. הערכים כבר קיימים ב-PLACE_TYPE_TAGS (place.tags) - לא
+ *  טקסונומיה חדשה, רק תת-קבוצה ממוקדת לתצוגה. */
+const NIGHTLIFE_TAG_KEYS = ["cocktail_bar", "wine_bar", "club", "live_show", "standup", "theater", "karaoke", "bowling", "snooker", "arcade"];
+
 interface Place {
   id: string;
   name: string;
@@ -92,6 +98,9 @@ export default function PlaceWorkspacePage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!adminSecret || !id) return;
@@ -217,6 +226,68 @@ export default function PlaceWorkspacePage() {
     }
   }
 
+  /** "השלם עם Google" - ר' דרישה מפורשת. שומר ישירות בשרת (לא רק
+   *  ממלא טופס מקומי) - כי זה תואם למקור נתונים חיצוני אמיתי, לא
+   *  הצעה ל-AI שדורשת אישור אנושי. */
+  async function handleEnrichFromGoogle() {
+    if (!place) return;
+    setEnriching(true);
+    setError(null);
+    setEnrichMessage(null);
+    try {
+      const res = await fetch(`/api/admin/places/${place.id}/enrich-from-google`, {
+        method: "POST",
+        headers: { [ADMIN_SECRET_HEADER]: adminSecret },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "השלמה מ-Google נכשלה");
+      setPlace(data.place);
+      setEnrichMessage(data.filledFields.length > 0 ? `הושלמו: ${data.filledFields.join(", ")}` : data.message ?? "לא נמצא מידע חדש");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "השלמה מ-Google נכשלה");
+    } finally {
+      setEnriching(false);
+    }
+  }
+
+  /** העלאת קובץ תמונה ישירות (לא רק URL - ר' דרישה מפורשת). מעלה
+   *  ל-Storage ומוסיפה את ה-URL שחוזר ל-image_urls המקומי - עדיין
+   *  צריך "שמירה" כדי לפרסם, בדיוק כמו הוספת URL ידני. */
+  async function handleUploadImage(file: File) {
+    if (!place) return;
+    setUploadingImage(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/admin/places/${place.id}/upload-image`, {
+        method: "POST",
+        headers: { [ADMIN_SECRET_HEADER]: adminSecret },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "העלאת התמונה נכשלה");
+      update("image_urls", [...place.image_urls, data.url]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "העלאת התמונה נכשלה");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  const completenessChecks = place
+    ? [
+        { label: "תיאור קצר", ok: !!place.short_description },
+        { label: "טלפון", ok: !!place.phone },
+        { label: "אתר", ok: !!place.website },
+        { label: "שעות פעילות", ok: !!(place.opening_hours && place.opening_hours.length > 0) },
+        { label: "רמת מחיר", ok: !!place.price_level || place.average_price != null },
+        { label: "נגישות", ok: place.accessible !== null },
+        { label: "תמונה", ok: place.image_urls.length > 0 },
+      ]
+    : [];
+  const missingCount = completenessChecks.filter((c) => !c.ok).length;
+
   if (error && !place) {
     return (
       <div className="p-6">
@@ -288,7 +359,205 @@ export default function PlaceWorkspacePage() {
           {/* Content */}
           <div className="admin-scrollbar flex-1 overflow-y-auto p-6">
             {tab === "general" && (
-          <div className="grid max-w-2xl grid-cols-2 gap-4">
+          <div className="flex max-w-2xl flex-col gap-5">
+            {/* דשבורד השלמת מידע + "השלם עם Google" - דרישה מפורשת:
+                "מה לא מופיע, אני רוצה כפתור השלם עם גוגל שיופיע בעמוד
+                הראשי (עם דשבורד שנדע מה חסר כמה חסר ואיפה)". */}
+            <div className="rounded-[var(--admin-radius-lg)] border p-4" style={{ borderColor: missingCount > 0 ? "var(--admin-warning)" : "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[13.5px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                    השלמת מידע: {completenessChecks.length - missingCount}/{completenessChecks.length}
+                  </p>
+                  {missingCount > 0 && (
+                    <p className="mt-0.5 text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                      חסר: {completenessChecks.filter((c) => !c.ok).map((c) => c.label).join(", ")}
+                    </p>
+                  )}
+                </div>
+                {missingCount > 0 && (
+                  <AdminButton onClick={handleEnrichFromGoogle} disabled={enriching}>
+                    {enriching ? "בודק ב-Google..." : "🔍 השלם עם Google"}
+                  </AdminButton>
+                )}
+              </div>
+              {enrichMessage && (
+                <p className="mt-2 text-[12px]" style={{ color: "var(--admin-accent)" }}>
+                  {enrichMessage}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {completenessChecks.map((c) => (
+                  <span
+                    key={c.label}
+                    className="rounded-full px-2.5 py-1 text-[11px] font-medium"
+                    style={{
+                      background: c.ok ? "var(--admin-success-soft)" : "var(--admin-bg-sunken)",
+                      color: c.ok ? "var(--admin-success)" : "var(--admin-ink-faint)",
+                    }}
+                  >
+                    {c.ok ? "✓" : "○"} {c.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* מיקום בקטגוריה - "לכל אטרקציה אפשרות לבחור קטגוריית על
+                וקטגוריית משנה, שנדע איפה היא צריכה להופיע" - הועבר
+                לעמוד הראשי (דרישה מפורשת - לא רק בטאב "קטגוריות" נפרד).
+                *** תיקון (באג אמיתי, שוב - "איפה כל הקטגוריות של
+                המסעדות???"): לא הספיק להפנות לטאב אחר - "מסעדות"
+                (ו"חיי לילה") פשוט **לא** מסווגות דרך TRIP_TYPE_GROUPS/
+                subcategory בכלל, אלא דרך טקסונומיה נפרדת לגמרי:
+                מסעדות → cuisine_tags (CUISINE_TAGS - ישראלי/איטלקי/
+                אסייתי/בשרים...), חיי לילה → tags (בר קוקטיילים/מועדון/
+                הופעה חיה...) - שתיהן קיימות במערכת (לא טקסונומיה
+                חדשה), פשוט היו בטאב אחר. עכשיו הפיקר הנכון מוצג *כאן*,
+                לפי הקטגוריה שנבחרה - זה מה שקובע בפועל אם המקום מופיע
+                בסקשן "🥢 אסייתי" וכו'. TRIP_TYPE_GROUPS (הכללי) עדיין
+                נשאר זמין למטה בשביל שיוך ל"טיול יומי"/"חופשה בארץ"
+                וכו' - שתי השכבות פועלות במקביל, לא סותרות. */}
+            <div className="flex flex-col gap-4 rounded-[var(--admin-radius-lg)] border p-4" style={{ borderColor: "var(--admin-border)" }}>
+              <div className="text-[11.5px] font-bold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
+                מיקום בקטגוריה - קובע באיזה חלק באפליקציה זה יופיע
+              </div>
+
+              <AdminField label="קטגוריית-על">
+                <select
+                  className={adminInputClass}
+                  style={{ ...adminInputStyle, maxWidth: 260 }}
+                  value={place.category}
+                  onChange={(e) => {
+                    const nextCategory = e.target.value as PlaceCategoryKey;
+                    setPlace((p) => {
+                      if (!p) return p;
+                      const suggested = CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS[nextCategory] ?? [];
+                      const shouldAutoFill = p.trip_type_tags.length === 0 && suggested.length > 0;
+                      return { ...p, category: nextCategory, trip_type_tags: shouldAutoFill ? [suggested[0]] : p.trip_type_tags };
+                    });
+                  }}
+                >
+                  {PLACE_CATEGORIES.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </AdminField>
+
+              {/* מסעדות: הפיקר האמיתי הוא מטבח (cuisine_tags), לא subcategory כללי */}
+              {place.category === "restaurants" && (
+                <div>
+                  <p className="mb-1.5 text-[12px] font-medium" style={{ color: "var(--admin-ink-secondary)" }}>
+                    סגנון מטבח - קובע איפה זה יופיע בסקשני מסעדות (למשל &quot;🥢 אסייתי&quot;)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CUISINE_TAGS.map((t) => {
+                      const active = place.cuisine_tags?.includes(t.key) ?? false;
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => toggleArrayTag("cuisine_tags", t.key)}
+                          className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                          style={{
+                            borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                            background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                            color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                          }}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* חיי לילה: הפיקר האמיתי הוא tags ייעודיים, לא subcategory כללי */}
+              {place.category === "nightlife" && (
+                <div>
+                  <p className="mb-1.5 text-[12px] font-medium" style={{ color: "var(--admin-ink-secondary)" }}>
+                    סוג בילוי - קובע איפה זה יופיע בסקשני חיי לילה (למשל &quot;🍸 בר קוקטיילים&quot;)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PLACE_TYPE_TAGS.filter((t) => NIGHTLIFE_TAG_KEYS.includes(t.key)).map((t) => {
+                      const active = place.tags?.includes(t.key) ?? false;
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => toggleArrayTag("tags", t.key)}
+                          className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                          style={{
+                            borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                            background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                            color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                          }}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-1.5 text-[12px] font-medium" style={{ color: "var(--admin-ink-secondary)" }}>
+                  סוג/י טיול שהמקום שייך אליהם (trip_type_tags) - קובע איפה הוא יופיע בדפי היעדים (יומי/חופשה בארץ/וכו&apos;)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {TRIP_TYPE_GROUPS.map((g) => {
+                    const active = place.trip_type_tags.includes(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => {
+                          const next = active ? place.trip_type_tags.filter((t) => t !== g.id) : [...place.trip_type_tags, g.id];
+                          update("trip_type_tags", next);
+                          // אם הוסרה הקבוצה היחידה שממנה ה-subcategory הנוכחי הגיע - מנקים,
+                          // כדי לא להשאיר subcategory "יתום" שלא שייך לאף קבוצה נבחרת יותר.
+                          if (!active) return;
+                          const stillValid = next.some((tId) => TRIP_TYPE_GROUPS.find((tg) => tg.id === tId)?.subTags.some((s) => s.id === place.subcategory));
+                          if (place.subcategory && !stillValid) update("subcategory", "");
+                        }}
+                        className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition"
+                        style={{
+                          borderColor: active ? "var(--admin-accent)" : "var(--admin-border)",
+                          background: active ? "var(--admin-accent-soft)" : "var(--admin-bg-surface)",
+                          color: active ? "var(--admin-accent)" : "var(--admin-ink-secondary)",
+                        }}
+                      >
+                        {g.emoji} {g.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <AdminField label="קטגוריית-משנה (מדויקת - רק מהקבוצות שנבחרו למעלה)">
+                <input
+                  list="subcategory-options-main"
+                  className={adminInputClass}
+                  style={adminInputStyle}
+                  value={place.subcategory ?? ""}
+                  onChange={(e) => update("subcategory", e.target.value)}
+                  disabled={place.trip_type_tags.length === 0}
+                  placeholder={place.trip_type_tags.length === 0 ? "בחרו קודם לפחות סוג טיול אחד למעלה" : ""}
+                />
+                <datalist id="subcategory-options-main">
+                  {TRIP_TYPE_GROUPS.filter((g) => place.trip_type_tags.includes(g.id))
+                    .flatMap((g) => g.subTags)
+                    .map((s) => (
+                      <option key={s.id} value={s.id} label={s.label} />
+                    ))}
+                </datalist>
+              </AdminField>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
             <AdminField label="שם המקום">
               <input className={adminInputClass} style={adminInputStyle} value={place.name} onChange={(e) => update("name", e.target.value)} />
             </AdminField>
@@ -374,73 +643,21 @@ export default function PlaceWorkspacePage() {
                 <option value="false">לא</option>
               </select>
             </AdminField>
+            </div>
           </div>
         )}
 
         {tab === "categories" && (
           <div className="grid max-w-2xl grid-cols-2 gap-4">
-            <AdminField label="קטגוריה ראשית">
-              {/* חייב להיות אחת מ-5 הקטגוריות הראשיות בלבד - לא כל 20+
-                  הקבוצות מ-tripTaxonomy (אלה מתאימות לתת-קטגוריה/תגיות).
-                  שים לב: זה שדה תצוגה/סינון באדמין בלבד - מנוע החיפוש של
-                  בניית הטיול לא בודק אותו, הוא בודק רק trip_type_tags
-                  (למטה). לכן בבחירה כאן, אם עדיין אין תגיות סוג טיול
-                  בכלל, ממלאים אוטומטית הצעה סבירה - כדי שמקום חדש לא
-                  "ייעלם" בשקט מהחיפוש רק כי נבחרה כאן קטגוריה בלי למלא
-                  גם את השדה השני. */}
-              <select
-                className={adminInputClass}
-                style={adminInputStyle}
-                value={place.category}
-                onChange={(e) => {
-                  const nextCategory = e.target.value as PlaceCategoryKey;
-                  setPlace((p) => {
-                    if (!p) return p;
-                    const suggested = CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS[nextCategory] ?? [];
-                    const shouldAutoFill = p.trip_type_tags.length === 0 && suggested.length > 0;
-                    return {
-                      ...p,
-                      category: nextCategory,
-                      trip_type_tags: shouldAutoFill ? [suggested[0]] : p.trip_type_tags,
-                    };
-                  });
-                }}
-              >
-                {PLACE_CATEGORIES.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </AdminField>
-            <AdminField label="תת-קטגוריה (סוג מדויק, למשל: nature_trails, cocktail_bar, cafe)">
-              <input
-                list="subcategory-options"
-                className={adminInputClass}
-                style={adminInputStyle}
-                value={place.subcategory ?? ""}
-                onChange={(e) => update("subcategory", e.target.value)}
-              />
-              <datalist id="subcategory-options">
-                {TRIP_TYPE_GROUPS.flatMap((g) => g.subTags).map((s) => (
-                  <option key={s.id} value={s.id} label={s.label} />
-                ))}
-              </datalist>
-            </AdminField>
+            <p className="col-span-2 rounded-[var(--admin-radius-sm)] p-3 text-[12.5px]" style={{ background: "var(--admin-bg-sunken)", color: "var(--admin-ink-secondary)" }}>
+              קטגוריית-על, סוגי טיול וקטגוריית-משנה עברו לעמוד &quot;מידע כללי&quot; הראשי - כאן נשארו רק תיוגים נוספים (מטבח, סוג מקום).
+            </p>
             <div className="col-span-2">
               <AdminField label="סוג יעד (place_type_key) - קובע אילו שדות AI מוצגים בטאב AI">
                 <input className={adminInputClass} style={adminInputStyle} value={place.place_type_key ?? ""} onChange={(e) => update("place_type_key", e.target.value)} />
               </AdminField>
             </div>
             <div className="col-span-2">
-              <AdminField label="תגיות סוג טיול (trip_type_tags, מופרד בפסיקים)">
-                <input
-                  className={adminInputClass}
-                  style={adminInputStyle}
-                  value={place.trip_type_tags.join(", ")}
-                  onChange={(e) => update("trip_type_tags", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-                />
-              </AdminField>
               {(() => {
                 const suggested = CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS[place.category as PlaceCategoryKey] ?? [];
                 if (suggested.length === 0) return null;
@@ -706,7 +923,7 @@ export default function PlaceWorkspacePage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-col gap-3">
               <AdminField label="הוסף תמונה (URL)">
                 <div className="flex gap-2">
                   <input
@@ -724,7 +941,44 @@ export default function PlaceWorkspacePage() {
                       }
                     }}
                   />
+                  <AdminButton
+                    variant="secondary"
+                    onClick={() => {
+                      const input = document.getElementById("new-image-url") as HTMLInputElement;
+                      const val = input?.value.trim();
+                      if (val) {
+                        update("image_urls", [...place.image_urls, val]);
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    הוסף
+                  </AdminButton>
                 </div>
+              </AdminField>
+
+              {/* *** תוספת (דרישה מפורשת - "אין אפשרות להוסיף תמונה,
+                  צריך שיהיה אפשר גם קובץ"): העלאת קובץ ישירה, לא רק URL -
+                  ל-Storage הקיים (place-images, אותו bucket שגוגל כבר
+                  משתמש בו). */}
+              <AdminField label="או העלאת קובץ (JPG/PNG/WEBP, עד 8MB)">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  disabled={uploadingImage}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadImage(file);
+                    e.target.value = "";
+                  }}
+                  className={adminInputClass}
+                  style={adminInputStyle}
+                />
+                {uploadingImage && (
+                  <p className="mt-1 text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                    מעלה...
+                  </p>
+                )}
               </AdminField>
             </div>
           </div>
