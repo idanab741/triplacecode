@@ -175,7 +175,7 @@ export default function PlaceConsolePage() {
   const [charStats, setCharStats] = useState<{
     total: number;
     uncharacterized: { count: number; pct: number };
-    noSubcategory: { count: number; pct: number };
+    breakdown: { viaTripTypeTags: number; viaSubcategoryOnly: number; viaTagsOrCuisineOnly: number };
     perGroup: { id: string; emoji: string; label: string; count: number }[];
   } | null>(null);
   const [charStatsOpen, setCharStatsOpen] = useState(false);
@@ -361,21 +361,23 @@ export default function PlaceConsolePage() {
         </p>
       </div>
 
-      {/* דשבורד "כמה אטרקציות לא מאופיינות לשום יעד/סוג טיול" (דרישה
-          מפורשת). trip_type_tags ריק = המקום לא יכול להופיע בשום מקום
-          במסך הזה, גם אם יש לו category/subcategory - זו ההסברה
-          הסבירה ביותר לסקשנים ריקים ("דייט רומנטי"/"טיול בטבע" וכו') -
-          פער באפיון הנתונים, לא באג בקוד. מתקפל כברירת מחדל, כדי לא
-          להעמיס על מסך שהמטרה שלו להיות ויזואלי. */}
+      {/* דשבורד "כמה אטרקציות לא מאופיינות" (דרישה מפורשת).
+          *** תיקון (באג אמיתי - "אין סיכוי ש-90% לא מאופיין!!"): הבדיקה
+          הקודמת בדקה רק trip_type_tags, אבל מנוע ההתאמה האמיתי
+          (buildCategoryOrFilter) כבר מכיר גם subcategory, וגם cuisine_tags/
+          tags הם מנגנוני אפיון נפרדים למסעדות/חיי לילה (ר' עמוד המקום) -
+          "לא מאופיין" עכשיו אומר: אין ערך באף אחד מ-4 השדות, לא רק באחד
+          מהם. מתקפל כברירת מחדל, כדי לא להעמיס על מסך שהמטרה שלו
+          להיות ויזואלי. */}
       {charStats && (
         <div className="rounded-[var(--admin-radius-lg)] border" style={{ borderColor: charStats.uncharacterized.count > 0 ? "var(--admin-warning)" : "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
           <button type="button" onClick={() => setCharStatsOpen((v) => !v)} className="flex w-full items-center justify-between p-4 text-right">
             <div>
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-                📊 דשבורד אפיון: {charStats.uncharacterized.count.toLocaleString()} מתוך {charStats.total.toLocaleString()} אטרקציות ({charStats.uncharacterized.pct}%) לא מאופיינות לשום סוג טיול
+                📊 דשבורד אפיון: {charStats.uncharacterized.count.toLocaleString()} מתוך {charStats.total.toLocaleString()} אטרקציות ({charStats.uncharacterized.pct}%) לא מאופיינות בשום שדה
               </p>
               <p className="mt-0.5 text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-                אלה לעולם לא יופיעו בשום יעד/קטגוריה בעמוד הזה - חסר להן trip_type_tags בכלל
+                בודק trip_type_tags + קטגוריית-משנה + tags + cuisine_tags יחד - אלה יופיעו רק אם אין להן אף אחד מהארבעה
               </p>
             </div>
             <span className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
@@ -385,7 +387,37 @@ export default function PlaceConsolePage() {
           {charStatsOpen && (
             <div className="border-t p-4" style={{ borderColor: "var(--admin-border)" }}>
               <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
-                כמות אטרקציות לפי סוג טיול (מסביר סקשנים ריקים - סוג עם 0/מעט = סקשנים שלו ריקים בכל מקום)
+                איך שאר האטרקציות מאופיינות בפועל
+              </p>
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                <div className="rounded-[var(--admin-radius-sm)] p-2.5 text-center" style={{ background: "var(--admin-bg-sunken)" }}>
+                  <p className="admin-mono text-[16px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                    {charStats.breakdown.viaTripTypeTags.toLocaleString()}
+                  </p>
+                  <p className="text-[10.5px]" style={{ color: "var(--admin-ink-faint)" }}>
+                    דרך trip_type_tags
+                  </p>
+                </div>
+                <div className="rounded-[var(--admin-radius-sm)] p-2.5 text-center" style={{ background: "var(--admin-bg-sunken)" }}>
+                  <p className="admin-mono text-[16px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                    {charStats.breakdown.viaSubcategoryOnly.toLocaleString()}
+                  </p>
+                  <p className="text-[10.5px]" style={{ color: "var(--admin-ink-faint)" }}>
+                    רק דרך קטגוריית-משנה
+                  </p>
+                </div>
+                <div className="rounded-[var(--admin-radius-sm)] p-2.5 text-center" style={{ background: "var(--admin-bg-sunken)" }}>
+                  <p className="admin-mono text-[16px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                    {charStats.breakdown.viaTagsOrCuisineOnly.toLocaleString()}
+                  </p>
+                  <p className="text-[10.5px]" style={{ color: "var(--admin-ink-faint)" }}>
+                    רק דרך tags/מטבח
+                  </p>
+                </div>
+              </div>
+
+              <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
+                כמות אטרקציות עם trip_type_tags לפי סוג טיול (רק מדד השיוך ל"סוגי מסלול" - לא כל אפיון)
               </p>
               <div className="flex flex-col gap-1">
                 {charStats.perGroup.map((g) => (
@@ -406,11 +438,15 @@ export default function PlaceConsolePage() {
                 ))}
               </div>
               <p className="mt-3 text-[11.5px]" style={{ color: "var(--admin-ink-faint)" }}>
-                {charStats.noSubcategory.count.toLocaleString()} אטרקציות ({charStats.noSubcategory.pct}%) גם ללא קטגוריית-משנה. תיקון: פתחו את המקום ב-{" "}
-                <Link href="/admin/places" className="underline">
-                  מקומות ואטרקציות
-                </Link>
-                , או השתמשו בכפתור &quot;השלם עם Google&quot; בעמוד המקום.
+                {charStats.uncharacterized.count > 0 && (
+                  <>
+                    {charStats.uncharacterized.count.toLocaleString()} אטרקציות באמת ללא שום אפיון. תיקון: פתחו את המקום ב-{" "}
+                    <Link href="/admin/places" className="underline">
+                      מקומות ואטרקציות
+                    </Link>
+                    , או השתמשו בכפתור &quot;השלם עם Google&quot; בעמוד המקום.
+                  </>
+                )}
               </p>
             </div>
           )}
