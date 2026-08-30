@@ -14,11 +14,18 @@ interface TripHeroHeaderProps {
   dark?: boolean;
 }
 
-/** להשתמש כש-dark=true - הופך את הלוגו/אייקונים ללבן מלא,
+/**
+ * כש-dark=true - הופך את הלוגו/אייקונים ללבן מלא,
  * עם drop-shadow כהה עדין לקריאות.
  */
 export const WHITE_ICON_FILTER =
   "brightness-0 invert drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)]";
+
+/**
+ * נשמר כ-export לצורך תאימות לעמודים קיימים שמייבאים אותו.
+ * ריק בכוונה - אין יותר glow/הילה באזורים בהירים.
+ */
+export const LIGHT_AREA_ICON_STYLE = "";
 
 /**
  * הבר העליון שקוף ויושב מעל תמונת ה-HERO.
