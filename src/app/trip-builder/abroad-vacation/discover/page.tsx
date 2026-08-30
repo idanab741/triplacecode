@@ -56,7 +56,7 @@ export default function AbroadVacationDiscoverPage() {
 
       {/* 3. שורה: אייקון+"חופשה בחו''ל" בצד ימין, באותו גודל בדיוק כמו
           בשני העמודים האחרים. */}
-      <div className="flex items-center gap-2 px-6 pt-4">
+      <div className="flex items-center gap-2 px-6 pt-0">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={ABROAD_CATEGORY.imageSrc} alt="" className="h-full w-full object-cover" />

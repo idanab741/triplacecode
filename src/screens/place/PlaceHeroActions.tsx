@@ -4,30 +4,26 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
-import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
+import {
+  getFavoriteStatus,
+  toggleFavorite,
+  type PlaceType,
+} from "@/services/favorites/favoritesService";
 import { WHITE_ICON_FILTER } from "@/screens/layout/TripHeroHeader";
 
 interface PlaceHeroActionsProps {
   placeId: string;
   placeName: string;
+  placeType?: PlaceType;
+  backHref?: string;
 }
 
-/**
- * בר פעולות - לוגו+חזרה משמאל, שמירה+שיתוף מימין - נשארים באותו מקום
- * בדיוק כמו קודם.
- *
- * *** תיקון (בקשה מפורשת - "בעמודים של היעדים/אטרקציות ואתרים... שכפתור
- * החזור והשיתוף יהיה למעלה באותו מקום בדיוק. המטרה להעלים את הלבן של
- * הבר העליון - שהכל יהיה שקוף"): לפני זה זה היה `<header>` עצמאי,
- * sticky, עם רקע לבן (bg-white shadow-sm), יושב **מעל** תמונת ה-HERO
- * בזרימת העמוד הרגילה (לא חופף אותה). עכשיו: בלי רקע/sticky בכלל -
- * רק שני קבוצות הכפתורים ב-position absolute, כדי שההורה (place/[id]/
- * page.tsx) יוכל למקם את זה **בתוך** קונטיינר ה-HERO עצמו (relative),
- * חופף את התמונה לגמרי - "הבר הלבן" נעלם כי אין יותר רקע נפרד. אותו
- * WHITE_ICON_FILTER (brightness-0 invert + drop-shadow) כמו ב-
- * TripHeroHeader.tsx, לקריאות מעל כל תמונה, כהה או בהירה.
- */
-export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) {
+export function PlaceHeroActions({
+  placeId,
+  placeName,
+  placeType = "place",
+  backHref,
+}: PlaceHeroActionsProps) {
   const { user } = useAuth();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,20 +31,34 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
 
   useEffect(() => {
     if (!user) return;
+
     const supabase = createClient();
-    getFavoriteStatus(supabase, user.id, placeId).then((status) => setSaved(status === "saved"));
+
+    getFavoriteStatus(supabase, user.id, placeId).then((status) => {
+      setSaved(status === "saved");
+    });
   }, [user, placeId]);
 
   async function handleSave() {
     if (!user || busy) return;
+
     setBusy(true);
-    setSaved((s) => !s); // אופטימי - מרגיש מיידי
+    setSaved((s) => !s);
+
     try {
       const supabase = createClient();
-      const status = await toggleFavorite(supabase, user.id, placeId, "place", "saved");
+
+      const status = await toggleFavorite(
+        supabase,
+        user.id,
+        placeId,
+        placeType,
+        "saved"
+      );
+
       setSaved(status === "saved");
     } catch {
-      setSaved((s) => !s); // rollback אם נכשל
+      setSaved((s) => !s);
     } finally {
       setBusy(false);
     }
@@ -59,11 +69,15 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
     setTimeout(() => setJustShared(false), 1500);
 
     const url = window.location.href;
+
     if (navigator.share) {
       try {
-        await navigator.share({ title: placeName, url });
+        await navigator.share({
+          title: placeName,
+          url,
+        });
       } catch {
-        // המשתמש ביטל את השיתוף - לא שגיאה אמיתית
+        // המשתמש ביטל את השיתוף
       }
     } else {
       await navigator.clipboard.writeText(url);
@@ -71,18 +85,25 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
   }
 
   return (
-    <div className="absolute inset-x-0 top-0 z-30 h-16">
-      <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-        <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className={`object-contain ${WHITE_ICON_FILTER}`} />
+    <header className="absolute inset-x-0 top-0 z-30 w-full">
+      <div className="relative flex h-16 items-center justify-center px-2">
+
+        {/* חזור — אותו מיקום כמו בעמודי סוגי הטיול */}
         <button
           type="button"
-          onClick={() => window.history.back()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center"
+          onClick={() => {
+            if (backHref) {
+              window.location.href = backHref;
+            } else {
+              window.history.back();
+            }
+          }}
           aria-label="חזרה"
+          className="absolute left-2 flex h-10 w-10 shrink-0 items-center justify-center"
         >
           <svg
-            width="22"
-            height="22"
+            width="26"
+            height="26"
             viewBox="0 0 24 24"
             fill="none"
             stroke="white"
@@ -94,29 +115,58 @@ export function PlaceHeroActions({ placeId, placeName }: PlaceHeroActionsProps) 
             <path d="m14 6-6 6 6 6" />
           </svg>
         </button>
-      </div>
 
-      <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-        {user && (
+        {/* לוגו — 140x43 ובמרכז אמיתי */}
+        <Image
+          src="/images/triplace-logo-black.png"
+          alt=""
+          width={140}
+          height={43}
+          className={`object-contain ${WHITE_ICON_FILTER}`}
+        />
+
+        {/* שמירה + שיתוף — צד ימין */}
+        <div className="absolute right-2 flex items-center gap-1">
+
+          {user && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={busy}
+              aria-label={saved ? "הסרה משמורים" : "שמירה"}
+              className="flex h-10 w-10 shrink-0 items-center justify-center disabled:opacity-60"
+            >
+              <Image
+                src={saved ? "/icons/save-active.png" : "/icons/save.png"}
+                alt=""
+                width={23}
+                height={23}
+                className={WHITE_ICON_FILTER}
+              />
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={handleSave}
-            disabled={busy}
-            aria-label={saved ? "הסרה משמורים" : "שמירה"}
-            className="flex h-10 w-10 items-center justify-center rounded-full disabled:opacity-60"
+            onClick={handleShare}
+            aria-label="שיתוף"
+            className="flex h-10 w-10 shrink-0 items-center justify-center"
           >
-            <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={23} height={23} className={WHITE_ICON_FILTER} />
+            <Image
+              src={
+                justShared
+                  ? "/icons/share-active.png"
+                  : "/icons/share.png"
+              }
+              alt=""
+              width={26}
+              height={26}
+              className={WHITE_ICON_FILTER}
+            />
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleShare}
-          aria-label="שיתוף"
-          className="flex h-10 w-10 items-center justify-center rounded-full"
-        >
-          <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} className={WHITE_ICON_FILTER} />
-        </button>
+
+        </div>
       </div>
-    </div>
+    </header>
   );
 }

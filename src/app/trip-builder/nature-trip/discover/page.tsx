@@ -126,7 +126,7 @@ export default function NatureTripDiscoverPage() {
       <TripHeroHeader heroSrc="/images/hero-nature-trip.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"טיול בטבע" בצד ימין, מיקום בצד שמאל. */}
-      <div className="flex items-center justify-between px-6 pt-4">
+      <div className="flex items-center justify-between px-6 pt-0">
         <div className="flex items-center gap-2">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}

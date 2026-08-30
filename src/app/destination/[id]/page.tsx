@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { getDestinationById, getDestinationEditionSection } from "@/services/destinations/destinationsServerService";
 import {
@@ -17,7 +16,7 @@ import { WeatherRow } from "@/screens/destination/WeatherRow";
 import { EventsRow } from "@/screens/destination/EventsRow";
 import { PlaceRow } from "@/screens/destination/PlaceRow";
 import { BusinessOwnersRow } from "@/screens/destination/BusinessOwnersRow";
-import { WHITE_ICON_FILTER } from "@/screens/layout/TripHeroHeader";
+import { PlaceHeroActions } from "@/screens/place/PlaceHeroActions";
 
 interface DestinationPageProps {
   params: Promise<{ id: string }>;
@@ -59,38 +58,13 @@ export default async function DestinationPage({ params, searchParams }: Destinat
 
   return (
     <div className="min-h-screen bg-white pb-28">
-      {/* *** תיקון (בקשה מפורשת - בר שקוף מעל ה-HERO, "שכפתור החזור
-          יהיה למעלה באותו מקום בדיוק... שהכל יהיה שקוף"): הבר עבר
-          מ-<header> עצמאי לבן (מעל התמונה, דוחף אותה למטה) לבר שקוף
-          **בתוך** קונטיינר ה-HERO עצמו (position absolute) - לוגו+חזרה
-          נשארים באותו מקום בדיוק (משמאל), רק שאין יותר רקע לבן. אותו
-          WHITE_ICON_FILTER (brightness-0 invert + drop-shadow) כמו
-          TripHeroHeader.tsx/PlaceHeroActions.tsx - קריאות מעל כל תמונה. */}
       <div className="relative h-72 w-full">
-        <div className="absolute inset-x-0 top-0 z-30 h-16">
-          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className={`object-contain ${WHITE_ICON_FILTER}`} />
-            <Link
-              href="/home"
-              className="flex h-10 w-10 shrink-0 items-center justify-center"
-              aria-label="חזרה לדף הבית"
-            >
-              <svg
-                width="26"
-                height="26"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)]"
-              >
-                <path d="m14 6-6 6 6 6" />
-              </svg>
-            </Link>
-          </div>
-        </div>
+        <PlaceHeroActions
+          placeId={destination.id}
+          placeName={destination.name}
+          placeType="destination"
+          backHref="/home"
+        />
 
         {destination.image_url && (
           // eslint-disable-next-line @next/next/no-img-element

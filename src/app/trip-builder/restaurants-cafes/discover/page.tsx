@@ -132,7 +132,7 @@ export default function RestaurantsCafesDiscoverPage() {
       <TripHeroHeader heroSrc="/images/hero-restaurants-cafes.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"מסעדות וקפה" בצד ימין, מיקום בצד שמאל. */}
-      <div className="flex items-center justify-between px-6 pt-4">
+      <div className="flex items-center justify-between px-6 pt-1">
         <div className="flex items-center gap-2">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}

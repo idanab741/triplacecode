@@ -157,7 +157,7 @@ export default function DayTripDiscoverPage() {
       <TripHeroHeader heroSrc="/images/hero-day-trip-result.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"טיול יומי" בצד ימין, מיקום (כמו HomeHeader) בצד שמאל. */}
-      <div className="flex items-center justify-between px-6 pt-4">
+      <div className="flex items-center justify-between px-6 pt-2">
         <div className="flex items-center gap-2">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}

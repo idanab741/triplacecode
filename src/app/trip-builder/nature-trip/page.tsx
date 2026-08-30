@@ -77,7 +77,7 @@ function TripTypeBadge({ label }: { label: string }) {
   return (
     <div className="flex justify-end">
       <div
-        className="flex items-center gap-2 rounded-pill px-3 py-2"
+        className="flex items-center gap-2 rounded-pill px-3 py-0"
         style={{
           background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))",
           boxShadow: "0 4px 12px rgba(24,119,242,0.28)",
