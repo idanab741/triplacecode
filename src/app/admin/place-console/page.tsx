@@ -177,6 +177,9 @@ export default function PlaceConsolePage() {
     uncharacterized: { count: number; pct: number };
     breakdown: { viaTripTypeTags: number; viaSubcategoryOnly: number; viaTagsOrCuisineOnly: number };
     perGroup: { id: string; emoji: string; label: string; count: number }[];
+    bySection: { quickCategory: string; quickCategoryLabel: string; sectionId: string; emoji: string; title: string; count: number }[];
+    emptySectionsCount: number;
+    totalSectionsCount: number;
   } | null>(null);
   const [charStatsOpen, setCharStatsOpen] = useState(false);
   useEffect(() => {
@@ -370,14 +373,14 @@ export default function PlaceConsolePage() {
           מהם. מתקפל כברירת מחדל, כדי לא להעמיס על מסך שהמטרה שלו
           להיות ויזואלי. */}
       {charStats && (
-        <div className="rounded-[var(--admin-radius-lg)] border" style={{ borderColor: charStats.uncharacterized.count > 0 ? "var(--admin-warning)" : "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
+        <div className="rounded-[var(--admin-radius-lg)] border" style={{ borderColor: charStats.emptySectionsCount > 0 ? "var(--admin-danger)" : "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
           <button type="button" onClick={() => setCharStatsOpen((v) => !v)} className="flex w-full items-center justify-between p-4 text-right">
             <div>
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--admin-ink)" }}>
                 📊 דשבורד אפיון: {charStats.uncharacterized.count.toLocaleString()} מתוך {charStats.total.toLocaleString()} אטרקציות ({charStats.uncharacterized.pct}%) לא מאופיינות בשום שדה
               </p>
               <p className="mt-0.5 text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-                בודק trip_type_tags + קטגוריית-משנה + tags + cuisine_tags יחד - אלה יופיעו רק אם אין להן אף אחד מהארבעה
+                {charStats.emptySectionsCount} מתוך {charStats.totalSectionsCount} סקשנים ספציפיים ריקים לגמרי (0 אטרקציות) - זה מה שבאמת קובע מה ריק בעמוד, לא האחוז הכללי
               </p>
             </div>
             <span className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
@@ -386,6 +389,36 @@ export default function PlaceConsolePage() {
           </button>
           {charStatsOpen && (
             <div className="border-t p-4" style={{ borderColor: "var(--admin-border)" }}>
+              {charStats.emptySectionsCount > 0 && (
+                <div className="mb-4">
+                  <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-danger)" }}>
+                    סקשנים ריקים לגמרי - בדיוק לפי אותה בדיקה שקובעת מה מוצג בעמוד (לא רק "יש תיוג כלשהו")
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {charStats.bySection
+                      .filter((s) => s.count === 0)
+                      .map((s) => (
+                        <button
+                          key={`${s.quickCategory}:${s.sectionId}`}
+                          type="button"
+                          onClick={() => {
+                            setActiveCategory(s.quickCategory as QuickCategoryId);
+                            setActivePillKey(s.sectionId);
+                            setCharStatsOpen(false);
+                          }}
+                          className="flex items-center justify-between rounded-[var(--admin-radius-sm)] px-2.5 py-1.5 text-right text-[12px] transition hover:opacity-80"
+                          style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}
+                        >
+                          <span>
+                            {s.emoji} {s.title}
+                          </span>
+                          <span style={{ color: "var(--admin-ink-faint)" }}>{s.quickCategoryLabel} ←</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-secondary)" }}>
                 איך שאר האטרקציות מאופיינות בפועל
               </p>

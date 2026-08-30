@@ -47,10 +47,24 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   if (linksError) return NextResponse.json({ error: linksError.message }, { status: 500 });
 
-  const curatedPlaces = (links ?? []).map((l) => l.places).filter(Boolean) as Record<string, unknown>[];
+  // *** תיקון (שגיאת build אמיתית - "Conversion of type 'any[][]' to
+  // type 'Record<string, unknown>[]' may be a mistake"): supabase-js
+  // מסיק את הטיפוס של המשאב המקונן places(*) לפעמים כאובייקט בודד
+  // ולפעמים כמערך, תלוי אם היחס place_id→places.id מזוהה אצלו כ-
+  // to-one או to-many (משתנה לפי אם יש Database types מיוצרים
+  // בפרויקט). ה-cast הישיר הקודם הניח תמיד אובייקט בודד - כששורת ה-
+  // build האמיתית (עם טיפוסים מלאים) הסיקה מערך, ה-cast נכשל בפועל.
+  // הקוד כאן מטפל בשתי הצורות במפורש, בלי any/cast לא-בטוח.
+  type PlaceEmbed = Record<string, unknown> | Record<string, unknown>[] | null;
+  const curatedPlaces = (links ?? [])
+    .map((l) => {
+      const embed = l.places as PlaceEmbed;
+      return Array.isArray(embed) ? (embed[0] ?? null) : embed;
+    })
+    .filter((p): p is Record<string, unknown> => Boolean(p));
   const curatedIds = new Set(curatedPlaces.map((p) => p.id as string));
 
-  const cityName = (edition as { destinations?: { name?: string } }).destinations?.name;
+  const cityName = (edition as unknown as { destinations?: { name?: string } }).destinations?.name;
   let discoveredPlaces: Record<string, unknown>[] = [];
   if (cityName) {
     const { data: byCity } = await supabase
