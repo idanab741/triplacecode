@@ -197,7 +197,9 @@ export default function ProfilePage() {
             onClick={() => router.push("/trips")}
             className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >
-            <span className="font-bold text-ink">הטיולים שלי</span>
+            {/* *** תיקון (בקשה מפורשת - "לשנות את הטיולים שלי - לבחירות
+                שלי"): מוביל לאותו עמוד בדיוק (/trips) - רק שם עדכני. */}
+            <span className="font-bold text-ink">הבחירות שלי</span>
             <ChevronLeft />
           </button>
 

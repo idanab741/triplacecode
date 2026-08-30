@@ -4,11 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
 import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { TripHeroHeader, LIGHT_AREA_ICON_STYLE } from "@/screens/layout/TripHeroHeader";
 import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { minutesToTimeLabel } from "@/utils/openingHours";
@@ -24,6 +25,7 @@ const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then(
 });
 
 function WeekendResultContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const [session, setSession] = useState<TripBuilderSession | null>(null);
@@ -306,46 +308,31 @@ function WeekendResultContent() {
   });
 
   return (
-    <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
-            <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
-        <div className="relative h-16">
-          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
-            <Link
-              href="/home"
-              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
-              aria-label="חזרה לדף הבית"
-            >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m14 6-6 6 6 6" />
-              </svg>
-            </Link>
-          </div>
-
-          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <SaveTripIconButton sessionId={sessionId} />
+    <Screen withBottomNavSpacing={true} className="!bg-white !px-0 !pt-0">
+      <TripHeroHeader
+        heroSrc="/images/hero-weekend.png"
+        heroAlt='הסופ"ש שלכם מוכן'
+        onBack={() => router.push("/home")}
+        rightSlot={
+          <>
+            <SaveTripIconButton sessionId={sessionId} iconClassName={LIGHT_AREA_ICON_STYLE} />
             <button
               type="button"
               onClick={handleShareTrip}
               aria-label="שתף מסלול"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+              className="flex h-10 w-10 items-center justify-center rounded-full"
             >
-              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+              <Image
+                src={justShared ? "/icons/share-active.png" : "/icons/share.png"}
+                alt=""
+                width={26}
+                height={26}
+                className={LIGHT_AREA_ICON_STYLE}
+              />
             </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="relative w-full">
-        <Image
-          src="/images/hero-weekend.png"
-          alt='הסופ"ש שלכם מוכן'
-          width={800}
-          height={450}
-          priority
-          className="h-auto w-full"
-        />
-      </div>
+          </>
+        }
+      />
 
       <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-4">
         <div>

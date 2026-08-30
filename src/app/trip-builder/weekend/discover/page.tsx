@@ -8,7 +8,7 @@ import { createClient } from "@/services/supabase/client";
 import { listAddresses, type UserAddress } from "@/services/addresses/addressesService";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { TripHeroHeader } from "@/screens/layout/TripHeroHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { ISRAEL_VACATION_DESTINATIONS } from "@/constants/israelVacationDestinations";
 import { VacationDestinationsCarousel } from "@/screens/discovery/VacationDestinationsCarousel";
@@ -134,15 +134,9 @@ export default function VacationIlDiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg pb-36">
-      {/* 1. TOP BAR - ממוחזר במלואו מ"הטיולים שלי" (SimpleAppHeader), בלי title. */}
-      <SimpleAppHeader onBack={() => router.back()} />
-
-      {/* 2. HERO - full-bleed, אותו דפוס בדיוק כמו day-trip/discover, עם
-          asset ה-Hero הקיים של "סופ"ש" (hero-weekend.png). */}
-      <div className="relative w-full">
-        <Image src="/images/hero-weekend.png" alt="" width={800} height={450} priority className="h-auto w-full" />
-      </div>
+    <div className="min-h-screen bg-white pb-36">
+      {/* 1. TOP BAR - שקוף, חופף את ה-HERO (TripHeroHeader), לוגו ממורכז. */}
+      <TripHeroHeader heroSrc="/images/hero-weekend.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"חופשה בארץ" בצד ימין, מיקום בצד שמאל. */}
       <div className="flex items-center justify-between px-6 pt-4">

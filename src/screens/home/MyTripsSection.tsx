@@ -60,7 +60,12 @@ export function MyTripsSection() {
       fetch(`/api/trip-builder/sessions/saved?all=true&limit=${PREVIEW_LIMIT}`)
         .then((res) => res.json())
         .catch(() => ({ trips: [] })),
-      fetch(`/api/trippy-ai?limit=${PREVIEW_LIMIT}`)
+      // *** תיקון (ר' /api/trippy-ai/route.ts - נוסף פרמטר `all`, ברירת
+      // מחדל הפכה ל"שמורות בלבד" כדי לתמוך בלשונית "שמורים" בעמוד
+      // "הבחירות שלי"): כאן, כמו תמיד, רוצים גם תוצאות זמניות אחרונות
+      // (לא רק שמורות) - בדיוק כמו הקריאה המקבילה ל-sessions/saved
+      // למעלה (all=true).
+      fetch(`/api/trippy-ai?all=true&limit=${PREVIEW_LIMIT}`)
         .then((res) => res.json())
         .catch(() => ({ results: [] })),
     ]).then(([sessionsData, trippyAiData]) => {
@@ -102,14 +107,18 @@ export function MyTripsSection() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between px-6">
-        <h3 className="text-lg font-semibold tracking-tight text-ink">הטיולים שלי</h3>
+        {/* *** תיקון (בקשה מפורשת - "לשנות את הטיולים שלי - לבחירות שלי"):
+            כותרת הקטע כאן בעמוד הבית + קישור "לכל..." - שניהם מובילים
+            לאותו עמוד /trips שעכשיו נקרא "הבחירות שלי" (ר' trips/page.tsx),
+            אז השם כאן מתעדכן בהתאם לעקביות. */}
+        <h3 className="text-lg font-semibold tracking-tight text-ink">הבחירות שלי</h3>
         {trips && trips.length > 0 && (
           <button
             type="button"
             onClick={() => router.push("/trips?filter=all")}
             className="text-sm font-medium text-accent"
           >
-            לכל הטיולים
+            לכל הבחירות
           </button>
         )}
       </div>

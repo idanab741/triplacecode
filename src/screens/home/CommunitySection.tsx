@@ -41,7 +41,7 @@ export function CommunitySection() {
   return (
     <section className="px-6">
       <h3 className="text-lg font-semibold tracking-tight text-ink">👥 ה-Matches של הקהילה</h3>
-      <p className="mt-0.5 text-sm text-ink-secondary">מקומות שאנשים בוחרים עכשיו</p>
+      <p className="mt-0.5 text-sm text-ink-secondary">המקומות הכי חמים עכשיו</p>
 
       {/* תיקון (שוליים נחתכים בסוף הגלילה) - ראו הסבר מפורט ב-TrendingSection
           (אותו באג, אותה קטגוריית קונטיינר overflow-x-auto): padding בסוף

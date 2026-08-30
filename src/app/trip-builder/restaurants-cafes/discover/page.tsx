@@ -7,8 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { listAddresses, type UserAddress } from "@/services/addresses/addressesService";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
+import { LocationPromptModal } from "@/screens/home/LocationPromptModal";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { TripHeroHeader } from "@/screens/layout/TripHeroHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { QUICK_CATEGORY_LABELS } from "@/locales/he/quickCategories";
 import { DiscoverySection } from "@/screens/discovery/DiscoverySection";
@@ -65,6 +66,12 @@ export default function RestaurantsCafesDiscoverPage() {
   const [selectedAddress, setSelectedAddress] = useState<UserAddress | null>(null);
   const [addressLoading, setAddressLoading] = useState(true);
   const [locationSheetOpen, setLocationSheetOpen] = useState(false);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+
+  // פותח אוטומטית את הפופ-אפ "איפה הטיול הבא שלך?" בכל כניסה לעמוד.
+  useEffect(() => {
+    setLocationPromptOpen(true);
+  }, []);
 
   const [data, setData] = useState<RestaurantsApiResponse | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -120,14 +127,9 @@ export default function RestaurantsCafesDiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg pb-36">
+    <div className="min-h-screen bg-white pb-36">
       {/* 1. TOP BAR - זהה בדיוק לשאר עמודי ה-Discovery. */}
-      <SimpleAppHeader onBack={() => router.back()} />
-
-      {/* 2. HERO - full-bleed, אותו דפוס בדיוק, עם ה-asset הקיים למסעדות וקפה. */}
-      <div className="relative w-full">
-        <Image src="/images/hero-restaurants-cafes.png" alt="" width={800} height={450} priority className="h-auto w-full" />
-      </div>
+      <TripHeroHeader heroSrc="/images/hero-restaurants-cafes.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"מסעדות וקפה" בצד ימין, מיקום בצד שמאל. */}
       <div className="flex items-center justify-between px-6 pt-4">
@@ -141,7 +143,7 @@ export default function RestaurantsCafesDiscoverPage() {
 
         <button
           type="button"
-          onClick={() => setLocationSheetOpen(true)}
+          onClick={() => setLocationPromptOpen(true)}
           className="flex items-center gap-1 truncate text-sm font-medium text-ink"
         >
           <Image src="/icons/location.png" alt="" width={22} height={22} />
@@ -171,6 +173,17 @@ export default function RestaurantsCafesDiscoverPage() {
           </>
         )}
       </div>
+
+      {locationPromptOpen && (
+        <LocationPromptModal
+          currentLocationLabel={locationLabel ?? "המיקום שלי"}
+          onClose={() => setLocationPromptOpen(false)}
+          onSearchDestination={() => {
+            setLocationPromptOpen(false);
+            setLocationSheetOpen(true);
+          }}
+        />
+      )}
 
       {locationSheetOpen && (
         <ChooseLocationSheet

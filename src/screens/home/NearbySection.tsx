@@ -46,7 +46,7 @@ const CATEGORY_ENDPOINTS: Record<NearbyCategory, { label: string; urls: string[]
   food: { label: "🍽️ אוכל", urls: ["/api/discovery/restaurants-cafes?category=hot"] },
   nature: { label: "🌿 טבע", urls: ["/api/discovery/day-trip?category=nature_trails"] },
   nightlife: {
-    label: "🎉 בילויים",
+    label: "🎉 חיי לילה",
     urls: ["/api/discovery/nightlife?category=club", "/api/discovery/nightlife?category=cocktail_bar"],
   },
 };
@@ -151,7 +151,7 @@ export function NearbySection() {
             <p className="text-xs text-ink-secondary">בואו ננסה קטגוריה אחרת</p>
           </div>
         ) : (
-          <DiscoveryPlacesMap places={mapPlaces} />
+          <DiscoveryPlacesMap places={mapPlaces} userLocation={coords} />
         )}
       </div>
     </section>

@@ -71,7 +71,7 @@ export function DiscoverCard() {
   return (
     <section className="px-6">
       <h3 className="mb-3 text-lg font-semibold text-ink">
-        גלה עוד
+        עוד בשבילך ב-TRIPLACE
       </h3>
 
       <Swiper

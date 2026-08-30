@@ -1,0 +1,88 @@
+﻿@import "tailwindcss";
+@import "../theme/tokens.css";
+
+:root {
+  /* מונע מדפדפנים (בעיקר כרום באנדרואיד) לכפות מצב כהה - האתר בעיצוב בהיר בלבד */
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* *** תיקון: באייפון, כשה-font-size של input/textarea/select קטן מ-16px,
+   Safari מבצע זום אוטומטי בפוקוס (זה עיצוב מכוון של iOS, לא באג) - זה
+   מה שגרם ל"זום מעצבן" בכל שדה הקלדה. פותרים בלי לבטל pinch-zoom
+   (שפוגע בנגישות) - פשוט מבטיחים שגודל הטקסט בשדות תמיד לפחות 16px
+   במסכים ניידים, כדי ש-Safari לא יחשוב שצריך להתקרב. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* *** תיקון קריטי: מסך ה-swiping ב-TripMatch (וכל שימוש עתידי דומה)
+   הסתמך על height: 100dvh דרך inline style בלבד, בלי fallback. בתוך
+   ה-WebView של האפליקציה (לא Safari/Chrome רגיל) 100dvh לא נתמך תמיד -
+   כשזה קורה, הדפדפן פשוט מתעלם מהערך (לא נופל לברירת מחדל שימושית),
+   הגובה נשאר auto/0, וכל שרשרת ה-h-full מתחתיו (כרטיס ה-TripMatch,
+   הכפתורים) קורסת - בדיוק מה שראינו: רק הכפתורים (גודל קבוע בפיקסלים,
+   לא תלויים בגובה ההורה) נשארו נראים, בזמן שגוף הכרטיס נעלם לגמרי.
+   הפתרון הקלאסי: שתי הצהרות height - הדפדפן משתמש בערך התקין האחרון
+   שהוא מבין. דפדפן בלי תמיכה ב-dvh פשוט מתעלם מהשורה השנייה ונשאר עם
+   100vh (השורה הראשונה) - fallback עובד תמיד, בלי JS. */
+.h-viewport-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* *** תוספת (בקשת המשתמש - בועת תצוגה מקדימה עם תמונה בלחיצה על פין
+   במפה): מבטלת את ה-padding/margin שברירת המחדל של Leaflet מוסיפה
+   סביב תוכן הבועה, כדי שהתמונה תיצמד לקצוות ולפינות המעוגלות. */
+.place-preview-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: var(--radius-card, 14px);
+  overflow: hidden;
+}
+.place-preview-popup .leaflet-popup-content {
+  margin: 0;
+  width: 128px !important;
+}
+.place-preview-popup .leaflet-popup-tip {
+  background: white;
+}
+.place-preview-popup .leaflet-popup-close-button {
+  z-index: 1;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* *** תיקון (בקשת המשתמש - "למה המפה נראית אותו דבר??" - הגישה
+   הקודמת [grayscale על אריחי המפה + div נפרד מעליו עם
+   mix-blend-mode:color] לא באמת עבדה בפועל, כנראה כי Leaflet מקדם
+   כל pane משלו (tile-pane וכו') לשכבת compositing נפרדת (transform:
+   translate3d לצורך ביצועים) - ותקלה ידועה ב-WebView/Safari היא
+   ש-mix-blend-mode "לא רואה מבעד" לשכבות compositing כאלה, אז הגוון
+   פשוט לא מתערבב עם האריחים שמתחתיו בפועל, גם שהקוד "נראה" תקין.
+   הפתרון החדש לא תלוי ב-blend-mode/compositing בכלל: שרשרת filter
+   אחת שממפה את הצבעים ישירות (grayscale -> sepia -> hue-rotate ->
+   saturate) - טכניקת ה-"duotone" הסטנדרטית, נתמכת בכל דפדפן/WebView
+   בלי אפקטים צדדיים. שווה לכוון ידנית (hue-rotate/saturate) מול
+   מפה אמיתית - הערכים כאן הם נקודת התחלה סבירה לכיוון כחול-תכלת. */
+.map-branded .leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.15) sepia(0.6) hue-rotate(185deg) saturate(2.2) contrast(0.95);
+}
+
+/* *** תיקון (בקשת המשתמש - "למה זה נראה ככה??" - כמעט ריק/לבן):
+   הפילטר הזה כוון במקור מול אריחי OSM הרוויים-בצבע. DATAVIZ (סגנון
+   MapTiler) כבר בהיר וחיוור בעצמו - brightness/contrast חזקים "שורפים"
+   ללבן כל מה שכבר כמעט-לבן שם (רקע, כבישים דקים). מסירים את הפילטר
+   הזה לגמרי מעל canvas של MapTiler - במקום להמשיך לנחש ערכי CSS בלי
+   אפשרות לראות תוצאה בזמן אמת, עדיף סגנון בסיס נקי כמו שהוא (הפינים
+   כבר בכחול המותג). התאמת צבע מדויקת לבסיס המפה עצמו דורשת את כלי
+   ה-Customize של MapTiler (עיצוב סגנון מותאם אישית עם משוב חזותי
+   בזמן אמת) - לא CSS filter עיוור. */

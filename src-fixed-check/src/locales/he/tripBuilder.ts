@@ -1,0 +1,153 @@
+﻿import type { StepOption } from "@/services/tripBuilder/types";
+
+export const COMPANION_OPTIONS: StepOption[] = [
+  { value: "couple", label: "זוג", emoji: "💑" },
+  { value: "family", label: "משפחה עם ילדים", emoji: "👨‍👩‍👧‍👦" },
+  { value: "family_no_kids", label: "משפחה", emoji: "👪" },
+  { value: "friends", label: "חברים", emoji: "🙋" },
+  { value: "solo", label: "לבד", emoji: "🧍" },
+];
+
+export const PET_OPTION: StepOption = { value: "with_pet", label: "עם בעל חיים", emoji: "🐶" };
+
+export const CHILD_AGE_OPTIONS: StepOption[] = [
+  { value: "0-3", label: "0-3" },
+  { value: "3-7", label: "3-7" },
+  { value: "7-12", label: "7-12" },
+  { value: "12-18", label: "12-18" },
+];
+
+export const TIMING_OPTIONS: StepOption[] = [
+  { value: "today", label: "היום" },
+  { value: "tomorrow", label: "מחר" },
+  { value: "other_date", label: "תאריך אחר" },
+];
+
+export const DISTANCE_STEPS: StepOption[] = [
+  { value: "10min", label: "10 דקות" },
+  { value: "20min", label: "20 דקות" },
+  { value: "30min", label: "30 דקות" },
+  { value: "40min", label: "40 דקות" },
+  { value: "50min", label: "50 דקות" },
+  { value: "1h", label: "שעה" },
+  { value: "1.5h", label: "שעה וחצי" },
+  { value: "2h", label: "שעתיים" },
+  { value: "2.5h", label: "שעתיים וחצי" },
+  { value: "3h", label: "3 שעות" },
+  { value: "4h", label: "4 שעות" },
+  { value: "5h", label: "5 שעות" },
+];
+
+export const BUDGET_STEPS: StepOption[] = [
+  { value: "0-100", label: "₪0-100" },
+  { value: "100-300", label: "₪100-300" },
+  { value: "300-600", label: "₪300-600" },
+  { value: "600-1000", label: "₪600-1,000" },
+  { value: "unlimited", label: "ללא הגבלה" },
+];
+
+export const DAY_TRIP_INTEREST_OPTIONS: StepOption[] = [
+  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
+  { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },
+  { value: "beaches_pools", label: "חופי ים ובריכות", emoji: "🏖️" },
+  { value: "viewpoints", label: "תצפיות, זריחות ושקיעות", emoji: "🌅" },
+  { value: "parks_gardens", label: "פארקים וגנים", emoji: "🌳" },
+  { value: "water_amusement_parks", label: "פארקי מים, שעשועים ומתקנים", emoji: "🎡" },
+  { value: "attractions_activities", label: "אטרקציות ופעילויות", emoji: "🎯" },
+  { value: "sports_extreme", label: "ספורט ואקסטרים", emoji: "🚴" },
+  { value: "wineries_dining", label: "יקבים, מבשלות ומסעדות", emoji: "🍷" },
+  { value: "culture_history", label: "תרבות, מוזיאונים והיסטוריה", emoji: "🏛️" },
+  { value: "shopping", label: "שופינג, קניות ושווקים", emoji: "🛍️" },
+  { value: "events_festivals", label: "אירועים ופסטיבלים", emoji: "🎪" },
+  { value: "spa_relaxation", label: "ספא ורוגע", emoji: "🧖" },
+];
+
+export const DURATION_OPTIONS: StepOption[] = [
+  { value: "1-2h", label: "שעה-שעתיים" },
+  { value: "half_day", label: "חצי יום" },
+  { value: "full_day", label: "יום שלם" },
+];
+
+/** קטגוריות ל-TripMatch (התאמת יעדים כלליים) - רשימה נפרדת לגמרי מ-DAY_TRIP_INTEREST_OPTIONS, לא משפיעה על הטיול היומי. */
+export const TRIPMATCH_INTEREST_OPTIONS: StepOption[] = [
+  { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
+  { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },
+  { value: "beaches_pools", label: "חופי ים, אגמים ובריכות", emoji: "🏖️" },
+  { value: "viewpoints", label: "תצפיות, זריחות ושקיעות", emoji: "🌅" },
+  { value: "parks_gardens", label: "פארקים, גנים ופינות פיקניק", emoji: "🌳" },
+  { value: "water_amusement_parks", label: "פארקי מים, פארקי שעשועים ומתקנים", emoji: "🎡" },
+  { value: "attractions_activities", label: "אטרקציות ופעילויות", emoji: "🎯" },
+  { value: "sports_extreme", label: "ספורט ואקסטרים", emoji: "🚴" },
+  { value: "wineries_dining", label: "מסעדות, יקבים ומבשלות", emoji: "🍽️" },
+  { value: "culture_history", label: "תרבות, מוזיאונים והיסטוריה", emoji: "🏛️" },
+  { value: "shopping", label: "שופינג, קניות ושווקים", emoji: "🛍️" },
+  { value: "events_festivals", label: "אירועים, הופעות ופסטיבלים", emoji: "🎪" },
+  { value: "nightlife_entertainment", label: "חיי לילה ובילויים", emoji: "🎭" },
+  { value: "spa_relaxation", label: "ספא, מרחצאות ורוגע", emoji: "🧖" },
+  { value: "boating_water_attractions", label: "שיט ואטרקציות מים", emoji: "🛶" },
+  { value: "heritage_holy_sites", label: "אתרי מורשת ומקומות קדושים", emoji: "🛕" },
+  { value: "kids_family_activities", label: "פעילויות לילדים ומשפחות", emoji: "👨‍👩‍👧‍👦" },
+  { value: "art_galleries", label: "אמנות וגלריות", emoji: "🎨" },
+  { value: "photo_spots", label: "נקודות צילום ונופי אינסטגרם", emoji: "📸" },
+];
+
+/**
+ * 4 הקטגוריות הראשיות ל-TripMatch (שלב 2 - אחרי בחירת יעד) - תואמות
+ * ל-5 הקטגוריות הראשיות שהוגדרו באדמין (placeCategories.ts), פחות
+ * "מלונות" (TripMatch הוא לפעילויות/חוויות, לא ללינה). לפני זה, שלב 2
+ * הציג ישירות את 19 תת-הקטגוריות של TRIPMATCH_INTEREST_OPTIONS כרשימה
+ * שטוחה - זה עבר לתוך הפילטרים בתוך ההחלקות עצמן, כדי שהבחירה הראשונית
+ * תהיה פשוטה (4 אפשרויות בלבד) והזיקוק יקרה אחרי שרואים תוצאות.
+ */
+export interface TripMatchCategoryBucket {
+  value: "restaurants" | "nightlife" | "nature" | "attractions";
+  label: string;
+  emoji: string;
+  /** אייקון (PNG) לכפתור הבחירה בעמוד TripMatch - מוצג בעיגול קטן,
+   *  במקום/בנוסף לאימוג'י, בסגנון לחצני ה"התאמה אישית" (ImageOptionRow). */
+  imageSrc: string;
+  /** אילו מתוך 19 תתי-הקטגוריות למעלה שייכות לדלי הזה - לשימוש עתידי
+   *  (למשל תיוג התחלתי) - הבחירה בפועל של תת-קטגוריה קורית בפילטרים. */
+  subTagValues: string[];
+}
+
+export const TRIPMATCH_CATEGORY_BUCKETS: TripMatchCategoryBucket[] = [
+  {
+    value: "restaurants",
+    label: "מסעדות וקולינריה",
+    emoji: "🍽️",
+    imageSrc: "/images/tripmatch/category-restaurants.png",
+    subTagValues: ["coffee_carts_cafes", "wineries_dining"],
+  },
+  {
+    value: "nightlife",
+    label: "חיי לילה ובילויים",
+    emoji: "🎭",
+    imageSrc: "/images/tripmatch/category-nightlife.png",
+    subTagValues: ["nightlife_entertainment", "events_festivals", "spa_relaxation"],
+  },
+  {
+    value: "nature",
+    label: "טבע ונופים",
+    emoji: "🌿",
+    imageSrc: "/images/tripmatch/category-nature.png",
+    subTagValues: ["nature_trails", "beaches_pools", "viewpoints", "parks_gardens", "boating_water_attractions"],
+  },
+  {
+    value: "attractions",
+    label: "אטרקציות ואתרים",
+    emoji: "🎯",
+    imageSrc: "/images/tripmatch/category-attractions.png",
+    subTagValues: [
+      "water_amusement_parks",
+      "attractions_activities",
+      "sports_extreme",
+      "culture_history",
+      "shopping",
+      "heritage_holy_sites",
+      "kids_family_activities",
+      "art_galleries",
+      "photo_spots",
+    ],
+  },
+];

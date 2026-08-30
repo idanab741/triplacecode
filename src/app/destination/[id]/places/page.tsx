@@ -11,6 +11,7 @@ import {
   type PlaceSummary,
 } from "@/services/places/placesServerService";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { WHITE_ICON_FILTER } from "@/screens/layout/TripHeroHeader";
 
 interface DestinationPlacesPageProps {
   params: Promise<{ id: string }>;
@@ -67,29 +68,38 @@ export default async function DestinationPlacesPage({ params, searchParams }: De
   }
 
   return (
-    <div className="min-h-screen bg-bg pb-28">
-      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
-        <div className="relative h-16">
+    <div className="min-h-screen bg-white pb-28">
+      {/* *** תיקון (בר שקוף מעל ה-HERO - אותו טיפול כמו destination/[id]/page.tsx) */}
+      <div className="relative h-72 w-full">
+        <div className="absolute inset-x-0 top-0 z-30 h-16">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className={`object-contain ${WHITE_ICON_FILTER}`} />
             <Link
               href={`/destination/${id}`}
-              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              className="flex h-10 w-10 shrink-0 items-center justify-center"
               aria-label="חזרה ליעד"
             >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)]"
+              >
                 <path d="m14 6-6 6 6 6" />
               </svg>
             </Link>
           </div>
         </div>
-      </header>
 
-      {/* תיקון Product מפורש ("למה אין את התמונה של היעד? מעל
-          המסעדות?") - אותה תמונת hero בדיוק כמו בעמוד היעד ההורה
-          (destination.image_url), כדי שברור על איזה יעד מסתכלים גם
-          פה, לא רק כותרת טקסט. */}
-      <div className="relative h-72 w-full">
+        {/* תיקון Product מפורש ("למה אין את התמונה של היעד? מעל
+            המסעדות?") - אותה תמונת hero בדיוק כמו בעמוד היעד ההורה
+            (destination.image_url), כדי שברור על איזה יעד מסתכלים גם
+            פה, לא רק כותרת טקסט. */}
         {destination.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={destination.image_url} alt={destination.name} className="h-full w-full object-cover" />

@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { isPreferencesComplete } from "@/services/preferences/preferencesService";
 import { usePersonalizedDestinations } from "@/hooks/usePersonalizedDestinations";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { TripHeroHeader } from "@/screens/layout/TripHeroHeader";
 import { QUICK_CATEGORIES } from "@/constants/quickCategories";
 import { HotDestinations } from "@/screens/home/HotDestinations";
 import { DealsComingSoonCard } from "@/screens/discovery/DealsComingSoonCard";
@@ -51,14 +50,9 @@ export default function AbroadVacationDiscoverPage() {
   });
 
   return (
-    <div className="min-h-screen bg-bg pb-36">
+    <div className="min-h-screen bg-white pb-36">
       {/* 1. TOP BAR - זהה במדויק לחופשה בארץ/טיול יומי. */}
-      <SimpleAppHeader onBack={() => router.back()} />
-
-      {/* 2. HERO - full-bleed, אותו דפוס בדיוק, עם ה-asset הקיים לחופשה בחו"ל. */}
-      <div className="relative w-full">
-        <Image src="/images/hero-abroad-vacation.png" alt="" width={800} height={450} priority className="h-auto w-full" />
-      </div>
+      <TripHeroHeader heroSrc="/images/hero-abroad-vacation.png" onBack={() => router.back()} />
 
       {/* 3. שורה: אייקון+"חופשה בחו''ל" בצד ימין, באותו גודל בדיוק כמו
           בשני העמודים האחרים. */}

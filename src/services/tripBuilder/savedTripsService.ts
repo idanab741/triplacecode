@@ -1,4 +1,5 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import { UNSAVED_CONTENT_RETENTION_DAYS } from "@/constants/contentRetention";
 
 export interface SavedTripSummary {
   sessionId: string;
@@ -7,6 +8,14 @@ export interface SavedTripSummary {
   imageUrl: string | null;
   stopCount: number;
   createdAt: string;
+  // *** תוספת (בקשה מפורשת - "עמוד הבחירות שלי - שינויים"): עד עכשיו
+  // השדה הזה לא הוחזר ללקוח בכלל - כל צרכן ידע רק "שמורים" מול "לא"
+  // דרך *איזה endpoint/פרמטר* נקרא (savedOnly), לא דרך שדה בשורה
+  // עצמה. כדי שהעמוד "הבחירות שלי" יוכל להציג לכל פריט (גם בלשונית
+  // "כל הבחירות", שמכילה גם שמורים וגם זמניים יחד) האם הוא זמני
+  // ולחשב כמה ימים נשארו לו (ר' getDaysRemainingBeforeRemoval) - צריך
+  // את הערך הזה בכל שורה.
+  isSaved: boolean;
 }
 
 const TRIP_TYPE_ROUTE: Record<string, string> = {
@@ -38,8 +47,13 @@ export async function getSavedTrips(
   if (savedOnly) {
     query = query.eq("is_saved", true);
   } else {
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    query = query.or(`is_saved.eq.true,created_at.gte.${weekAgo}`);
+    // *** תיקון (בקשה מפורשת - "לוודא שתקופת השמירה היא 14 יום"): היה
+    // 7 ימים (שבוע) - לא תואם למנגנון השמירה הזמנית שהוצג למשתמש
+    // (ר' UnsavedContentRetentionModal.tsx + contentRetention.ts).
+    // עכשיו אותו קבוע משותף בדיוק כמו trippy_ai_results, כדי ששני סוגי
+    // ה"בחירות" יתנהגו באותו אופן.
+    const cutoffIso = new Date(Date.now() - UNSAVED_CONTENT_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    query = query.or(`is_saved.eq.true,created_at.gte.${cutoffIso}`);
   }
   if (options?.limit) query = query.limit(options.limit);
 
@@ -70,6 +84,7 @@ export async function getSavedTrips(
       imageUrl,
       stopCount,
       createdAt: session.created_at as string,
+      isSaved: session.is_saved === true,
     } satisfies SavedTripSummary;
   });
 

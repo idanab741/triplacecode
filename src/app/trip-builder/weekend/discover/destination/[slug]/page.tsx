@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { TripHeroHeader } from "@/screens/layout/TripHeroHeader";
 import { ISRAEL_VACATION_DESTINATIONS } from "@/constants/israelVacationDestinations";
 import { DiscoverySection } from "@/screens/discovery/DiscoverySection";
 import { HotPlacesSection } from "@/screens/discovery/HotPlacesSection";
@@ -66,15 +66,10 @@ export default function VacationDestinationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg pb-36">
-      {/* 1. TOP BAR - זהה בדיוק לעמוד "חופשה בארץ" הראשי. */}
-      <SimpleAppHeader onBack={() => router.back()} />
-
-      {/* 2. HERO - full-bleed, אותה תמונת חופשה בארץ (עד שיגיעו תמונות
-          ייעודיות ליעד עצמו). */}
-      <div className="relative w-full">
-        <Image src="/images/hero-weekend.png" alt="" width={800} height={450} priority className="h-auto w-full" />
-      </div>
+    <div className="min-h-screen bg-white pb-36">
+      {/* 1+2. TOP BAR + HERO - שקוף, לוגו ממורכז, אותה תמונת חופשה בארץ
+          (עד שיגיעו תמונות ייעודיות ליעד עצמו). */}
+      <TripHeroHeader heroSrc="/images/hero-weekend.png" onBack={() => router.back()} />
 
       {/* 3. שם היעד. */}
       <div className="px-6 pt-4">

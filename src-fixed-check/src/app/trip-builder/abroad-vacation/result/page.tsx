@@ -1,0 +1,989 @@
+"use client";
+
+import { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
+import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { Screen, Skeleton } from "@/components/ui";
+import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
+import { AddToCalendarButton } from "@/screens/trip-builder/AddToCalendarButton";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { minutesToTimeLabel } from "@/utils/openingHours";
+import { recalculateStopTimes } from "@/services/tripBuilder/reorderStops";
+import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
+import { LogisticsStopCard } from "@/screens/trip-builder/LogisticsStopCard";
+import { LoadingGame } from "@/screens/trip-builder/LoadingGame";
+import { HotelAutocomplete } from "@/screens/trip-builder/chat/HotelAutocomplete";
+import { resolveTripCalendarDate } from "@/utils/tripCalendarDate";
+import type { FinalItinerary, TripBuilderSession } from "@/services/tripBuilder/types";
+
+const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
+  ssr: false,
+});
+
+function AbroadVacationResultContent() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("sessionId");
+  const [session, setSession] = useState<TripBuilderSession | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dayStartMinutes, setDayStartMinutes] = useState<Record<number, number>>({});
+  const [editingTime, setEditingTime] = useState<number | null>(null);
+ const [activeDayFilter, setActiveDayFilter] = useState<number | "all">("all");
+  const [stopTimeOverrides, setStopTimeOverrides] = useState<Record<string, number>>({});
+  const [editingStopId, setEditingStopId] = useState<string | null>(null);
+  const [hotelDraft, setHotelDraft] = useState<{ name: string; address: string }>({ name: "", address: "" });
+  const [savingHotel, setSavingHotel] = useState(false);
+  const [hotelSaved, setHotelSaved] = useState(false);
+  const [editingHotel, setEditingHotel] = useState(false);
+  const [justShared, setJustShared] = useState(false);
+  const [logisticsImages, setLogisticsImages] = useState<Record<string, string | null>>({});
+  const [airportInfo, setAirportInfo] = useState<{
+    name: string;
+    coords: { lat: number; lng: number };
+    imageUrl: string | null;
+  } | null>(null);
+  const [neighborhoodInfo, setNeighborhoodInfo] = useState<{
+    name: string;
+    coords: { lat: number; lng: number };
+    imageUrl: string | null;
+  } | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  async function handleSaveHotel() {
+    if (!sessionId || !hotelDraft.name || savingHotel) return;
+    setSavingHotel(true);
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/hotel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: hotelDraft.name, address: hotelDraft.address }),
+      });
+      if (!response.ok) throw new Error();
+      setSession((s) =>
+        s
+          ? {
+              ...s,
+              answers: { ...(s.answers as object), hotels: [{ name: hotelDraft.name, address: hotelDraft.address }] },
+            }
+          : s
+      );
+      setHotelSaved(true);
+      setEditingHotel(false);
+    } catch {
+      // שקט - לא חוסם את המשתמש
+    } finally {
+      setSavingHotel(false);
+    }
+  }
+
+    /** שיתוף - מעדיף את ה-share sheet הטבעי של המכשיר (navigator.share) אם
+   *  קיים; אחרת נופל ל-וואטסאפ ישירות. שיתוף PDF אמיתי (לא רק לינק) הוא
+   *  פיצ'ר נפרד וגדול יותר - זה כרגע שיתוף קישור למסלול. */
+  async function handleShareTrip() {
+    setJustShared(true);
+    setTimeout(() => setJustShared(false), 1500);
+
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `החופשה שלי ל${answersTyped?.destination ?? "היעד"} מוכנה! תראו את המסלול: ${url}`;
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "המסלול שלי ב-TRIPLACE", text, url });
+        return;
+      } catch {
+        // המשתמש ביטל את ה-share sheet, או שהוא לא נתמך בפועל - נופלים לוואטסאפ
+      }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const itinerary = session?.final_itinerary;
+    if (!session || !itinerary || !event.over || event.active.id === event.over.id) return;
+
+    const oldIndex = itinerary.stops.findIndex((s) => s.stopId === event.active.id);
+    const newIndex = itinerary.stops.findIndex((s) => s.stopId === event.over!.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(itinerary.stops, oldIndex, newIndex);
+
+    // גרירה בין ימים: קודם היה DndContext נפרד לכל יום, כך שלא ניתן היה
+    // בכלל לגרור תחנה מיום אחד לתוך יום אחר. עכשיו יש הקשר גרירה אחד משותף
+    // לכל הימים - וכשתחנה "נוחתת" בין תחנות של יום אחר, מעדכנים את היום שלה
+    // בפועל לפי השכנות החדשות.
+    const movedStop = reordered[newIndex];
+    const prevStop = reordered[newIndex - 1];
+    const nextStop = reordered[newIndex + 1];
+
+    // תיקון באג אמיתי (בקשה מפורשת - "גוררים להתחלת היום, הוא מעביר יום
+    // אחורה"): בגבול בין ימים (השכן הקודם שייך ליום X-1, השכן הבא שייך
+    // ליום X) - גרירה "לתחילת יום X" (ממש לפני התחנה הראשונה שלו) הייתה
+    // מעדיפה תמיד את יום השכן הקודם (X-1), דוחפת את התחנה אחורה בטעות.
+    // עכשיו: בגבול בין ימים ספציפית, מעדיפים את יום השכן הבא - זה בדיוק
+    // "תחילת היום" שאליו גוררים, לא סוף היום הקודם.
+    const inferredDay =
+      prevStop && nextStop && prevStop.dayIndex !== nextStop.dayIndex
+        ? nextStop.dayIndex
+        : (prevStop?.dayIndex ?? nextStop?.dayIndex ?? movedStop.dayIndex);
+    if (inferredDay != null && inferredDay !== movedStop.dayIndex) {
+      reordered[newIndex] = { ...movedStop, dayIndex: inferredDay };
+    }
+
+    const recalculated = recalculateStopTimes(reordered, {
+      lat: session.origin_latitude!,
+      lng: session.origin_longitude!,
+    });
+
+    const updatedItinerary = { ...itinerary, stops: recalculated };
+    setSession((s) => (s ? { ...s, final_itinerary: updatedItinerary } : s));
+
+    if (sessionId) {
+      fetch(`/api/trip-builder/sessions/${sessionId}/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itinerary: updatedItinerary }),
+      }).catch(() => {});
+    }
+  }
+
+  /** משנה את שעת ההתחלה של יום שלם, ומאפסת כל דריסת-שעה ידנית שהוגדרה בעבר
+   *  לתחנות של אותו יום - כדי שכולן יגזרו מחדש מהשעה החדשה, במקום שחלקן
+   *  יישארו "תקועות" בזמן ישן שכבר לא תואם. */
+  function handleDayStartChange(day: number, newMinutes: number, dayStopsForDay: FinalItinerary["stops"]) {
+    setDayStartMinutes((s) => ({ ...s, [day]: newMinutes }));
+    setStopTimeOverrides((s) => {
+      const updated = { ...s };
+      for (const stop of dayStopsForDay) delete updated[stop.stopId];
+      return updated;
+    });
+  }
+
+  /** משנה את השעה של תחנה ספציפית ביום. אם זו התחנה **הראשונה** ביום - זה
+   *  שקול לשינוי שעת ההתחלה של כל היום. אחרת - מזיז את **כל התחנות שאחריה**
+   *  באותו יום באותו הפרש בדיוק, כדי שהסדר הכרונולוגי יישאר הגיוני במקום
+   *  שרק תחנה אחת "תזוז" והשאר יישארו עם שעות ישנות שלא מתעדכנות. */
+  function handleStopTimeChange(day: number, dayStopsForDay: FinalItinerary["stops"], stopId: string, newMinutes: number) {
+    const idx = dayStopsForDay.findIndex((s) => s.stopId === stopId);
+    if (idx === -1) return;
+
+    if (idx === 0) {
+      handleDayStartChange(day, newMinutes - dayStopsForDay[0].arrivalOffsetMinutes, dayStopsForDay);
+      return;
+    }
+
+    setStopTimeOverrides((s) => {
+      const currentDisplay = s[stopId] ?? (dayStartMinutes[day] ?? 9 * 60) + dayStopsForDay[idx].arrivalOffsetMinutes;
+      const delta = newMinutes - currentDisplay;
+      const updated = { ...s };
+      for (let i = idx; i < dayStopsForDay.length; i++) {
+        const stop = dayStopsForDay[i];
+        const displayForStop = s[stop.stopId] ?? (dayStartMinutes[day] ?? 9 * 60) + stop.arrivalOffsetMinutes;
+        updated[stop.stopId] = displayForStop + delta;
+      }
+      return updated;
+    });
+  }
+
+  async function handleDeleteStop(stopId: string) {
+    if (!sessionId || !session?.final_itinerary) return;
+
+    // עדכון אופטימי - מוחקים מהתצוגה מיד, בלי לחכות לשרת
+    const remainingStops = session.final_itinerary.stops.filter((s) => s.stopId !== stopId);
+    setSession((s) => (s ? { ...s, final_itinerary: { ...s.final_itinerary!, stops: remainingStops } } : s));
+
+    try {
+      const response = await fetch(`/api/trip-builder/sessions/${sessionId}/stops/${stopId}/instruct`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove" }),
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.itinerary) {
+        setSession((s) => (s ? { ...s, final_itinerary: data.itinerary } : s));
+      }
+    } catch {
+      // התצוגה כבר עודכנה אופטימית; אם השרת נכשל, המחיקה תישאר רק מקומית
+      // עד לרענון הבא - עדיף מאשר לחסום את המשתמש עם שגיאה על פעולה כזו פשוטה
+    }
+  }
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    function fetchOnce() {
+      fetch(`/api/trip-builder/sessions?sessionId=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          if (!data.session) {
+            setError("לא הצלחנו לטעון את החופשה");
+            return;
+          }
+          setSession(data.session);
+          // ברגע שהבנייה הסתיימה (status "completed") - מפסיקים לתשאל את השרת שוב ושוב.
+          if (data.session.status === "completed" && intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setError("לא הצלחנו לטעון את החופשה");
+        });
+    }
+
+    fetchOnce();
+    // הבנייה בפועל (auto-build) רצה ברקע בשרת - לא ממתינים לה לפני הניווט
+    // לעמוד הזה, אלא מתשאלים אותה כל 2.5 שניות עד שהיא מסתיימת.
+    intervalId = setInterval(fetchOnce, 2500);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [sessionId]);
+
+  const itinerary: FinalItinerary | null = session?.final_itinerary ?? null;
+
+  useEffect(() => {
+    if (!session) return;
+    const destination = (session.answers as { destination?: string })?.destination;
+    const hotel = (session.answers as { hotels?: { name: string; address: string }[] })?.hotels?.[0];
+
+    if (destination && airportInfo === null) {
+      fetch(`/api/places/airport-info?destination=${encodeURIComponent(destination)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.airport) {
+            setAirportInfo({ name: data.airport.name, coords: data.airport.coords, imageUrl: data.airport.imageUrl });
+          }
+        })
+        .catch(() => {});
+    }
+    if (destination && neighborhoodInfo === null) {
+      fetch(`/api/places/central-neighborhood?destination=${encodeURIComponent(destination)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.neighborhood) {
+            setNeighborhoodInfo({
+              name: data.neighborhood.name,
+              coords: data.neighborhood.coords,
+              imageUrl: data.neighborhood.imageUrl,
+            });
+          }
+        })
+        .catch(() => {});
+    }
+    if (hotel?.name && logisticsImages["hotel"] === undefined) {
+      fetch(`/api/places/photo-search?q=${encodeURIComponent(`${hotel.name} ${hotel.address}`)}`)
+        .then((res) => res.json())
+        .then((data) => setLogisticsImages((s) => ({ ...s, hotel: data.imageUrl })))
+        .catch(() => setLogisticsImages((s) => ({ ...s, hotel: null })));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  if (error) {
+    return (
+      <Screen>
+        <p className="pt-10 text-center text-danger">{error}</p>
+      </Screen>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Screen>
+        <p className="pt-10 text-center text-ink-secondary">טוען...</p>
+      </Screen>
+    );
+  }
+
+  // בקשה מפורשת וחד-משמעית: "10-15 שניות ליעד+יום 1, ואז סקלטון לכל
+  // כרטיסייה של שאר הימים" - לא מסך LoadingGame מלא-מסך שחוסם הכל עד
+  // ש-status="completed". ברגע שיש כבר itinerary חלקי (יום 1, נשמר עם
+  // isFinal=false ב-auto-build) - עוברים לתצוגת הטיול הרגילה מיד, גם אם
+  // status עדיין "building"; שאר הימים מוצגים כסקלטון (ר' renderDayTab/
+  // הרשימה למטה) עד שהם מגיעים באותו polling הקיים.
+  if (!itinerary || itinerary.stops.length === 0) {
+    if (session.status !== "completed") {
+      return (
+        <LoadingGame
+          statusText="רגע, בונים לכם את היעד ואת יום 1..."
+          steps={[
+            "🌍 מוצאים את היעד המושלם בשבילכם",
+            "🏛️ בוחרים אטרקציות ופינות מיוחדות ליום הראשון",
+            "🍽️ מתאימים מסעדה קרובה לשכונה המרכזית",
+          ]}
+        />
+      );
+    }
+    return (
+      <Screen>
+        <div className="pt-10 text-center text-ink-secondary">
+          <p>לא נבחרו מספיק תחנות כדי לבנות חופשה.</p>
+          <Link href="/home" className="mt-4 inline-block text-accent">
+            חזרה לדף הבית
+          </Link>
+        </div>
+      </Screen>
+    );
+  }
+
+  const answersTyped = session.answers as {
+    destination?: string;
+    startDate?: string;
+    endDate?: string;
+    flights?: { flightNumber: string | null; departureTime: string; arrivalTime: string }[];
+    hotels?: { name: string; address: string }[];
+  };
+
+  // ימים שעדיין לא הגיעו (לא קיימים ב-dayGroups עדיין) - מוצגים כטאב+כרטיסי
+  // סקלטון, כל עוד הבנייה עדיין רצה. מספר הימים הכולל נגזר מטווח
+  // התאריכים - אותו חישוב בדיוק כמו countDays ב-categoryPlanService.ts
+  // (כולל ברירת המחדל הקבועה של 5 ימים).
+  //
+  // תיקון באג אמיתי (בקשה מפורשת - "אין את עמודי הטעינה!"): הגרסה
+  // הקודמת נפלה חזרה ל-dayGroups.length כשהתאריכים ריקים/לא תקינים - זה
+  // בדיוק ה"יעד" שגדל אוטומטית ככל שעוד ימים מגיעים, כך ש-pendingDayNumbers
+  // תמיד יצא ריק (0 ימים "חסרים" ביחס ל"יעד" שכל הזמן שווה למה שכבר יש) -
+  // הסקלטון פשוט לא יכול היה להופיע אף פעם. עכשיו נופל ל-5 קבוע, בדיוק
+  // כמו הבקאנד (countDays), כדי ששני הצדדים תמיד יסכימו על "כמה ימים
+  // בסך הכל" - לא תלוי כמה כבר נטען עד כה.
+  const expectedTotalDays = (() => {
+    if (!answersTyped.startDate || !answersTyped.endDate) return 5;
+    const start = new Date(answersTyped.startDate);
+    const end = new Date(answersTyped.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 5;
+    const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, days);
+  })();
+
+  const dayGroups = injectLogisticsStops(
+    groupStopsByDay(itinerary.stops),
+    answersTyped,
+    logisticsImages,
+    airportInfo,
+    neighborhoodInfo,
+    expectedTotalDays
+  );
+  const hasHotel = Boolean(answersTyped.hotels?.[0]?.name);
+
+  const visibleDayGroups = dayGroups.filter(
+    ({ day }) => activeDayFilter === "all" || day === activeDayFilter
+  );
+  // סה"כ תחנות אמיתיות (לא סינתטיות כמו נחיתה/מלון) על פני כל הימים -
+  // אותו חישוב בדיוק כמו ה-items של ה-SortableContext למטה. משמש לקבוע
+  // אם גרירה/מחיקה בכלל רלוונטיות (מעל 2 תחנות) - "שינוי עם TRIPPY"
+  // תמיד זמין בלי קשר לכך.
+  const totalRealStopsCount = visibleDayGroups.flatMap(({ stops }) => stops.filter((s) => !s.specialType)).length;
+  const visibleStopsForMap = itinerary.stops.filter((s) => {
+    if (activeDayFilter === "all") return true;
+    const stopDay = (s as unknown as { dayIndex: number | null }).dayIndex ?? 1;
+    return stopDay === activeDayFilter;
+  });
+
+  const readyDayNumbers = new Set(dayGroups.map((g) => g.day));
+  const pendingDayNumbers =
+    session.status === "completed"
+      ? []
+      : Array.from({ length: expectedTotalDays }, (_, i) => i + 1).filter((d) => !readyDayNumbers.has(d));
+
+  return (
+    <Screen withBottomNavSpacing={true} className="!bg-bg !px-0 !pt-0">
+            <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <div className="relative h-16">
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Link
+              href="/home"
+              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              aria-label="חזרה לדף הבית"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
+            </Link>
+          </div>
+
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
+            <SaveTripIconButton sessionId={sessionId} />
+            <button
+              type="button"
+              onClick={handleShareTrip}
+              aria-label="שתף חופשה"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+            >
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="relative w-full">
+        <Image
+          src="/images/hero-abroad-vacation.png"
+          alt="החופשה שלכם מוכנה"
+          width={800}
+          height={450}
+          priority
+          className="h-auto w-full"
+        />
+      </div>
+
+      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-10 pt-4">
+        <div>
+          <h1 className="text-xl font-bold text-ink">
+            החופשה שלכם ל{answersTyped.destination ?? "היעד שבחרתם"} מוכנה!
+          </h1>
+          <p className="mt-1 text-sm text-ink-secondary">
+            {itinerary.stops.length} תחנות
+            {answersTyped.startDate && (
+              <>
+                {" · "}
+                {formatDateRange(answersTyped.startDate, answersTyped.endDate!)}
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* בקשה מפורשת ("תעשה שגיאות גלויות באפליקציה") - כל אזהרה שנאספה
+            בזמן הבנייה (כמו יום שנכשל) מוצגת כאן ישירות, בלי צורך בגישה
+            לטרמינל/לוגי שרת בכלל. */}
+        {itinerary.warnings.length > 0 && (
+          <div className="rounded-card border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-bold">שימו לב:</p>
+            <ul className="mt-1 list-inside list-disc space-y-1">
+              {itinerary.warnings.map((warning, i) => (
+                <li key={i}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* הזמנת טיסה ומלון - placeholder בלבד לעכשיו, הפיצ'ר בפועל ייבנה בהמשך.
+            עיצוב: הגרדיאנט של המותג עצמו (אותו אחד כמו כפתור "שמור חופשה") -
+            כדי שזה ירגיש כמו קדימון פרימיום, לא תיבה אפורה גנרית. */}
+        <div
+          className="relative overflow-hidden rounded-card p-4 text-white shadow-soft"
+          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl backdrop-blur-sm">
+                🛫
+              </div>
+              <div>
+                <p className="text-[15px] font-bold">הזמנת טיסה ומלון</p>
+                <p className="text-xs text-white/80">הכל במקום אחד, בקרוב</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-pill bg-white/25 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-sm">
+              בקרוב
+            </span>
+          </div>
+        </div>
+
+        {/* בר הימים - מעל המפה, full-bleed. לוחצים כדי לסנן גם את המפה
+            וגם את הרשימה למטה לאותו יום בלבד. */}
+        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1" style={{ scrollbarWidth: "none" }}>
+  <button
+            type="button"
+            onClick={() => setActiveDayFilter("all")}
+            className={`flex shrink-0 flex-col items-center rounded-card px-4 py-2 shadow-soft ${
+              activeDayFilter === "all" ? "bg-accent" : "bg-white"
+            }`}
+          >
+            <span className={`text-xs font-bold ${activeDayFilter === "all" ? "text-white" : "text-accent"}`}>
+              כל המסלול
+            </span>
+            {answersTyped.startDate && answersTyped.endDate && (
+              <span className={`text-[10px] ${activeDayFilter === "all" ? "text-white/80" : "text-ink-secondary"}`}>
+                {formatDateRange(answersTyped.startDate, answersTyped.endDate)}
+              </span>
+            )}
+          </button>
+          {dayGroups.map(({ day }) => (
+            <button
+              key={day}
+              type="button"
+              onClick={() => setActiveDayFilter(day)}
+              className={`flex shrink-0 flex-col items-center rounded-card px-4 py-2 shadow-soft ${
+                activeDayFilter === day ? "bg-accent" : "bg-white"
+              }`}
+            >
+              <span className={`text-xs font-bold ${activeDayFilter === day ? "text-white" : "text-accent"}`}>
+                יום {day}
+              </span>
+              {answersTyped.startDate && (
+                <span className={`text-[10px] ${activeDayFilter === day ? "text-white/80" : "text-ink-secondary"}`}>
+                  {formatSingleDate(answersTyped.startDate, day - 1)}
+                </span>
+              )}
+            </button>
+          ))}
+          {/* ימים שעדיין בבנייה - טאב סקלטון פועם, לא לחיץ (עדיין אין
+              מה להציג עבורם) - זה בדיוק הסקלטון-לכל-כרטיסייה שהוזכר. */}
+          {pendingDayNumbers.map((day) => (
+            <div
+              key={`pending-${day}`}
+              className="flex shrink-0 flex-col items-center gap-1 rounded-card bg-white px-4 py-2 shadow-soft opacity-60"
+            >
+              <span className="text-xs font-bold text-ink-secondary">יום {day}</span>
+              <Skeleton className="h-2 w-10" />
+            </div>
+          ))}
+        </div>
+
+        <ResultMap
+          stops={visibleStopsForMap.map((s) => ({
+            stopId: s.stopId,
+            name: s.name,
+            latitude: s.latitude,
+            longitude: s.longitude,
+            dayIndex: (s as unknown as { dayIndex: number | null }).dayIndex,
+          }))}
+        />
+
+        {/* *** תיקון (בקשה מפורשת - "עד יום אחד בלבד!! שלא יראה כמו
+            עמוד המסלול של חופשה בחו''ל"): כרטיס "איפה תישנו?" רלוונטי
+            רק לטיול רב-ימי אמיתי - בטיול יום אחד (expectedTotalDays===1,
+            הזרימה הפשוטה של TrippyConversation) הוא לא רלוונטי בכלל
+            ומזכיר "עמוד חופשה" יותר מדי. מוסתר לגמרי בטיול יום-אחד,
+            בלי קשר אם יש/אין מלון שמור (hasHotel ממילא false תמיד
+            בזרימה הזו, כי היא לא שואלת על מלון). */}
+        {expectedTotalDays > 1 && ((!hasHotel && !hotelSaved) || editingHotel ? (
+          <div className="flex flex-col gap-2 rounded-card bg-white p-4 shadow-md">
+            <p className="text-sm font-semibold text-ink">איפה תישנו? (אופציונלי)</p>
+            <p className="text-xs text-ink-secondary">
+              הקלידו את שם המלון ובחרו מהרשימה שנפתחת - כדי שנדע את הכתובת המדויקת (חשוב לכפתור הזמנת הנסיעה).
+            </p>
+            <HotelAutocomplete
+              name={hotelDraft.name}
+              address={hotelDraft.address}
+              onChange={(name, address) => setHotelDraft({ name, address })}
+              destination={answersTyped.destination}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSaveHotel}
+                disabled={!hotelDraft.name || savingHotel}
+                className="mt-1 w-fit rounded-pill px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              >
+                {savingHotel ? "שומר..." : "שמרו מלון"}
+              </button>
+              {editingHotel && (
+                <button
+                  type="button"
+                  onClick={() => setEditingHotel(false)}
+                  className="mt-1 w-fit rounded-pill border border-ink-secondary/25 px-4 py-2 text-xs font-semibold text-ink-secondary"
+                >
+                  ביטול
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          hasHotel && (
+            <div className="flex items-center justify-between rounded-card bg-white p-3.5 shadow-soft">
+              <div>
+                <p className="text-sm font-semibold text-ink">🏨 {answersTyped.hotels?.[0]?.name}</p>
+                <p className="text-xs text-ink-secondary">
+                  {answersTyped.hotels?.[0]?.address || "אין כתובת מדויקת - בחרו מהרשימה כדי שכפתור ההזמנה יעבוד"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setHotelDraft({ name: answersTyped.hotels?.[0]?.name ?? "", address: answersTyped.hotels?.[0]?.address ?? "" });
+                  setEditingHotel(true);
+                }}
+                className="shrink-0 rounded-pill border border-accent/30 px-3 py-1.5 text-xs font-semibold text-accent"
+              >
+                ערוך
+              </button>
+            </div>
+          )
+        ))}
+
+        {/* הקשר גרירה אחד משותף לכל הימים (לא אחד נפרד לכל יום) - זה מה
+            שמאפשר לגרור תחנה מיום אחד לתוך יום אחר. items כולל את כל
+            התחנות האמיתיות (לא הסינתטיות - נחיתה/מלון - שאינן ניתנות
+            לגרירה/מחיקה ולא קיימות ב-itinerary.stops בכלל). */}
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={visibleDayGroups.flatMap(({ stops }) => stops.filter((s) => !s.specialType).map((s) => s.stopId))}
+            strategy={verticalListSortingStrategy}
+          >
+            {visibleDayGroups.map(({ day, stops: dayStops }) => (
+              <div key={day} id={`day-${day}`} className="flex flex-col gap-3 scroll-mt-4">
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-ink">יום {day}</h2>
+                      {answersTyped.startDate && (
+                        <span className="text-xs text-ink-secondary">{formatSingleDate(answersTyped.startDate, day - 1)}</span>
+                      )}
+                    </div>
+                    {itinerary.dayTitles?.[String(day)] && (
+                      <span className="text-xs font-medium text-accent">{itinerary.dayTitles[String(day)]}</span>
+                    )}
+                  </div>
+                  {editingTime === day ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="time"
+                        value={minutesToTimeLabel(dayStartMinutes[day] ?? 9 * 60)}
+                        onChange={(e) => {
+                          const [h, m] = e.target.value.split(":").map(Number);
+                          if (!isNaN(h) && !isNaN(m)) handleDayStartChange(day, h * 60 + m, dayStops);
+                        }}
+                        autoFocus
+                        className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1.5 text-sm font-semibold text-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditingTime(null)}
+                        className="rounded-pill bg-accent px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        אישור
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingTime(day)}
+                      className="rounded-pill border border-accent/30 bg-accent/5 px-3 py-1.5 text-sm font-semibold text-accent"
+                    >
+                      {minutesToTimeLabel(dayStartMinutes[day] ?? 9 * 60)}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {dayStops.map((stop) => {
+                    const defaultMinutes = (dayStartMinutes[day] ?? 9 * 60) + stop.arrivalOffsetMinutes;
+                    const displayMinutes = stopTimeOverrides[stop.stopId] ?? defaultMinutes;
+                    if (stop.specialType) {
+                      return (
+                        <div key={stop.stopId} className="flex flex-col gap-1">
+                          <span className="w-fit pr-1 text-sm font-bold text-accent">
+                            🕐 {minutesToTimeLabel(displayMinutes)}
+                          </span>
+                          <LogisticsStopCard stop={stop} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={stop.stopId} className="flex flex-col gap-1">
+                        {editingStopId === stop.stopId ? (
+                          <div className="flex w-fit items-center gap-1.5">
+                            <input
+                              type="time"
+                              value={minutesToTimeLabel(displayMinutes)}
+                              onChange={(e) => {
+                                const [h, m] = e.target.value.split(":").map(Number);
+                                if (!isNaN(h) && !isNaN(m)) {
+                                  handleStopTimeChange(day, dayStops, stop.stopId, h * 60 + m);
+                                }
+                              }}
+                              autoFocus
+                              className="w-24 rounded-pill border border-accent/30 bg-white px-2 py-1 text-sm font-bold text-accent"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setEditingStopId(null)}
+                              className="rounded-pill bg-accent px-2 py-1 text-[10px] font-semibold text-white"
+                            >
+                              אישור
+                            </button>
+                          </div>
+                        ) : stopTimeOverrides[stop.stopId] !== undefined ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingStopId(stop.stopId)}
+                            className="w-fit pr-1 text-sm font-bold text-accent"
+                          >
+                            🕐 {minutesToTimeLabel(displayMinutes)}
+                          </button>
+                        ) : (
+                          // בקשה מפורשת ("תעיף לגמרי את השעות!!! כפתור למילוי עצמי") -
+                          // בלי override ידני, לא מציגים שעה מחושבת אוטומטית בכלל
+                          // (המשתמש כבר לא סומך עליה) - רק כפתור עדין להוספה, למי
+                          // שכן רוצה לקבוע שעה בעצמו לתחנה הזו.
+                          <button
+                            type="button"
+                            onClick={() => setEditingStopId(stop.stopId)}
+                            className="w-fit rounded-pill border border-dashed border-ink-secondary/30 px-2 py-0.5 text-xs text-ink-secondary"
+                          >
+                            + הוסף שעה
+                          </button>
+                        )}
+                        <SortableStopCard
+                          stop={stop}
+                          sessionId={sessionId}
+                          onItineraryUpdate={(updated) => setSession((s) => (s ? { ...s, final_itinerary: updated } : s))}
+                          draggable={totalRealStopsCount >= 2}
+                          onDelete={totalRealStopsCount >= 2 ? () => handleDeleteStop(stop.stopId) : undefined}
+                          placeHref={`/place/${stop.placeId}?from=ai`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </SortableContext>
+        </DndContext>
+
+        {/* ימים שעדיין בבנייה ברקע (ר' pendingDayNumbers למעלה) - כרטיסי
+            סקלטון פועמים לכל יום, לא רשימה ריקה/ספינר כללי. נעלם מעצמו
+            ברגע שהיום הזה מגיע ב-polling (session.final_itinerary מתעדכן). */}
+        {activeDayFilter === "all" &&
+          pendingDayNumbers.map((day) => (
+            <div key={`pending-day-${day}`} className="flex flex-col gap-3 pt-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-ink-secondary">יום {day}</h2>
+                <span className="text-xs text-ink-secondary">בבנייה...</span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-card bg-white p-3 shadow-soft">
+                    <Skeleton className="h-20 w-20 shrink-0" />
+                    <div className="flex flex-1 flex-col gap-2">
+                      <Skeleton className="h-3 w-2/3" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+        <AddToCalendarButton sessionId={sessionId} date={resolveTripCalendarDate(session?.answers)} />
+      </div>
+      <MainBottomNav active="home" />
+    </Screen>
+  );
+}
+
+/** מציג טווח תאריכים בעברית, לדוגמה "12.8 - 15.8". */
+function formatDateRange(startDate: string, endDate: string): string {
+  const format = (d: string) => {
+    const date = new Date(d);
+    return `${date.getDate()}.${date.getMonth() + 1}`;
+  };
+  return `${format(startDate)} - ${format(endDate)}`;
+}
+
+/** מחזיר תאריך בודד בעברית, בתוספת מספר ימים מתאריך ההתחלה. */
+function formatSingleDate(startDate: string, addDays: number): string {
+  const date = new Date(startDate);
+  date.setDate(date.getDate() + addDays);
+  return `${date.getDate()}.${date.getMonth() + 1}`;
+}
+
+/** מקבץ תחנות לפי dayIndex, ומחזיר מערך ממוין לפי מספר יום. תחנות בלי
+ *  dayIndex (טיולים חד-יומיים ישנים) מקובצות תחת "יום 1" יחיד. */
+function groupStopsByDay(
+  stops: FinalItinerary["stops"]
+): { day: number; stops: FinalItinerary["stops"] }[] {
+  const groups = new Map<number, FinalItinerary["stops"]>();
+  for (const stop of stops) {
+    const day = (stop as unknown as { dayIndex: number | null }).dayIndex ?? 1;
+    if (!groups.has(day)) groups.set(day, []);
+    groups.get(day)!.push(stop);
+  }
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([day, dayStops]) => ({ day, stops: dayStops }));
+}
+
+/** יוצר תחנת-תצוגה מלאכותית (לא מ-DB) - נחיתה/צ'ק-אין/צ'ק-אאוט, בהתבסס
+ *  על פרטי הטיסה/מלון שהמשתמש הזין בשאלון. */
+function makeSyntheticStop(
+  id: string,
+  name: string,
+  description: string,
+  specialType: "landing" | "hotel_checkin" | "hotel_checkout" | "return_flight" | "neighborhood",
+  offsetMinutes: number,
+  imageUrl?: string | null,
+  directionsUrl?: string | null
+): FinalItinerary["stops"][number] {
+  return {
+    stopId: id,
+    placeId: id,
+    name,
+    category: "logistics",
+    imageUrls: imageUrl ? [imageUrl] : [],
+    etaMinutes: 0,
+    arrivalOffsetMinutes: offsetMinutes,
+    estimatedVisitMinutes: 30,
+    priceLevel: null,
+    rating: null,
+    reason: null,
+    shortDescription: description,
+    latitude: 0,
+    longitude: 0,
+    openingHours: null,
+    dayIndex: null,
+    specialType,
+    directionsUrl: directionsUrl ?? null,
+  };
+}
+
+/** בונה קישור ל-Google Maps עם מסלול נסיעה מוכן (origin -> destination) -
+ *  המשתמש שבוחר לפתוח אותו רואה שם גם אפשרויות אובר/מונית/תחבורה ציבורית. */
+function buildDirectionsUrl(origin: string, destination: string): string {
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+}
+
+/** מוסיף שורות נחיתה/צ'ק-אין ליום הראשון, וצ'ק-אאוט + טיסת חזרה ליום האחרון -
+ *  לפי פרטי הטיסה/מלון הראשונים שהמשתמש הזין (אם בכלל), ושם שדה התעופה
+ *  האמיתי של היעד (אם אותר). */
+function injectLogisticsStops(
+  dayGroups: { day: number; stops: FinalItinerary["stops"] }[],
+  answers: {
+    flights?: { flightNumber: string | null; departureTime: string; arrivalTime: string }[];
+    hotels?: { name: string; address: string }[];
+  },
+  images: Record<string, string | null>,
+  airportInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null,
+  neighborhoodInfo: { name: string; coords: { lat: number; lng: number }; imageUrl: string | null } | null,
+  expectedTotalDays: number
+): { day: number; stops: FinalItinerary["stops"] }[] {
+  if (dayGroups.length === 0) return dayGroups;
+
+  const flight = answers.flights?.[0];
+  const hotel = answers.hotels?.[0];
+  const firstDay = dayGroups[0];
+  const lastDay = dayGroups[dayGroups.length - 1];
+
+  // שם שדה התעופה: אם אותר בפועל (airportInfo) - משתמשים בשם האמיתי, לא
+  // בכותרת גנרית. אותו שדה תעופה בדיוק משמש גם לטיסת החזרה בסוף המסלול.
+  const airportName = airportInfo?.name ?? "שדה התעופה";
+  // מזהה מדויק לשדה התעופה בקישורי הניווט (קואורדינטות, לא רק שם טקסטואלי) -
+  // מונע דו-משמעות אם יש כמה מקומות עם שם דומה.
+  const airportPoint = airportInfo ? `${airportInfo.coords.lat},${airportInfo.coords.lng}` : airportName;
+
+  const firstDayExtras: FinalItinerary["stops"] = [];
+  firstDayExtras.push(
+    makeSyntheticStop(
+      "synthetic-landing",
+      airportName,
+      flight?.flightNumber
+        ? `נחיתה בשדה התעופה (טיסה ${flight.flightNumber}), ולאחר מכן נסיעה למקום האירוח`
+        : "נחיתה בשדה התעופה, ולאחר מכן נסיעה למקום האירוח",
+      "landing",
+      -60,
+      airportInfo?.imageUrl ?? images.airport,
+      hotel?.address ? buildDirectionsUrl(airportPoint, hotel.address) : null
+    )
+  );
+  if (hotel?.name) {
+    firstDayExtras.push(
+      makeSyntheticStop(
+        "synthetic-checkin",
+        `הגעה למלון - ${hotel.name}`,
+        hotel.address || "צ'ק-אין במלון",
+        "hotel_checkin",
+        -30,
+        images.hotel
+      )
+    );
+  }
+  // בקשה מפורשת: כרטיס "השכונה המרכזית" של היעד - תמיד אחרי שדה
+  // התעופה/המלון, ולפני התחנות האמיתיות (ארוחת יום 1 וכו') - זה כרטיס
+  // תצוגה בלבד, לא תחנת place מהמאגר (ר' centralNeighborhoodService.ts).
+  if (neighborhoodInfo) {
+    firstDayExtras.push(
+      makeSyntheticStop(
+        "synthetic-neighborhood",
+        neighborhoodInfo.name,
+        "סיבוב חופשי בשכונה המרכזית והתוססת של היעד",
+        "neighborhood",
+        -15,
+        neighborhoodInfo.imageUrl
+      )
+    );
+  }
+
+  const updatedFirstDay = {
+    ...firstDay,
+    stops: [...firstDayExtras, ...firstDay.stops],
+  };
+
+  const lastDayExtras: FinalItinerary["stops"] = [];
+  if (hotel?.name) {
+    // עזיבת המלון - מתעדכן אוטומטית מהמלון שהוזן ביום הראשון (hotel.name
+    // כאן הוא בדיוק אותו hotel כמו למעלה - אין הזנה כפולה). זהה לצ'ק-אין:
+    // תמונת המלון + כפתור הזמנת נסיעה - אבל **לשדה התעופה** (לא חוזר על
+    // כפתור ההלוך בטעות - זה מסלול הפוך: מהמלון לשדה התעופה).
+    lastDayExtras.push(
+      makeSyntheticStop(
+        "synthetic-checkout",
+        `צ'ק-אאוט מהמלון - ${hotel.name}`,
+        hotel.address || "סיום השהייה",
+        "hotel_checkout",
+        24 * 60,
+        images.hotel,
+        hotel.address ? buildDirectionsUrl(hotel.address, airportPoint) : null
+      )
+    );
+  }
+  // טיסת חזרה - **אותו שדה תעופה בדיוק** של ההלוך, בסוף המסלול. בלי כפתור
+  // הזמנת נסיעה משלה - זה כבר על כרטיס הצ'ק-אאוט שלפניה (אותה נסיעה בדיוק).
+  lastDayExtras.push(
+    makeSyntheticStop(
+      "synthetic-return-flight",
+      airportName,
+      "טיסה חזרה מהיעד",
+      "return_flight",
+      24 * 60 + 60,
+      airportInfo?.imageUrl ?? images.airport
+    )
+  );
+
+  // בקשה מפורשת (באג אמיתי, נמצא בצילום מסך): "השדה תעופה ביום האחרון
+  // מופיע יחד עם היום הראשון" - כי dayGroups[dayGroups.length-1] היה
+  // day1 עצמו כל עוד ימים 2+ עוד לא הגיעו מה-polling (day1 היה גם
+  // "ראשון" וגם "אחרון" זמנית ברשימה שכבר נטענה) - מה שהזריק את כרטיס
+  // הטיסה חזרה + הצ'ק-אאוט לתוך יום 1 בטעות. עכשיו בודקים שהיום שכן
+  // נטען הוא **באמת** היום האחרון הצפוי של הטיול (day === expectedTotalDays) -
+  // אם לא, לא מזריקים את הכרטיסים האלה בכלל; הם יופיעו ברגע שהיום האחרון
+  // האמיתי יגיע דרך אותו polling שכבר קיים.
+  const lastDayHasArrived = lastDay.day === expectedTotalDays;
+
+  const isSameDay = firstDay.day === lastDay.day;
+  const updatedLastDay = isSameDay
+    ? { ...updatedFirstDay, stops: lastDayHasArrived ? [...updatedFirstDay.stops, ...lastDayExtras] : updatedFirstDay.stops }
+    : { ...lastDay, stops: lastDayHasArrived ? [...lastDay.stops, ...lastDayExtras] : lastDay.stops };
+
+  if (isSameDay) return [updatedLastDay, ...dayGroups.slice(1)];
+
+  return [updatedFirstDay, ...dayGroups.slice(1, -1), updatedLastDay];
+}
+
+export default function AbroadVacationResultPage() {
+  return (
+    <Suspense
+      fallback={
+        <Screen>
+          <p className="pt-10 text-center text-ink-secondary">טוען...</p>
+        </Screen>
+      }
+    >
+      <AbroadVacationResultContent />
+    </Suspense>
+  );
+}

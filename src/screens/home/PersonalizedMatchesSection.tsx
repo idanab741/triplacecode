@@ -102,7 +102,7 @@ export function PersonalizedMatchesSection() {
 
   return (
     <section className="px-6">
-      <h3 className="text-lg font-semibold tracking-tight text-ink">🎯 התאמנו לכם</h3>
+      <h3 className="text-lg font-semibold tracking-tight text-ink">🎯 התאמנו לכם בקרבת מקום</h3>
       <p className="mt-0.5 text-sm text-ink-secondary">אטרקציות ומקומות שכדאי להכיר</p>
 
       <div className="mt-3 grid grid-cols-2 gap-3">

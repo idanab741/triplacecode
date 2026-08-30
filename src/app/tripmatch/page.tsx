@@ -723,9 +723,19 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
         });
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.error ?? "יצירת הטיול נכשלה");
-        if (!cancelled && data?.sessionId) {
+        // *** תיקון (הטיול עדיין נשמר פעמיים ב"הטיולים שלי"): גם עם
+        // התור (syncQueueRef), אם ה-effect הזה כבר "בוטל" (cancelled)
+        // עד שהתשובה חזרה - השורה כבר *נוצרה בפועל* בשרת, אבל ה-ref
+        // לא היה מתעדכן (המקור הישן חסם את זה מאחורי !cancelled) - כך
+        // שקריאת הסנכרון הבאה בתור לא ידעה שכבר יש sessionId, ויצרה
+        // שורה שנייה (INSERT) במקום לעדכן את הקיימת (UPDATE). ה-ref
+        // חייב להתעדכן תמיד כשיש תשובה מוצלחת, בלי קשר ל-cancelled -
+        // הוא לא state ויזואלי, הוא רק "זיכרון" של איזו שורה כבר קיימת
+        // בשרת. רק setTripRecordId (שגורם ל-re-render) עדיין מוגן מאחורי
+        // cancelled, כדי לא לעדכן state של הפעלה ישנה של האפקט.
+        if (data?.sessionId) {
           tripRecordIdRef.current = data.sessionId;
-          setTripRecordId(data.sessionId);
+          if (!cancelled) setTripRecordId(data.sessionId);
         }
       } catch (err) {
         // *** לא מציגים שגיאה חוסמת (זה סנכרון רקע, לא פעולה שהמשתמש
@@ -792,7 +802,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
    *  סיום אנימציית ה-swipe, ושליחת ההחלטה לשרת קורית ברקע. */
   /** *** תיקון (מערכת "טריפים" - דרישה מפורשת): Skip (liked=false) לא
    *  עולה כלום - ממשיך בדיוק כמו קודם, אופטימי ומיידי. Like (liked=true)
-   *  עולה 10 טריפים, אז חייבים לחכות לתשובת השרת *לפני* שמזיזים את
+   *  עולה TOKEN_COST_LIKE טריפים, אז חייבים לחכות לתשובת השרת *לפני* שמזיזים את
    *  הכרטיס/מציגים את דיאלוג "אהבתי" - אחרת משתמש בלי מספיק טריפים
    *  היה רואה לייק "מצליח" ויזואלית שבפועל לא נשמר ולא חויב. */
   async function handleDecision(liked: boolean) {

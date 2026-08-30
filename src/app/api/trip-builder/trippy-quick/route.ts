@@ -175,10 +175,14 @@ cuisineIds=[], restaurantNameKeyword="חומוס". אם המשתמש כן ביק
 - city: שם עיר בעברית **רק אם צוינה עיר של ממש** (לא אזור/אתר/גוף מים/
   הר - למשל "תל אביב"/"חיפה" כן, "הכנרת"/"הרי ירושלים"/"ים המלח" לא -
   אלה הולכים ל-regionLat/regionLng למטה). אחרת null.
-- regionLat / regionLng: אם הבקשה מציינת אזור/אתר גיאוגרפי מוכר שהוא
-  **לא** שם עיר (ימה/הר/מדבר/אזור כמו "ליד הכנרת", "בהרי ירושלים",
-  "באזור אילת והערבה") - קואורדינטות משוערות (מספרים, לפי הידע
-  הגיאוגרפי שלך) למרכז האזור הזה. אחרת null/null (גם אם city מולא).
+- regionLat / regionLng: קואורדינטות משוערות (מספרים, לפי הידע
+  הגיאוגרפי שלך) למרכז המיקום המבוקש - **תמיד** כשהבקשה מציינת מיקום
+  גיאוגרפי מפורש כלשהו, בין אם זו עיר של ממש (city מולא, למשל "אילת"/
+  "תל אביב") ובין אם זה אזור/אתר שהוא **לא** שם עיר (ימה/הר/מדבר/אזור
+  כמו "ליד הכנרת", "בהרי ירושלים", "באזור אילת והערבה" - שם city נשאר
+  null). כלומר: בכל פעם ש-city לא-null - למלא גם את הקואורדינטות
+  המשוערות של אותה עיר בדיוק, לא רק את השם. null/null רק כשהבקשה לא
+  מציינת שום מיקום גיאוגרפי בכלל (אז נופלים חזרה למיקום המכשיר).
 - attractionsWanted: 0-3 (טבע/תצפיות/תרבות/קניות/ספא/וכו').
 - attractionCategoryIds: מערך מתוך הרשימה הזו בדיוק (ריק אם attractionsWanted=0):
   ${ATTRACTION_CATEGORY_IDS}
@@ -325,8 +329,8 @@ export async function POST(request: NextRequest) {
   const userId = user.id;
 
   // חיוב אטומי *לפני* כל עבודה יקרה (Claude + שאילתות DB) - זה מה שסוגר
-  // את חלון המרוץ: שתי בקשות מקבילות עם רק 20 טריפים ביחד ינעלו זו את
-  // זו על אותה שורת יתרה ב-Postgres (ר' consume_tokens), ורק אחת תצליח.
+  // את חלון המרוץ: שתי בקשות מקבילות עם רק TOKEN_COSTS.trippy_ai_generation
+  // טריפים ביחד ינעלו זו את זו על אותה שורת יתרה ב-Postgres (ר' consume_tokens), ורק אחת תצליח.
   // אם הפעולה בפועל תיכשל (Claude נכשל / 0 תוצאות) - מחזירים (refund)
   // למטה, בדיוק לפי הדרישה "לא לחייב אם הפעולה נכשלה".
   const chargeReferenceId = `trippy_ai_generation:${crypto.randomUUID()}`;
@@ -369,18 +373,24 @@ export async function POST(request: NextRequest) {
 
   console.log("[trippy-quick DEBUG] קריטריונים שחולצו", { freeText, criteria, clientLat, clientLng });
 
-  // *** תיקון (בקשת המשתמש - "מסלול בטבע ליד הכנרת - למה לא נמצא"):
-  // כשיש קואורדינטות אזור (regionLat/regionLng, ר' ExtractedCriteria) -
-  // הן גוברות על מיקום המכשיר לגמרי, כי המשתמש ציין מפורשות איפה
-  // הוא רוצה, לא איפה הוא נמצא פיזית. hasExplicitLocation (מועבר
-  // כפרמטר hasExplicitCity לפונקציות המשותפות - אותה משמעות בפועל:
-  // "אל תגביל ל-10 ק"מ הדוקים") נכון גם לעיר וגם לאזור - שניהם מיקום
-  // *מפורש* שהמשתמש ציין, לא סתם "המכשיר איפה שהוא".
+  // *** תיקון קריטי (בקשת המשתמש - "ביקשתי מסעדה באילת - ונתן לי בתל
+  // אביב כי אני מתל אביב!!"): לפני זה, כש-city מולא (עיר של ממש) אבל
+  // regionLat/regionLng לא (המקרה הרגיל, לפני התיקון בפרומפט למעלה) -
+  // location.lat/lng נפלו בחזרה ל-clientLat/clientLng (מיקום המכשיר,
+  // תל אביב) בעוד location.city נשאר "אילת" - ו-queryPlaces
+  // (discoveryService.ts) **תמיד מעדיף geo bounding-box על פני city
+  // טקסטואלי כשיש lat/lng בכלל** (LOCATION FIRST), אז city="אילת"
+  // פשוט התעלם לגמרי, וחיפש רדיוס סביב תל אביב. התיקון: fallback
+  // למכשיר קורה **רק** כשגם city וגם regionLat/regionLng ריקים - אם
+  // המשתמש ציין עיר במפורש (גם בלי regionLat/regionLng, כרשת ביטחון
+  // אם Claude בכל זאת לא מילא קואורדינטות כמבוקש בפרומפט) - lat/lng
+  // נשארים null, כדי ש-queryPlaces ייפול חזרה לחיפוש עיר טקסטואלי
+  // מדויק (.eq("city", ...)) ולא ישתמש במיקום המכשיר בשום מקרה.
   const hasRegion = criteria.regionLat != null && criteria.regionLng != null;
   const hasExplicitCity = criteria.city != null || hasRegion;
   const location = {
-    lat: hasRegion ? criteria.regionLat : clientLat,
-    lng: hasRegion ? criteria.regionLng : clientLng,
+    lat: hasRegion ? criteria.regionLat : hasExplicitCity ? null : clientLat,
+    lng: hasRegion ? criteria.regionLng : hasExplicitCity ? null : clientLng,
     city: criteria.city,
   };
 

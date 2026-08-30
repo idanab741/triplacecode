@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Screen } from "@/components/ui";
+import { TripHeroHeader, LIGHT_AREA_ICON_STYLE } from "@/screens/layout/TripHeroHeader";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { ChatHeader } from "@/screens/trip-builder/chat/ChatHeader";
 import { SortableStopCard } from "@/screens/trip-builder/SortableStopCard";
 import { downloadIcsFile } from "@/utils/downloadIcsFile";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
@@ -26,12 +26,15 @@ interface SearchContext {
  * מסלול ייחודי שלא היה באפליקציה... עד 3 מסעדות ו-3 אטרקציות...
  * גרירה ומחיקה... הוספה ליומן... החיפוש על בסיס ה-API של קלוד").
  * *** תיקון עיצוב (בקשה מפורשת - "האם הסתכלת על האפליקציה שלנו???"):
- * - בר עליון: ChatHeader מקורי (לא בר משלי) - עקביות עם שאר עמודי טריפי.
- * - HERO: 100% רוחב, ישר מתחת לבר (בלי padding/gap) - לא בתוך ה-
+ * - בר עליון: HERO 100% רוחב, ישר מתחת לבר (בלי padding/gap) - לא בתוך ה-
  *   קונטיינר עם ה-padding הרגיל של Screen.
  * - סדר: HERO -> שם המסלול -> מפה -> כרטיסיות (בעיצוב SortableStopCard
  *   האמיתי - גרירה למעלה/למטה + סוויפ שמאלה למחיקה, לא כרטיס מותאם
  *   אישית) -> הוספה ליומן (בפופאפ, לא inline).
+ * *** תיקון (בקשה מפורשת - "להעביר את כפתור שיתוף ושמירה - למעלה כמו
+ * בשאר עמודי הטיול"): הבר העליון הממותג (ChatHeader, "טריפי AI" +
+ * פס התקדמות) הוחלף בבר הרגיל של שאר עמודי התוצאה (לוגו+חזרה+שמירה+
+ * שיתוף) - עקביות מלאה עם day-trip/nightlife/וכו', לא רק HERO.
  * ר' src/app/api/trip-builder/trippy-quick/route.ts להסבר על מקור
  * הנתונים (Claude + אימות Google, בלי DB/session).
  */
@@ -103,6 +106,30 @@ function TrippyQuickResultContent() {
     return d.toISOString().slice(0, 10);
   });
   const [addedToCalendar, setAddedToCalendar] = useState(false);
+  // *** תוספת (בקשה מפורשת - "עמוד הבחירות שלי - שינויים", סעיף "שמור"):
+  // עד עכשיו לתוצאת trippy AI לא היה כפתור "שמור" בכלל - כל תוצאה
+  // פשוט נוצרה כ"זמנית" (ר' migration 0064 - is_saved=false כברירת
+  // מחדל) בלי דרך להפוך אותה לקבועה. saved נטען מחדש מה-DB לפי
+  // persistId (ר' /api/trippy-ai/[id]/save/route.ts) - לא רק state
+  // מקומי - כדי שהמצב יישאר נכון גם בפתיחה חוזרת מ"הבחירות שלי".
+  const [saved, setSaved] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  // *** תוספת (בקשה מפורשת - "בהחלפת אטרקציה - שיהיה יותר מ-2 בבנק"):
+  // לפני זה, handleSwap החריג רק את התחנות המוצגות **כרגע** על המסך
+  // (stops.map(id)) - לא כל מה שכבר הוצע והוחלף-משם בעבר לאותו סלוט.
+  // בבריכת מועמדים קטנה (קטגוריה ספציפית/אזור קטן), זה גרם להחלפה
+  // חוזרת "לסובב" בין אותם 2 מקומות בדיוק במקום להציג אופציה חדשה.
+  // seenIdsRef צובר את **כל** ה-id-ים שהוצגו אי-פעם בעמוד הזה (גם כאלה
+  // שכבר הוחלפו והוסרו) - מתעדכן אוטומטית בכל שינוי של stops (טעינה
+  // ראשונית/swap/הוספת עצירה) דרך ה-useEffect למטה, ונשלח כ-excludeIds
+  // מלא בכל בקשת swap - כך שאף פעם לא חוזרים על מקום שכבר הוצע.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!stops) return;
+    for (const s of stops) seenIdsRef.current.add(s.id);
+  }, [stops]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -205,6 +232,40 @@ function TrippyQuickResultContent() {
     };
   }, [requestId, freeText, savedId]);
 
+  useEffect(() => {
+    if (!persistId) return;
+    let cancelled = false;
+    fetch(`/api/trippy-ai/${persistId}/save`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setSaved(data.saved === true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [persistId]);
+
+  /** הופך את התוצאה ל"שמורה" (קבועה, מופיעה בלשונית "שמורים") או מבטל
+   *  שמירה - אופטימי (מרגיש מיידי), עם rollback אם הבקשה נכשלת. בניגוד
+   *  ל-SaveTripIconButton (טיולים "מלאים") - בכוונה **לא** מנווט אוטומטית
+   *  לעמוד הבית אחרי שמירה, כי כאן עדיין אפשר להמשיך לערוך את המסלול
+   *  (החלף/הוסף עצירה) אחרי השמירה. */
+  async function handleToggleSave() {
+    if (!persistId || saveLoading) return;
+    const nextSaved = !saved;
+    setSaveLoading(true);
+    setSaved(nextSaved);
+    try {
+      const res = await fetch(`/api/trippy-ai/${persistId}/save`, { method: nextSaved ? "POST" : "DELETE" });
+      if (!res.ok) throw new Error();
+    } catch {
+      setSaved(!nextSaved);
+    } finally {
+      setSaveLoading(false);
+    }
+  }
+
   /** שולח את מערך התחנות המעודכן ל-DB (ר' PATCH ב-/api/trippy-ai/[id]) -
    *  "כשל שקט": אם אין persistId (לא נשמר מלכתחילה) או אם הבקשה נכשלת,
    *  לא חוסמים את חוויית העמוד - המשתמש כבר רואה את השינוי ב-state
@@ -262,7 +323,7 @@ function TrippyQuickResultContent() {
           city: searchContext?.city ?? null,
           lat: searchContext?.lat ?? null,
           lng: searchContext?.lng ?? null,
-          excludeIds: stops.map((s) => s.id),
+          excludeIds: Array.from(seenIdsRef.current),
         }),
       });
       const data = await res.json();
@@ -303,7 +364,7 @@ function TrippyQuickResultContent() {
           city: searchContext?.city ?? null,
           lat: searchContext?.lat ?? null,
           lng: searchContext?.lng ?? null,
-          excludeIds: stops.map((s) => s.id),
+          excludeIds: Array.from(seenIdsRef.current),
         }),
       });
       const data = await res.json();
@@ -328,37 +389,77 @@ function TrippyQuickResultContent() {
     setCalendarOpen(false);
   }
 
+  async function handleShareTrip() {
+    if (!shareToken) return;
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 1500);
+
+    const url = `${window.location.origin}/trip-builder/trippy-quick/shared/${shareToken}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: title ?? "המסלול שלי מ-trippy AI", url });
+        return;
+      } catch {
+        // המשתמש ביטל את השיתוף - לא שגיאה אמיתית, פשוט לא ממשיכים לפולבאק
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // אין גישה ללוח - אין מה לעשות יותר, לא קריטי
+    }
+  }
+
   const mapStops = (stops ?? [])
     .filter((s) => s.latitude != null && s.longitude != null)
     .map((s) => ({ stopId: s.id, name: s.name, latitude: s.latitude, longitude: s.longitude }));
 
   return (
-    <Screen withBottomNavSpacing>
-      {/* *** תיקון (בקשה מפורשת - "הHERO צריך להיות על 100 אחוז!!"):
-          אותה שיטה מוכחת ואמינה שכבר בשימוש בכל שאר האפליקציה (למשל
-          ChatHeader.tsx דרך TrippyConversation.tsx) - במקום לנסות
-          לאפס את ה-padding של Screen עצמו עם !important (עלול
-          להתנגש/להיכשל בעדינות), פשוט "יוצאים" מהריווח הקבוע של
-          Screen עם מרווח שלילי מדויק (-mx-5 -mt-8, בדיוק הערך של
-          Screen: px-5 pt-8) - זו הדרך שכבר עובדת בפועל בכל מקום אחר
-          בקוד, לא ניחוש חדש. */}
-      <div className="-mx-5 -mt-8">
-        <ChatHeader current={1} total={1} onBack={() => router.push("/ai")} />
+    <Screen withBottomNavSpacing className="!bg-white !px-0 !pt-0">
+      <TripHeroHeader
+        heroSrc="/images/trippy-hero-calendar.png"
+        onBack={() => router.push("/ai")}
+        rightSlot={
+          <>
+            {persistId && (
+              <button
+                type="button"
+                onClick={handleToggleSave}
+                disabled={saveLoading}
+                aria-label={saved ? "הסרה מהשמורים" : "שמור מסלול"}
+                className="flex h-10 w-10 items-center justify-center rounded-full disabled:opacity-60"
+              >
+                <Image
+                  src={saved ? "/icons/save-active.png" : "/icons/save.png"}
+                  alt=""
+                  width={23}
+                  height={23}
+                  className={LIGHT_AREA_ICON_STYLE}
+                />
+              </button>
+            )}
+            {shareToken && (
+              <button
+                type="button"
+                onClick={handleShareTrip}
+                aria-label="שתפו את המסלול"
+                className="flex h-10 w-10 items-center justify-center rounded-full"
+              >
+                <Image
+                  src={shareCopied ? "/icons/share-active.png" : "/icons/share.png"}
+                  alt=""
+                  width={26}
+                  height={26}
+                  className={LIGHT_AREA_ICON_STYLE}
+                />
+              </button>
+            )}
+          </>
+        }
+      />
 
-        <div className="w-full">
-          <Image
-            src="/images/trippy-hero-calendar.png"
-            alt=""
-            width={0}
-            height={0}
-            sizes="100vw"
-            className="h-auto w-full"
-            priority
-          />
-        </div>
-      </div>
-
-      <div className="mx-auto flex max-w-md flex-col gap-4 pt-4">
+      <div className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-4">
         {title && <h1 className="text-center text-lg font-bold text-ink">{title}</h1>}
 
         {error && (
@@ -428,39 +529,6 @@ function TrippyQuickResultContent() {
             >
               {addedToCalendar ? "✓ נוסף - הוספה שוב?" : "הוספה ליומן"}
             </button>
-
-            {/* *** תוספת (בקשה מפורשת - "אפשרות לשמירה ושיתוף"): קישור
-                ציבורי read-only (ר' migration 0058) - מוצג רק כש-
-                shareToken קיים (כלומר המסלול באמת נשמר; משתמש לא
-                מחובר לא רואה את הכפתור, כי אין מה לשתף). Web Share API
-                כשקיים (בעיקר מובייל) - נופל בחזרה להעתקה ללוח. */}
-            {shareToken && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const url = `${window.location.origin}/trip-builder/trippy-quick/shared/${shareToken}`;
-                  if (navigator.share) {
-                    try {
-                      await navigator.share({ title: title ?? "המסלול שלי מ-trippy AI", url });
-                      return;
-                    } catch {
-                      // המשתמש ביטל את השיתוף - לא שגיאה אמיתית, פשוט לא ממשיכים לפולבאק
-                      return;
-                    }
-                  }
-                  try {
-                    await navigator.clipboard.writeText(url);
-                    setShareCopied(true);
-                    setTimeout(() => setShareCopied(false), 2000);
-                  } catch {
-                    // אין גישה ללוח - אין מה לעשות יותר, לא קריטי
-                  }
-                }}
-                className="w-full rounded-pill border border-accent/40 py-2.5 text-sm font-semibold text-accent"
-              >
-                {shareCopied ? "✓ הקישור הועתק" : "שתפו את המסלול"}
-              </button>
-            )}
           </>
         )}
       </div>

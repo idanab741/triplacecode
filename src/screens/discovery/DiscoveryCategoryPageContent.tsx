@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import dynamic from "next/dynamic";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { TripHeroHeader } from "@/screens/layout/TripHeroHeader";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { DiscoveryPlaceCard } from "@/screens/discovery/DiscoveryPlaceCard";
 import type { DiscoveryPlace } from "@/services/places/discoveryService";
@@ -27,6 +26,9 @@ interface DiscoveryCategoryPageContentProps {
   apiEndpoint: string;
   heroSrc: string;
   from: string;
+  /** ר' TripHeroHeader.tsx - true רק כשה-HERO הספציפי הזה כהה (כרגע
+   *  רק חיי לילה). ברירת המחדל false מתאימה לרוב התמונות (רקעים בהירים). */
+  dark?: boolean;
 }
 
 /**
@@ -41,7 +43,7 @@ interface DiscoveryCategoryPageContentProps {
  * קואורדינטות אמיתיות. אם אין תוצאות/קואורדינטות - לא מוצגת מפה ריקה
  * (הרכיב עצמו כבר מחזיר null).
  */
-export function DiscoveryCategoryPageContent({ apiEndpoint, heroSrc, from }: DiscoveryCategoryPageContentProps) {
+export function DiscoveryCategoryPageContent({ apiEndpoint, heroSrc, from, dark = false }: DiscoveryCategoryPageContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [data, setData] = useState<CategoryApiResponse | null>(null);
@@ -57,14 +59,9 @@ export function DiscoveryCategoryPageContent({ apiEndpoint, heroSrc, from }: Dis
   }, [searchParams, apiEndpoint]);
 
   return (
-    <div className="min-h-screen bg-bg pb-36">
-      {/* 1. TOP BAR - זהה בדיוק לעמוד ה-Discovery הראשי. */}
-      <SimpleAppHeader onBack={() => router.back()} />
-
-      {/* 2. HERO - full-bleed, זהה בדיוק לעמוד הראשי. */}
-      <div className="relative w-full">
-        <Image src={heroSrc} alt="" width={800} height={450} priority className="h-auto w-full" />
-      </div>
+    <div className="min-h-screen bg-white pb-36">
+      {/* 1+2. TOP BAR + HERO - שקוף, חופף את ה-HERO, לוגו ממורכז (TripHeroHeader) - זהה לעמודי ה-discover/result הראשיים. */}
+      <TripHeroHeader heroSrc={heroSrc} onBack={() => router.back()} dark={dark} />
 
       {/* 3. כותרת הקטגוריה. */}
       <div className="flex items-center gap-2 px-6 pt-4">

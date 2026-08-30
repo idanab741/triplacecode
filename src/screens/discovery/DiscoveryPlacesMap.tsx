@@ -35,6 +35,13 @@ interface ValidMapPlace {
 
 interface DiscoveryPlacesMapProps {
   places: MapPlace[];
+  /** תיקון (בקשה מפורשת - "צריך לסדר את המרחק מהמיקום הנוכחי"): כשמוגדר,
+   *  המפה ממורכזת על המיקום האמיתי של המשתמש (GPS) במקום על "האשכול
+   *  הצפוף ביותר" של המקומות - שיכול להיות רחוק מהמשתמש בפועל אם
+   *  המקומות שהתקבלו מפוזרים. אופציונלי (undefined/null) כדי לא לשבור
+   *  שימושים קיימים ברכיב הזה (עמודי result וכו') שאין להם מיקום GPS
+   *  זמין - שם ממשיכים עם חישוב האשכול הישן כברירת מחדל. */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 /**
@@ -107,19 +114,48 @@ function findClusterCenter(places: ValidMapPlace[]): [number, number] {
   return [clusterCenter.latitude, clusterCenter.longitude];
 }
 
-function computeClusterView(places: ValidMapPlace[]): { center: [number, number]; zoom: number } {
+function computeClusterView(
+  places: ValidMapPlace[],
+  userLocation?: { lat: number; lng: number } | null
+): { center: [number, number]; zoom: number } {
+  // *** מיקום המשתמש האמיתי (אם קיים) גובר על חישוב האשכול - זו הנקודה
+  // שהמשתמש בפועל נמצא בה, לא "איפה שרוב המקומות שהתקבלו נמצאים".
+  if (userLocation) return { center: [userLocation.lat, userLocation.lng], zoom: FIXED_ZOOM };
   if (places.length === 0) return { center: [31.5, 34.9], zoom: 8 }; // מרכז ישראל, גיבוי בלבד
   return { center: findClusterCenter(places), zoom: FIXED_ZOOM };
 }
 
-function FitBounds({ places }: { places: ValidMapPlace[] }) {
+function FitBounds({
+  places,
+  userLocation,
+}: {
+  places: ValidMapPlace[];
+  userLocation?: { lat: number; lng: number } | null;
+}) {
   const map = useMap();
   useEffect(() => {
+    if (userLocation) {
+      map.setView([userLocation.lat, userLocation.lng], FIXED_ZOOM, { animate: false });
+      return;
+    }
     if (places.length === 0) return;
     map.setView(findClusterCenter(places), FIXED_ZOOM, { animate: false });
-  }, [places, map]);
+  }, [places, userLocation, map]);
   return null;
 }
+
+/** נקודת "אתם כאן" - עיגול כחול שקוף (בסגנון Google Maps/מפות ניווט
+ *  מוכר), מובחן בבירור מהפינים האדומים-בצורת-טיפה של המקומות. */
+const USER_LOCATION_ICON = L.divIcon({
+  className: "",
+  html: `<div style="
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #4285F4;
+    border: 3px solid white; box-shadow: 0 0 0 2px rgba(66,133,244,0.35), 0 2px 6px rgba(16,24,40,0.35);
+  "></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
 
 const PLACE_ICON = L.divIcon({
   className: "",
@@ -163,13 +199,13 @@ function PlacePreview({ place }: { place: ValidMapPlace }) {
   );
 }
 
-export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
+export function DiscoveryPlacesMap({ places, userLocation }: DiscoveryPlacesMapProps) {
   const validPlaces = places.filter(
     (p): p is ValidMapPlace => p.latitude != null && p.longitude != null
   );
   if (validPlaces.length === 0) return null;
 
-  const initialView = computeClusterView(validPlaces);
+  const initialView = computeClusterView(validPlaces, userLocation);
 
   return (
     <div
@@ -200,7 +236,10 @@ export function DiscoveryPlacesMap({ places }: DiscoveryPlacesMapProps) {
             </Popup>
           </Marker>
         ))}
-        <FitBounds places={validPlaces} />
+        {userLocation && (
+          <Marker position={[userLocation.lat, userLocation.lng]} icon={USER_LOCATION_ICON} />
+        )}
+        <FitBounds places={validPlaces} userLocation={userLocation} />
       </MapContainer>
     </div>
   );

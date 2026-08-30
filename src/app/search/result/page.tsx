@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
 import { AddPlaceToCalendarSheet } from "@/screens/search/AddPlaceToCalendarSheet";
+import { WHITE_ICON_FILTER } from "@/screens/layout/TripHeroHeader";
 
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
   ssr: false,
@@ -131,18 +132,33 @@ function SearchResultContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
-        <div className="relative h-16">
+    <Screen withBottomNavSpacing className="!bg-white !px-0 !pt-0">
+      {/* *** תיקון (בקשה מפורשת - בר שקוף מעל ה-HERO, "עמודי אתרים" -
+          אותו טיפול בדיוק כמו PlaceHeroActions.tsx/destination/[id]):
+          הבר עבר להיות בתוך קונטיינר ה-HERO (relative), position
+          absolute, בלי רקע לבן - לוגו+חזרה+שמירה+שיתוף נשארים באותו
+          מקום בדיוק. */}
+      <div className="relative w-full">
+        <div className="absolute inset-x-0 top-0 z-30 h-16 w-full">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className="object-contain" />
+            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className={`object-contain ${WHITE_ICON_FILTER}`} />
             <button
               type="button"
               onClick={() => router.push("/home")}
-              className="flex h-10 w-10 shrink-0 items-center justify-center text-ink"
+              className="flex h-10 w-10 shrink-0 items-center justify-center"
               aria-label="חזרה לדף הבית"
             >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)]"
+              >
                 <path d="m14 6-6 6 6 6" />
               </svg>
             </button>
@@ -155,24 +171,22 @@ function SearchResultContent() {
                 onClick={handleSavePlace}
                 disabled={savingPlace}
                 aria-label={saved ? "הסרה משמורים" : "שמור מקום"}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-ink disabled:opacity-60"
+                className="flex h-10 w-10 items-center justify-center rounded-full disabled:opacity-60"
               >
-                <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={23} height={23} />
+                <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={23} height={23} className={WHITE_ICON_FILTER} />
               </button>
             )}
             <button
               type="button"
               onClick={handleSharePlace}
               aria-label="שתף מקום"
-              className="flex h-10 w-10 items-center justify-center rounded-full text-ink"
+              className="flex h-10 w-10 items-center justify-center rounded-full"
             >
-              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} />
+              <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={26} height={26} className={WHITE_ICON_FILTER} />
             </button>
           </div>
         </div>
-      </header>
 
-      <div className="relative w-full">
         <Image
           src="/images/hero-search-result.png"
           alt="תוצאת חיפוש"

@@ -4,8 +4,10 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { Screen } from "@/components/ui";
 import { PlaceHeroActions } from "@/screens/place/PlaceHeroActions";
 import { PlaceNavigationCard } from "@/screens/place/PlaceNavigationCard";
+import { PlaceCommunityStatsSection } from "@/screens/place/PlaceCommunityStatsSection";
 import { TripLaceRatingSection } from "@/screens/place/TripLaceRatingSection";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { getPlaceCommunityStats } from "@/services/places/placeCommunityStatsService";
 
 interface PlacePageProps {
   params: Promise<{ id: string }>;
@@ -43,6 +45,12 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
     );
   }
 
+  // *** תוספת (בקשה מפורשת - "נתונים על האטרקציה - כמה אהבו/לא אהבו/
+  // שמרו"): נשלף כאן, בשרת, יחד עם שאר נתוני העמוד - לא useEffect/API
+  // route נפרד בצד הלקוח, כי העמוד הזה כבר Server Component אסינכרוני
+  // ממילא (getPlaceById למעלה). ר' placeCommunityStatsService.ts.
+  const communityStats = await getPlaceCommunityStats(place.id);
+
   // *** תיקון (בקשה מפורשת - "כל האטרקציות/מסעדות/אתרים צריכים
   // להתעדכן על בסיס מסך התגיות... לא שום דבר אחר!!"): הוסר
   // place.subcategory מרשימת הצ'יפים. זה שדה טקסט חופשי נפרד לגמרי,
@@ -72,12 +80,13 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city ?? ""}`)}`;
 
   return (
-    <div className="min-h-screen bg-bg pb-28">
-      <PlaceHeroActions placeId={place.id} placeName={place.name} />
-
-      {/* תמונת HERO בגובה קבוע - עקבי בכל עמוד אטרקציה, בדיוק כמו ה-HERO
-          בעמודי תוצאות המסלולים השונים. */}
+    <div className="min-h-screen bg-white pb-28">
+      {/* *** תיקון (בקשה מפורשת - בר שקוף מעל ה-HERO): PlaceHeroActions
+          עבר להיות **בתוך** קונטיינר ה-HERO (relative) - לא sibling
+          לפניו - כדי שיחפוף את התמונה עצמה (position absolute), בלי
+          רקע לבן נפרד שדוחף אותה למטה. */}
       <div className="relative h-72 w-full bg-bg-secondary">
+        <PlaceHeroActions placeId={place.id} placeName={place.name} />
         {place.image_urls?.[0] && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={place.image_urls[0]} alt={place.name} className="h-full w-full object-cover" />
@@ -110,6 +119,8 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
             ))}
           </div>
         )}
+
+        <PlaceCommunityStatsSection stats={communityStats} />
 
         {/* מפה + מרחק/זמן הגעה + כפתור ניווט (Leaflet משלנו, לא Google) */}
         <PlaceNavigationCard placeId={place.id} latitude={place.latitude} longitude={place.longitude} />

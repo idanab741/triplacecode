@@ -14,6 +14,7 @@ export default function NightlifeCategoryDiscoverPage() {
         apiEndpoint="/api/discovery/nightlife"
         heroSrc="/images/hero-nightlife.png"
         from="nightlife-discover"
+        dark
       />
     </Suspense>
   );

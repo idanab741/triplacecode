@@ -24,6 +24,17 @@ const FOLLOW_UP_WITH_SUGGESTIONS = "מעולה, קיבלתי מושג טוב �
 const FOLLOW_UP_NO_SUGGESTIONS = "מעולה, קיבלתי מושג טוב 🙂 יש לכם יעד ספציפי בראש, או שתרצו שאני אבחר בשבילכם?";
 const SURPRISE_LABEL = "תפתיעו אותי 🎁";
 
+/** אותו אייקון שליחה בדיוק כמו SupportComposer.tsx (הודעות תמיכה/מערכת) -
+ *  עקביות חזותית מלאה בין שני ה"כפתור עיגול לצד תיבת טקסט" באפליקציה. */
+function ContinueIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </svg>
+  );
+}
+
 type Stage = "compose" | "followUp" | "building";
 type Message = { id: string; role: "assistant" | "user" | "runtrippy"; text: string };
 type DestinationChoice = { type: "single"; value: string } | { type: "multi"; values: string[] } | { type: "surprise" };
@@ -186,7 +197,7 @@ export function TrippyConversation() {
       });
       const data = await res.json();
 
-      // *** מערכת "טריפים" (דרישה מפורשת): בניית טיול עולה 20 טריפים -
+      // *** מערכת "טריפים" (דרישה מפורשת): בניית טיול עולה TOKEN_COSTS.trippy_ai_generation טריפים -
       // אם אין מספיק, השרת לא ביצע (ולא חייב) שום דבר. לא מנווטים לעמוד
       // תוצאה של טיול שלא נוצר - מציגים הודעה ברורה בצ'אט וחוזרים למצב
       // כתיבה, כדי שהמשתמש יבין בדיוק למה ולא "יתקע" על מסך טעינה.
@@ -369,23 +380,32 @@ export function TrippyConversation() {
         <div className="fixed inset-x-0 bottom-24 z-40 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3">
           <div className="mx-auto flex max-w-md flex-col gap-2">
             <p className="text-center text-[11px] font-medium text-ink-secondary">בניית טיול — {TRIPPY_AI_COST} טריפים</p>
-            <button
-              type="button"
-              onClick={submitFreeText}
-              disabled={!text.trim()}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-            >
-              המשך
-            </button>
-            <textarea
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
-              rows={1}
-              autoFocus
-              className="w-full rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-            />
+            {/* *** תיקון (בקשה מפורשת - "שורת המלל - שהכפתור המשך יהיה
+                עיגול בצד שמאל כמו בהודעות למערכת"): לפני זה כפתור
+                "המשך" מלא-רוחב **מעל** התיבה - עכשיו אותו דפוס בדיוק
+                כמו SupportComposer.tsx (הודעות תמיכה/מערכת): תיבת
+                טקסט + עיגול גרדיאנט לידה (RTL - התיבה ראשונה ב-DOM =
+                מימין, הכפתור אחריה = משמאל). */}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="אני רוצה חופשת בטן גב ביוון, טיול בניו יורק..."
+                rows={1}
+                autoFocus
+                className="max-h-[120px] min-h-[44px] flex-1 resize-none rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
+              <button
+                type="button"
+                onClick={submitFreeText}
+                disabled={!text.trim()}
+                aria-label="המשך"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md transition active:scale-95 disabled:opacity-40 disabled:active:scale-100"
+                style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              >
+                <ContinueIcon />
+              </button>
+            </div>
           </div>
         </div>
       )}
