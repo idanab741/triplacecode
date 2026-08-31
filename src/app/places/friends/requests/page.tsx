@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
@@ -53,7 +52,8 @@ export default function FriendRequestsPage() {
         <div key={req.id} className="flex items-center gap-3 px-4 py-3">
           <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
             {req.requester.avatar_url ? (
-              <Image src={req.requester.avatar_url} alt="" width={44} height={44} className="h-full w-full object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={req.requester.avatar_url} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="flex h-full w-full items-center justify-center font-bold text-ink-secondary">
                 {req.requester.full_name?.[0] ?? "?"}

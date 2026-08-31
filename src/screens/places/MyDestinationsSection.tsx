@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
@@ -56,7 +55,8 @@ export function MyDestinationsSection() {
             className="relative h-28 w-40 shrink-0 overflow-hidden rounded-card"
           >
             {dest.imageUrls[0] ? (
-              <Image src={dest.imageUrls[0]} alt="" fill className="object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={dest.imageUrls[0]} alt="" className="absolute inset-0 h-full w-full object-cover" />
             ) : (
               <div className="h-full w-full" style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }} />
             )}

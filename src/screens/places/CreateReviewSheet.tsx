@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { BottomSheet, Button } from "@/components/ui";
+import { BottomSheet } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
@@ -72,8 +72,7 @@ export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted }: 
 
   return (
     <BottomSheet onClose={onClose}>
-      <div className="max-h-[85vh] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-6 pt-4">
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-ink-secondary/20" />
+      <div className="max-h-[85vh] overflow-y-auto px-5 pb-2">
         <h2 className="mb-1 text-[17px] font-bold text-ink">כתיבת ביקורת</h2>
         <p className="mb-4 truncate text-[13px] text-ink-secondary">{placeName}</p>
 
@@ -102,7 +101,8 @@ export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted }: 
                 {m.type === "video" ? (
                   <video src={m.previewUrl} className="h-full w-full object-cover" muted />
                 ) : (
-                  <Image src={m.previewUrl} alt="" fill className="object-cover" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
                 )}
               </div>
             ))}
@@ -118,21 +118,23 @@ export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted }: 
             className="flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-40"
             style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
           >
-            📷 {uploading ? "מעלה..." : "הוסף תמונה/וידאו"}
+            <Image src="/images/places-camera-icon.png" alt="" width={16} height={14} className="object-contain" />
+            {uploading ? "מעלה..." : "הוסף תמונה/וידאו"}
           </button>
         </div>
 
         {error && <p className="mt-3 text-[12.5px] text-red-500">{error}</p>}
 
         <div className="mt-5">
-          <Button
-            fullWidth
+          <button
+            type="button"
             disabled={submitting || uploading}
             onClick={handleSubmit}
-            style={{ background: "var(--color-places-purple)", backgroundImage: "none" }}
+            className="w-full rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
+            style={{ background: "var(--color-places-purple)" }}
           >
             {submitting ? "מפרסם..." : "פרסם ביקורת"}
-          </Button>
+          </button>
         </div>
       </div>
     </BottomSheet>

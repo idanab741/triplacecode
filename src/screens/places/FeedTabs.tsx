@@ -5,12 +5,11 @@ import type { FeedTab } from "@/services/social/feedService";
 const TABS: { id: FeedTab; label: string }[] = [
   { id: "for_you", label: "עבורך" },
   { id: "friends", label: "חברים" },
-  { id: "following", label: "עוקב אחריהם" },
 ];
 
 export function FeedTabs({ active, onChange }: { active: FeedTab; onChange: (tab: FeedTab) => void }) {
   return (
-    <div className="flex gap-2 border-b border-ink-secondary/10 px-4 pb-2">
+    <div className="flex justify-center gap-2 border-b border-ink-secondary/10 px-4 pb-2">
       {TABS.map((tab) => (
         <button
           key={tab.id}

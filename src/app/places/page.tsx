@@ -10,17 +10,23 @@ import { PlacesCreateIcon } from "@/screens/places/PlacesCreateIcon";
 import { StoriesRail } from "@/screens/places/StoriesRail";
 import { StoryViewerModal } from "@/screens/places/StoryViewerModal";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
+import { SuggestedTravelersRow } from "@/screens/places/SuggestedTravelersRow";
 import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
+import { CreatePostBar } from "@/screens/places/CreatePostBar";
+import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
+import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
+import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import type { FeedItemDto, FeedTab } from "@/services/social/feedService";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
+import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
 import type { PostVisibility } from "@/services/social/types";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -33,11 +39,12 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function PlacesHomePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [storyRail, setStoryRail] = useState<StoryRailAuthorDto[] | null>(null);
   const [creators, setCreators] = useState<CreatorCardDto[] | null>(null);
+  const [suggestedTravelers, setSuggestedTravelers] = useState<SuggestedTravelerDto[] | null>(null);
   const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[] | null>(null);
   const [feedItems, setFeedItems] = useState<FeedItemDto[] | null>(null);
   const [feedTab, setFeedTab] = useState<FeedTab>("for_you");
@@ -47,6 +54,9 @@ export default function PlacesHomePage() {
 
   const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
   const [createPostOpen, setCreatePostOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
+  const [suggestPlaceOpen, setSuggestPlaceOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
 
   useEffect(() => {
@@ -72,6 +82,9 @@ export default function PlacesHomePage() {
     if (!user) return;
     fetchJson<{ rail: StoryRailAuthorDto[] }>("/api/social/stories").then((r) => setStoryRail(r.rail)).catch(() => setStoryRail([]));
     fetchJson<{ creators: CreatorCardDto[] }>("/api/social/creators").then((r) => setCreators(r.creators)).catch(() => setCreators([]));
+    fetchJson<{ travelers: SuggestedTravelerDto[] }>("/api/social/suggested-travelers")
+      .then((r) => setSuggestedTravelers(r.travelers))
+      .catch(() => setSuggestedTravelers([]));
     fetchJson<{ friends: OnlineFriendDto[] }>("/api/social/presence/online-friends")
       .then((r) => setOnlineFriends(r.friends))
       .catch(() => setOnlineFriends([]));
@@ -104,6 +117,16 @@ export default function PlacesHomePage() {
       await fetchJson("/api/social/follows", { method: "POST", body: JSON.stringify({ userId: creatorId }) });
     }
     setCreators((prev) => prev?.map((c) => (c.id === creatorId ? { ...c, viewerFollowing: !isFollowing } : c)) ?? null);
+  }
+
+  async function handleTravelerFollowToggle(userId: string) {
+    const isFollowing = suggestedTravelers?.find((t) => t.id === userId)?.viewerFollowing;
+    if (isFollowing) {
+      await fetchJson(`/api/social/follows?userId=${userId}`, { method: "DELETE" });
+    } else {
+      await fetchJson("/api/social/follows", { method: "POST", body: JSON.stringify({ userId }) });
+    }
+    setSuggestedTravelers((prev) => prev?.map((t) => (t.id === userId ? { ...t, viewerFollowing: !isFollowing } : t)) ?? null);
   }
 
   async function handleLikeToggle(postId: string): Promise<boolean> {
@@ -140,12 +163,29 @@ export default function PlacesHomePage() {
     await loadFeed(feedTab);
   }
 
+  async function handleEditPost(postId: string, newText: string) {
+    await fetchJson(`/api/social/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ text: newText }) });
+  }
+
+  async function handleDeletePost(postId: string) {
+    await fetchJson(`/api/social/posts/${postId}`, { method: "DELETE" });
+    setFeedItems((prev) => prev?.filter((i) => i.id !== postId) ?? null);
+  }
+
   function handleOpenStory(authorIndex: number) {
     setStoryViewerIndex(authorIndex);
   }
 
   async function handleStoryViewed(storyId: string) {
     fetchJson(`/api/social/stories/${storyId}/view`, { method: "POST" }).catch(() => {});
+    // עדכון מקומי מיידי - כדי שהטבעת הסגולה תיעלם ברגע שנצפו כל
+    // הסטוריז של אותו מחבר, בלי לחכות לרענון מלא של הדף (בקשה מפורשת).
+    setStoryRail((prev) =>
+      prev?.map((entry) => {
+        const stories = entry.stories.map((s) => (s.id === storyId ? { ...s, viewed: true } : s));
+        return { ...entry, stories, hasUnviewed: stories.some((s) => !s.viewed) };
+      }) ?? null
+    );
   }
 
   if (authLoading || !user) {
@@ -162,6 +202,8 @@ export default function PlacesHomePage() {
     <div className="min-h-screen bg-bg-secondary pb-24">
       <PlacesHeader />
 
+      <CreatePostBar avatarUrl={profile?.avatar_url} onClick={() => setCreateMenuOpen(true)} />
+
       <div className="bg-white">
         {storyRail === null ? (
           <div className="flex gap-4 px-4 py-3">
@@ -173,11 +215,25 @@ export default function PlacesHomePage() {
           <StoriesRail
             rail={storyRail}
             viewerId={user.id}
+            viewerAvatarUrl={profile?.avatar_url}
             onOpenStory={handleOpenStory}
             onCreateStory={() => router.push("/places/story/create")}
           />
         )}
       </div>
+
+      {suggestedTravelers === null ? (
+        <div className="border-t border-ink-secondary/10 px-4 py-3">
+          <Skeleton className="mb-3 h-4 w-36" />
+          <div className="flex gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-14 w-14 shrink-0 rounded-full" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <SuggestedTravelersRow travelers={suggestedTravelers} onFollowToggle={handleTravelerFollowToggle} />
+      )}
 
       {creators === null ? (
         <div className="px-4 py-3">
@@ -225,9 +281,7 @@ export default function PlacesHomePage() {
             title={
               feedTab === "friends"
                 ? "אין עדיין תוכן מחברים - עדיין אין לך חברים ב-place's"
-                : feedTab === "following"
-                  ? "עדיין לא עוקב אחרי אף אחד - גלה יוצרים ומטיילים שכדאי לעקוב אחריהם"
-                  : "שתף את הרגע הראשון שלך"
+                : "שתף את הרגע הראשון שלך"
             }
             actionLabel="צור פוסט"
             onAction={() => setCreatePostOpen(true)}
@@ -245,6 +299,8 @@ export default function PlacesHomePage() {
                 onOpenComments={handleOpenComments}
                 onAddToTrip={handleAddToTrip}
                 onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
+                onEditPost={handleEditPost}
+                onDeletePost={handleDeletePost}
               />
             ))}
             {nextCursor && (
@@ -263,7 +319,7 @@ export default function PlacesHomePage() {
 
       <MyDestinationsSection />
 
-      <MainBottomNav active="places" elevatedOverride={{ icon: <PlacesCreateIcon />, onClick: () => setCreatePostOpen(true) }} />
+      <MainBottomNav active="places" elevatedOverride={{ icon: <PlacesCreateIcon />, onClick: () => setCreateMenuOpen(true) }} />
 
       {storyViewerIndex !== null && storyRail && (
         <StoryViewerModal
@@ -275,6 +331,29 @@ export default function PlacesHomePage() {
       )}
 
       {createPostOpen && <CreatePostSheet onClose={() => setCreatePostOpen(false)} onSubmit={handleCreatePost} />}
+
+      {createMenuOpen && (
+        <CreateMenuSheet
+          onClose={() => setCreateMenuOpen(false)}
+          onSelectPost={() => setCreatePostOpen(true)}
+          onSelectReview={() => setReviewPickerOpen(true)}
+          onSelectPlace={() => setSuggestPlaceOpen(true)}
+          onSelectTrip={() => router.push("/tripmatch")}
+        />
+      )}
+
+      {reviewPickerOpen && (
+        <ReviewPlacePickerSheet
+          onClose={() => setReviewPickerOpen(false)}
+          onSelectPlace={(place) => {
+            setReviewPickerOpen(false);
+            setReviewTarget({ placeId: place.id, placeName: place.name });
+          }}
+          onSuggestNewPlace={() => setSuggestPlaceOpen(true)}
+        />
+      )}
+
+      {suggestPlaceOpen && <SuggestPlaceSheet onClose={() => setSuggestPlaceOpen(false)} />}
 
       {reviewTarget && (
         <CreateReviewSheet

@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     tripId: body.tripId,
     visibility: body.visibility as PostVisibility | undefined,
     mediaIds: body.mediaIds,
+    mentionedUserIds: body.mentionedUserIds,
   });
   return NextResponse.json({ id: storyId }, { status: 201 });
 }

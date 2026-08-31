@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
@@ -77,7 +76,8 @@ export default function PlacesNotificationsPage() {
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
                   {item.actor.avatarUrl ? (
-                    <Image src={item.actor.avatarUrl} alt="" width={40} height={40} className="h-full w-full object-cover" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.actor.avatarUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center text-sm font-bold text-ink-secondary">
                       {item.actor.fullName?.[0] ?? "?"}

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
 
@@ -26,7 +25,8 @@ export function OnlineFriendsSection({ friends }: OnlineFriendsSectionProps) {
           >
             <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
               {friend.avatarUrl ? (
-                <Image src={friend.avatarUrl} alt="" width={48} height={48} className="h-full w-full object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={friend.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="text-sm font-bold text-ink-secondary">{friend.fullName?.[0] ?? "?"}</span>
               )}

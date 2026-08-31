@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
@@ -85,7 +84,8 @@ export default function PlacesSearchPage() {
               >
                 <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
                   {person.avatar_url ? (
-                    <Image src={person.avatar_url} alt="" width={44} height={44} className="h-full w-full object-cover" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={person.avatar_url} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center font-bold text-ink-secondary">
                       {person.full_name?.[0] ?? "?"}

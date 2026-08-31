@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { BottomSheet, Button } from "@/components/ui";
+import { BottomSheet } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
@@ -15,14 +15,13 @@ interface CreatePostSheetProps {
 
 const VISIBILITY_OPTIONS: { id: PostVisibility; label: string }[] = [
   { id: "public", label: "ציבורי" },
-  { id: "followers", label: "עוקבים" },
   { id: "friends", label: "חברים" },
   { id: "private", label: "פרטי" },
 ];
 
-const MAX_FILES = 4;
+const MAX_FILES = 10;
 
-/** יצירת Post - טקסט + עד 4 תמונות/סרטונים אמיתיים (Storage upload +
+/** יצירת Post - טקסט + עד 10 תמונות/סרטונים אמיתיים (Storage upload +
  *  media_assets, לא placeholder). מענה ישיר לבקשה #9 - "למה אי אפשר
  *  להוסיף תמונות וסרטונים". */
 export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
@@ -82,9 +81,11 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
 
   return (
     <BottomSheet onClose={onClose}>
-      <div className="max-h-[85vh] overflow-y-auto rounded-t-[28px] bg-white px-5 pb-6 pt-4">
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-ink-secondary/20" />
-        <h2 className="mb-4 text-[17px] font-bold text-ink">יצירת פוסט</h2>
+      <div className="max-h-[85vh] overflow-y-auto px-5 pb-2">
+        <span className="text-[12px] font-bold" style={{ color: "var(--color-places-purple)" }}>
+          פוסט
+        </span>
+        <h2 className="mb-4 mt-0.5 text-[24px] font-extrabold leading-tight text-ink">העלאת פוסט</h2>
 
         <textarea
           value={text}
@@ -101,7 +102,8 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
                 {m.type === "video" ? (
                   <video src={m.previewUrl} className="h-full w-full object-cover" muted />
                 ) : (
-                  <Image src={m.previewUrl} alt="" fill className="object-cover" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
                 )}
                 <button
                   type="button"
@@ -132,7 +134,8 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
             className="flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-40"
             style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
           >
-            📷 {uploading ? "מעלה..." : "הוסף תמונה/וידאו"}
+            <Image src="/images/places-camera-icon.png" alt="" width={16} height={14} className="object-contain" />
+            {uploading ? "מעלה..." : "הוסף תמונה/וידאו"}
           </button>
           <span className="text-[11px] text-ink-secondary">{media.length}/{MAX_FILES}</span>
         </div>
@@ -158,14 +161,15 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
         {error && <p className="mt-3 text-[12.5px] text-red-500">{error}</p>}
 
         <div className="mt-5">
-          <Button
-            fullWidth
+          <button
+            type="button"
             disabled={submitting || uploading}
             onClick={handleSubmit}
-            style={{ background: "var(--color-places-purple)", backgroundImage: "none" }}
+            className="w-full rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
+            style={{ background: "var(--color-places-purple)" }}
           >
             {submitting ? "מפרסם..." : "פרסם"}
-          </Button>
+          </button>
         </div>
       </div>
     </BottomSheet>

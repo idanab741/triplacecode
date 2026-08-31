@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 
@@ -13,6 +13,8 @@ interface PostCardProps {
   onOpenComments: (postId: string) => void;
   onAddToTrip: (postId: string) => void;
   onWriteReview: (placeId: string, placeName: string) => void;
+  onEditPost: (postId: string, newText: string) => Promise<void>;
+  onDeletePost: (postId: string) => Promise<void>;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -27,10 +29,49 @@ const TYPE_LABEL: Record<string, string> = {
 
 /** כרטיס Feed אחיד לכל סוגי ה-Content (סעיף 11). כל הפעולות החברתיות
  *  זמינות בהתאם לסוג (סעיף 12) - "פתח מקום"/"הוסף לטיול" רק כשיש place. */
-export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onAddToTrip, onWriteReview }: PostCardProps) {
+export function PostCard({
+  item,
+  onLikeToggle,
+  onSaveToggle,
+  onOpenComments,
+  onAddToTrip,
+  onWriteReview,
+  onEditPost,
+  onDeletePost,
+}: PostCardProps) {
   const [liked, setLiked] = useState(item.viewerState.liked);
   const [saved, setSaved] = useState(item.viewerState.saved);
   const [likeCount, setLikeCount] = useState(item.stats.likes);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(item.text ?? "");
+  const [displayText, setDisplayText] = useState(item.text);
+  const [deleted, setDeleted] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (deleted) return null;
+
+  async function handleSaveEdit() {
+    setBusy(true);
+    try {
+      await onEditPost(item.id, editText.trim());
+      setDisplayText(editText.trim());
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("למחוק את הפוסט הזה? הפעולה לא הפיכה.")) return;
+    setBusy(true);
+    try {
+      await onDeletePost(item.id);
+      setDeleted(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <article className="mb-2 bg-white px-4 py-4">
@@ -38,7 +79,8 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
         <Link href={`/places/profile/${item.author.username ?? item.author.id}`} className="shrink-0">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
             {item.author.avatarUrl ? (
-              <Image src={item.author.avatarUrl} alt="" width={40} height={40} className="h-full w-full object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.author.avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="text-sm font-bold text-ink-secondary">{item.author.fullName?.[0] ?? "?"}</span>
             )}
@@ -58,12 +100,84 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
             {TYPE_LABEL[item.type] ? ` · ${TYPE_LABEL[item.type]}` : ""}
           </span>
         </div>
-        <button type="button" aria-label="עוד" className="text-ink-secondary">
+        <button
+          type="button"
+          aria-label="עוד"
+          onClick={() => setMenuOpen((o) => !o)}
+          className="relative text-ink-secondary"
+        >
           ⋯
+          {menuOpen && (
+            <>
+              <span className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+              <span className="absolute end-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-card bg-white text-start shadow-soft ring-1 ring-black/5">
+                {item.viewerState.isSelf ? (
+                  <>
+                    <span
+                      role="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setEditing(true);
+                      }}
+                      className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-bg-secondary"
+                    >
+                      ✏️ ערוך
+                    </span>
+                    <span
+                      role="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleDelete();
+                      }}
+                      className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-bg-secondary"
+                    >
+                      🗑️ מחק
+                    </span>
+                  </>
+                ) : (
+                  <span className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-ink-secondary">
+                    אין פעולות זמינות
+                  </span>
+                )}
+              </span>
+            </>
+          )}
         </button>
       </div>
 
-      {item.text && <p className="mb-3 whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{item.text}</p>}
+      {editing ? (
+        <div className="mb-3">
+          <textarea
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            rows={3}
+            className="w-full resize-none rounded-card border border-ink-secondary/15 p-3 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleSaveEdit}
+              className="rounded-pill px-4 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50"
+              style={{ background: "var(--color-places-purple)" }}
+            >
+              שמור
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditText(displayText ?? "");
+                setEditing(false);
+              }}
+              className="rounded-pill bg-bg-secondary px-4 py-1.5 text-[12.5px] font-bold text-ink-secondary"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      ) : (
+        displayText && <p className="mb-3 whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{displayText}</p>
+      )}
 
       {item.media.length > 0 && (
         <div className={`mb-3 grid gap-1 overflow-hidden rounded-card ${item.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -71,18 +185,15 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
             <div key={media.id} className="relative aspect-square bg-bg-secondary">
               {media.type === "video" ? (
                 <>
-                  <Image
-                    src={media.thumbnailUrl ?? media.url}
-                    alt=""
-                    fill
-                    className="object-cover"
-                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={media.thumbnailUrl ?? media.url} alt="" className="h-full w-full object-cover" />
                   <span className="absolute inset-0 flex items-center justify-center">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white">▶</span>
                   </span>
                 </>
               ) : (
-                <Image src={media.url} alt="" fill className="object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={media.url} alt="" className="h-full w-full object-cover" />
               )}
             </div>
           ))}
@@ -130,7 +241,13 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
           className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold"
           style={{ color: liked ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
         >
-          <span>{liked ? "❤️" : "🤍"}</span>
+          <Image
+            src={liked ? "/images/places-like-filled.png" : "/images/places-like-outline.png"}
+            alt=""
+            width={18}
+            height={16}
+            className="object-contain"
+          />
           לייק
         </button>
         <button
@@ -138,7 +255,8 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
           onClick={() => onOpenComments(item.id)}
           className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold text-ink-secondary"
         >
-          💬 תגובה
+          <Image src="/images/places-comment-icon.png" alt="" width={17} height={16} className="object-contain" />
+          תגובה
         </button>
         {item.place && (
           <button
@@ -155,7 +273,22 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onOpenComments, onA
           className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold"
           style={{ color: saved ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
         >
-          {saved ? "🔖" : "🏷️"} שמור
+          <span
+            aria-hidden
+            className="inline-block h-4 w-[13px]"
+            style={{
+              backgroundColor: saved ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)",
+              WebkitMaskImage: "url(/images/places-save-outline.png)",
+              maskImage: "url(/images/places-save-outline.png)",
+              WebkitMaskSize: "contain",
+              maskSize: "contain",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+            }}
+          />
+          שמור
         </button>
       </div>
     </article>

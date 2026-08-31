@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Image from "next/image";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
 
 interface StoryViewerModalProps {
@@ -67,7 +66,8 @@ export function StoryViewerModal({ rail, startAuthorIndex, onClose, onView }: St
         <div className="flex items-center gap-2">
           <span className="h-8 w-8 overflow-hidden rounded-full bg-white/20">
             {author.author.avatarUrl && (
-              <Image src={author.author.avatarUrl} alt="" width={32} height={32} className="h-full w-full object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={author.author.avatarUrl} alt="" className="h-full w-full object-cover" />
             )}
           </span>
           <span className="text-[13px] font-semibold text-white">{author.author.fullName ?? author.author.username}</span>
@@ -79,8 +79,23 @@ export function StoryViewerModal({ rail, startAuthorIndex, onClose, onView }: St
         </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center px-6">
-        {story.text && <p className="text-center text-[20px] font-bold leading-relaxed text-white">{story.text}</p>}
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-0">
+        {story.media[0] &&
+          (story.media[0].type === "video" ? (
+            <video src={story.media[0].url} className="h-full w-full object-contain" autoPlay muted playsInline />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={story.media[0].url} alt="" className="h-full w-full object-contain" />
+          ))}
+
+        {story.text && (
+          <p
+            className="absolute inset-x-6 top-1/2 -translate-y-1/2 text-center text-[20px] font-bold leading-relaxed text-white"
+            style={story.media[0] ? { textShadow: "0 2px 8px rgba(0,0,0,0.6)" } : undefined}
+          >
+            {story.text}
+          </p>
+        )}
 
         <button type="button" aria-label="הקודם" onClick={goPrev} className="absolute inset-y-0 start-0 w-1/3" />
         <button type="button" aria-label="הבא" onClick={goNext} className="absolute inset-y-0 end-0 w-1/3" />

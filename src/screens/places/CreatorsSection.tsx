@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
@@ -35,7 +34,8 @@ function CreatorCard({ creator, onFollowToggle }: { creator: CreatorCardDto; onF
       <Link href={`/places/profile/${creator.username ?? creator.id}`} className="flex flex-col items-center">
         <span className="h-16 w-16 overflow-hidden rounded-full bg-bg-secondary">
           {creator.avatarUrl ? (
-            <Image src={creator.avatarUrl} alt="" width={64} height={64} className="h-full w-full object-cover" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={creator.avatarUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-xl font-bold text-ink-secondary">
               {creator.fullName?.[0] ?? "?"}

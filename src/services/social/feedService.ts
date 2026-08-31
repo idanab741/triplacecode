@@ -12,7 +12,7 @@ export interface FeedItemDto {
   place: { id: string; name: string } | null;
   destination: { id: string; name: string } | null;
   stats: { likes: number; comments: number };
-  viewerState: { liked: boolean; saved: boolean; following: boolean };
+  viewerState: { liked: boolean; saved: boolean; following: boolean; isSelf: boolean };
   nextCursor: string | null;
 }
 
@@ -120,6 +120,7 @@ export async function getFeed(
         liked: viewerLikedSet.has(post.id),
         saved: viewerSavedSet.has(post.id),
         following: followingSet.has(post.author_id) || post.author_id === viewerId,
+        isSelf: post.author_id === viewerId,
       },
       nextCursor: null,
     };

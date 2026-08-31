@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
@@ -69,7 +68,8 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
           <div key={comment.id} className="flex gap-2.5 px-4 py-3">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
               {comment.author.avatar_url ? (
-                <Image src={comment.author.avatar_url} alt="" width={36} height={36} className="h-full w-full object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={comment.author.avatar_url} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-xs font-bold text-ink-secondary">
                   {comment.author.full_name?.[0] ?? "?"}

@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Skeleton, Button } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
@@ -91,14 +90,16 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
       <PlacesHeader onBack={() => router.back()} />
 
       <div className="h-28 w-full bg-bg-secondary">
-        {profile.coverUrl && <Image src={profile.coverUrl} alt="" width={800} height={200} className="h-full w-full object-cover" />}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {profile.coverUrl && <img src={profile.coverUrl} alt="" className="h-full w-full object-cover" />}
       </div>
 
       <div className="px-4">
         <div className="-mt-10 flex items-end justify-between">
           <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
             {profile.avatarUrl ? (
-              <Image src={profile.avatarUrl} alt="" width={80} height={80} className="h-full w-full object-cover" />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-ink-secondary">
                 {profile.fullName?.[0] ?? "?"}
