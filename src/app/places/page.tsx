@@ -1,0 +1,289 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { PlacesCreateIcon } from "@/screens/places/PlacesCreateIcon";
+import { StoriesRail } from "@/screens/places/StoriesRail";
+import { StoryViewerModal } from "@/screens/places/StoryViewerModal";
+import { CreatorsSection } from "@/screens/places/CreatorsSection";
+import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
+import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
+import { FeedTabs } from "@/screens/places/FeedTabs";
+import { PostCard } from "@/screens/places/PostCard";
+import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
+import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
+import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
+import type { FeedItemDto, FeedTab } from "@/services/social/feedService";
+import type { StoryRailAuthorDto } from "@/services/social/storyService";
+import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
+import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
+import type { PostVisibility } from "@/services/social/types";
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? "שגיאה בטעינת הנתונים");
+  }
+  return res.json();
+}
+
+export default function PlacesHomePage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  const [storyRail, setStoryRail] = useState<StoryRailAuthorDto[] | null>(null);
+  const [creators, setCreators] = useState<CreatorCardDto[] | null>(null);
+  const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[] | null>(null);
+  const [feedItems, setFeedItems] = useState<FeedItemDto[] | null>(null);
+  const [feedTab, setFeedTab] = useState<FeedTab>("for_you");
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
+  const [createPostOpen, setCreatePostOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/auth/login");
+  }, [authLoading, user, router]);
+
+  const loadFeed = useCallback(async (tab: FeedTab) => {
+    setFeedItems(null);
+    setFeedError(null);
+    try {
+      const { items, nextCursor } = await fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(
+        `/api/social/feed?tab=${tab}`
+      );
+      setFeedItems(items);
+      setNextCursor(nextCursor);
+    } catch (err) {
+      setFeedError(err instanceof Error ? err.message : "שגיאה בטעינת ה-Feed");
+      setFeedItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchJson<{ rail: StoryRailAuthorDto[] }>("/api/social/stories").then((r) => setStoryRail(r.rail)).catch(() => setStoryRail([]));
+    fetchJson<{ creators: CreatorCardDto[] }>("/api/social/creators").then((r) => setCreators(r.creators)).catch(() => setCreators([]));
+    fetchJson<{ friends: OnlineFriendDto[] }>("/api/social/presence/online-friends")
+      .then((r) => setOnlineFriends(r.friends))
+      .catch(() => setOnlineFriends([]));
+    fetch("/api/social/presence/heartbeat", { method: "POST" }).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadFeed(feedTab);
+  }, [user, feedTab, loadFeed]);
+
+  async function loadMoreFeed() {
+    if (!nextCursor || feedLoadingMore) return;
+    setFeedLoadingMore(true);
+    try {
+      const { items, nextCursor: newCursor } = await fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(
+        `/api/social/feed?tab=${feedTab}&cursor=${encodeURIComponent(nextCursor)}`
+      );
+      setFeedItems((prev) => [...(prev ?? []), ...items]);
+      setNextCursor(newCursor);
+    } finally {
+      setFeedLoadingMore(false);
+    }
+  }
+
+  async function handleFollowToggle(creatorId: string) {
+    const isFollowing = creators?.find((c) => c.id === creatorId)?.viewerFollowing;
+    if (isFollowing) {
+      await fetchJson(`/api/social/follows?userId=${creatorId}`, { method: "DELETE" });
+    } else {
+      await fetchJson("/api/social/follows", { method: "POST", body: JSON.stringify({ userId: creatorId }) });
+    }
+    setCreators((prev) => prev?.map((c) => (c.id === creatorId ? { ...c, viewerFollowing: !isFollowing } : c)) ?? null);
+  }
+
+  async function handleLikeToggle(postId: string): Promise<boolean> {
+    const { liked } = await fetchJson<{ liked: boolean }>(`/api/social/posts/${postId}/like`, { method: "POST" });
+    return liked;
+  }
+
+  async function handleSaveToggle(postId: string): Promise<boolean> {
+    const { saved } = await fetchJson<{ saved: boolean }>(`/api/social/posts/${postId}/save`, { method: "POST" });
+    return saved;
+  }
+
+  function handleOpenComments(postId: string) {
+    router.push(`/places/post/${postId}`);
+  }
+
+  async function handleAddToTrip(postId: string) {
+    // שומר את המקום ל-Favorites הקיים (סעיף 90 - "הוסף לטיול" המלא, עם
+    // בחירת טיול ספציפי, מתחבר כשקיים Social Trip אמיתי - שלב 2/3).
+    const item = feedItems?.find((i) => i.id === postId);
+    if (!item?.place) return;
+    const { createClient } = await import("@/services/supabase/client");
+    const { toggleFavorite } = await import("@/services/favorites/favoritesService");
+    const supabase = createClient();
+    if (!user) return;
+    await toggleFavorite(supabase, user.id, item.place.id, "place", "saved");
+  }
+
+  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[]) {
+    await fetchJson("/api/social/posts", {
+      method: "POST",
+      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds }),
+    });
+    await loadFeed(feedTab);
+  }
+
+  function handleOpenStory(authorIndex: number) {
+    setStoryViewerIndex(authorIndex);
+  }
+
+  async function handleStoryViewed(storyId: string) {
+    fetchJson(`/api/social/stories/${storyId}/view`, { method: "POST" }).catch(() => {});
+  }
+
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-white px-4 pt-6">
+        <Skeleton className="mb-4 h-10 w-full" />
+        <Skeleton className="mb-4 h-20 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-bg-secondary pb-24">
+      <PlacesHeader />
+
+      <div className="bg-white">
+        {storyRail === null ? (
+          <div className="flex gap-4 px-4 py-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-[60px] w-[60px] shrink-0 rounded-full" />
+            ))}
+          </div>
+        ) : (
+          <StoriesRail
+            rail={storyRail}
+            viewerId={user.id}
+            onOpenStory={handleOpenStory}
+            onCreateStory={() => router.push("/places/story/create")}
+          />
+        )}
+      </div>
+
+      {creators === null ? (
+        <div className="px-4 py-3">
+          <Skeleton className="mb-3 h-4 w-40" />
+          <div className="flex gap-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-44 w-[150px] shrink-0" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <CreatorsSection creators={creators} onFollowToggle={handleFollowToggle} />
+      )}
+
+      {onlineFriends === null ? (
+        <div className="px-4 py-3">
+          <Skeleton className="mb-3 h-4 w-32" />
+          <div className="flex gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-12 shrink-0 rounded-full" />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <OnlineFriendsSection friends={onlineFriends} />
+      )}
+
+      <div className="mt-2 bg-white">
+        <FeedTabs active={feedTab} onChange={setFeedTab} />
+
+        {feedItems === null && (
+          <div className="p-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="mb-3 h-48 w-full" />
+            ))}
+          </div>
+        )}
+
+        {feedError && (
+          <PlacesEmptyState title={feedError} actionLabel="נסה שוב" onAction={() => loadFeed(feedTab)} />
+        )}
+
+        {feedItems?.length === 0 && !feedError && (
+          <PlacesEmptyState
+            title={
+              feedTab === "friends"
+                ? "אין עדיין תוכן מחברים - עדיין אין לך חברים ב-place's"
+                : feedTab === "following"
+                  ? "עדיין לא עוקב אחרי אף אחד - גלה יוצרים ומטיילים שכדאי לעקוב אחריהם"
+                  : "שתף את הרגע הראשון שלך"
+            }
+            actionLabel="צור פוסט"
+            onAction={() => setCreatePostOpen(true)}
+          />
+        )}
+
+        {feedItems && feedItems.length > 0 && (
+          <div>
+            {feedItems.map((item) => (
+              <PostCard
+                key={item.id}
+                item={item}
+                onLikeToggle={handleLikeToggle}
+                onSaveToggle={handleSaveToggle}
+                onOpenComments={handleOpenComments}
+                onAddToTrip={handleAddToTrip}
+                onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
+              />
+            ))}
+            {nextCursor && (
+              <button
+                type="button"
+                onClick={loadMoreFeed}
+                disabled={feedLoadingMore}
+                className="w-full py-4 text-[13px] font-semibold text-ink-secondary disabled:opacity-50"
+              >
+                {feedLoadingMore ? "טוען..." : "טען עוד"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <MyDestinationsSection />
+
+      <MainBottomNav active="places" elevatedOverride={{ icon: <PlacesCreateIcon />, onClick: () => setCreatePostOpen(true) }} />
+
+      {storyViewerIndex !== null && storyRail && (
+        <StoryViewerModal
+          rail={storyRail}
+          startAuthorIndex={storyViewerIndex}
+          onClose={() => setStoryViewerIndex(null)}
+          onView={handleStoryViewed}
+        />
+      )}
+
+      {createPostOpen && <CreatePostSheet onClose={() => setCreatePostOpen(false)} onSubmit={handleCreatePost} />}
+
+      {reviewTarget && (
+        <CreateReviewSheet
+          placeId={reviewTarget.placeId}
+          placeName={reviewTarget.placeName}
+          onClose={() => setReviewTarget(null)}
+          onSubmitted={() => loadFeed(feedTab)}
+        />
+      )}
+    </div>
+  );
+}

@@ -17,6 +17,7 @@ import { TrendingSection } from "@/screens/home/TrendingSection";
 import { PersonalizedMatchesSection } from "@/screens/home/PersonalizedMatchesSection";
 import { NearbySection } from "@/screens/home/NearbySection";
 import { CommunitySection } from "@/screens/home/CommunitySection";
+import { PlacesEntryBanner } from "@/screens/home/PlacesEntryBanner";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
 import { PartnersSection } from "@/screens/home/PartnersSection";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
@@ -180,6 +181,7 @@ export default function HomePage() {
                 האחיד בתוך כל div. עכשיו הכל div אחד, gap-6 יחיד -
                 בדיוק אותו רווח בין כל שני בלוקים לאורך כל העמוד. */}
             <div className="flex flex-col gap-6 pb-6 pt-5">
+              <PlacesEntryBanner />
               <DiscoverCard />
               <MyTripsSection />
               <TrendingSection />

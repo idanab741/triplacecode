@@ -10,6 +10,10 @@ export interface BottomNavItem {
   icon: ReactNode;
   href?: string;
   elevated?: boolean;
+  /** רק לפריט elevated: מחליף את AiGlobeIcon בברירת המחדל בתוכן חופשי.
+   *  כשלא מועבר (undefined בכל מקום קיים באפליקציה), ההתנהגות המקורית
+   *  של Trippy AI נשארת בדיוק כפי שהייתה - זה שדה תוסף בלבד. */
+  elevatedIcon?: ReactNode;
 }
 
 interface BottomNavProps {
@@ -25,7 +29,17 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
-            const content = (
+            const content = item.elevatedIcon ? (
+              // *** place's בלבד: כפתור "+" מוחלף כאן, לא AiGlobeIcon.
+              // בלי ה-glow/ring הכחול של Trippy AI - עיצוב נפרד לגמרי,
+              // בלי לגעת ב-branch המקורי למטה (else) שנשאר זהה ב-100%
+              // לכל שאר האפליקציה כשלא מועבר elevatedIcon.
+              <span className="relative -mt-9 flex h-[70px] w-[70px] items-center justify-center">
+                <span className="relative z-10 flex h-[58px] w-[58px] items-center justify-center overflow-hidden rounded-full">
+                  {item.elevatedIcon}
+                </span>
+              </span>
+            ) : (
               <span className="relative -mt-9 flex h-[70px] w-[70px] items-center justify-center">
                   <span className="ai-glow absolute inset-0 rounded-full" style={isActive ? undefined : { opacity: 0 }} />
                 <span

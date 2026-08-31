@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { BottomNav, type BottomNavItem } from "@/components/ui";
 
@@ -28,11 +29,17 @@ function NavIcon({
 }
 
 interface MainBottomNavProps {
-  active: "home" | "favorites" | "ai" | "community" | "profile";
+  active: "home" | "favorites" | "ai" | "community" | "profile" | "places";
+  /** רק לעמודי place's: מחליף את העיגול המסתובב של Trippy AI בכפתור "+"
+   *  ליצירת תוכן (סעיף 6 - בקשה מפורשת: "רק בעמוד של places, חשוב מאוד
+   *  שלא תהרוס אותו"). כשלא מועבר (כל שאר האפליקציה) - האייקון, ה-glow
+   *  וההתנהגות של Trippy AI נשארים בדיוק זהים ל-100% למה שהיו. */
+  elevatedOverride?: { icon: ReactNode; onClick: () => void };
 }
 
-/** בר הניווט התחתון האמיתי של האפליקציה, לשימוש בכל מסכי הטאבים הראשיים. */
-export function MainBottomNav({ active }: MainBottomNavProps) {
+/** בר הניווט התחתון האמיתי של האפליקציה, לשימוש בכל מסכי הטאבים הראשיים
+ *  - כולל place's (עם elevatedOverride) - זהו אותו בר בדיוק, לא עותק. */
+export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) {
   const items: BottomNavItem[] = [
     {
       id: "home",
@@ -60,7 +67,7 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
       ),
       href: "/community",
     },
-    { id: "ai", label: "trippy AI", icon: "AI", href: "/ai", elevated: true },
+    { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
  {
       id: "favorites",
       label: "tripmatch",
@@ -90,5 +97,13 @@ export function MainBottomNav({ active }: MainBottomNavProps) {
     },
   ];
 
-  return <BottomNav items={items} activeId={active} />;
+  return (
+    <BottomNav
+      items={items}
+      activeId={active}
+      onChange={(id) => {
+        if (id === "ai" && elevatedOverride) elevatedOverride.onClick();
+      }}
+    />
+  );
 }

@@ -20,6 +20,13 @@
   --color-category-purple: #9f7bff;
   --color-category-green: #3ec28f;
 
+  /* place's - סגול חד ובוהק, נפרד מ-category-purple הרך (בקשה מפורשת:
+     "אהבתי את הסגול - אבל הוא צריך להיות חזק וחד יותר"). לא מחליף את
+     category-purple הקיים בשום מקום אחר באפליקציה - זה טוקן תוסף. */
+  --color-places-purple: #7c3aed;
+  --color-places-purple-dark: #5b21b6;
+  --color-places-violet: #a855f7;
+
   --radius-card: 20px;
   --radius-pill: 999px;
 
@@ -40,6 +47,9 @@
   --color-category-pink: var(--color-category-pink);
   --color-category-purple: var(--color-category-purple);
   --color-category-green: var(--color-category-green);
+  --color-places-purple: var(--color-places-purple);
+  --color-places-purple-dark: var(--color-places-purple-dark);
+  --color-places-violet: var(--color-places-violet);
 
   --radius-card: var(--radius-card);
   --radius-pill: var(--radius-pill);
