@@ -1,5 +1,6 @@
 ﻿import { ADMIN_DISCOVERY_SECTIONS, type AdminDiscoverySection } from "@/constants/adminDiscoverySections";
 import { QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES } from "@/constants/placeCategories";
+import type { QuickCategoryId } from "@/constants/quickCategories";
 
 export interface ClassifiablePlaceRow {
   id: string;
@@ -35,10 +36,13 @@ export function matchesSection(p: ClassifiablePlaceRow, section: AdminDiscoveryS
  *  quickCategory (המנגנון הזה מכסה רק את 5 סוגי הטיול מבוססי-הסקשנים -
  *  day_trip/nature_trip/restaurants_cafes/romantic_date/nightlife;
  *  מלונות/abroad/weekend עובדים אחרת לגמרי, לא חלק מהבדיקה הזו). */
-const CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES: Record<string, string[]> = {};
+const CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES: Record<string, QuickCategoryId[]> = {};
 for (const [quickCategory, categories] of Object.entries(QUICK_CATEGORY_FALLBACK_MAIN_CATEGORIES)) {
   for (const category of categories ?? []) {
-    CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] = [...(CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] ?? []), quickCategory];
+    CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] = [
+      ...(CATEGORY_TO_ELIGIBLE_QUICK_CATEGORIES[category] ?? []),
+      quickCategory as QuickCategoryId,
+    ];
   }
 }
 
