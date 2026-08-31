@@ -212,7 +212,7 @@ export default function PlaceConsolePage() {
     let afterId: string | null = null;
     try {
       while (true) {
-        const res = await fetch("/api/admin/places/bulk-suggest-tags", {
+        const res: Response = await fetch("/api/admin/places/bulk-suggest-tags", {
           method: "POST",
           headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
           body: JSON.stringify({ mode: "needs_classification", afterId }),
