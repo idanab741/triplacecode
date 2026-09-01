@@ -104,9 +104,13 @@ export function PostCard({
           type="button"
           aria-label="עוד"
           onClick={() => setMenuOpen((o) => !o)}
-          className="relative text-ink-secondary"
+          className="relative flex h-8 w-8 items-center justify-center text-ink-secondary"
         >
-          ⋯
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="2.6" />
+            <circle cx="12" cy="12" r="2.6" />
+            <circle cx="19" cy="12" r="2.6" />
+          </svg>
           {menuOpen && (
             <>
               <span className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
@@ -119,9 +123,10 @@ export function PostCard({
                         setMenuOpen(false);
                         setEditing(true);
                       }}
-                      className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-bg-secondary"
+                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-bg-secondary"
                     >
-                      ✏️ ערוך
+                      <Image src="/images/places-edit-icon.png" alt="" width={14} height={14} className="object-contain" />
+                      ערוך
                     </span>
                     <span
                       role="button"
@@ -129,9 +134,18 @@ export function PostCard({
                         setMenuOpen(false);
                         handleDelete();
                       }}
-                      className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-bg-secondary"
+                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-bg-secondary"
                     >
-                      🗑️ מחק
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      מחק
                     </span>
                   </>
                 ) : (
@@ -273,20 +287,12 @@ export function PostCard({
           className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold"
           style={{ color: saved ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
         >
-          <span
-            aria-hidden
-            className="inline-block h-4 w-[13px]"
-            style={{
-              backgroundColor: saved ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)",
-              WebkitMaskImage: "url(/images/places-save-outline.png)",
-              maskImage: "url(/images/places-save-outline.png)",
-              WebkitMaskSize: "contain",
-              maskSize: "contain",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-              WebkitMaskPosition: "center",
-              maskPosition: "center",
-            }}
+          <Image
+            src={saved ? "/images/places-save-filled.png" : "/images/places-save-outline.png"}
+            alt=""
+            width={15}
+            height={18}
+            className="object-contain"
           />
           שמור
         </button>

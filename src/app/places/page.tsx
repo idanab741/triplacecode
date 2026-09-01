@@ -10,7 +10,7 @@ import { PlacesCreateIcon } from "@/screens/places/PlacesCreateIcon";
 import { StoriesRail } from "@/screens/places/StoriesRail";
 import { StoryViewerModal } from "@/screens/places/StoryViewerModal";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
-import { SuggestedTravelersRow } from "@/screens/places/SuggestedTravelersRow";
+import { SuggestedPeopleCircles } from "@/screens/places/SuggestedPeopleCircles";
 import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
@@ -119,16 +119,6 @@ export default function PlacesHomePage() {
     setCreators((prev) => prev?.map((c) => (c.id === creatorId ? { ...c, viewerFollowing: !isFollowing } : c)) ?? null);
   }
 
-  async function handleTravelerFollowToggle(userId: string) {
-    const isFollowing = suggestedTravelers?.find((t) => t.id === userId)?.viewerFollowing;
-    if (isFollowing) {
-      await fetchJson(`/api/social/follows?userId=${userId}`, { method: "DELETE" });
-    } else {
-      await fetchJson("/api/social/follows", { method: "POST", body: JSON.stringify({ userId }) });
-    }
-    setSuggestedTravelers((prev) => prev?.map((t) => (t.id === userId ? { ...t, viewerFollowing: !isFollowing } : t)) ?? null);
-  }
-
   async function handleLikeToggle(postId: string): Promise<boolean> {
     const { liked } = await fetchJson<{ liked: boolean }>(`/api/social/posts/${postId}/like`, { method: "POST" });
     return liked;
@@ -224,15 +214,15 @@ export default function PlacesHomePage() {
 
       {suggestedTravelers === null ? (
         <div className="border-t border-ink-secondary/10 px-4 py-3">
-          <Skeleton className="mb-3 h-4 w-36" />
+          <Skeleton className="mb-2.5 h-4 w-40" />
           <div className="flex gap-4">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-14 w-14 shrink-0 rounded-full" />
+              <Skeleton key={i} className="h-[62px] w-[62px] shrink-0 rounded-full" />
             ))}
           </div>
         </div>
       ) : (
-        <SuggestedTravelersRow travelers={suggestedTravelers} onFollowToggle={handleTravelerFollowToggle} />
+        <SuggestedPeopleCircles people={suggestedTravelers} />
       )}
 
       {creators === null ? (

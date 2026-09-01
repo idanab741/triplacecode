@@ -251,8 +251,11 @@ export default function PlaceWorkspacePage() {
   }
 
   /** העלאת קובץ תמונה ישירות (לא רק URL - ר' דרישה מפורשת). מעלה
-   *  ל-Storage ומוסיפה את ה-URL שחוזר ל-image_urls המקומי - עדיין
-   *  צריך "שמירה" כדי לפרסם, בדיוק כמו הוספת URL ידני. */
+   *  ל-Storage ומכניסה את ה-URL שחוזר ל-*תחילת* image_urls המקומי -
+   *  כלומר מחליפה את התמונה הראשית/"ראשית" הקיימת (בקשה מפורשת:
+   *  תמונה חדשה שמועלית צריכה להחליף את התמונה שמוצגת באפליקציה),
+   *  במקום רק להתווסף לסוף הרשימה. תמונות קודמות לא נמחקות - הן
+   *  זזות אחורה ברשימה - עדיין צריך "שמירה" כדי לפרסם. */
   async function handleUploadImage(file: File) {
     if (!place) return;
     setUploadingImage(true);
@@ -267,7 +270,7 @@ export default function PlaceWorkspacePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "העלאת התמונה נכשלה");
-      update("image_urls", [...place.image_urls, data.url]);
+      update("image_urls", [data.url, ...place.image_urls]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "העלאת התמונה נכשלה");
     } finally {
@@ -935,7 +938,7 @@ export default function PlaceWorkspacePage() {
                       if (e.key === "Enter") {
                         const val = (e.target as HTMLInputElement).value.trim();
                         if (val) {
-                          update("image_urls", [...place.image_urls, val]);
+                          update("image_urls", [val, ...place.image_urls]);
                           (e.target as HTMLInputElement).value = "";
                         }
                       }
@@ -947,7 +950,7 @@ export default function PlaceWorkspacePage() {
                       const input = document.getElementById("new-image-url") as HTMLInputElement;
                       const val = input?.value.trim();
                       if (val) {
-                        update("image_urls", [...place.image_urls, val]);
+                        update("image_urls", [val, ...place.image_urls]);
                         input.value = "";
                       }
                     }}

@@ -1,0 +1,30 @@
+-- ========================================================================
+-- Migration 0075: הגדרת פרופיל "טריפי" (מסקוט) לצורך "אולי תתעניין
+-- באנשים הבאים" ב-SuggestedPeopleCircles.
+--
+-- getSuggestedTravelers() (src/services/social/suggestedTravelersService.ts)
+-- כבר מחפש שורה ב-profiles עם username = 'trippy' - אם היא לא קיימת,
+-- הסקשן פשוט לא מוצג.
+--
+-- profiles.id הוא FK ל-auth.users(id), אז לא ניתן ליצור את המשתמש
+-- ב-SQL בלבד. יש לבצע פעם אחת, בסדר הזה:
+--
+-- 1. Supabase Dashboard -> Authentication -> Users -> Add user
+--    (למשל עם המייל trippy@triplace.app) - זה יוצר גם שורת profiles
+--    ריקה אוטומטית (טריגר handle_new_user הקיים).
+-- 2. להעלות את תמונת המסקוט הכחולה ל-Storage (bucket "place-images",
+--    בדיוק כמו src/app/api/admin/places/[id]/upload-image/route.ts),
+--    או לשים אותה תחת public/images/trippy-avatar.png ולהשתמש בנתיב
+--    היחסי הזה כ-avatar_url.
+-- 3. להריץ את העדכון הבא ב-SQL Editor, אחרי שממלאים את ה-UUID של
+--    המשתמש שנוצר בשלב 1:
+--
+-- update public.profiles
+-- set
+--   username = 'trippy',
+--   full_name = 'טריפי',
+--   avatar_url = '/images/trippy-avatar.png', -- או ה-public URL מה-Storage
+--   is_creator = true,
+--   profile_visibility = 'public'
+-- where id = '<TRIPPY_AUTH_USER_UUID>';
+-- ========================================================================
