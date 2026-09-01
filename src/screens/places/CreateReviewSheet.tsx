@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { BottomSheet } from "@/components/ui";
+import { BottomSheet, BackButton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
@@ -12,11 +12,13 @@ interface CreateReviewSheetProps {
   placeName: string;
   onClose: () => void;
   onSubmitted: () => void;
+  /** אופציונלי - חוזר לבחירת מקום (ReviewPlacePickerSheet) במקום לסגור לגמרי. */
+  onBack?: () => void;
 }
 
 /** כתיבת ביקורת אמיתית: דירוג 1-5 כוכבים + טקסט + עד 4 תמונות/וידאו -
  *  נשמר ב-place_reviews הקיים ומופיע ב-Feed (סעיף 37-39, בקשה #9). */
-export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted }: CreateReviewSheetProps) {
+export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted, onBack }: CreateReviewSheetProps) {
   const { user } = useAuth();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -73,6 +75,11 @@ export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted }: 
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[85vh] overflow-y-auto px-5 pb-2">
+        {onBack && (
+          <div className="mb-1 flex justify-end">
+            <BackButton onBack={onBack} />
+          </div>
+        )}
         <h2 className="mb-1 text-[17px] font-bold text-ink">כתיבת ביקורת</h2>
         <p className="mb-4 truncate text-[13px] text-ink-secondary">{placeName}</p>
 

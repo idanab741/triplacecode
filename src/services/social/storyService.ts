@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/services/supabase/admin";
 import type { PostVisibility } from "./types";
 
 export interface CreateStoryInput {
@@ -65,10 +66,19 @@ export async function getStoryRail(supabase: SupabaseClient, viewerId: string): 
   const authorIds = [...new Set(stories.map((s) => s.author_id))];
   const storyIds = stories.map((s) => s.id);
 
+  // *** תיקון "מסך שחור" בצפייה בסטורי של משתמשים אחרים: media_assets
+  // ב-RLS מגביל SELECT לבעלים בלבד (ר' הערה במיגרציה 0067 - החשיפה
+  // הציבורית שלה אמורה לקרות בשכבת ה-API/service, לא ב-RLS ישיר).
+  // כשה-join הזה רץ עם ה-supabase client הרגיל (כפוף לסשן/RLS), שורות
+  // media_assets של סטורי שאינו שלנו נחסמות ומוחזרות כ-null - הסטורי
+  // מגיע בלי מדיה בכלל. פותרים עם admin client רק כאן: זה בטוח כי
+  // storyIds כבר עברו RLS filtering מלא (visibility/חסימות/תוקף) בשאילתת
+  // stories למעלה - אנחנו רק "משלימים" מדיה לסטוריז שכבר אושרו כנראים.
+  const adminSupabase = createAdminClient();
   const [authorsRes, viewsRes, mediaRes] = await Promise.all([
     supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", authorIds),
     supabase.from("story_views").select("story_id").in("story_id", storyIds).eq("viewer_id", viewerId),
-    supabase
+    adminSupabase
       .from("story_media")
       .select("story_id, sort_order, media:media_assets(id, type, url)")
       .in("story_id", storyIds)
@@ -129,9 +139,15 @@ export async function getStoryRail(supabase: SupabaseClient, viewerId: string): 
 }
 
 export async function markStoryViewed(supabase: SupabaseClient, storyId: string, viewerId: string) {
+  // *** תיקון 500 חוזר: ל-story_views יש RLS policies רק ל-SELECT/INSERT
+  // (ר' מיגרציה 0069) - אין policy ל-UPDATE. upsert רגיל מייצר
+  // ON CONFLICT DO UPDATE, וכשמישהו צופה שוב באותו סטורי (conflict על
+  // ה-PK story_id+viewer_id) ה-UPDATE נחסם ע"י RLS ומחזיר שגיאת הרשאות
+  // (500). עם ignoreDuplicates:true זו הופכת ל-DO NOTHING - אין נתיב
+  // UPDATE בכלל, אז אין מה שיחסם. viewed_at לא חייב להתעדכן בצפייה חוזרת.
   const { error } = await supabase
     .from("story_views")
-    .upsert({ story_id: storyId, viewer_id: viewerId }, { onConflict: "story_id,viewer_id" });
+    .upsert({ story_id: storyId, viewer_id: viewerId }, { onConflict: "story_id,viewer_id", ignoreDuplicates: true });
   if (error) throw error;
 }
 

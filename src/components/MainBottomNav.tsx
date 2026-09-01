@@ -55,17 +55,17 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
       href: "/home",
     },
     {
-      id: "community",
-      label: "קהילה",
+      id: "places",
+      label: "places",
       icon: (
         <NavIcon
-          active={active === "community"}
+          active={active === "places"}
           activeSrc="/images/icon-globe-active.png"
           inactiveSrc="/images/icon-globe-inactive.png"
-          alt="קהילה"
+          alt="places"
         />
       ),
-      href: "/community",
+      href: "/places",
     },
     { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
  {
@@ -93,7 +93,7 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
           alt="פרופיל"
         />
       ),
-      href: "/profile",
+      href: "/places/profile/me",
     },
   ];
 

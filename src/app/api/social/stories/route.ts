@@ -11,6 +11,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
 
   const rail = await getStoryRail(supabase, user.id);
+  // *** DEBUG זמני - למחוק אחרי שמסיימים לאבחן את באג המסך השחור בסטורי.
+  console.log("[DEBUG stories] rail:", JSON.stringify(rail, null, 2));
   return NextResponse.json({ rail });
 }
 

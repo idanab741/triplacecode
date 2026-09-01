@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { BottomSheet, Input, ImageOptionRow } from "@/components/ui";
+import { BottomSheet, Input, ImageOptionRow, BackButton } from "@/components/ui";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
@@ -44,10 +44,12 @@ interface DuplicateMatch {
 
 interface SuggestPlaceSheetProps {
   onClose: () => void;
+  /** אופציונלי - חוזר לתפריט "מה תרצה ליצור?" במקום לסגור לגמרי. */
+  onBack?: () => void;
 }
 
 /** "מקום חדש" - Bottom Sheet (לא עמוד נפרד, בקשה מפורשת). */
-export function SuggestPlaceSheet({ onClose }: SuggestPlaceSheetProps) {
+export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
   const { user } = useAuth();
   const router = useRouter();
 
@@ -212,6 +214,11 @@ export function SuggestPlaceSheet({ onClose }: SuggestPlaceSheetProps) {
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[85vh] overflow-y-auto px-5 pb-2">
+        {onBack && (
+          <div className="mb-1 flex justify-end">
+            <BackButton onBack={onBack} />
+          </div>
+        )}
         <span className="text-[12px] font-bold" style={{ color: "var(--color-places-purple)" }}>
           מקום חדש
         </span>

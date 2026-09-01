@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { AvatarUploader } from "@/components/AvatarUploader";
+import { uploadSocialMedia } from "@/services/social/mediaUploadService";
+import { createClient } from "@/services/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function PlacesSettingsPage() {
@@ -13,6 +16,10 @@ export default function PlacesSettingsPage() {
   const [website, setWebsite] = useState("");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [username, setUsername] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -25,9 +32,26 @@ export default function PlacesSettingsPage() {
         setWebsite(data.profile?.website ?? "");
         setVisibility(data.profile?.profile_visibility ?? "public");
         setUsername(data.profile?.username ?? null);
+        setAvatarUrl(data.profile?.avatar_url ?? null);
+        setCoverUrl(data.profile?.cover_url ?? null);
         setLoaded(true);
       });
   }, [user]);
+
+  async function handleCoverFileChange(file: File | undefined) {
+    if (!file || !user) return;
+    setUploadingCover(true);
+    setCoverError(null);
+    try {
+      const supabase = createClient();
+      const uploaded = await uploadSocialMedia(supabase, user.id, file);
+      setCoverUrl(uploaded.url);
+    } catch {
+      setCoverError("העלאת תמונת הקאבר נכשלה, נסו שוב");
+    } finally {
+      setUploadingCover(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -35,7 +59,7 @@ export default function PlacesSettingsPage() {
       await fetch("/api/social/profile/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio, website, profileVisibility: visibility }),
+        body: JSON.stringify({ bio, website, profileVisibility: visibility, coverUrl }),
       });
       if (username) router.replace(`/places/profile/${username}`);
     } finally {
@@ -48,6 +72,31 @@ export default function PlacesSettingsPage() {
   return (
     <div className="min-h-screen bg-white pb-10">
       <PlacesHeader onBack={() => router.back()} />
+
+      <div className="relative h-28 w-full bg-bg-secondary">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
+        <label className="absolute bottom-2 end-2 flex cursor-pointer items-center gap-1.5 rounded-pill bg-black/50 px-3 py-1.5 text-[11.5px] font-semibold text-white">
+          {uploadingCover ? "מעלה..." : "החלף קאבר"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploadingCover}
+            onChange={(e) => handleCoverFileChange(e.target.files?.[0])}
+          />
+        </label>
+      </div>
+      {coverError && <p className="px-4 pt-1 text-[12px] text-red-500">{coverError}</p>}
+
+      <div className="-mt-10 flex justify-center">
+        {user && (
+          <div className="h-[88px] w-[88px] overflow-hidden rounded-full border-4 border-white shadow-soft">
+            <AvatarUploader userId={user.id} initialUrl={avatarUrl} onUploaded={setAvatarUrl} fluid bordered={false} />
+          </div>
+        )}
+      </div>
+
       <div className="px-4">
         <div className="mt-4 flex flex-col gap-4">
         <div>

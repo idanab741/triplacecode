@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
-import { PlacesCreateIcon } from "@/screens/places/PlacesCreateIcon";
 import { StoriesRail } from "@/screens/places/StoriesRail";
 import { StoryViewerModal } from "@/screens/places/StoryViewerModal";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
@@ -177,7 +176,7 @@ export default function PlacesHomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-secondary pb-24">
+    <div className="min-h-screen bg-places-bg pb-24">
       <PlacesHeader />
 
       <CreatePostBar avatarUrl={profile?.avatar_url} onClick={() => setCreateMenuOpen(true)} />
@@ -285,7 +284,7 @@ export default function PlacesHomePage() {
 
       <MyDestinationsSection />
 
-      <MainBottomNav active="places" elevatedOverride={{ icon: <PlacesCreateIcon />, onClick: () => setCreateMenuOpen(true) }} />
+      <MainBottomNav active="places" />
 
       {storyViewerIndex !== null && storyRail && (
         <StoryViewerModal
@@ -296,7 +295,16 @@ export default function PlacesHomePage() {
         />
       )}
 
-      {createPostOpen && <CreatePostSheet onClose={() => setCreatePostOpen(false)} onSubmit={handleCreatePost} />}
+      {createPostOpen && (
+        <CreatePostSheet
+          onClose={() => setCreatePostOpen(false)}
+          onSubmit={handleCreatePost}
+          onBack={() => {
+            setCreatePostOpen(false);
+            setCreateMenuOpen(true);
+          }}
+        />
+      )}
 
       {createMenuOpen && (
         <CreateMenuSheet
@@ -316,10 +324,25 @@ export default function PlacesHomePage() {
             setReviewTarget({ placeId: place.id, placeName: place.name });
           }}
           onSuggestNewPlace={() => setSuggestPlaceOpen(true)}
+          onBack={() => {
+            setReviewPickerOpen(false);
+            setCreateMenuOpen(true);
+          }}
         />
       )}
 
-      {suggestPlaceOpen && <SuggestPlaceSheet onClose={() => setSuggestPlaceOpen(false)} />}
+      {suggestPlaceOpen && (
+        <SuggestPlaceSheet
+          onClose={() => setSuggestPlaceOpen(false)}
+          onBack={() => {
+            setSuggestPlaceOpen(false);
+            // מגיעים לכאן גם מ-CreateMenuSheet וגם מ"לא מצאתי" בתוך
+            // ReviewPlacePickerSheet - ברירת המחדל היא לחזור לתפריט
+            // הראשי, שזה נכון ברוב המקרים.
+            setCreateMenuOpen(true);
+          }}
+        />
+      )}
 
       {reviewTarget && (
         <CreateReviewSheet
@@ -327,6 +350,10 @@ export default function PlacesHomePage() {
           placeName={reviewTarget.placeName}
           onClose={() => setReviewTarget(null)}
           onSubmitted={() => loadFeed(feedTab)}
+          onBack={() => {
+            setReviewTarget(null);
+            setReviewPickerOpen(true);
+          }}
         />
       )}
     </div>

@@ -93,3 +93,23 @@ export async function updateSocialProfile(
   const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
   if (error) throw error;
 }
+
+/** יוצר username ברירת מחדל אוטומטית בפעם הראשונה שמשתמש נכנס לעולם
+ *  ה-places בלי אחד קיים - במקום לחסום אותו במסך "בחר שם משתמש" (בקשה
+ *  מפורשת: "אפשר להוסיף את השאלה הזאת בבניית הפרופיל בהרשמה, לא כמסך
+ *  שקופץ סתם"). כרגע פותרים בכיוון הפשוט יותר - לא שואלים בכלל, יוצרים
+ *  לבד; אפשר לשנות מאוחר יותר ב-/places/settings. user_XXXXXX + ניסיון
+ *  חוזר במקרה התנגשות נדיר (23505). */
+export async function ensureUsername(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data: existing } = await supabase.from("profiles").select("username").eq("id", userId).single();
+  if (existing?.username) return existing.username;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = `user_${Math.random().toString(36).slice(2, 8)}`;
+    const { error } = await supabase.from("profiles").update({ username: candidate }).eq("id", userId);
+    if (!error) return candidate;
+    if (error.code !== "23505") throw error;
+    // התנגשות נדירה על אותו candidate - מנסים שוב עם מחרוזת אחרת.
+  }
+  throw new Error("לא הצלחנו ליצור שם משתמש, נסו שוב");
+}

@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { BottomSheet } from "@/components/ui";
+import { BottomSheet, BackButton } from "@/components/ui";
 import { searchPlaces, type PlaceSearchResult } from "@/services/places/searchService";
 
 interface ReviewPlacePickerSheetProps {
   onClose: () => void;
   onSelectPlace: (place: PlaceSearchResult) => void;
   onSuggestNewPlace: () => void;
+  /** אופציונלי - חוזר לתפריט "מה תרצה ליצור?" במקום לסגור לגמרי. */
+  onBack?: () => void;
 }
 
 /** שלב ראשון של "ביקורת": בחירת מקום קיים מהמאגר. אם לא נמצא - פותח
  *  את SuggestPlaceSheet (Bottom Sheet, לא ניווט לעמוד - בקשה מפורשת). */
-export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPlace }: ReviewPlacePickerSheetProps) {
+export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPlace, onBack }: ReviewPlacePickerSheetProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -39,6 +41,11 @@ export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPla
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[80vh] overflow-y-auto px-5 pb-2">
+        {onBack && (
+          <div className="mb-1 flex justify-end">
+            <BackButton onBack={onBack} />
+          </div>
+        )}
         <h2 className="mb-4 text-[17px] font-bold text-ink">על איזה מקום תרצה לכתוב ביקורת?</h2>
 
         <input

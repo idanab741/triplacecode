@@ -18,13 +18,12 @@ interface PlacesHeaderProps {
  *  (העמודה הנגדית). כפתור חיפוש חדש יושב לצד הצ'אט, שניהם בלי מסגרת/
  *  רקע עגול - רק האייקון, באותו עובי קו כמו הפעמון.
  *
- *  תיקון (בקשה מפורשת - "שאייקון הצ'אט יהיה ישירות מעל העיגול של
- *  הפרופיל"): קבוצת האייקונים הוזזה מ-right-5 ל-right-4 כדי שהצ'אט
- *  (הראשון בקבוצה, הכי קרוב לקצה) יתיישר במדויק עם מרכז עיגול הפרופיל
- *  ב-CreatePostBar (px-4 + חצי מ-h-9 w-9 = 34px מהקצה, אותו חישוב בדיוק
- *  אחרי השינוי). בנוסף, זכוכית המגדלת (חיפוש) הוזזה עוד קצת ימינה
- *  (relative left-1) לבקשה מפורשת נוספת - צמודה יותר לצ'אט. הצ'אט
- *  עצמו לא זז מ-right-4 (נשאר בדיוק מעל עיגול הפרופיל). */
+ *  תיקון (בקשה מפורשת - "שהצ'אט יהיה בדיוק מעל עיגול הפרופיל למטה"):
+ *  אחרי שכפתורי הצ'אט/חיפוש הפכו לעיגולים h-10 w-10 (כמו הפעמון), חצי
+ *  הרוחב שלהם הוא 20px - אז קבוצת האייקונים זזה מ-right-4 ל-right-3.5
+ *  (14px), כדי שמרכז כפתור הצ'אט (הראשון בקבוצה, מיושר עם הקצה) ייצא
+ *  בדיוק 14+20=34px מהקצה - זהה למרכז עיגול הפרופיל ב-CreatePostBar
+ *  (px-4 + חצי מ-h-9 w-9 = 16+18=34px). */
 export function PlacesHeader({ onBack }: PlacesHeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full bg-white">
@@ -43,12 +42,20 @@ export function PlacesHeader({ onBack }: PlacesHeaderProps) {
           </div>
         )}
 
-        <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-0">
-          <Link href="/places/chat" aria-label="צ'אט" className="flex h-10 w-9 items-center justify-center">
-            <Image src="/images/places-chat-icon.png" alt="" width={24} height={22} className="object-contain" />
+        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 items-center gap-2">
+          <Link
+            href="/places/chat"
+            aria-label="צ'אט"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+          >
+            <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
           </Link>
-          <Link href="/places/search" aria-label="חיפוש" className="relative left-1 flex h-10 w-9 items-center justify-center">
-            <Image src="/images/places-search-icon.png" alt="" width={23} height={22} className="object-contain" />
+          <Link
+            href="/places/search"
+            aria-label="חיפוש"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+          >
+            <Image src="/images/places-search-icon.png" alt="" width={21} height={20} className="object-contain" />
           </Link>
         </div>
       </div>

@@ -232,7 +232,7 @@ export default function CreateStoryPage() {
         )}
       </div>
 
-      {error && <p className="absolute bottom-24 inset-x-6 z-20 text-center text-[12.5px] text-white">{error}</p>}
+      {error && <p className="relative z-20 px-6 pb-2 text-center text-[12.5px] text-white">{error}</p>}
 
       {!hasMedia && (
         <div className="relative z-20 flex items-center justify-center gap-4 pb-4">
@@ -257,21 +257,24 @@ export default function CreateStoryPage() {
       )}
 
       {!hasMedia && (
-        <div className="relative z-20 flex justify-center gap-3 pb-6">
-          {BACKGROUNDS.map((bg, i) => (
-            <button
-              key={bg}
-              type="button"
-              onClick={() => setBgIndex(i)}
-              aria-label={`רקע ${i + 1}`}
-              className="h-9 w-9 rounded-full border-2"
-              style={{ background: bg, borderColor: i === bgIndex ? "white" : "transparent" }}
-            />
-          ))}
+        <div className="relative z-20 flex flex-col items-center gap-2 pb-6">
+          <span className="text-[11.5px] font-semibold text-white/80">רקע</span>
+          <div className="flex justify-center gap-3">
+            {BACKGROUNDS.map((bg, i) => (
+              <button
+                key={bg}
+                type="button"
+                onClick={() => setBgIndex(i)}
+                aria-label={`רקע ${i + 1}`}
+                className="h-9 w-9 rounded-full border-2"
+                style={{ background: bg, borderColor: i === bgIndex ? "white" : "transparent" }}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-6 z-30 flex justify-center">
+      <div className="relative z-30 flex justify-center pb-6">
         <button
           type="button"
           onClick={handlePublish}

@@ -3,6 +3,16 @@
 import { useEffect, useState, useCallback } from "react";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
 
+/** "לפני X דקות/שעות" - יחסי, בעברית, בהתאם לגודל הפרש הזמן. */
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "עכשיו";
+  if (minutes < 60) return `לפני ${minutes} דק'`;
+  const hours = Math.floor(minutes / 60);
+  return `לפני ${hours} ש'`;
+}
+
 interface StoryViewerModalProps {
   rail: StoryRailAuthorDto[];
   startAuthorIndex: number;
@@ -71,6 +81,7 @@ export function StoryViewerModal({ rail, startAuthorIndex, onClose, onView }: St
             )}
           </span>
           <span className="text-[13px] font-semibold text-white">{author.author.fullName ?? author.author.username}</span>
+          <span className="text-[12px] text-white/70">{timeAgo(story.createdAt)}</span>
         </div>
         <button type="button" onClick={onClose} aria-label="סגור" className="p-2 text-white">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { BottomSheet } from "@/components/ui";
+import { BottomSheet, BackButton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
@@ -11,6 +11,10 @@ import type { PostVisibility } from "@/services/social/types";
 interface CreatePostSheetProps {
   onClose: () => void;
   onSubmit: (text: string, visibility: PostVisibility, mediaIds: string[]) => Promise<void>;
+  /** אופציונלי - כשמועבר, מציג כפתור חזרה שסוגר את הגיליון הזה וחוזר
+   *  לתפריט "מה תרצה ליצור?" (CreateMenuSheet) במקום לסגור לגמרי את כל
+   *  תהליך היצירה (בקשה מפורשת - "אין מקום לכפתור חזור"). */
+  onBack?: () => void;
 }
 
 const VISIBILITY_OPTIONS: { id: PostVisibility; label: string }[] = [
@@ -24,7 +28,7 @@ const MAX_FILES = 10;
 /** יצירת Post - טקסט + עד 10 תמונות/סרטונים אמיתיים (Storage upload +
  *  media_assets, לא placeholder). מענה ישיר לבקשה #9 - "למה אי אפשר
  *  להוסיף תמונות וסרטונים". */
-export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
+export function CreatePostSheet({ onClose, onSubmit, onBack }: CreatePostSheetProps) {
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [visibility, setVisibility] = useState<PostVisibility>("public");
@@ -82,6 +86,11 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[85vh] overflow-y-auto px-5 pb-2">
+        {onBack && (
+          <div className="mb-1 flex justify-end">
+            <BackButton onBack={onBack} />
+          </div>
+        )}
         <span className="text-[12px] font-bold" style={{ color: "var(--color-places-purple)" }}>
           פוסט
         </span>

@@ -72,7 +72,7 @@ export function PostCard({
   }
 
   return (
-    <article className="mb-2 bg-white px-4 py-4">
+    <article className="mx-3 mb-3 rounded-card bg-white px-4 py-4" style={{ boxShadow: "var(--shadow-places-soft)" }}>
       <div className="mb-3 flex items-center gap-2.5">
         <Link href={`/places/profile/${item.author.username ?? item.author.id}`} className="shrink-0">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">

@@ -23,7 +23,8 @@ export async function getFeed(
   viewerId: string,
   tab: FeedTab,
   limit = 15,
-  cursor?: string
+  cursor?: string,
+  authorId?: string
 ): Promise<{ items: FeedItemDto[]; nextCursor: string | null }> {
   let authorFilterIds: string[] | null = null;
 
@@ -50,6 +51,11 @@ export async function getFeed(
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  // *** נוסף (עמוד פרופיל - טאב "פוסטים"): מסנן לפוסטים של מחבר בודד
+  // בלבד, בנפרד לגמרי מ-authorFilterIds (חברים/עוקב) - כאן רוצים את כל
+  // הפוסטים של אותו משתמש שה-RLS מרשה לצופה לראות, לא רק אם הוא בין
+  // החברים/הנעקבים של הצופה עצמו.
+  if (authorId) query = query.eq("author_id", authorId);
   if (authorFilterIds) query = query.in("author_id", authorFilterIds);
   if (cursor) query = query.lt("created_at", cursor);
 
