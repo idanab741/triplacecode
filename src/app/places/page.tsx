@@ -212,18 +212,7 @@ export default function PlacesHomePage() {
         )}
       </div>
 
-      {suggestedTravelers === null ? (
-        <div className="border-t border-ink-secondary/10 px-4 py-3">
-          <Skeleton className="mb-2.5 h-4 w-40" />
-          <div className="flex gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-[62px] w-[62px] shrink-0 rounded-full" />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <SuggestedPeopleCircles people={suggestedTravelers} />
-      )}
+      {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}
 
       {creators === null ? (
         <div className="px-4 py-3">
