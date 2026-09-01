@@ -9,7 +9,7 @@ export interface FeedItemDto {
   text: string | null;
   author: { id: string; username: string | null; fullName: string | null; avatarUrl: string | null; isCreator: boolean };
   media: { id: string; type: string; url: string; thumbnailUrl: string | null }[];
-  place: { id: string; name: string } | null;
+  place: { id: string; name: string; imageUrl: string | null } | null;
   destination: { id: string; name: string } | null;
   stats: { likes: number; comments: number };
   viewerState: { liked: boolean; saved: boolean; following: boolean; isSelf: boolean };
@@ -65,7 +65,7 @@ export async function getFeed(
   const [authorsRes, placesRes, destinationsRes, mediaRes, likesRes, commentsRes, viewerLikesRes, viewerSavesRes, followingRes] =
     await Promise.all([
       supabase.from("profiles").select("id, username, full_name, avatar_url, is_creator").in("id", authorIds),
-      placeIds.length ? supabase.from("places").select("id, name").in("id", placeIds) : Promise.resolve({ data: [] }),
+      placeIds.length ? supabase.from("places").select("id, name, image_urls").in("id", placeIds) : Promise.resolve({ data: [] }),
       destinationIds.length
         ? supabase.from("destinations").select("id, name").in("id", destinationIds)
         : Promise.resolve({ data: [] }),
@@ -82,7 +82,12 @@ export async function getFeed(
     ]);
 
   const authorsById = new Map((authorsRes.data ?? []).map((a) => [a.id, a]));
-  const placesById = new Map((placesRes.data ?? []).map((p) => [p.id, p]));
+  const placesById = new Map(
+    (placesRes.data ?? []).map((p: { id: string; name: string; image_urls?: string[] | null }) => [
+      p.id,
+      { id: p.id, name: p.name, imageUrl: p.image_urls?.[0] ?? null },
+    ])
+  );
   const destinationsById = new Map((destinationsRes.data ?? []).map((d) => [d.id, d]));
   const mediaByPost = new Map<string, { id: string; type: string; url: string; thumbnailUrl: string | null }[]>();
   for (const row of mediaRes.data ?? []) {

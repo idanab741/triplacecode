@@ -133,18 +133,6 @@ export default function PlacesHomePage() {
     router.push(`/places/post/${postId}`);
   }
 
-  async function handleAddToTrip(postId: string) {
-    // שומר את המקום ל-Favorites הקיים (סעיף 90 - "הוסף לטיול" המלא, עם
-    // בחירת טיול ספציפי, מתחבר כשקיים Social Trip אמיתי - שלב 2/3).
-    const item = feedItems?.find((i) => i.id === postId);
-    if (!item?.place) return;
-    const { createClient } = await import("@/services/supabase/client");
-    const { toggleFavorite } = await import("@/services/favorites/favoritesService");
-    const supabase = createClient();
-    if (!user) return;
-    await toggleFavorite(supabase, user.id, item.place.id, "place", "saved");
-  }
-
   async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[]) {
     await fetchJson("/api/social/posts", {
       method: "POST",
@@ -276,7 +264,6 @@ export default function PlacesHomePage() {
                 onLikeToggle={handleLikeToggle}
                 onSaveToggle={handleSaveToggle}
                 onOpenComments={handleOpenComments}
-                onAddToTrip={handleAddToTrip}
                 onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
                 onEditPost={handleEditPost}
                 onDeletePost={handleDeletePost}

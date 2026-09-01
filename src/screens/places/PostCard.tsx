@@ -11,7 +11,6 @@ interface PostCardProps {
   onLikeToggle: (postId: string) => Promise<boolean>;
   onSaveToggle: (postId: string) => Promise<boolean>;
   onOpenComments: (postId: string) => void;
-  onAddToTrip: (postId: string) => void;
   onWriteReview: (placeId: string, placeName: string) => void;
   onEditPost: (postId: string, newText: string) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
@@ -34,7 +33,6 @@ export function PostCard({
   onLikeToggle,
   onSaveToggle,
   onOpenComments,
-  onAddToTrip,
   onWriteReview,
   onEditPost,
   onDeletePost,
@@ -219,7 +217,12 @@ export function PostCard({
           href={item.place ? `/place/${item.place.id}` : `/destination/${item.destination?.id}`}
           className="mb-3 flex items-center gap-2 rounded-card bg-bg-secondary px-3 py-2"
         >
-          <span style={{ color: "var(--color-places-purple)" }}>📍</span>
+          {item.place?.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.place.imageUrl} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span style={{ color: "var(--color-places-purple)" }}>📍</span>
+          )}
           <span className="truncate text-[13px] font-semibold text-ink">{item.place?.name ?? item.destination?.name}</span>
         </Link>
       )}
@@ -272,15 +275,6 @@ export function PostCard({
           <Image src="/images/places-comment-icon.png" alt="" width={17} height={16} className="object-contain" />
           תגובה
         </button>
-        {item.place && (
-          <button
-            type="button"
-            onClick={() => onAddToTrip(item.id)}
-            className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold text-ink-secondary"
-          >
-            ➕ הוסף לטיול
-          </button>
-        )}
         <button
           type="button"
           onClick={async () => setSaved(await onSaveToggle(item.id))}
