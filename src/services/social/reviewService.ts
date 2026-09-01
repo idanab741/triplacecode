@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPost } from "./postService";
+import { createAdminClient } from "@/services/supabase/admin";
 
 export interface CreateReviewInput {
   userId: string;
@@ -59,6 +60,54 @@ export async function createOrUpdateReview(supabase: SupabaseClient, input: Crea
   if (input.mediaIds?.length && !existing) {
     const rows = input.mediaIds.map((mediaId, sortOrder) => ({ review_id: review.id, media_id: mediaId, sort_order: sortOrder }));
     await supabase.from("review_media").insert(rows);
+
+    // *** נוסף (בקשה מפורשת - "שהתמונות יישמרו בתור התמונה של
+    // האטרקציה"): תמונות שמשתמש מצרף לביקורת אמיתית על מקום נוספות גם
+    // לגלריית התמונות של המקום עצמו (places.image_urls), לא רק
+    // לביקורת. חייב admin client - RLS על places לא מאפשר UPDATE
+    // למשתמשים רגילים (רק SELECT ציבורי, ר' מיגרציה 0004), רק וידאו לא
+    // נכנס לגלריית תמונות (image_urls מיועד לתמונות בלבד).
+    // *** תיקון (בקשה מפורשת): "התמונה הראשונה שמכניסים - תחליף את
+    // התמונה הראשית של האטרקציה, התמונות שבאות אחר כך יופיעו בגלריה
+    // למטה". has_user_photo קובע אם זו הפעם הראשונה (מחליפים את
+    // image_urls[0], לא זורקים את הישנה - היא זזה להיות חלק מהגלריה)
+    // או לא (רק append לסוף, בלי לגעת ב-index 0).
+    const { data: mediaRows } = await supabase.from("media_assets").select("url, type").in("id", input.mediaIds);
+    const imageUrls = (mediaRows ?? []).filter((m) => m.type === "image").map((m) => m.url);
+    if (imageUrls.length) {
+      const admin = createAdminClient();
+      const { data: place, error: placeSelectError } = await admin
+        .from("places")
+        .select("image_urls, has_user_photo")
+        .eq("id", input.placeId)
+        .single();
+      if (placeSelectError) {
+        // *** לוג רועש בכוונה - אם זה נכשל בשקט (למשל כי מיגרציה 0076
+        // עדיין לא רצה ב-DB ולעמודה has_user_photo אין קיום), התמונה
+        // הראשית אף פעם לא מתעדכנת בלי שום סימן למה.
+        console.error("[reviewService] נכשל לשלוף place לצורך עדכון image_urls:", placeSelectError);
+      }
+      const existingUrls: string[] = place?.image_urls ?? [];
+      const [firstNew, ...restNew] = imageUrls;
+
+      let merged: string[];
+      if (!place?.has_user_photo) {
+        // תמונת-המשתמש הראשונה אי-פעם למקום הזה - הופכת לראשית;
+        // התמונה הקודמת (אם הייתה) לא נמחקת, רק זזה לגלריה.
+        merged = [firstNew, ...existingUrls.filter((url) => url !== firstNew), ...restNew];
+      } else {
+        // כבר יש תמונת-משתמש ראשית - כל התמונות החדשות רק מתווספות לגלריה.
+        merged = [...existingUrls, ...imageUrls.filter((url) => !existingUrls.includes(url))];
+      }
+
+      const { error: placeUpdateError } = await admin
+        .from("places")
+        .update({ image_urls: merged, has_user_photo: true })
+        .eq("id", input.placeId);
+      if (placeUpdateError) {
+        console.error("[reviewService] נכשל לעדכן image_urls/has_user_photo על המקום:", placeUpdateError);
+      }
+    }
   }
 
   return review.id as string;

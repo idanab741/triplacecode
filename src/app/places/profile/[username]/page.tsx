@@ -13,6 +13,9 @@ import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
 import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
+import { AvatarUploader } from "@/components/AvatarUploader";
+import { uploadSocialMedia } from "@/services/social/mediaUploadService";
+import { createClient } from "@/services/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { FeedItemDto } from "@/services/social/feedService";
@@ -42,6 +45,44 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
   const [suggestPlaceOpen, setSuggestPlaceOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [bioDraft, setBioDraft] = useState("");
+  const [savingBio, setSavingBio] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setCoverUrl(profile.coverUrl);
+      setBioDraft(profile.bio ?? "");
+    }
+  }, [profile]);
+
+  async function handleCoverFileChange(file: File | undefined) {
+    if (!file || !user) return;
+    setUploadingCover(true);
+    try {
+      const supabase = createClient();
+      const uploaded = await uploadSocialMedia(supabase, user.id, file);
+      setCoverUrl(uploaded.url);
+      await fetchJson("/api/social/profile/me", {
+        method: "PATCH",
+        body: JSON.stringify({ coverUrl: uploaded.url }),
+      });
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
+  async function handleBioBlur() {
+    if (!profile || bioDraft === (profile.bio ?? "")) return;
+    setSavingBio(true);
+    try {
+      await fetchJson("/api/social/profile/me", { method: "PATCH", body: JSON.stringify({ bio: bioDraft }) });
+      setProfile((p) => (p ? { ...p, bio: bioDraft } : p));
+    } finally {
+      setSavingBio(false);
+    }
+  }
 
   useEffect(() => {
     fetchJson<{ profile: SocialProfileDto }>(`/api/social/profile/${username}`)
@@ -166,26 +207,60 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     <div className="min-h-screen bg-white pb-24">
       <PlacesHeader onBack={() => router.back()} />
 
-      <div className="h-28 w-full bg-bg-secondary">
+      <div className="relative h-28 w-full bg-bg-secondary">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {profile.coverUrl && <img src={profile.coverUrl} alt="" className="h-full w-full object-cover" />}
+        {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
+        {profile.viewerState.isSelf && (
+          <label className="absolute bottom-2 end-2 flex cursor-pointer items-center gap-1.5 rounded-pill bg-black/50 px-3 py-1.5 text-[11.5px] font-semibold text-white">
+            {uploadingCover ? "מעלה..." : "החלף קאבר"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploadingCover}
+              onChange={(e) => handleCoverFileChange(e.target.files?.[0])}
+            />
+          </label>
+        )}
       </div>
 
       <div className="px-4">
         <div className="-mt-10 flex items-end justify-between">
-          <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
-            {profile.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-ink-secondary">
-                {profile.fullName?.[0] ?? "?"}
+          {profile.viewerState.isSelf && user ? (
+            <AvatarUploader userId={user.id} initialUrl={profile.avatarUrl} size={80} bordered />
+          ) : (
+            <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
+              {profile.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-ink-secondary">
+                  {profile.fullName?.[0] ?? "?"}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-baseline gap-2">
+          <h2 className="text-[17px] font-bold text-ink">
+            {profile.fullName}
+            {profile.isCreator && (
+              <span className="ms-1" style={{ color: "var(--color-places-purple)" }}>
+                ✓
               </span>
             )}
-          </span>
+          </h2>
+          {profile.username && (
+            <span dir="ltr" className="text-[13px] text-ink-secondary">
+              @{profile.username}
+            </span>
+          )}
+        </div>
 
-          {!profile.viewerState.isSelf && (
-            <div className="flex gap-2 pb-1">
+        {!profile.viewerState.isSelf && (
+          <div className="mt-3">
+            <div className="flex gap-2">
               <button
                 type="button"
                 disabled={busy}
@@ -205,37 +280,24 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
                 {profile.viewerState.following ? "עוקב" : "עקוב"}
               </button>
             </div>
-          )}
-          {profile.viewerState.isSelf && (
-            <div className="pb-1">
-              <button
-                type="button"
-                onClick={() => router.push("/places/settings")}
-                className="rounded-pill px-3.5 py-1.5 text-[12.5px] font-bold"
-                style={{ border: "1px solid var(--color-places-purple)", color: "var(--color-places-purple)" }}
-              >
-                עריכת פרופיל
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <h2 className="text-[17px] font-bold text-ink">
-            {profile.fullName}
-            {profile.isCreator && (
-              <span className="ms-1" style={{ color: "var(--color-places-purple)" }}>
-                ✓
-              </span>
-            )}
-          </h2>
-          {profile.username && (
-            <span dir="ltr" className="text-[13px] text-ink-secondary">
-              @{profile.username}
-            </span>
-          )}
-        </div>
-        {profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>}
+        {profile.viewerState.isSelf ? (
+          <div className="mt-2">
+            <textarea
+              value={bioDraft}
+              onChange={(e) => setBioDraft(e.target.value)}
+              onBlur={handleBioBlur}
+              placeholder="קצת עליי..."
+              rows={2}
+              className="w-full resize-none rounded-card border border-ink-secondary/15 p-2.5 text-[13.5px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            />
+            {savingBio && <p className="mt-1 text-[11px] text-ink-secondary">שומר...</p>}
+          </div>
+        ) : (
+          profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>
+        )}
 
         <div className="mt-4 flex gap-5 border-y border-ink-secondary/10 py-3 text-center">
           <Link href={`/places/profile/${username}/followers`} className="flex-1">
