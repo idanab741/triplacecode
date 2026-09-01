@@ -17,7 +17,6 @@ import { TrendingSection } from "@/screens/home/TrendingSection";
 import { PersonalizedMatchesSection } from "@/screens/home/PersonalizedMatchesSection";
 import { NearbySection } from "@/screens/home/NearbySection";
 import { CommunitySection } from "@/screens/home/CommunitySection";
-import { PlacesEntryBanner } from "@/screens/home/PlacesEntryBanner";
 import { MyTripsSection } from "@/screens/home/MyTripsSection";
 import { PartnersSection } from "@/screens/home/PartnersSection";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
@@ -179,9 +178,12 @@ export default function HomePage() {
                 זה על זה (pb של האחד + pt של הבא), ויצרו רווח *גדול
                 יותר* בדיוק בנקודות המעבר בין הבלוקים, לעומת ה-gap
                 האחיד בתוך כל div. עכשיו הכל div אחד, gap-6 יחיד -
-                בדיוק אותו רווח בין כל שני בלוקים לאורך כל העמוד. */}
+                בדיוק אותו רווח בין כל שני בלוקים לאורך כל העמוד.
+                תיקון (בקשה מפורשת - "להעלים את הכפתור place's מדף
+                הבית"): באנר הכניסה הנפרד ל-place's (PlacesEntryBanner)
+                הוסר מכאן לגמרי - הכניסה היחידה שנשארה היא שקופית
+                ה-places בתוך DiscoverCard, מתחת לשער סיסמה. */}
             <div className="flex flex-col gap-6 pb-6 pt-5">
-              <PlacesEntryBanner />
               <DiscoverCard />
               <MyTripsSection />
               <TrendingSection />

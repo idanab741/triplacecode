@@ -84,29 +84,42 @@ export async function getSocialNotifications(
   const readKeys = new Set((readsRes.data ?? []).map((r) => r.activity_key));
   const items: SocialNotificationItem[] = [];
 
+  // *** תיקון (שגיאת build - "Type ... is missing fullName, avatarUrl"):
+  // התוצאה הגולמית מ-Supabase מגיעה בשמות העמודות מה-DB (snake_case:
+  // full_name, avatar_url) - אבל SocialNotificationItem.actor מוגדר
+  // ב-camelCase (fullName, avatarUrl). ה-cast הישן (`as unknown as {...}`)
+  // רק "שיקר" ל-TypeScript עם שמות שדות snake_case, בלי למפות בפועל -
+  // עכשיו כל שורה עוברת דרך הפונקציה הזו שממפה את השדות בפועל.
+  function toActor(
+    raw: unknown
+  ): { id: string; username: string | null; fullName: string | null; avatarUrl: string | null } {
+    const row = raw as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    return { id: row.id, username: row.username, fullName: row.full_name, avatarUrl: row.avatar_url };
+  }
+
   for (const row of followsRes.data ?? []) {
     const key = `social_follow:${row.follower_id}:${userId}`;
-    const actor = row.follower as unknown as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    const actor = toActor(row.follower);
     items.push({ id: key, type: "NEW_FOLLOWER", actor, targetId: null, createdAt: row.created_at, isRead: readKeys.has(key) });
   }
   for (const row of friendReqRes.data ?? []) {
     const key = `social_friend_request:${row.id}`;
-    const actor = row.requester as unknown as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    const actor = toActor(row.requester);
     items.push({ id: key, type: "FRIEND_REQUEST", actor, targetId: row.id, createdAt: row.created_at, isRead: readKeys.has(key) });
   }
   for (const row of friendAcceptedRes.data ?? []) {
     const key = `social_friend_accepted:${row.id}`;
-    const actor = row.addressee as unknown as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    const actor = toActor(row.addressee);
     items.push({ id: key, type: "FRIEND_ACCEPTED", actor, targetId: row.id, createdAt: row.updated_at, isRead: readKeys.has(key) });
   }
   for (const row of likesRes.data ?? []) {
     const key = `social_post_like:${row.post_id}:${row.user_id}`;
-    const actor = row.user as unknown as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    const actor = toActor(row.user);
     items.push({ id: key, type: "POST_LIKE", actor, targetId: row.post_id, createdAt: row.created_at, isRead: readKeys.has(key) });
   }
   for (const row of commentsRes.data ?? []) {
     const key = `social_post_comment:${row.id}`;
-    const actor = row.author as unknown as { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+    const actor = toActor(row.author);
     items.push({ id: key, type: "POST_COMMENT", actor, targetId: row.post_id, createdAt: row.created_at, isRead: readKeys.has(key) });
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -11,9 +12,11 @@ import "swiper/css";
 import "swiper/css/pagination";
 
 import { SurpriseMeSection } from "@/screens/home/SurpriseMeSection";
+import { PlacesPasswordModal } from "@/screens/home/PlacesPasswordModal";
 
 type Slide =
   | { kind: "link"; href: string; image: string; alt: string }
+  | { kind: "places"; image: string; alt: string }
   | { kind: "surprise" };
 
 /**
@@ -24,6 +27,13 @@ type Slide =
  * שלה (מבקשת מיקום, בוחרת מקום רנדומלי ומנווטת) - ולכן הקליק עליה
  * מטופל ע"י הכפתור הפנימי שלה, לא ע"י handleClick הכללי של ה-Swiper
  * (ר' למטה - מדלג עליה כי אין לה href).
+ *
+ * תיקון (בקשה מפורשת - "להעלים את הכפתור place's מדף הבית ולהעביר
+ * אותו לכרטיסייה של places כאן"): שקופית ה-place's (שקישרה בעבר
+ * ל-/community, עמוד "בקרוב" נפרד) עברה ל-kind="places" ומקשרת עכשיו
+ * בפועל ל-/places - אבל דרך שער סיסמה (PlacesPasswordModal), לא ניווט
+ * ישיר כמו שאר השקופיות. ה-banner העצמאי הישן (PlacesEntryBanner)
+ * הוסר לגמרי מדף הבית - זו נקודת הכניסה היחידה שנשארה ל-place's.
  */
 const SLIDES: Slide[] = [
   { kind: "surprise" },
@@ -34,8 +44,7 @@ const SLIDES: Slide[] = [
     alt: "TripLace Deals - הדילים והמבצעים המשתלמים ביותר עבורכם",
   },
   {
-    kind: "link",
-    href: "/community",
+    kind: "places",
     image: "/images/discover/discover-places-social.png",
     alt: "Place's - משתפים, יוצאים לדרך",
   },
@@ -49,6 +58,10 @@ const SLIDES: Slide[] = [
 
 export function DiscoverCard() {
   const router = useRouter();
+  // *** שער הסיסמה ל-place's (ר' תיעוד למעלה ליד SLIDES): נפתח בלחיצה
+  // על שקופית ה-places במקום ניווט מיידי. לא נשמר בין ביקורים בכוונה -
+  // כל לחיצה פותחת מופע חדש של המודאל, בלי לזכור סיסמה קודמת שהוזנה.
+  const [showPlacesPassword, setShowPlacesPassword] = useState(false);
 
   // לא ניתן להשתמש כאן ב-next/link רגיל: כש-loop מופעל, Swiper משכפל
   // את אלמנטי הסליידים ב-DOM ישירות (לא דרך React) כדי ליצור לולאה
@@ -64,7 +77,13 @@ export function DiscoverCard() {
     const slide = SLIDES[Number(indexAttr)];
     // שקופית "surprise" מטפלת בקליק שלה בעצמה (כפתור פנימי) - אין כאן
     // מה לנווט אליו ברמת ה-Swiper.
-    if (!slide || slide.kind !== "link") return;
+    if (!slide) return;
+    // שקופית "places" לא מנווטת ישירות - פותחת קודם את שער הסיסמה.
+    if (slide.kind === "places") {
+      setShowPlacesPassword(true);
+      return;
+    }
+    if (slide.kind !== "link") return;
     router.push(slide.href);
   }
 
@@ -90,7 +109,10 @@ export function DiscoverCard() {
         className="aspect-[2112/1408] rounded-[30px] shadow-xl"
       >
         {SLIDES.map((slide, i) => (
-          <SwiperSlide key={slide.kind === "link" ? slide.href : "surprise"} className="relative cursor-pointer">
+          <SwiperSlide
+            key={slide.kind === "link" ? slide.href : slide.kind === "places" ? "places" : "surprise"}
+            className="relative cursor-pointer"
+          >
             {slide.kind === "surprise" ? (
               <SurpriseMeSection variant="embedded" />
             ) : (
@@ -99,6 +121,16 @@ export function DiscoverCard() {
           </SwiperSlide>
         ))}
       </Swiper>
+
+      {showPlacesPassword && (
+        <PlacesPasswordModal
+          onClose={() => setShowPlacesPassword(false)}
+          onSuccess={() => {
+            setShowPlacesPassword(false);
+            router.push("/places");
+          }}
+        />
+      )}
     </section>
   );
 }
