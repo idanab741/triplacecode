@@ -7,6 +7,7 @@ import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface CommentRow {
   id: string;
@@ -67,14 +68,8 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         {comments?.map((comment) => (
           <div key={comment.id} className="flex gap-2.5 px-4 py-3">
             <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-              {comment.author.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={comment.author.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-xs font-bold text-ink-secondary">
-                  {comment.author.full_name?.[0] ?? "?"}
-                </span>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={getAvatarUrl(comment.author.avatar_url)} alt="" className="h-full w-full object-cover" />
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[13.5px] text-ink">

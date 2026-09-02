@@ -16,6 +16,7 @@ import { AnswerOptions } from "@/screens/trip-builder/chat/AnswerOptions";
 import { RuntrippyPromptBubble } from "@/screens/trip-builder/chat/RuntrippyPromptBubble";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import Image from "next/image";
+import { getAvatarUrl } from "@/constants/avatar";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
 const DEFAULT_ANSWERS: DayTripAnswers = {
@@ -49,23 +50,10 @@ type ChatMessage = {
 };
 
 /** עיגול אווטאר קטן ליד כל הודעת משתמש — תמונת פרופיל אם קיימת, אחרת אות ראשונה. */
-function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: string | null }) {
-  const initial = name?.trim()?.[0]?.toUpperCase() ?? "👤";
-
-  if (avatarUrl) {
-    return (
-      <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5">
-        <Image src={avatarUrl} alt="" fill className="object-cover" />
-      </div>
-    );
-  }
-
+function UserAvatar({ avatarUrl }: { avatarUrl: string | null; name: string | null }) {
   return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-    >
-      {initial}
+    <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5">
+      <Image src={getAvatarUrl(avatarUrl)} alt="" fill className="object-cover" />
     </div>
   );
 }

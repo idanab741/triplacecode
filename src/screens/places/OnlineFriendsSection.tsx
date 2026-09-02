@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface OnlineFriendsSectionProps {
   friends: OnlineFriendDto[];
@@ -24,12 +25,8 @@ export function OnlineFriendsSection({ friends }: OnlineFriendsSectionProps) {
             className="flex w-14 shrink-0 flex-col items-center gap-1"
           >
             <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
-              {friend.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={friend.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-sm font-bold text-ink-secondary">{friend.fullName?.[0] ?? "?"}</span>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={getAvatarUrl(friend.avatarUrl)} alt="" className="h-full w-full object-cover" />
               <span
                 className="absolute bottom-0 end-0 h-3 w-3 rounded-full border-2 border-white"
                 style={{ background: friend.status === "online" ? "#22c55e" : "#facc15" }}

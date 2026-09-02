@@ -8,6 +8,7 @@ import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { useAuth } from "@/hooks/useAuth";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import type { SocialNotificationItem } from "@/services/social/socialNotificationsService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 const TYPE_TEXT: Record<string, string> = {
   NEW_FOLLOWER: "התחיל/ה לעקוב אחריך",
@@ -75,14 +76,8 @@ export default function PlacesNotificationsPage() {
                 style={{ background: item.isRead ? "transparent" : "rgba(159,123,255,0.06)" }}
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-                  {item.actor.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.actor.avatarUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center text-sm font-bold text-ink-secondary">
-                      {item.actor.fullName?.[0] ?? "?"}
-                    </span>
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={getAvatarUrl(item.actor.avatarUrl)} alt="" className="h-full w-full object-cover" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] text-ink">

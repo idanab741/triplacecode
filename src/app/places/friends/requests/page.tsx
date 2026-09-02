@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { useAuth } from "@/hooks/useAuth";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface PendingRequest {
   id: string;
@@ -51,14 +52,8 @@ export default function FriendRequestsPage() {
       {requests?.map((req) => (
         <div key={req.id} className="flex items-center gap-3 px-4 py-3">
           <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-            {req.requester.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={req.requester.avatar_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center font-bold text-ink-secondary">
-                {req.requester.full_name?.[0] ?? "?"}
-              </span>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getAvatarUrl(req.requester.avatar_url)} alt="" className="h-full w-full object-cover" />
           </span>
           <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">
             {req.requester.full_name ?? req.requester.username}

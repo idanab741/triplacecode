@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { getAvatarUrl } from "@/constants/avatar";
 
 export interface SimpleProfileDto {
   id: string;
@@ -66,14 +67,8 @@ export function UserListPage({ title, fetchUrl, emptyMessage }: UserListPageProp
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-bg-secondary"
             >
               <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-                {u.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-[15px] font-bold text-ink-secondary">
-                    {u.full_name?.[0] ?? "?"}
-                  </span>
-                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={getAvatarUrl(u.avatar_url)} alt="" className="h-full w-full object-cover" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13.5px] font-bold text-ink">

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface PersonResult {
   id: string;
@@ -83,14 +84,8 @@ export default function PlacesSearchPage() {
                 className="flex items-center gap-3 px-4 py-3 hover:bg-bg-secondary"
               >
                 <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-                  {person.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={person.avatar_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full w-full items-center justify-center font-bold text-ink-secondary">
-                      {person.full_name?.[0] ?? "?"}
-                    </span>
-                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={getAvatarUrl(person.avatar_url)} alt="" className="h-full w-full object-cover" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1">

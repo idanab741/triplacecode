@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { listAddresses, type UserAddress } from "@/services/addresses/addressesService";
+import { getAvatarUrl } from "@/constants/avatar";
 import { ChooseLocationSheet } from "./ChooseLocationSheet";
 import { LocationPromptModal } from "./LocationPromptModal";
 import { NotificationCard } from "@/screens/notifications/NotificationCard";
@@ -138,26 +139,12 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
       >
         {loading ? (
           <Skeleton className="h-full w-full rounded-full" />
-        ) : avatarUrl ? (
+        ) : (
           <img
-            src={avatarUrl}
+            src={getAvatarUrl(avatarUrl)}
             alt="הפרופיל שלי"
             className="h-full w-full object-cover"
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-ink-secondary">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-            </svg>
-          </div>
         )}
       </Link>
 

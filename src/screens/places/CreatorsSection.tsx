@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface CreatorsSectionProps {
   creators: CreatorCardDto[];
@@ -33,14 +34,8 @@ function CreatorCard({ creator, onFollowToggle }: { creator: CreatorCardDto; onF
     <div className="w-[150px] shrink-0 rounded-card bg-white p-3 shadow-soft">
       <Link href={`/places/profile/${creator.username ?? creator.id}`} className="flex flex-col items-center">
         <span className="h-16 w-16 overflow-hidden rounded-full bg-bg-secondary">
-          {creator.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={creator.avatarUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center text-xl font-bold text-ink-secondary">
-              {creator.fullName?.[0] ?? "?"}
-            </span>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={getAvatarUrl(creator.avatarUrl)} alt="" className="h-full w-full object-cover" />
         </span>
         <span className="mt-2 truncate text-[13px] font-semibold text-ink">{creator.fullName ?? creator.username}</span>
         <span className="text-[11px] text-ink-secondary">{creator.followersCount} עוקבים</span>

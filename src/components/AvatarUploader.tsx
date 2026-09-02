@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { uploadAvatar, updateProfile } from "@/services/profile/profileService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface AvatarUploaderProps {
   userId: string;
@@ -79,22 +80,8 @@ export function AvatarUploader({
             bordered ? "border-4 border-[var(--color-primary-start)] shadow-soft" : ""
           }`}
         >
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="תמונת פרופיל" className="h-full w-full object-cover" />
-          ) : (
-            <svg
-              width={iconSize}
-              height={iconSize}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-ink-secondary)"
-              strokeWidth="1.5"
-            >
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-            </svg>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={getAvatarUrl(avatarUrl)} alt="תמונת פרופיל" className="h-full w-full object-cover" />
         </div>
 
         <button

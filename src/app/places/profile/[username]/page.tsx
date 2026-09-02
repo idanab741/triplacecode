@@ -14,6 +14,7 @@ import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
 import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
 import { AvatarUploader } from "@/components/AvatarUploader";
+import { getAvatarUrl } from "@/constants/avatar";
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { createClient } from "@/services/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -230,14 +231,8 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             <AvatarUploader userId={user.id} initialUrl={profile.avatarUrl} size={80} bordered />
           ) : (
             <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
-              {profile.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-ink-secondary">
-                  {profile.fullName?.[0] ?? "?"}
-                </span>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
             </span>
           )}
         </div>

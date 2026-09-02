@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface StoriesRailProps {
   rail: StoryRailAuthorDto[];
@@ -14,17 +15,12 @@ interface StoriesRailProps {
   onCreateStory: () => void;
 }
 
-function Avatar({ url, initial }: { url: string | null; initial: string }) {
-  return url ? (
+// url==null (אין תמונה בכלל) => תמונת ברירת המחדל (getAvatarUrl).
+// כשיש כתובת אמיתית - מוצגת כרגיל.
+function Avatar({ url }: { url: string | null }) {
+  return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt="" className="h-full w-full object-cover" />
-  ) : (
-    <span
-      className="flex h-full w-full items-center justify-center text-xl font-extrabold text-white"
-      style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
-    >
-      {initial}
-    </span>
+    <img src={getAvatarUrl(url)} alt="" className="h-full w-full object-cover" />
   );
 }
 
@@ -55,7 +51,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, onOpenStory, onCr
       >
         <span className="relative">
           <WindowFrame gradient="var(--color-bg-secondary, #eee)" glow={false}>
-            <Avatar url={viewerAvatarUrl ?? null} initial="" />
+            <Avatar url={viewerAvatarUrl ?? null} />
           </WindowFrame>
           <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2">
             <Image src="/images/places-plus-icon.png" alt="הוסף סטורי" width={26} height={26} />
@@ -85,7 +81,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, onOpenStory, onCr
               }
               glow={entry.hasUnviewed}
             >
-              <Avatar url={thumbnailUrl} initial={entry.author.fullName?.[0] ?? "?"} />
+              <Avatar url={thumbnailUrl ?? null} />
             </WindowFrame>
             <span className="w-full truncate text-center text-[11.5px] font-bold text-ink">
               {isSelf ? "הסטורי שלי" : (entry.author.fullName ?? entry.author.username ?? "מטייל")}

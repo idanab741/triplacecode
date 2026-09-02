@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface PostCardProps {
   item: FeedItemDto;
@@ -76,12 +77,8 @@ export function PostCard({
       <div className="mb-3 flex items-center gap-2.5">
         <Link href={`/places/profile/${item.author.username ?? item.author.id}`} className="shrink-0">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
-            {item.author.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.author.avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-sm font-bold text-ink-secondary">{item.author.fullName?.[0] ?? "?"}</span>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getAvatarUrl(item.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
           </span>
         </Link>
         <div className="min-w-0 flex-1">

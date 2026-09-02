@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 /** "לפני X דקות/שעות" - יחסי, בעברית, בהתאם לגודל הפרש הזמן. */
 function timeAgo(iso: string): string {
@@ -75,10 +76,8 @@ export function StoryViewerModal({ rail, startAuthorIndex, onClose, onView }: St
       <div className="flex items-center justify-between px-3 py-3">
         <div className="flex items-center gap-2">
           <span className="h-8 w-8 overflow-hidden rounded-full bg-white/20">
-            {author.author.avatarUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={author.author.avatarUrl} alt="" className="h-full w-full object-cover" />
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getAvatarUrl(author.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
           </span>
           <span className="text-[13px] font-semibold text-white">{author.author.fullName ?? author.author.username}</span>
           <span className="text-[12px] text-white/70">{timeAgo(story.createdAt)}</span>

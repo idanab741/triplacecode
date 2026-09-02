@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
+import { getAvatarUrl } from "@/constants/avatar";
 
 interface SuggestedPeopleCirclesProps {
   people: SuggestedTravelerDto[];
@@ -88,17 +89,8 @@ function PersonCircle({ person, overlap, zIndex }: { person: SuggestedTravelerDt
         className="block overflow-hidden rounded-full border-2 border-white bg-bg-secondary transition-transform active:scale-95"
         style={{ height: CIRCLE_SIZE, width: CIRCLE_SIZE }}
       >
-        {person.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={person.avatarUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span
-            className="flex h-full w-full items-center justify-center text-sm font-extrabold text-white"
-            style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
-          >
-            {person.fullName?.[0] ?? "?"}
-          </span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={getAvatarUrl(person.avatarUrl)} alt="" className="h-full w-full object-cover" />
       </Link>
       <span className="text-[10.5px] font-bold text-ink-secondary">{person.username ?? person.fullName}</span>
     </span>

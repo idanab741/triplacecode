@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { getAvatarUrl } from "@/constants/avatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Screen, ChipGroup, Field, Slider } from "@/components/ui";
@@ -107,21 +108,10 @@ const DEFAULT_ANSWERS: AbroadVacationAnswers = {
 
 type ChatMessage = { id: number; role: "assistant" | "user" | "icon" | "runtrippy"; text: string; editStage?: Stage };
 
-function UserAvatar({ avatarUrl, name }: { avatarUrl: string | null; name: string | null }) {
-  const initial = name?.trim()?.[0]?.toUpperCase() ?? "👤";
-  if (avatarUrl) {
-    return (
-      <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5">
-        <Image src={avatarUrl} alt="" fill className="object-cover" />
-      </div>
-    );
-  }
+function UserAvatar({ avatarUrl }: { avatarUrl: string | null; name: string | null }) {
   return (
-    <div
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-    >
-      {initial}
+    <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5">
+      <Image src={getAvatarUrl(avatarUrl)} alt="" fill className="object-cover" />
     </div>
   );
 }
