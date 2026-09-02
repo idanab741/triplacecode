@@ -165,6 +165,17 @@ export default function PlacesHomePage() {
     );
   }
 
+  async function handleStoryDeleted(storyId: string) {
+    await fetchJson(`/api/social/stories/${storyId}`, { method: "DELETE" });
+    // מסירים את הסטורי מה-state המקומי, וגם את המחבר כולו מהשורה אם
+    // זה היה הסטורי האחרון שלו - בלי לחכות לרענון מלא.
+    setStoryRail((prev) =>
+      prev
+        ?.map((entry) => ({ ...entry, stories: entry.stories.filter((s) => s.id !== storyId) }))
+        .filter((entry) => entry.stories.length > 0) ?? null
+    );
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-white px-4 pt-6">
@@ -290,8 +301,10 @@ export default function PlacesHomePage() {
         <StoryViewerModal
           rail={storyRail}
           startAuthorIndex={storyViewerIndex}
+          viewerId={user.id}
           onClose={() => setStoryViewerIndex(null)}
           onView={handleStoryViewed}
+          onDelete={handleStoryDeleted}
         />
       )}
 

@@ -57,7 +57,13 @@ export async function createOrUpdateReview(supabase: SupabaseClient, input: Crea
     .single();
   if (error) throw error;
 
-  if (input.mediaIds?.length && !existing) {
+  if (input.mediaIds?.length) {
+    // *** תיקון באג: קודם התנאי כלל && !existing - כך שאם למשתמש כבר
+    // הייתה ביקורת קיימת לאותו מקום (עריכה), תמונות חדשות שהוא הוסיף
+    // בעריכה מעולם לא נשמרו ב-review_media וגם לא סונכרנו לגלריית
+    // המקום. עכשיו כל תמונה חדשה (מה-mediaIds שהתקבלו בקריאה הזו,
+    // שממילא תמיד "טריים" - ר' CreateReviewSheet.tsx, ה-state שם תמיד
+    // מתחיל ריק) נשמרת ומסונכרנת, גם בעריכה.
     const rows = input.mediaIds.map((mediaId, sortOrder) => ({ review_id: review.id, media_id: mediaId, sort_order: sortOrder }));
     await supabase.from("review_media").insert(rows);
 
