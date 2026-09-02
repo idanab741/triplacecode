@@ -228,7 +228,14 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
       <div className="px-4">
         <div className="-mt-10 flex items-end justify-between">
           {profile.viewerState.isSelf && user ? (
-            <AvatarUploader userId={user.id} initialUrl={profile.avatarUrl} size={80} bordered />
+            <AvatarUploader
+              userId={user.id}
+              initialUrl={profile.avatarUrl}
+              size={104}
+              bordered
+              onUploaded={(url) => setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev))}
+              onRemoved={() => setProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev))}
+            />
           ) : (
             <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
               {/* eslint-disable-next-line @next/next/no-img-element */}

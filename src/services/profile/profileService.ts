@@ -64,3 +64,17 @@ export async function uploadAvatar(userId: string, file: File): Promise<string> 
   const { data } = supabase.storage.from("avatars").getPublicUrl(path);
   return `${data.publicUrl}?t=${Date.now()}`;
 }
+
+/** מוחק את תמונת הפרופיל שהמשתמש העלה - חוזרים לתמונת ברירת המחדל
+ *  הגנרית של האפליקציה (ר' getAvatarUrl ב-constants/avatar.ts).
+ *  מנקה גם את הקובץ מה-storage (best-effort - סיומת לא ידועה מראש,
+ *  אז מנסים את הסיומות הנפוצות ומתעלמים משגיאות "לא נמצא"). */
+export async function removeAvatar(userId: string): Promise<void> {
+  const supabase = createClient();
+  await updateProfile(userId, { avatar_url: null });
+  const commonExts = ["jpg", "jpeg", "png", "webp", "gif"];
+  await supabase.storage
+    .from("avatars")
+    .remove(commonExts.map((ext) => `${userId}/avatar.${ext}`))
+    .catch(() => {});
+}

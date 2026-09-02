@@ -92,7 +92,14 @@ export default function PlacesSettingsPage() {
       <div className="-mt-10 flex justify-center">
         {user && (
           <div className="h-[88px] w-[88px] overflow-hidden rounded-full border-4 border-white shadow-soft">
-            <AvatarUploader userId={user.id} initialUrl={avatarUrl} onUploaded={setAvatarUrl} fluid bordered={false} />
+            <AvatarUploader
+              userId={user.id}
+              initialUrl={avatarUrl}
+              onUploaded={setAvatarUrl}
+              onRemoved={() => setAvatarUrl(null)}
+              fluid
+              bordered={false}
+            />
           </div>
         )}
       </div>

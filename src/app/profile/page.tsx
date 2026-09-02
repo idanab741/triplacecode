@@ -127,6 +127,7 @@ export default function ProfilePage() {
                   bordered={false}
                   deferSave
                   onFileSelected={setPendingAvatarFile}
+                  onFileCleared={() => setPendingAvatarFile(null)}
                 />
               )}
             </div>
