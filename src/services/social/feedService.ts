@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/services/supabase/admin";
 
 export type FeedTab = "for_you" | "friends" | "following";
 
@@ -75,7 +76,17 @@ export async function getFeed(
       destinationIds.length
         ? supabase.from("destinations").select("id, name").in("id", destinationIds)
         : Promise.resolve({ data: [] }),
-      supabase
+      // *** תיקון באג (בקשה מפורשת - "התמונות לא מופיעות לכל המשתמשים"):
+      // media_assets ב-RLS מגביל SELECT לבעלים בלבד (auth.uid()=owner_id,
+      // ר' מיגרציה 0067) - בדיוק אותה בעיה שכבר תועדה ותוקנה ב-
+      // storyService.ts/getStoryRail. כשה-join הזה רץ עם ה-supabase
+      // client הרגיל (כפוף ל-RLS של הצופה), פוסטים של מחברים אחרים
+      // מקבלים media=null בשקט ומסוננים החוצה (ר' "if (!media) continue"
+      // למטה) - הצופה רואה טקסט/צ'יפ מקום בלבד, בלי התמונה הגדולה של
+      // הפוסט עצמו, גם כשהיא כן קיימת ב-DB. פותרים כאן עם admin client:
+      // בטוח כי postIds כבר עברו RLS filtering מלא (visibility/חסימות)
+      // בשאילתת posts למעלה - רק "משלימים" מדיה לפוסטים שכבר אושרו כנראים.
+      createAdminClient()
         .from("post_media")
         .select("post_id, sort_order, media:media_assets(id, type, url, thumbnail_url)")
         .in("post_id", postIds)
