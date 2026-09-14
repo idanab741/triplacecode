@@ -15,6 +15,8 @@ import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { HomeQuickCategories } from "@/screens/home/HomeQuickCategories";
 import { AddPlaceFab } from "@/screens/home/AddPlaceFab";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
+import { LocateMeFab } from "@/screens/home/LocateMeFab";
+import type { HomeMapHandle } from "@/screens/home/HomeMap";
 
 // אותו דפוס דינמי-import בדיוק כמו NearbySection.tsx/DiscoveryPlacesMap -
 // Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR.
@@ -30,6 +32,8 @@ export default function HomePage() {
   const router = useRouter();
 
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
+  // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
+  const homeMapRef = useRef<HomeMapHandle>(null);
 
   // *** קיפול בגלילה (בקשה מפורשת, אושרה בסבב שאלות נפרד): בגלילה
   // למטה, ה-HERO (תמונת המסקוט) והברכה האישית מתקפלים ונעלמים - נשארים
@@ -131,7 +135,7 @@ export default function HomePage() {
       {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). לא מושפעת
           מהקיפול/גלילה למטה בכלל - היא כבר "מלאה" תמיד. */}
       <div className="fixed inset-0 z-0">
-        <HomeMap className="h-full w-full" />
+        <HomeMap ref={homeMapRef} className="h-full w-full" />
       </div>
 
       {/* *** תיקון מקיף יותר (Bug נמשך - "המפה עדיין תקועה"): במקום
@@ -213,6 +217,7 @@ export default function HomePage() {
 
       </div>
 
+      <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} />
       <AddPlaceFab onClick={() => setAddPlaceOpen(true)} />
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
 

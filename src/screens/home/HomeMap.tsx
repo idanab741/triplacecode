@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { MapContainer, TileLayer, AttributionControl, Marker, useMap } from "react-leaflet";
+import type { Map as LeafletMap } from "leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -35,6 +36,12 @@ export interface HomeMapPlace {
 interface HomeMapProps {
   places?: HomeMapPlace[];
   className?: string;
+}
+
+/** נחשף החוצה (ref) כדי שכפתור "מצפן"/מיקום-נוכחי שיושב מחוץ לרכיב
+ *  הזה (ב-page.tsx, ליד כפתור ה-+ הצף) יוכל להפעיל מירכוז מחדש. */
+export interface HomeMapHandle {
+  recenterToUser: () => void;
 }
 
 /** אותו סגנון פין בדיוק כמו DiscoveryPlacesMap.tsx - לא ה-icon
@@ -113,9 +120,17 @@ function InvalidateSizeOnResize() {
  * NearbySection.tsx כבר עושה ל-DiscoveryPlacesMap) - Leaflet משתמש
  * ב-window/DOM ולא ניתן לרנדור בצד השרת.
  */
-export function HomeMap({ places = [], className }: HomeMapProps) {
+export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
+  { places = [], className },
+  ref
+) {
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  // *** ref ל-instance האמיתי של Leaflet (לא useMap - זה תקף רק
+  // לרכיבים-ילדים בתוך MapContainer; כאן אנחנו צריכים לקרוא ל-setView
+  // מבחוץ, מלחיצה על כפתור חיצוני). react-leaflet v4 תומך ב-ref
+  // ישירות על MapContainer בדיוק לצורך זה.
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
 
   useEffect(() => {
     getCurrentPositionSafe()
@@ -128,6 +143,27 @@ export function HomeMap({ places = [], className }: HomeMapProps) {
       });
   }, []);
 
+  // *** כפתור "מצפן"/מיקום-נוכחי (בקשה מפורשת - "כפתור מצפן מעל ה-+
+  // שיחזיר למיקום הנוכחי שלי"): מאתר מחדש בפועל (לא רק חוזר לנקודה
+  // ששמורה מהטעינה הראשונית - המשתמש יכול להיות זז מאז) ומזיז את
+  // המפה + הנקודה הכחולה אליו.
+  useImperativeHandle(
+    ref,
+    () => ({
+      recenterToUser: () => {
+        getCurrentPositionSafe()
+          .then(({ lat, lng }) => {
+            setUserLocation([lat, lng]);
+            mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
+          })
+          .catch(() => {
+            // אין הרשאה/כשל איתור - אין מיקום אמיתי למרכז אליו, נשארים במקום הנוכחי.
+          });
+      },
+    }),
+    []
+  );
+
   return (
     <div
       className={`home-map-fixed-gesture ${IS_USING_FALLBACK_TILES ? "map-branded" : ""} ${className ?? ""}`}
@@ -138,6 +174,7 @@ export function HomeMap({ places = [], className }: HomeMapProps) {
       style={{ position: "relative", height: "100%", width: "100%" }}
     >
       <MapContainer
+        ref={mapInstanceRef}
         center={center}
         zoom={DEFAULT_ZOOM}
         scrollWheelZoom={false}
@@ -167,4 +204,4 @@ export function HomeMap({ places = [], className }: HomeMapProps) {
       </MapContainer>
     </div>
   );
-}
+});
