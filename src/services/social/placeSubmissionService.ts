@@ -64,40 +64,6 @@ export async function createPlaceSubmission(supabase: SupabaseClient, input: Cre
   return submission.id as string;
 }
 
-/**
- * *** השלמת מידע אחרי השמירה (סעיף 7-8 בפרומפט - "לא להעמיס את זה
- * בטופס"): נקראת ע"י placeSubmissionEnrichmentService.enrichPlaceSubmission
- * בלבד (מופעלת כ-fire-and-forget מתוך POST /api/social/place-submissions
- * מיד אחרי היצירה) - לא ישירות מהטופס. AI מיועד רק לסיווג subcategory -
- * לעולם לא ממציא מידע עובדתי (מחיר/כתובת/שעות) שלא הגיע בפועל מ-Google.
- */
-export interface SubmissionEnrichmentPatch {
-  subcategory?: string | null;
-  accessible?: boolean | null;
-  priceLevel?: number | null;
-  phone?: string | null;
-  shortDescription?: string | null;
-  openingHours?: string[] | null;
-}
-
-export async function applySubmissionEnrichment(
-  supabase: SupabaseClient,
-  submissionId: string,
-  patch: SubmissionEnrichmentPatch,
-  status: "done" | "failed" | "skipped"
-): Promise<void> {
-  const update: Record<string, unknown> = { enrichment_status: status };
-  if (patch.subcategory !== undefined) update.subcategory = patch.subcategory;
-  if (patch.accessible !== undefined) update.accessible = patch.accessible;
-  if (patch.priceLevel !== undefined) update.price_level = patch.priceLevel;
-  if (patch.phone !== undefined) update.phone = patch.phone;
-  if (patch.shortDescription !== undefined) update.short_description = patch.shortDescription;
-  if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
-
-  const { error } = await supabase.from("place_submissions").update(update).eq("id", submissionId);
-  if (error) throw error;
-}
-
 export async function getMySubmissions(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from("place_submissions")

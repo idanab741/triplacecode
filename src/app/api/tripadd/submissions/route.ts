@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
-import { createPlaceSubmission, getMySubmissions, type PlaceSubmissionCategory } from "@/services/social/placeSubmissionService";
+import { createTripAddSubmission, getMyTripAddSubmissions, type TripAddCategory } from "@/services/tripadd/tripAddService";
+import { enrichTripAddSubmission } from "@/services/tripadd/tripAddEnrichmentService";
 
-const VALID_CATEGORIES: PlaceSubmissionCategory[] = ["restaurant", "attraction", "nature", "nightlife", "hotel", "shopping"];
+const VALID_CATEGORIES: TripAddCategory[] = ["attraction", "food", "shopping", "nature", "nightlife", "sleep"];
 
 export async function GET() {
   const supabase = await createClient();
@@ -11,10 +12,16 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
 
-  const submissions = await getMySubmissions(supabase, user.id);
+  const submissions = await getMyTripAddSubmissions(supabase, user.id);
   return NextResponse.json({ submissions });
 }
 
+/**
+ * *** מאגר עצמאי (TripAdd) - בכוונה **אין כאן שום בדיקת כפילות** מול
+ * places/destinations/place_submissions (בקשה מפורשת - "המאגר הזה
+ * מנותק מהמאגר שהיה"). כל שמירה נכנסת כ-pending בטבלה העצמאית
+ * tripadd_submissions.
+ */
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -24,7 +31,7 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => null);
   const name = body?.name as string | undefined;
-  const category = body?.category as PlaceSubmissionCategory | undefined;
+  const category = body?.category as TripAddCategory | undefined;
   const rating = body?.rating as number | undefined;
   if (!name?.trim() || !category || !VALID_CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "חסר שם או קטגוריה לא תקינה" }, { status: 422 });
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const id = await createPlaceSubmission(supabase, {
+    const id = await createTripAddSubmission(supabase, {
       submittedBy: user.id,
       name: name.trim(),
       category,
@@ -49,6 +56,9 @@ export async function POST(request: Request) {
       googlePlaceId: body?.googlePlaceId,
       googlePhotoUrl: body?.googlePhotoUrl,
     });
+
+    // fire-and-forget - לא מעכב את התשובה למשתמש, כשלון לא מכשיל את השמירה.
+    enrichTripAddSubmission(id).catch(() => {});
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {

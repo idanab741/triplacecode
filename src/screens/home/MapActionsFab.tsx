@@ -34,20 +34,14 @@ function FilterIcon() {
 }
 
 /**
- * *** כפתור ה-(+) הצף מעל המפה + תפריט הפעולות הקטן שנפתח ממנו (בקשה
- * מפורשת, פרומפט "FAB + Floating Actions" מלא). לא Modal מיידי, לא
- * FAB גנרי של Android - תפריט Floating Actions קטן: ה-+ מסתובב ל-×,
- * ומעליו שתי תיבות pill קומפקטיות (לא כפתורים עגולים נוספים).
+ * *** כפתור ה-(+) הצף מעל המפה + תפריט הפעולות הקטן שנפתח ממנו.
  *
- * מידות/מיקום מדויקים לפי הבקשה: כפתור 52×52, right:16px, ~16px מעל
- * ה-Bottom Navigation (משתמש באותו חישוב safe-area שכבר הוכח ב-
- * AddPlaceFab/LocateMeFab הקודמים באפליקציה - לא ממציא נוסחה חדשה).
- * shadow-soft בלבד (הטוקן הקיים) - לא glow, לא shadow כבד.
- *
- * תיבות הפעולה: rounded-[14px] (לא rounded-pill המלא של האפליקציה -
- * הבקשה המפורשת כאן היא 14px בדיוק, לא קפסולה מלאה), רקע לבן, גובה
- * 44px, אייקון+טקסט. אנימציית כניסה: opacity+scale+translateY עם
- * stagger קצר בין השתיים (הוספת מקום קודם, כי היא הקרובה יותר ל-FAB).
+ * *** תיקון (בקשה מפורשת - "העיגול קפץ לימין, צריך שמאל במיקום הקבוע
+ * שלו"): חוזר ל-left (אותו X בדיוק כמו LocateMeFab - עמודה אחת קבועה
+ * בצד שמאל, שהייתה קיימת כבר בעמוד הבית לפני הפרומפט הזה - לא ממציא
+ * מיקום חדש). *** תיקון נוסף (בקשה מפורשת - "הלשוניות בלי השם, רק
+ * האייקון"): שתי הפעולות עכשיו עיגולים קטנים עם אייקון בלבד (לא
+ * pill עם טקסט) - סטייל תואם לכפתור המצפן (LocateMeFab) הסמוך.
  */
 export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapActionsFabProps) {
   const [open, setOpen] = useState(false);
@@ -70,16 +64,13 @@ export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapAc
       )}
 
       <div
-        className="fixed z-40 flex flex-col items-end gap-2"
+        className="fixed z-40 flex flex-col items-center gap-2.5"
         style={{
-          right: "1rem",
+          left: "1.25rem",
           bottom: "calc(max(env(safe-area-inset-bottom), 22px) + 78px)",
         }}
       >
-        {/* תיבת "סינון" - שנייה מלמעלה בסדר ה-DOM, אבל מלמעלה ויזואלית
-            (flex-col-reverse למטה היה מסבך RTL/stagger - סדר ה-DOM כאן
-            כבר "סינון" למעלה, "הוספת מקום" למטה, קרוב ל-FAB, כמו שהתבקש). */}
-        <ActionPill
+        <ActionIcon
           visible={open}
           delayMs={90}
           label="סינון"
@@ -90,7 +81,7 @@ export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapAc
             onFilter();
           }}
         />
-        <ActionPill
+        <ActionIcon
           visible={open}
           delayMs={30}
           label="הוספת מקום"
@@ -129,7 +120,7 @@ export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapAc
   );
 }
 
-interface ActionPillProps {
+interface ActionIconProps {
   visible: boolean;
   delayMs: number;
   label: string;
@@ -138,32 +129,31 @@ interface ActionPillProps {
   onClick: () => void;
 }
 
-/** תיבת פעולה בודדת - pill קומפקטי, לא כפתור עגול. מוצג/נעלם תמיד
- *  (לא unmount/mount - כדי שהאנימציה ההפוכה בסגירה תרוץ חלק, לא
- *  "תיעלם בפתאומיות"), רק visibility/opacity/transform משתנים. */
-function ActionPill({ visible, delayMs, label, icon, badge, onClick }: ActionPillProps) {
+/** עיגול פעולה בודד - אייקון בלבד, בלי טקסט (בקשה מפורשת). מוצג/נעלם
+ *  תמיד (לא unmount/mount, כדי שהאנימציה ההפוכה בסגירה תרוץ חלק). */
+function ActionIcon({ visible, delayMs, label, icon, badge, onClick }: ActionIconProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
+      title={label}
       tabIndex={visible ? 0 : -1}
       aria-hidden={!visible}
-      className="relative flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[14px] bg-white px-3.5 text-[14px] font-semibold text-ink shadow-soft"
+      className="relative flex items-center justify-center rounded-full bg-white text-ink shadow-soft"
       style={{
+        width: 44,
         height: 44,
-        minWidth: 120,
-        maxWidth: 145,
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0) scale(1)" : "translateY(10px) scale(0.92)",
         transition: `opacity 240ms ease-out ${delayMs}ms, transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1) ${delayMs}ms`,
         pointerEvents: visible ? "auto" : "none",
       }}
     >
-      <span className="text-ink-secondary">{icon}</span>
-      <span>{label}</span>
+      {icon}
       {badge !== undefined && (
         <span
-          className="flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9.5px] font-bold leading-none text-white"
+          className="absolute -left-1 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9.5px] font-bold leading-none text-white"
           style={{ background: "var(--color-primary-start)" }}
         >
           {badge}

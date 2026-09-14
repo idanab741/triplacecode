@@ -53,19 +53,22 @@ export default function HomePage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
+  const [minRating, setMinRating] = useState(0);
   const [filteredPlaces, setFilteredPlaces] = useState<HomeMapPlace[]>([]);
   // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
   const homeMapRef = useRef<HomeMapHandle>(null);
 
-  // *** סעיף 9-11 בפרומפט - "שינוי הפילטרים צריך לעדכן את ה-markers
-  // של המפה ללא reload". כל שינוי בבחירות (אנשים/קטגוריות) מפעיל
-  // מחדש קריאה ל-/api/map/filtered-places ומעדכן את ה-state - אין
-  // "כפתור החל" נפרד, זה חי (live) כמו שהתבקש. "נקה הכל" (שני המערכים
-  // מתרוקנים) מחזיר לבסיס הקיים של המפה (בלי מרקרים נוספים) - לא
-  // "כל המקומות שקיימים" (מאות/אלפי שורות, לא היה קיים כפיצ'ר קודם
-  // ולא התבקש כאן במפורש להמציא אותו).
+  // *** סעיף 9-11 בפרומפט + תוספת מפורשת (דירוג + תתי-קטגוריה) -
+  // "שינוי הפילטרים צריך לעדכן את ה-markers של המפה ללא reload". כל
+  // שינוי בבחירות מפעיל מחדש קריאה ל-/api/map/filtered-places.
   useEffect(() => {
-    if (selectedPeople.length === 0 && selectedCategories.length === 0) {
+    if (
+      selectedPeople.length === 0 &&
+      selectedCategories.length === 0 &&
+      selectedSubcategories.length === 0 &&
+      minRating === 0
+    ) {
       setFilteredPlaces([]);
       return;
     }
@@ -75,6 +78,8 @@ export default function HomePage() {
     const params = new URLSearchParams();
     if (selectedPeople.length > 0) params.set("people", selectedPeople.join(","));
     if (placeCategoryValues.length > 0) params.set("categories", placeCategoryValues.join(","));
+    if (selectedSubcategories.length > 0) params.set("subcategories", selectedSubcategories.join(","));
+    if (minRating > 0) params.set("minRating", String(minRating));
 
     let cancelled = false;
     fetch(`/api/map/filtered-places?${params}`)
@@ -96,7 +101,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedPeople, selectedCategories]);
+  }, [selectedPeople, selectedCategories, selectedSubcategories, minRating]);
 
   // *** קיפול בגלילה - נשארים רק לוגו/חיפוש/קטגוריות (בקשה מפורשת
   // אחרונה: גם Header - אווטאר/מיקום/פעמון - מתקפל עכשיו יחד עם
@@ -315,7 +320,9 @@ export default function HomePage() {
       <MapActionsFab
         onAddPlace={() => setAddPlaceOpen(true)}
         onFilter={() => setFilterOpen(true)}
-        activeFilterCount={selectedPeople.length + selectedCategories.length}
+        activeFilterCount={
+          selectedPeople.length + selectedCategories.length + selectedSubcategories.length + (minRating > 0 ? 1 : 0)
+        }
       />
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
       {filterOpen && (
@@ -323,8 +330,12 @@ export default function HomePage() {
           onClose={() => setFilterOpen(false)}
           selectedPeople={selectedPeople}
           selectedCategories={selectedCategories}
+          selectedSubcategories={selectedSubcategories}
+          minRating={minRating}
           onChangePeople={setSelectedPeople}
           onChangeCategories={setSelectedCategories}
+          onChangeSubcategories={setSelectedSubcategories}
+          onChangeMinRating={setMinRating}
         />
       )}
 

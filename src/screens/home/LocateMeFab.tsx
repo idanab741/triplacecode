@@ -23,9 +23,12 @@ export function LocateMeFab({ onClick }: LocateMeFabProps) {
       className="fixed z-40 flex h-14 w-14 items-center justify-center rounded-full bg-white text-ink shadow-soft transition active:scale-95"
       style={{
         left: "1.25rem",
-        // מעל AddPlaceFab בדיוק: bottom שלו (78px מעל ה-nav) + הגובה
-        // שלו (56px, h-14) + רווח קטן (12px) ביניהם = 78+56+12=146px.
-        bottom: "calc(max(env(safe-area-inset-bottom), 22px) + 146px)",
+        // *** תיקון (בקשה מפורשת - FAB חוזר לצד שמאל + שתי פעולות
+        // (עיגולי אייקון 44px כל אחת) שנפתחות מעליו): כדי שהמצפן
+        // לא יתנגש עם שתי הפעולות כשהתפריט פתוח, הוא יושב מעל כל
+        // הערימה כולה: 78 (בסיס ה-+) + 52 (גובה ה-+) + 10 (רווח) +
+        // 44 (סינון) + 10 (רווח) + 44 (הוספת מקום) + 12 (רווח נשימה) = 250px.
+        bottom: "calc(max(env(safe-area-inset-bottom), 22px) + 250px)",
       }}
     >
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
