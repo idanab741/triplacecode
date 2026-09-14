@@ -38,7 +38,16 @@ export function HomeQuickCategories() {
         <Link
           key={category.id}
           href={buildHref(category.id)}
-          className="flex shrink-0 flex-col items-center gap-1.5"
+          // *** תיקון (בקשה מפורשת - "הרווחים צריכים להיות שווים, טקסט
+          // שתופס יותר מדי מקום שירד שורה"): לפני זה לא היה רוחב קבוע
+          // על הפריט - הטקסט (למשל "מסעדות וקולינריה") היה רחב יותר
+          // מהעיגול (60px) וקבע את רוחב העמודה לפי אורך המילה, כך
+          // שהרווחים בפועל בין העיגולים היו לא-אחידים (תלויים באורך
+          // התווית של כל קטגוריה). עכשיו לכל פריט רוחב קבוע וזהה
+          // (w-[76px], מעט רחב מהעיגול) - זה מבטיח מרווח אחיד תמיד,
+          // וטקסט ארוך יותר מהרוחב הזה פשוט עובר שורה (ר' span למטה)
+          // במקום "לדחוף" את שאר השורה.
+          className="flex w-[76px] shrink-0 flex-col items-center gap-1.5"
         >
           <span className="flex h-15 w-15 items-center justify-center overflow-hidden rounded-full shadow-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -56,7 +65,7 @@ export function HomeQuickCategories() {
               className="h-full w-full scale-125 object-cover"
             />
           </span>
-          <span className="text-xs font-medium text-ink">
+          <span className="w-full text-center text-xs font-medium leading-tight text-ink">
             {HOME_QUICK_CATEGORY_LABELS[category.id]}
           </span>
         </Link>
