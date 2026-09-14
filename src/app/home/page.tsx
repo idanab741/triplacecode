@@ -13,10 +13,11 @@ import { HomeHeader } from "@/screens/home/HomeHeader";
 import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { HomeQuickCategories } from "@/screens/home/HomeQuickCategories";
-import { AddPlaceFab } from "@/screens/home/AddPlaceFab";
+import { MapActionsFab } from "@/screens/home/MapActionsFab";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
+import { FilterModal } from "@/screens/home/FilterModal";
 import { LocateMeFab } from "@/screens/home/LocateMeFab";
-import type { HomeMapHandle } from "@/screens/home/HomeMap";
+import type { HomeMapHandle, HomeMapPlace } from "@/screens/home/HomeMap";
 
 // אותו דפוס דינמי-import בדיוק כמו NearbySection.tsx/DiscoveryPlacesMap -
 // Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR.
@@ -24,6 +25,20 @@ const HomeMap = dynamic(() => import("@/screens/home/HomeMap").then((m) => m.Hom
 
 /** סף תזוזה (בפיקסלים) לפני שמחווה נחשבת "כוונה אמיתית", לא רעד קטן. */
 const GESTURE_THRESHOLD_PX = 30;
+
+/** *** מיפוי בין 6 הקטגוריות של שורת "סוגי הטיול" (עמוד הבית) לבין
+ *  places.category האמיתי (5 ערכים בלבד - ר' constants/placeCategories.ts).
+ *  "שופינג" אין לו קטגוריית places תואמת עדיין - מערך ריק, לא מומצא
+ *  ערך חדש (הפילטר פשוט לא יחזיר תוצאות לקטגוריה הזו, זה אמיתי, לא
+ *  שגיאה). */
+const CATEGORY_TO_PLACE_CATEGORY: Record<string, string[]> = {
+  attraction: ["attractions"],
+  food: ["restaurants"],
+  shopping: [],
+  nature: ["nature"],
+  nightlife: ["nightlife"],
+  sleep: ["hotels"],
+};
 
 export default function HomePage() {
   const {
@@ -35,8 +50,53 @@ export default function HomePage() {
   const router = useRouter();
 
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [filteredPlaces, setFilteredPlaces] = useState<HomeMapPlace[]>([]);
   // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
   const homeMapRef = useRef<HomeMapHandle>(null);
+
+  // *** סעיף 9-11 בפרומפט - "שינוי הפילטרים צריך לעדכן את ה-markers
+  // של המפה ללא reload". כל שינוי בבחירות (אנשים/קטגוריות) מפעיל
+  // מחדש קריאה ל-/api/map/filtered-places ומעדכן את ה-state - אין
+  // "כפתור החל" נפרד, זה חי (live) כמו שהתבקש. "נקה הכל" (שני המערכים
+  // מתרוקנים) מחזיר לבסיס הקיים של המפה (בלי מרקרים נוספים) - לא
+  // "כל המקומות שקיימים" (מאות/אלפי שורות, לא היה קיים כפיצ'ר קודם
+  // ולא התבקש כאן במפורש להמציא אותו).
+  useEffect(() => {
+    if (selectedPeople.length === 0 && selectedCategories.length === 0) {
+      setFilteredPlaces([]);
+      return;
+    }
+    const placeCategoryValues = Array.from(
+      new Set(selectedCategories.flatMap((id) => CATEGORY_TO_PLACE_CATEGORY[id] ?? []))
+    );
+    const params = new URLSearchParams();
+    if (selectedPeople.length > 0) params.set("people", selectedPeople.join(","));
+    if (placeCategoryValues.length > 0) params.set("categories", placeCategoryValues.join(","));
+
+    let cancelled = false;
+    fetch(`/api/map/filtered-places?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setFilteredPlaces(
+          (data.places ?? []).map((p: { id: string; name: string; latitude: number; longitude: number }) => ({
+            id: p.id,
+            name: p.name,
+            latitude: p.latitude,
+            longitude: p.longitude,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setFilteredPlaces([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPeople, selectedCategories]);
 
   // *** קיפול בגלילה - נשארים רק לוגו/חיפוש/קטגוריות (בקשה מפורשת
   // אחרונה: גם Header - אווטאר/מיקום/פעמון - מתקפל עכשיו יחד עם
@@ -165,7 +225,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-bg">
       {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). */}
       <div className="fixed inset-0 z-0">
-        <HomeMap ref={homeMapRef} className="h-full w-full" />
+        <HomeMap ref={homeMapRef} className="h-full w-full" places={filteredPlaces} />
       </div>
 
       {/* *** קונטיינר-גלילה פנימי משלנו (לא html/body, שנעולים למעלה) -
@@ -252,8 +312,21 @@ export default function HomePage() {
       </div>
 
       <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} />
-      <AddPlaceFab onClick={() => setAddPlaceOpen(true)} />
+      <MapActionsFab
+        onAddPlace={() => setAddPlaceOpen(true)}
+        onFilter={() => setFilterOpen(true)}
+        activeFilterCount={selectedPeople.length + selectedCategories.length}
+      />
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
+      {filterOpen && (
+        <FilterModal
+          onClose={() => setFilterOpen(false)}
+          selectedPeople={selectedPeople}
+          selectedCategories={selectedCategories}
+          onChangePeople={setSelectedPeople}
+          onChangeCategories={setSelectedCategories}
+        />
+      )}
 
       <MainBottomNav active="home" />
     </div>

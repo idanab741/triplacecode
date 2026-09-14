@@ -29,7 +29,7 @@ function NavIcon({
 }
 
 interface MainBottomNavProps {
-  active: "home" | "favorites" | "ai" | "community" | "profile" | "places";
+  active: "home" | "favorites" | "ai" | "community" | "profile" | "places" | "tripworld";
   /** רק לעמודי place's: מחליף את העיגול המסתובב של Trippy AI בכפתור "+"
    *  ליצירת תוכן (סעיף 6 - בקשה מפורשת: "רק בעמוד של places, חשוב מאוד
    *  שלא תהרוס אותו"). כשלא מועבר (כל שאר האפליקציה) - האייקון, ה-glow
@@ -68,19 +68,18 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
       href: "/places",
     },
     { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
- {
-      id: "favorites",
-      label: "tripmatch",
+    {
+      id: "tripworld",
+      label: "TripWorld",
       icon: (
         <NavIcon
-          active={active === "favorites"}
-          activeSrc="/images/icon-trips-active.png"
-          inactiveSrc="/images/icon-trips-inactive.png"
-          alt="tripmatch"
-          scale={1}
+          active={active === "tripworld"}
+          activeSrc="/images/icon-tripworld-active.png"
+          inactiveSrc="/images/icon-tripworld-inactive.png"
+          alt="TripWorld"
         />
       ),
-    href: "/tripmatch",
+      href: "/tripworld",
     },
     {
       id: "profile",

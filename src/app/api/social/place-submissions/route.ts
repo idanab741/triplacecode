@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createPlaceSubmission, getMySubmissions, type PlaceSubmissionCategory } from "@/services/social/placeSubmissionService";
+import { enrichPlaceSubmission } from "@/services/social/placeSubmissionEnrichmentService";
 
-const VALID_CATEGORIES: PlaceSubmissionCategory[] = ["restaurant", "attraction", "nature", "nightlife", "hotel"];
+const VALID_CATEGORIES: PlaceSubmissionCategory[] = ["restaurant", "attraction", "nature", "nightlife", "hotel", "shopping"];
 
 export async function GET() {
   const supabase = await createClient();
@@ -25,8 +26,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const name = body?.name as string | undefined;
   const category = body?.category as PlaceSubmissionCategory | undefined;
+  const rating = body?.rating as number | undefined;
   if (!name?.trim() || !category || !VALID_CATEGORIES.includes(category)) {
     return NextResponse.json({ error: "חסר שם או קטגוריה לא תקינה" }, { status: 422 });
+  }
+  if (rating !== undefined && (typeof rating !== "number" || rating < 1 || rating > 5)) {
+    return NextResponse.json({ error: "דירוג חייב להיות בין 1 ל-5" }, { status: 422 });
   }
 
   try {
@@ -35,6 +40,7 @@ export async function POST(request: Request) {
       name: name.trim(),
       category,
       description: body?.description,
+      rating,
       city: body?.city,
       address: body?.address,
       latitude: body?.latitude,
@@ -44,6 +50,16 @@ export async function POST(request: Request) {
       googlePlaceId: body?.googlePlaceId,
       googlePhotoUrl: body?.googlePhotoUrl,
     });
+
+    // *** סעיף 7 בפרומפט - "לאחר שהמשתמש לחץ שמור מקום, המערכת משלימה
+    // ברקע". לא מחכים לתשובה (fire-and-forget) - התשובה למשתמש חוזרת
+    // מיד אחרי השמירה עצמה, ההשלמה לא אמורה לעכב את חוויית ה-UI.
+    // כשלון בהשלמה לא אמור להיכשיל את השמירה עצמה - ר' try/catch נפרד.
+    enrichPlaceSubmission(id).catch(() => {
+      // נבלע בכוונה - ההשלמה היא best-effort, לא קריטית לשמירה עצמה.
+      // enrichPlaceSubmission כבר מסמנת enrichment_status='failed' בעצמה.
+    });
+
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה" }, { status: 400 });
