@@ -142,7 +142,16 @@ export default function HomePage() {
           קטגוריות) מקבל בחזרה pointer-events-auto במפורש, כי זה
           התוכן היחיד שבאמת אמור להיות אטום/אינטראקטיבי. */}
       <div className="pointer-events-none relative z-10 mx-auto max-w-xl">
-        <div ref={grayCardRef} className="pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
+        {/* *** תיקון (בקשה מפורשת - "החלק האפור צריך להיות מקובע! לא
+            ייתכן שיהיה אפשר לגלול אותו למעלה ולראות את המפה מלמעלה!
+            דטרמיניסטי"): sticky top-0 מבטיח את זה **במוחלט**, לא רק
+            "בדרך כלל" לפי חישוב גובה/תזמון אנימציה - ברגע שגלילה הייתה
+            מזיזה את הכרטיס מעל y=0, sticky פשוט לא מאפשר את זה, הוא
+            נשאר מקובע שם. זה שונה מ-fixed: sticky עדיין תופס את מקומו
+            הרגיל בזרימת הדף (חשוב כדי שמנגנון ה-spacer/גובה-גלילה
+            שמפעיל את הקיפול ימשיך לעבוד בלי שינוי), רק "נתקע" בתחתית
+            ה-scroll שלו במקום להמשיך לזוז איתו. */}
+        <div ref={grayCardRef} className="sticky top-0 pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
           {/* Header - אווטאר/מיקום/פעמון - נשאר קבוע לגמרי, לא חלק
               מהקיפול (אושר מפורשות). */}
           <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
