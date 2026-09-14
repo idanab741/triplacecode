@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -38,6 +38,11 @@ export default function HomePage() {
   // אותה טכניקה בדיוק (grid-template-rows 0fr/1fr) שכבר הייתה קיימת
   // בעמוד הזה במקור למעבר Home->TripMatch, לא מנגנון אנימציה חדש.
   const [collapsed, setCollapsed] = useState(false);
+  // *** תיקון (Bug מפורש - "גוללים במפה למטה וזה מחזיר את החלק האפור,
+  // רק גרירה על החלק האפור עצמו צריכה להחזיר אותו"): ref לאלמנט של
+  // הכרטיס האפור עצמו - ר' useEffect למטה שמחבר את מחוות היציאה אליו
+  // ולא ל-window כולו.
+  const grayCardRef = useRef<HTMLDivElement>(null);
 
   // סף גלילה רגיל - אותה רוח בדיוק כמו StickyHeader.tsx הקיים
   // (visible = scrollY > 140). ה-spacer השקוף למטה (ר' JSX) הוא מה
@@ -55,8 +60,18 @@ export default function HomePage() {
   // קורס ל-0 עם הכניסה למצב מקופל, scrollY מתאפס מעצמו, אז אי אפשר
   // להסתמך על עוד scrollY כדי לצאת - אותו דפוס wheel/touch הפוך
   // שכבר היה קיים כאן קודם ליציאה מ-TripMatch המוטמע.
+  //
+  // *** תיקון (Bug מפורש - "ברגע שגוללים מהטלפון גם במפה למטה - אז
+  // החלק האפור חוזר לגודל מלא - צריך שרק אם אני מחליק על החלק האפור
+  // הוא חוזר"): הגרסה הקודמת חיברה את ה-listeners ל-window כולו - כל
+  // גרירה כלפי מטה בכל מקום במסך, כולל גרירה על המפה עצמה (שתופסת את
+  // רוב המסך במצב מקופל), נתפסה בטעות כמחוות היציאה. עכשיו מחוברים
+  // ספציפית לאלמנט של הכרטיס האפור עצמו (grayCardRef) - גרירה על המפה
+  // כבר לא נוגעת במנגנון הזה בכלל, רק גרירה שמתחילה בפועל על הכרטיס.
   useEffect(() => {
     if (!collapsed) return;
+    const card = grayCardRef.current;
+    if (!card) return;
 
     let gestureEnabled = false;
     const enableTimer = setTimeout(() => {
@@ -80,14 +95,14 @@ export default function HomePage() {
       if (currentY - touchStartY > 24) exitIfAtTop();
     }
 
-    window.addEventListener("wheel", handleWheel, { passive: true });
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    card.addEventListener("wheel", handleWheel, { passive: true });
+    card.addEventListener("touchstart", handleTouchStart, { passive: true });
+    card.addEventListener("touchmove", handleTouchMove, { passive: true });
     return () => {
       clearTimeout(enableTimer);
-      window.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchmove", handleTouchMove);
+      card.removeEventListener("wheel", handleWheel);
+      card.removeEventListener("touchstart", handleTouchStart);
+      card.removeEventListener("touchmove", handleTouchMove);
     };
   }, [collapsed]);
 
@@ -127,7 +142,7 @@ export default function HomePage() {
           קטגוריות) מקבל בחזרה pointer-events-auto במפורש, כי זה
           התוכן היחיד שבאמת אמור להיות אטום/אינטראקטיבי. */}
       <div className="pointer-events-none relative z-10 mx-auto max-w-xl">
-        <div className="pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
+        <div ref={grayCardRef} className="pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
           {/* Header - אווטאר/מיקום/פעמון - נשאר קבוע לגמרי, לא חלק
               מהקיפול (אושר מפורשות). */}
           <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
