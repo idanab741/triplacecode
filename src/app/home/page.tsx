@@ -48,6 +48,37 @@ export default function HomePage() {
   // ולא ל-window כולו.
   const grayCardRef = useRef<HTMLDivElement>(null);
 
+  // *** תיקון ישיר ברמת JS (Bug נמשך - "עדיין גורר למטה ורואים את המפה
+  // למעלה"): overscroll-behavior ב-CSS (globals.css) לא נאכף באופן
+  // אמין בתוך WebView של Natively - זה אפקט ה"ריבאונד" הילידי של
+  // iOS/WKWebView, שלא תמיד נשלט ע"י CSS בכלל בסוג הזה של קונטיינר.
+  // זה תיקון ישיר על אירועי המגע עצמם, לא תלוי בתמיכת ה-WebView ב-CSS
+  // property ספציפי: כשכבר בראש הדף (scrollY=0) והאצבע ממשיכה לגרור
+  // כלפי מטה (בדיוק המחווה שגורמת לריבאונד), preventDefault() עוצר
+  // את ההתנהגות הילידית של הדפדפן/WebView לגמרי - לפני שהיא מספיקה
+  // לזוז ולחשוף את המפה. לא חוסם שום JS אחר (כולל את הגרירה על המפה
+  // עצמה - Leaflet מטפל בפאן שלו ידנית ב-JS, לא דרך default browser
+  // behavior, אז אינו מושפע מ-preventDefault כאן).
+  useEffect(() => {
+    let touchStartY = 0;
+    function handleTouchStart(e: TouchEvent) {
+      touchStartY = e.touches[0]?.clientY ?? 0;
+    }
+    function handleTouchMove(e: TouchEvent) {
+      const currentY = e.touches[0]?.clientY ?? 0;
+      const draggingDown = currentY - touchStartY > 0;
+      if (window.scrollY <= 0 && draggingDown) {
+        e.preventDefault();
+      }
+    }
+    document.addEventListener("touchstart", handleTouchStart, { passive: true });
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    return () => {
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, []);
+
   // סף גלילה רגיל - אותה רוח בדיוק כמו StickyHeader.tsx הקיים
   // (visible = scrollY > 140). ה-spacer השקוף למטה (ר' JSX) הוא מה
   // שנותן לדף בכלל גובה-גלילה לבצע את המחווה הזו - המפה עצמה כבר
