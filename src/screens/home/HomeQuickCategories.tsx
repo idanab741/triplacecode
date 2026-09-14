@@ -31,7 +31,7 @@ export function HomeQuickCategories() {
   return (
     <div
       ref={scrollRef}
-      className="flex gap-4 overflow-x-auto ps-6 pb-1"
+      className="flex gap-2 overflow-x-auto ps-6 pb-1"
       style={{ scrollbarWidth: "none" }}
     >
       {HOME_QUICK_CATEGORIES.map((category) => (

@@ -183,7 +183,18 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-xl">
           {/* sticky top-0 - קיבוע ודאי שהכרטיס לא "יגלוש" מעל ראש
               המסך (נשאר גם עכשיו, שכבת הגנה נוספת מעל נעילת html/body). */}
-          <div ref={grayCardRef} className="sticky top-0 pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
+          <div
+            ref={grayCardRef}
+            className="sticky top-0 pointer-events-auto overflow-hidden rounded-b-[50px]"
+            // *** תיקון (בקשה מפורשת - "יש לבן מעל הלוגו... הלוגו קרוב
+            // מידי"): padding-top לפי safe-area-inset-top - מבטיח שצבע
+            // הרקע הלבנדר של הכרטיס ימשיך/יתפוס את השטח מתחת לפס
+            // הסטטוס (אם ה-WebView בעורך "edge-to-edge"), ולא ישאיר
+            // שם רקע לבן חשוף. בנוסף לרווח נוסף מתחת ללוגו עצמו (ר'
+            // ה-className שלו למטה) - שני התיקונים ביחד נותנים ללוגו
+            // מרחק נשימה אמיתי מהאזור הזה, במקום צמידות ישירה.
+            style={{ backgroundColor: "#e5e6f4", paddingTop: "env(safe-area-inset-top)" }}
+          >
             {/* *** Header - אווטאר/מיקום/פעמון - עכשיו מתקפל *יחד* עם
                 ה-HERO (בקשה מפורשת אחרונה - "יעלמו גם המיקום שלי,
                 ההתראות והפרופיל... שהלוגו יהיה הכי עליון באפור מוקטן").
@@ -209,8 +220,11 @@ export default function HomePage() {
 
             {/* לוגו TRIPLACE - קבוע, לא חלק מהקיפול. במצב מקופל
                 (Header+HERO בגובה 0) הוא הופך אוטומטית לאלמנט הכי
-                עליון בכרטיס - בדיוק כמו שביקשת. */}
-            <div className={`relative z-10 flex justify-center ${collapsed ? "-mt-1" : "-mt-5"}`}>
+                עליון בכרטיס. *** תיקון (בקשה מפורשת - "הלוגו קרוב
+                מידי לחלק העליון"): במצב מקופל, במקום margin שלילי
+                (שהיה מצמיד אותו ישר לקצה) - padding-top חיובי קטן,
+                שנותן לו רווח נשימה אמיתי מלמעלה. */}
+            <div className={`relative z-10 flex justify-center ${collapsed ? "pt-3" : "-mt-5"}`}>
               <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={140} height={43} className="object-contain" />
             </div>
 
