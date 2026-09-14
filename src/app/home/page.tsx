@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,15 +13,17 @@ import { HomeHeader } from "@/screens/home/HomeHeader";
 import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { QuickCategories } from "@/screens/home/QuickCategories";
-import { DiscoverCard } from "@/screens/home/DiscoverCard";
-import { TrendingSection } from "@/screens/home/TrendingSection";
-import { PersonalizedMatchesSection } from "@/screens/home/PersonalizedMatchesSection";
-import { NearbySection } from "@/screens/home/NearbySection";
-import { CommunitySection } from "@/screens/home/CommunitySection";
-import { MyTripsSection } from "@/screens/home/MyTripsSection";
-import { PartnersSection } from "@/screens/home/PartnersSection";
-import { TripMatchPageContent } from "@/app/tripmatch/page";
-import { BackButton } from "@/components/ui";
+import { AddPlaceFab } from "@/screens/home/AddPlaceFab";
+import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
+
+// אותו דפוס דינמי-import בדיוק כמו NearbySection.tsx/DiscoveryPlacesMap -
+// Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR. לא רכיב מפה חדש
+// (HomeMap.tsx עצמו מרכיב מחדש את MapTilerBaseLayer/fallback הקיימים).
+const HomeMap = dynamic(() => import("@/screens/home/HomeMap").then((m) => m.HomeMap), { ssr: false });
+
+/** גובה המפה במצב הרגיל (מיד מתחת לאזור האפור/לבנדר - "מפה גדולה",
+ *  לא כרטיס קטן). ר' הערה על מצב Map Explore למטה לגבי הגובה השני. */
+const MAP_HEIGHT_DEFAULT = "min(60vh, 480px)";
 
 export default function HomePage() {
   const {
@@ -31,55 +34,67 @@ export default function HomePage() {
   } = useAuth();
   const router = useRouter();
 
-  // *** שורת החיפוש הופכת לנקודת הכניסה ל-TripMatch (Audit - "Home →
-  // Scroll → TripMatch"): ברגע שיש טקסט, ה-Home "גולל" את עצמו - Hero/
-  // Header/Search נעלמים למעלה, סוגי הטיול (QuickCategories) נשארים
-  // כ-anchor קבוע, ו-TripMatch הקיים (TripMatchPageContent, מוטמע -
-  // embedded prop) נחשף ישירות מתחתיהם, בלי router.push/שינוי URL. מחיקת
-  // הטקסט מבצעת בדיוק את האנימציה ההפוכה וחוזרת למצב ההתחלתי.
-  const [tripMatchQuery, setTripMatchQuery] = useState("");
-  const inTripMatchMode = tripMatchQuery.trim().length > 0;
-  // *** משמש כ-key על SearchBarLink כדי לאפס אותה (מרענן את הרכיב, מנקה
-  // את הטקסט שהוקלד) בחזרה מ-TripMatch למצב ההתחלתי - הבחירה עצמה
-  // (destinationMode) לא "מדווחת" יותר על כל הקשה, אלא רק כשמשלימים
-  // יעד קיים, אז אין state חיצוני שאפשר לאפס ישירות מ-Home.
-  const [searchResetKey, setSearchResetKey] = useState(0);
+  // *** שינוי מבני (פרומפט חדש - "TRIPLACE Home redesign, שלב 1"):
+  // מצב "Map Explore" - כשהמשתמש גולל למטה, האזור האפור/לבנדר העליון
+  // מתקפל (grid-template-rows 0fr/1fr, אותה טכניקה בדיוק שהייתה קיימת
+  // כאן קודם למעבר Home->TripMatch המוטמע - ממחזרים אותה, לא ממציאים
+  // מנגנון אנימציה חדש) והמפה מתרחבת למסך כמעט מלא, עם Header קומפקטי
+  // (לוגו בלבד) למעלה ו-Bottom Nav קבוע למטה.
+  const [mapExplore, setMapExplore] = useState(false);
+  const [addPlaceOpen, setAddPlaceOpen] = useState(false);
 
-  function handleExitTripMatch() {
-    setTripMatchQuery("");
-    setSearchResetKey((k) => k + 1);
-  }
-
-  // *** תיקון (בקשה מפורשת - "ברגע שגוללים למעלה זה מאפשר חזרה לעמוד
-  // הבית"): כשכבר בראש הדף (scrollY=0) וממשיכים "לגלול למעלה" בעכבר -
-  // יוצאים בחזרה למצב ה-Home הרגיל, בדיוק כמו מחיקת הטקסט.
-  // *** תיקון (Audit - "יש מנגנון קפיצה לדף הבית באמצע ההחלקה!"):
-  // הגרסה הקודמת האזינה גם ל-touchmove ברמת הדף - אבל זו **בדיוק** אותה
-  // סוג תנועה שה-Swipe Card עצמו משתמש בה כדי לגרור כרטיס ימינה/שמאלה!
-  // כל swipe אמיתי על כרטיס (שכמעט תמיד כולל גם קצת תנועה אנכית, לא
-  // רק אופקית טהורה) נקלט בטעות גם ע"י ה-listener הזה ברמת ה-window,
-  // וגרם ליציאה אוטומטית **תוך כדי** ההחלקה עצמה. הוסר לגמרי - נשאר רק
-  // המחווה בעכבר/trackpad (wheel), שלא מתנגשת עם swipe במגע בכלל
-  // (input שונה לחלוטין).
+  // כניסה ל-Map Explore: סף גלילה רגיל (window.scrollY), באותה רוח כמו
+  // StickyHeader.tsx הקיים (visible = scrollY > 140). ברגע שנכנסים למצב
+  // Map Explore האזור המתקפל+ה-spacer מתכווצים ל-0 (ר' JSX למטה) - הדף
+  // נעשה קצר מגובה המסך, אז הדפדפן "מאפס" את scrollY מעצמו. היציאה
+  // חזרה במעלה (סעיף 3 בפרומפט) לכן לא יכולה להסתמך על scrollY נוסף -
+  // נעשית דרך מחוות wheel/touch הפוכות בזמן שנמצאים בראש הדף, בדיוק
+  // אותו דפוס בדיוק שהיה קיים כאן קודם ליציאה מ-TripMatch המוטמע.
   useEffect(() => {
-    if (!inTripMatchMode) return;
+    function handleScroll() {
+      if (!mapExplore && window.scrollY > 90) setMapExplore(true);
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [mapExplore]);
+
+  useEffect(() => {
+    if (!mapExplore) return;
 
     let gestureEnabled = false;
     const enableTimer = setTimeout(() => {
       gestureEnabled = true;
-    }, 900);
+    }, 500);
+
+    function exitIfAtTop() {
+      if (gestureEnabled && window.scrollY <= 0) setMapExplore(false);
+    }
 
     function handleWheel(e: WheelEvent) {
-      if (gestureEnabled && window.scrollY <= 0 && e.deltaY < -8) handleExitTripMatch();
+      if (window.scrollY <= 0 && e.deltaY < -8) exitIfAtTop();
+    }
+
+    let touchStartY = 0;
+    function handleTouchStart(e: TouchEvent) {
+      touchStartY = e.touches[0]?.clientY ?? 0;
+    }
+    function handleTouchMove(e: TouchEvent) {
+      const currentY = e.touches[0]?.clientY ?? 0;
+      // אצבע זזה כלפי מטה (מושכת תוכן למטה) בזמן שכבר בראש הדף = אותה
+      // כוונה בדיוק כמו wheel כלפי מעלה - "תראה לי מה שיש מעל".
+      if (currentY - touchStartY > 24) exitIfAtTop();
     }
 
     window.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
     return () => {
       clearTimeout(enableTimer);
       window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inTripMatchMode]);
+  }, [mapExplore]);
 
   useEffect(() => {
     if (loading || profileLoading || !user) return;
@@ -103,101 +118,87 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg pb-28">
+      {/* Header קומפקטי - לוגו TRIPLACE בלבד, מוצג רק במצב Map Explore
+          (סעיף 3 בפרומפט: "בחלק העליון נשאר Header קטן ונקי עם לוגו
+          TRIPLACE בלבד"). fixed כדי שיישאר צמוד למעלה גם כשהמפה תופסת
+          כמעט את כל גובה המסך. /images/triplace-logo-black.png - אותו
+          קובץ לוגו בדיוק שכבר משמש את כל שאר ה-headers הפשוטים באפליקציה
+          (SimpleAppHeader וכו'), לא נכס חדש. */}
+      <div
+        className={`fixed inset-x-0 top-0 z-40 flex justify-center bg-bg/95 py-3 shadow-[0_2px_10px_rgba(16,24,40,0.06)] backdrop-blur-sm transition-opacity duration-300 ${
+          mapExplore ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      >
+        <div className="mx-auto w-full max-w-xl px-5">
+          <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={110} height={34} className="object-contain" />
+        </div>
+      </div>
+
       <div className="mx-auto max-w-xl">
         <div className="overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
-          {/* חלק "מתגלגל" - הכל שמעל סוגי הטיול. grid-template-rows
-              0fr/1fr (במקום max-height בפיקסלים קבועים) כדי שהאנימציה
-              תתאים לגובה האמיתי של התוכן (כולל שם משתמש ארוך/הגדרות
-              נגישות) בלי לנחש ערך ולסכן קיטוע. */}
+          {/* האזור האפור/לבנדר - זהה עיצובית/מבנית למה שהיה קיים
+              (לוגו+ברכה+חיפוש+קטגוריות עגולות), בלי לגעת בעיצוב שלו.
+              השינוי היחיד בו: שורת החיפוש (למטה) הפכה לחיפוש כללי. */}
           <div
             className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: inTripMatchMode ? "0fr" : "1fr" }}
+            style={{ gridTemplateRows: mapExplore ? "0fr" : "1fr" }}
           >
-            <div className={inTripMatchMode ? "overflow-hidden" : "overflow-visible"}>
+            <div className={mapExplore ? "overflow-hidden" : "overflow-visible"}>
               <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
               <HomeHero />
 
               <div className="flex flex-col">
                 <GreetingBlock name={displayName} loading={loading || profileLoading} />
                 <div className="mt-4">
-                  <SearchBarLink
-                    key={searchResetKey}
-                    destinationMode
-                    onSelectDestination={(label) => setTripMatchQuery(label)}
-                  />
+                  {/* *** סעיף 1 בפרומפט - "יש לבטל את ההתנהגות הזאת
+                      [קשירה ל-TripMatch] ולהפוך את השדה לחיפוש כללי
+                      בתוך TRIPLACE... בחירה בתוצאה צריכה לפתוח את עמוד
+                      המקום המתאים". SearchBarLink כבר תומך בדיוק בזה
+                      כברירת המחדל שלו (destinationMode=false, לא מועבר
+                      כאן יותר): autocomplete כללי מול
+                      /api/places/search-autocomplete, ובחירה מנווטת
+                      ל-/search/result?placeId=... (עמוד המקום). לא
+                      נבנה מנוע חיפוש חדש - רק הוסרו ה-props
+                      (destinationMode/onSelectDestination) שקישרו את
+                      השדה ל-TripMatch. */}
+                  <SearchBarLink />
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* לוגו TripMatch ממורכז - מופיע רק אחרי שמשלימים יעד קיים,
-              במקום שורת החיפוש/הירו שקרסו. עדיין מעל סוגי הטיול, בתוך
-              אותו בלוק לבנדר בדיוק. החץ-חזרה (שהיה קודם בבר הלבן הישן
-              בתוך TripMatch עצמו - הוסר משם) יושב כאן, באותה שורה,
-              בצד שמאל. */}
-          <div
-            className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: inTripMatchMode ? "1fr" : "0fr" }}
-          >
-            <div className="overflow-hidden">
-              <div className="relative flex items-center justify-center py-3">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                  <BackButton onBack={handleExitTripMatch} />
-                </div>
-                <Image src="/images/trip-tripmatch-logo.png" alt="TripMatch" width={140} height={43} className="object-contain" />
+              <div className="pb-6 pt-7">
+                <QuickCategories />
               </div>
             </div>
-          </div>
-
-          {/* סוגי הטיול - ה-anchor הקבוע. לא זז, לא משתנה עיצובית - רק
-              "נשאר בראש המסך" ברגע שהחלק שמעליו קורס. הרקע האפור/לבנדר
-              (על ה-div העוטף מלמעלה) נשאר איתם בדיוק, כי הוא אחיד לכל
-              התוכן שבתוך אותו div - לא ממשיך מתחתם לתוך TripMatch. */}
-          <div className={inTripMatchMode ? "pb-6 pt-1" : "pb-6 pt-7"}>
-            <QuickCategories />
           </div>
         </div>
 
-        {inTripMatchMode ? (
-          // *** TripMatch מוטמע - אותה קומפוננטה בדיוק כמו עמוד /tripmatch
-          // העצמאי (embedded=true רק מסתיר chrome כפול - Screen/BottomNav/
-          // חזרה-בניווט; שום שינוי בעיצוב/UI/לוגיקת ה-swipe של TripMatch
-          // עצמו). היעד עובר כפי שנבחר, בלי לאפס אותו.
-          <Suspense fallback={null}>
-            <TripMatchPageContent embedded initialCityQuery={tripMatchQuery} onExitEmbedded={handleExitTripMatch} />
-          </Suspense>
-        ) : (
-          <>
-            {/* תיקון (בקשה מפורשת - "גלה עוד ישר מתחת לסוג הטיול" +
-                "השותפים צריך להיות אחרון"): גלה עוד ראשון מתחת ל-Trip
-                Types (בגודל המקורי), הטיולים שלי אחריו, והשותפים עברו
-                לסוף לגמרי - אחרי כל 5 הסקשנים החדשים.
-                תיקון (בקשה מפורשת - "הרווחים בין כל בלוק לא זהים"):
-                כל התוכן הזה היה מפוצל ל-3 div-ים נפרדים, כל אחד עם
-                pt/pb משלו - בגבול שבין שני div-ים העיטופים הצטברו
-                זה על זה (pb של האחד + pt של הבא), ויצרו רווח *גדול
-                יותר* בדיוק בנקודות המעבר בין הבלוקים, לעומת ה-gap
-                האחיד בתוך כל div. עכשיו הכל div אחד, gap-6 יחיד -
-                בדיוק אותו רווח בין כל שני בלוקים לאורך כל העמוד.
-                תיקון (בקשה מפורשת - "להעלים את הכפתור place's מדף
-                הבית"): באנר הכניסה הנפרד ל-place's (PlacesEntryBanner)
-                הוסר מכאן לגמרי - הכניסה היחידה שנשארה היא שקופית
-                ה-places בתוך DiscoverCard, מתחת לשער סיסמה. */}
-            <div className="flex flex-col gap-6 pb-6 pt-5">
-              <DiscoverCard />
-              <MyTripsSection />
-              <TrendingSection />
-              <PersonalizedMatchesSection />
-              <NearbySection />
-              <CommunitySection />
-              <PartnersSection />
-            </div>
-          </>
-        )}
+        {/* *** סעיף 2 בפרומפט - "מיד לאחר סיום האזור האפור/לבנדר יש
+            להציג מפה גדולה... המפה מחליפה את התוכן שמופיע כיום מתחת
+            לאזור העליון". כל תוכן ה"עוד בשבילך" הקודם (DiscoverCard/
+            MyTripsSection/TrendingSection/PersonalizedMatchesSection/
+            NearbySection/CommunitySection/PartnersSection) לא נמחק -
+            הקומפוננטות והלוגיקה שלהן נשארות בקוד בדיוק כפי שהיו
+            (src/screens/home/*.tsx), רק כבר לא מיובאות/מוצגות כאן.
+            הן יעברו לעמוד TripWorld בפרומפט נפרד. */}
+        <div
+          className="relative w-full overflow-hidden transition-[height] duration-300 ease-out"
+          style={{ height: mapExplore ? "calc(100dvh - 148px)" : MAP_HEIGHT_DEFAULT }}
+        >
+          <HomeMap className="h-full w-full" />
+        </div>
+
+        {/* Spacer שקוף - נותן לדף גובה גלילה אמיתי כדי שמחוות הגלילה
+            למטה (סעיף 3) תיקלט בכלל, כשאין עוד תוכן קבוע מתחת למפה.
+            מתכווץ יחד עם הכניסה ל-Map Explore, לא רכיב תוכן. */}
+        <div aria-hidden style={{ height: mapExplore ? 0 : "40vh" }} />
       </div>
 
-      <MainBottomNav active={inTripMatchMode ? "favorites" : "home"} />
+      {/* כפתור הוספת מקום - צף מעל ה-Bottom Navigation, נגיש בשני
+          המצבים (סעיף 4). לחיצה פותחת רק Modal, בלי גלילה/Bottom Sheet. */}
+      <AddPlaceFab onClick={() => setAddPlaceOpen(true)} />
+      {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
+
+      <MainBottomNav active="home" />
     </div>
   );
 }
-
