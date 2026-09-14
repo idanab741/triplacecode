@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,9 @@ import type { HomeMapHandle } from "@/screens/home/HomeMap";
 // Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR.
 const HomeMap = dynamic(() => import("@/screens/home/HomeMap").then((m) => m.HomeMap), { ssr: false });
 
+/** סף תזוזה (בפיקסלים) לפני שמחווה נחשבת "כוונה אמיתית", לא רעד קטן. */
+const GESTURE_THRESHOLD_PX = 30;
+
 export default function HomePage() {
   const {
     user,
@@ -35,74 +38,75 @@ export default function HomePage() {
   // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
   const homeMapRef = useRef<HomeMapHandle>(null);
 
-  // *** קיפול בגלילה (בקשה מפורשת, אושרה בסבב שאלות נפרד): בגלילה
-  // למטה, ה-HERO (תמונת המסקוט) והברכה האישית מתקפלים ונעלמים - נשארים
-  // Header (אווטאר+מיקום+פעמון), הלוגו (triplace-logo-black.png,
-  // ממוקם קבוע בין ה-HERO לברכה - ר' JSX), שורת חיפוש, וסוגי הטיול.
-  // אותה טכניקה בדיוק (grid-template-rows 0fr/1fr) שכבר הייתה קיימת
-  // בעמוד הזה במקור למעבר Home->TripMatch, לא מנגנון אנימציה חדש.
+  // *** קיפול בגלילה - נשארים רק לוגו/חיפוש/קטגוריות (בקשה מפורשת
+  // אחרונה: גם Header - אווטאר/מיקום/פעמון - מתקפל עכשיו יחד עם
+  // ה-HERO/ברכה, כך שהלוגו הופך לעליון ביותר במצב מקופל).
   const [collapsed, setCollapsed] = useState(false);
-  // *** תיקון (Bug מפורש - "גוללים במפה למטה וזה מחזיר את החלק האפור,
-  // רק גרירה על החלק האפור עצמו צריכה להחזיר אותו"): ref לאלמנט של
-  // הכרטיס האפור עצמו - ר' useEffect למטה שמחבר את מחוות היציאה אליו
-  // ולא ל-window כולו.
   const grayCardRef = useRef<HTMLDivElement>(null);
 
-  // *** תיקון ישיר ברמת JS (Bug נמשך - "עדיין גורר למטה ורואים את המפה
-  // למעלה"): overscroll-behavior ב-CSS (globals.css) לא נאכף באופן
-  // אמין בתוך WebView של Natively - זה אפקט ה"ריבאונד" הילידי של
-  // iOS/WKWebView, שלא תמיד נשלט ע"י CSS בכלל בסוג הזה של קונטיינר.
-  // זה תיקון ישיר על אירועי המגע עצמם, לא תלוי בתמיכת ה-WebView ב-CSS
-  // property ספציפי: כשכבר בראש הדף (scrollY=0) והאצבע ממשיכה לגרור
-  // כלפי מטה (בדיוק המחווה שגורמת לריבאונד), preventDefault() עוצר
-  // את ההתנהגות הילידית של הדפדפן/WebView לגמרי - לפני שהיא מספיקה
-  // לזוז ולחשוף את המפה. לא חוסם שום JS אחר (כולל את הגרירה על המפה
-  // עצמה - Leaflet מטפל בפאן שלו ידנית ב-JS, לא דרך default browser
-  // behavior, אז אינו מושפע מ-preventDefault כאן).
+  // *** תיקון יסודי (Bug נמשך פעמיים - "גוררים למטה ורואים את המפה
+  // מלמעלה", "החיפוש נעלם עם המקלדת"): אישרת שזה נבדק בתוך אפליקציית
+  // Natively באייפון (WKWebView) - שם יש אפקט "ריבאונד" (bounce)
+  // ילידי של iOS על **גלילת הדף הראשית** (html/body) שלא תמיד נשלט
+  // ע"י CSS/JS רגילים על העמוד. הפתרון הנכון בסביבת WebView כזו:
+  // לנעול לגמרי את גלילת html/body (רק בזמן שעמוד הבית מותקן - לא
+  // משפיע על שאר האפליקציה), ולהעביר את כל הגלילה בפועל לתוך
+  // קונטיינר-div רגיל משלנו (ר' JSX, overflow-y-auto) - גלילה בתוך
+  // div רגיל לא סובלת מה-bounce הילידי של הדף הראשי ב-WKWebView.
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
+
+  // *** תיקון יסודי נוסף (אותו Bug + "החיפוש נעלם עם המקלדת, רק
+  // במצב הרגיל"): הגרסה הקודמת קבעה קיפול/הרחבה לפי **מיקום גלילה**
+  // (window.scrollY > סף) - זה בדיוק מה ששבר את שורת החיפוש: כשפותחים
+  // מקלדת על שדה חיפוש, הדפדפן/WebView גולל אוטומטית את הדף כדי
+  // להראות את השדה מעל המקלדת - גלילה **לא קשורה בכלל** לכוונת
+  // המשתמש לקפל, אבל חצתה את הסף ותפעלה קיפול לא-רצוי, שהעלים תוכן
+  // מסביב לשדה עצמו. הפתרון: קיפול/הרחבה כבר לא תלויים במיקום גלילה
+  // בכלל - רק במחוות מפורשות (wheel/touch drag) שמתחילות בפועל על
+  // הכרטיס האפור. גלילה שקורית מסיבה אחרת (כמו התאמת מקלדת) לא
+  // נוגעת במנגנון הזה כלל.
+  useEffect(() => {
+    if (collapsed) return;
+    const card = grayCardRef.current;
+    if (!card) return;
+
+    function handleWheel(e: WheelEvent) {
+      if (e.deltaY > 12) setCollapsed(true);
+    }
+
     let touchStartY = 0;
     function handleTouchStart(e: TouchEvent) {
       touchStartY = e.touches[0]?.clientY ?? 0;
     }
     function handleTouchMove(e: TouchEvent) {
       const currentY = e.touches[0]?.clientY ?? 0;
-      const draggingDown = currentY - touchStartY > 0;
-      if (window.scrollY <= 0 && draggingDown) {
-        e.preventDefault();
-      }
+      // אצבע זזה כלפי מעלה (מושכת תוכן כלפי מעלה) = כוונת "גלול למטה".
+      if (touchStartY - currentY > GESTURE_THRESHOLD_PX) setCollapsed(true);
     }
-    document.addEventListener("touchstart", handleTouchStart, { passive: true });
-    document.addEventListener("touchmove", handleTouchMove, { passive: false });
-    return () => {
-      document.removeEventListener("touchstart", handleTouchStart);
-      document.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, []);
 
-  // סף גלילה רגיל - אותה רוח בדיוק כמו StickyHeader.tsx הקיים
-  // (visible = scrollY > 140). ה-spacer השקוף למטה (ר' JSX) הוא מה
-  // שנותן לדף בכלל גובה-גלילה לבצע את המחווה הזו - המפה עצמה כבר
-  // "fixed" ברקע ולא תלויה בגובה הזה בכלל.
-  useEffect(() => {
-    function handleScroll() {
-      if (!collapsed && window.scrollY > 90) setCollapsed(true);
-    }
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    card.addEventListener("wheel", handleWheel, { passive: true });
+    card.addEventListener("touchstart", handleTouchStart, { passive: true });
+    card.addEventListener("touchmove", handleTouchMove, { passive: true });
+    return () => {
+      card.removeEventListener("wheel", handleWheel);
+      card.removeEventListener("touchstart", handleTouchStart);
+      card.removeEventListener("touchmove", handleTouchMove);
+    };
   }, [collapsed]);
 
-  // יציאה חזרה (גלילה/משיכה למעלה בזמן שכבר בראש הדף) - כשה-spacer
-  // קורס ל-0 עם הכניסה למצב מקופל, scrollY מתאפס מעצמו, אז אי אפשר
-  // להסתמך על עוד scrollY כדי לצאת - אותו דפוס wheel/touch הפוך
-  // שכבר היה קיים כאן קודם ליציאה מ-TripMatch המוטמע.
-  //
-  // *** תיקון (Bug מפורש - "ברגע שגוללים מהטלפון גם במפה למטה - אז
-  // החלק האפור חוזר לגודל מלא - צריך שרק אם אני מחליק על החלק האפור
-  // הוא חוזר"): הגרסה הקודמת חיברה את ה-listeners ל-window כולו - כל
-  // גרירה כלפי מטה בכל מקום במסך, כולל גרירה על המפה עצמה (שתופסת את
-  // רוב המסך במצב מקופל), נתפסה בטעות כמחוות היציאה. עכשיו מחוברים
-  // ספציפית לאלמנט של הכרטיס האפור עצמו (grayCardRef) - גרירה על המפה
-  // כבר לא נוגעת במנגנון הזה בכלל, רק גרירה שמתחילה בפועל על הכרטיס.
+  // יציאה חזרה (מחווה הפוכה) - אותו דפוס בדיוק, סימטרי לכניסה. לא
+  // תלוי במיקום גלילה, רק בכך שהמחווה עצמה מתחילה על הכרטיס האפור.
   useEffect(() => {
     if (!collapsed) return;
     const card = grayCardRef.current;
@@ -111,14 +115,10 @@ export default function HomePage() {
     let gestureEnabled = false;
     const enableTimer = setTimeout(() => {
       gestureEnabled = true;
-    }, 500);
-
-    function exitIfAtTop() {
-      if (gestureEnabled && window.scrollY <= 0) setCollapsed(false);
-    }
+    }, 400);
 
     function handleWheel(e: WheelEvent) {
-      if (window.scrollY <= 0 && e.deltaY < -8) exitIfAtTop();
+      if (gestureEnabled && e.deltaY < -12) setCollapsed(false);
     }
 
     let touchStartY = 0;
@@ -127,7 +127,7 @@ export default function HomePage() {
     }
     function handleTouchMove(e: TouchEvent) {
       const currentY = e.touches[0]?.clientY ?? 0;
-      if (currentY - touchStartY > 24) exitIfAtTop();
+      if (gestureEnabled && currentY - touchStartY > GESTURE_THRESHOLD_PX) setCollapsed(false);
     }
 
     card.addEventListener("wheel", handleWheel, { passive: true });
@@ -163,89 +163,78 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-bg">
-      {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). לא מושפעת
-          מהקיפול/גלילה למטה בכלל - היא כבר "מלאה" תמיד. */}
+      {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). */}
       <div className="fixed inset-0 z-0">
         <HomeMap ref={homeMapRef} className="h-full w-full" />
       </div>
 
-      {/* *** תיקון מקיף יותר (Bug נמשך - "המפה עדיין תקועה"): במקום
-          לרדוף אחרי כל div שקוף בנפרד (spacer וכו'), ה-wrapper כולו
-          מקבל pointer-events-none - כל מגע/גרירה "עובר דרכו" ומגיע
-          למפה שמתחתיו כברירת מחדל. רק האזור שבאמת צריך לחסום את המפה
-          (הכרטיס האפור האטום עצמו - header/hero/לוגו/ברכה/חיפוש/
-          קטגוריות) מקבל בחזרה pointer-events-auto במפורש, כי זה
-          התוכן היחיד שבאמת אמור להיות אטום/אינטראקטיבי. */}
-      <div className="pointer-events-none relative z-10 mx-auto max-w-xl">
-        {/* *** תיקון (בקשה מפורשת - "החלק האפור צריך להיות מקובע! לא
-            ייתכן שיהיה אפשר לגלול אותו למעלה ולראות את המפה מלמעלה!
-            דטרמיניסטי"): sticky top-0 מבטיח את זה **במוחלט**, לא רק
-            "בדרך כלל" לפי חישוב גובה/תזמון אנימציה - ברגע שגלילה הייתה
-            מזיזה את הכרטיס מעל y=0, sticky פשוט לא מאפשר את זה, הוא
-            נשאר מקובע שם. זה שונה מ-fixed: sticky עדיין תופס את מקומו
-            הרגיל בזרימת הדף (חשוב כדי שמנגנון ה-spacer/גובה-גלילה
-            שמפעיל את הקיפול ימשיך לעבוד בלי שינוי), רק "נתקע" בתחתית
-            ה-scroll שלו במקום להמשיך לזוז איתו. */}
-        <div ref={grayCardRef} className="sticky top-0 pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
-          {/* Header - אווטאר/מיקום/פעמון - נשאר קבוע לגמרי, לא חלק
-              מהקיפול (אושר מפורשות). */}
-          <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
-
-          {/* HERO - מתקפל ונעלם בגלילה למטה. */}
-          <div
-            className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
-          >
-            <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
-              <HomeHero />
+      {/* *** קונטיינר-גלילה פנימי משלנו (לא html/body, שנעולים למעלה) -
+          overflow-y-auto מאפשר עדיין גלילה אמיתית כשצריך (למשל כדי
+          שהדפדפן יוכל להראות שדה חיפוש ממוקד מעל מקלדת) בלי לסבול
+          מה-bounce הילידי של WKWebView. overscroll-behavior:contain +
+          WebkitOverflowScrolling:touch - התנהגות גלילה חלקה, בלי
+          "לדלוף" scroll chaining חזרה לדף הראשי הנעול. pointer-events
+          כמו קודם - שקוף לגמרי חוץ מהכרטיס האפור עצמו, כדי שהמפה
+          תישאר נגישה למגע בכל שטח ריק. */}
+      <div
+        className="pointer-events-none fixed inset-0 z-10 overflow-y-auto overscroll-contain"
+        style={{ WebkitOverflowScrolling: "touch" } as CSSProperties}
+      >
+        <div className="relative mx-auto max-w-xl">
+          {/* sticky top-0 - קיבוע ודאי שהכרטיס לא "יגלוש" מעל ראש
+              המסך (נשאר גם עכשיו, שכבת הגנה נוספת מעל נעילת html/body). */}
+          <div ref={grayCardRef} className="sticky top-0 pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
+            {/* *** Header - אווטאר/מיקום/פעמון - עכשיו מתקפל *יחד* עם
+                ה-HERO (בקשה מפורשת אחרונה - "יעלמו גם המיקום שלי,
+                ההתראות והפרופיל... שהלוגו יהיה הכי עליון באפור מוקטן").
+                נשאר גלוי במצב הרגיל בלבד. */}
+            <div
+              className="grid transition-[grid-template-rows] duration-300 ease-out"
+              style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+            >
+              <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
+                <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+              </div>
             </div>
-          </div>
 
-          {/* לוגו TRIPLACE - ללא רקע/כרית, חופף מעט את ה-HERO במצב
-              הרגיל. במצב מקופל (HERO בגובה 0) אותו margin שלילי היה
-              מצמיד אותו יותר מדי ל-Header שמעליו - לכן פחות margin
-              שלילי (רווח קצת יותר גדול מ"המיקום שלי") רק כשמקופלים. */}
-          <div className={`relative z-10 flex justify-center ${collapsed ? "-mt-1" : "-mt-5"}`}>
-            <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={140} height={43} className="object-contain" />
-          </div>
-
-          {/* ברכה אישית - מתקפלת ונעלמת בגלילה למטה, יחד עם ה-HERO
-              (שני grid-ים נפרדים עם אותו state, כדי שהלוגו יוכל לשבת
-              קבוע ביניהם בלי להיות חלק מאף אחד מהם). */}
-          <div
-            className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
-          >
-            <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
-              <GreetingBlock name={displayName} loading={loading || profileLoading} />
+            {/* HERO - מתקפל ונעלם בגלילה למטה. */}
+            <div
+              className="grid transition-[grid-template-rows] duration-300 ease-out"
+              style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+            >
+              <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
+                <HomeHero />
+              </div>
             </div>
-          </div>
 
-          {/* *** סעיף 1 - שורת חיפוש כללית (destinationMode לא מועבר,
-              ברירת המחדל של SearchBarLink כבר תומכת בחיפוש מקומות
-              כללי + ניווט לעמוד המקום). נשארת קבועה, לא חלק מהקיפול. */}
-          <div className={collapsed ? "mt-1" : "mt-4"}>
-            <SearchBarLink />
-          </div>
+            {/* לוגו TRIPLACE - קבוע, לא חלק מהקיפול. במצב מקופל
+                (Header+HERO בגובה 0) הוא הופך אוטומטית לאלמנט הכי
+                עליון בכרטיס - בדיוק כמו שביקשת. */}
+            <div className={`relative z-10 flex justify-center ${collapsed ? "-mt-1" : "-mt-5"}`}>
+              <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={140} height={43} className="object-contain" />
+            </div>
 
-          {/* קטגוריות/סוגי הטיול - נשארות קבועות, לא חלק מהקיפול. */}
-          <div className={collapsed ? "pb-6 pt-4" : "pb-6 pt-7"}>
-            <HomeQuickCategories />
+            {/* ברכה אישית - מתקפלת ונעלמת בגלילה למטה. */}
+            <div
+              className="grid transition-[grid-template-rows] duration-300 ease-out"
+              style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+            >
+              <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
+                <GreetingBlock name={displayName} loading={loading || profileLoading} />
+              </div>
+            </div>
+
+            {/* שורת חיפוש כללית - נשארת קבועה, לא חלק מהקיפול. */}
+            <div className={collapsed ? "mt-1" : "mt-4"}>
+              <SearchBarLink />
+            </div>
+
+            {/* קטגוריות/סוגי הטיול - נשארות קבועות, לא חלק מהקיפול. */}
+            <div className={collapsed ? "pb-6 pt-4" : "pb-6 pt-7"}>
+              <HomeQuickCategories />
+            </div>
           </div>
         </div>
-
-        {/* Spacer שקוף - נותן לדף גובה גלילה אמיתי כדי שמחוות הגלילה
-            למטה תיקלט בכלל (המפה עצמה fixed, לא תלויה בזה). נעלם
-            כשמקופלים - אין תוכן קבוע נוסף שדורש גובה בהמשך.
-            *** תיקון (Bug - "למה אני לא מצליח לגלול במפה?"): בלי
-            pointer-events-none, ה-div הזה (למרות שהוא שקוף/לא-נראה)
-            עדיין "תופס" כל מגע/גרירה שקורה בשטח שלו - בדיוק השטח שבו
-            רואים את המפה "מציצה" מתחתיו. המגע היה נבלע כאן ולא מגיע
-            בכלל למפה. pointer-events-none נותן למגע "לעבור דרכו" -
-            עדיין תופס גובה-גלילה לצורך הקיפול, אבל לא חוסם אינטראקציה
-            עם מה שמתחתיו. */}
-        <div aria-hidden className="pointer-events-none" style={{ height: collapsed ? 0 : "35vh" }} />
-
       </div>
 
       <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} />
