@@ -45,18 +45,6 @@ export function MapTilerBaseLayer() {
       apiKey: MAPTILER_KEY,
       style: MapStyle.DATAVIZ,
       language: Language.HEBREW,
-      // *** תיקון (Bug - "הפלוס שבור" + עיגול "N" מוזר על המפה): ל-
-      // MaptilerLayer יש את בקרות ה-UI המובנות שלו (navigationControl -
-      // זוג כפתורי זום +/- ביחד עם כפתור מצפן/bearing, geolocateControl)
-      // שמתווספות אוטומטית **בנוסף** לבקרת הזום הרגילה של Leaflet עצמו
-      // (ה-prop `zoomControl` על MapContainer) - שתי בקרות זום נפרדות,
-      // חופפות, במקומות שונים על אותה מפה. מבטלים את הבקרות המובנות
-      // של MapTiler ומשאירים רק את זו של Leaflet (עקבית עם כל שאר
-      // המפות באפליקציה - DiscoveryPlacesMap/ResultMap - שאף פעם לא
-      // הציגו בקרות כפולות כי שם scrollWheelZoom/zoomControl היו כבויים
-      // ברוב המקרים, אז הבאג הזה פשוט לא היה נראה לעין קודם).
-      navigationControl: false,
-      geolocateControl: false,
     }).addTo(map);
 
     // *** תיקון (בקשת המשתמש - "בלי הקו האדום"): הניסיון הקודם קרס עם
