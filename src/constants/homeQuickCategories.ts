@@ -27,11 +27,6 @@ export interface HomeQuickCategoryDefinition {
 
 export const HOME_QUICK_CATEGORIES: HomeQuickCategoryDefinition[] = [
   {
-    id: "nature",
-    colorVar: "--color-category-green",
-    imageSrc: "/images/categories/cat-nature.png",
-  },
-  {
     id: "attraction",
     colorVar: "--color-primary-start",
     imageSrc: "/images/categories/cat-attraction.png",
@@ -42,6 +37,16 @@ export const HOME_QUICK_CATEGORIES: HomeQuickCategoryDefinition[] = [
     imageSrc: "/images/categories/cat-food.png",
   },
   {
+    id: "shopping",
+    colorVar: "--color-category-pink",
+    imageSrc: "/images/categories/cat-shopping.png",
+  },
+  {
+    id: "nature",
+    colorVar: "--color-category-green",
+    imageSrc: "/images/categories/cat-nature.png",
+  },
+  {
     id: "nightlife",
     colorVar: "--color-category-blue",
     imageSrc: "/images/categories/cat-nightlife.png",
@@ -50,11 +55,6 @@ export const HOME_QUICK_CATEGORIES: HomeQuickCategoryDefinition[] = [
     id: "sleep",
     colorVar: "--color-category-purple",
     imageSrc: "/images/categories/cat-sleep.png",
-  },
-  {
-    id: "shopping",
-    colorVar: "--color-category-pink",
-    imageSrc: "/images/categories/cat-shopping.png",
   },
 ];
 

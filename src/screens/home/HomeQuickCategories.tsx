@@ -45,7 +45,15 @@ export function HomeQuickCategories() {
             <img
               src={category.imageSrc}
               alt={HOME_QUICK_CATEGORY_LABELS[category.id]}
-              className="h-full w-full object-cover"
+              // *** תיקון (בקשה מפורשת - "מסביב מסגרת לבנה - לא צריך
+              // אותה"): קבצי המקור הם ריבועים (בסגנון אייקון אפליקציה)
+              // עם מסגרת/הילה בהירה דקה קרוב לשוליים שלהם - כש-object-
+              // cover ממסגר אותם לתוך עיגול, בדיוק השוליים האלה נחתכים
+              // ל"טבעת" דקה ונראית ליד קצה העיגול. scale-125 מגדיל את
+              // התמונה ביחס למסגרת העיגולה שלה (לא את העיגול עצמו) -
+              // כך שרק המרכז (בלי המסגרת הבהירה) מוצג, לא "ממציא"
+              // תמונה חדשה, רק מבטל את הצורך להציג את קצוות המקור.
+              className="h-full w-full scale-125 object-cover"
             />
           </span>
           <span className="text-xs font-medium text-ink">
