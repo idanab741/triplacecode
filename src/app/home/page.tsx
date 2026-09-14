@@ -12,18 +12,13 @@ import { HomeHero } from "@/screens/home/HomeHero";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
-import { QuickCategories } from "@/screens/home/QuickCategories";
+import { HomeQuickCategories } from "@/screens/home/HomeQuickCategories";
 import { AddPlaceFab } from "@/screens/home/AddPlaceFab";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 
 // אותו דפוס דינמי-import בדיוק כמו NearbySection.tsx/DiscoveryPlacesMap -
-// Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR. לא רכיב מפה חדש
-// (HomeMap.tsx עצמו מרכיב מחדש את MapTilerBaseLayer/fallback הקיימים).
+// Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR.
 const HomeMap = dynamic(() => import("@/screens/home/HomeMap").then((m) => m.HomeMap), { ssr: false });
-
-/** גובה המפה במצב הרגיל (מיד מתחת לאזור האפור/לבנדר - "מפה גדולה",
- *  לא כרטיס קטן). ר' הערה על מצב Map Explore למטה לגבי הגובה השני. */
-const MAP_HEIGHT_DEFAULT = "min(60vh, 480px)";
 
 export default function HomePage() {
   const {
@@ -34,32 +29,34 @@ export default function HomePage() {
   } = useAuth();
   const router = useRouter();
 
-  // *** שינוי מבני (פרומפט חדש - "TRIPLACE Home redesign, שלב 1"):
-  // מצב "Map Explore" - כשהמשתמש גולל למטה, האזור האפור/לבנדר העליון
-  // מתקפל (grid-template-rows 0fr/1fr, אותה טכניקה בדיוק שהייתה קיימת
-  // כאן קודם למעבר Home->TripMatch המוטמע - ממחזרים אותה, לא ממציאים
-  // מנגנון אנימציה חדש) והמפה מתרחבת למסך כמעט מלא, עם Header קומפקטי
-  // (לוגו בלבד) למעלה ו-Bottom Nav קבוע למטה.
-  const [mapExplore, setMapExplore] = useState(false);
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
 
-  // כניסה ל-Map Explore: סף גלילה רגיל (window.scrollY), באותה רוח כמו
-  // StickyHeader.tsx הקיים (visible = scrollY > 140). ברגע שנכנסים למצב
-  // Map Explore האזור המתקפל+ה-spacer מתכווצים ל-0 (ר' JSX למטה) - הדף
-  // נעשה קצר מגובה המסך, אז הדפדפן "מאפס" את scrollY מעצמו. היציאה
-  // חזרה במעלה (סעיף 3 בפרומפט) לכן לא יכולה להסתמך על scrollY נוסף -
-  // נעשית דרך מחוות wheel/touch הפוכות בזמן שנמצאים בראש הדף, בדיוק
-  // אותו דפוס בדיוק שהיה קיים כאן קודם ליציאה מ-TripMatch המוטמע.
+  // *** קיפול בגלילה (בקשה מפורשת, אושרה בסבב שאלות נפרד): בגלילה
+  // למטה, ה-HERO (תמונת המסקוט) והברכה האישית מתקפלים ונעלמים - נשארים
+  // Header (אווטאר+מיקום+פעמון), הלוגו (triplace-logo-black.png,
+  // ממוקם קבוע בין ה-HERO לברכה - ר' JSX), שורת חיפוש, וסוגי הטיול.
+  // אותה טכניקה בדיוק (grid-template-rows 0fr/1fr) שכבר הייתה קיימת
+  // בעמוד הזה במקור למעבר Home->TripMatch, לא מנגנון אנימציה חדש.
+  const [collapsed, setCollapsed] = useState(false);
+
+  // סף גלילה רגיל - אותה רוח בדיוק כמו StickyHeader.tsx הקיים
+  // (visible = scrollY > 140). ה-spacer השקוף למטה (ר' JSX) הוא מה
+  // שנותן לדף בכלל גובה-גלילה לבצע את המחווה הזו - המפה עצמה כבר
+  // "fixed" ברקע ולא תלויה בגובה הזה בכלל.
   useEffect(() => {
     function handleScroll() {
-      if (!mapExplore && window.scrollY > 90) setMapExplore(true);
+      if (!collapsed && window.scrollY > 90) setCollapsed(true);
     }
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [mapExplore]);
+  }, [collapsed]);
 
+  // יציאה חזרה (גלילה/משיכה למעלה בזמן שכבר בראש הדף) - כשה-spacer
+  // קורס ל-0 עם הכניסה למצב מקופל, scrollY מתאפס מעצמו, אז אי אפשר
+  // להסתמך על עוד scrollY כדי לצאת - אותו דפוס wheel/touch הפוך
+  // שכבר היה קיים כאן קודם ליציאה מ-TripMatch המוטמע.
   useEffect(() => {
-    if (!mapExplore) return;
+    if (!collapsed) return;
 
     let gestureEnabled = false;
     const enableTimer = setTimeout(() => {
@@ -67,7 +64,7 @@ export default function HomePage() {
     }, 500);
 
     function exitIfAtTop() {
-      if (gestureEnabled && window.scrollY <= 0) setMapExplore(false);
+      if (gestureEnabled && window.scrollY <= 0) setCollapsed(false);
     }
 
     function handleWheel(e: WheelEvent) {
@@ -80,8 +77,6 @@ export default function HomePage() {
     }
     function handleTouchMove(e: TouchEvent) {
       const currentY = e.touches[0]?.clientY ?? 0;
-      // אצבע זזה כלפי מטה (מושכת תוכן למטה) בזמן שכבר בראש הדף = אותה
-      // כוונה בדיוק כמו wheel כלפי מעלה - "תראה לי מה שיש מעל".
       if (currentY - touchStartY > 24) exitIfAtTop();
     }
 
@@ -94,7 +89,7 @@ export default function HomePage() {
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
     };
-  }, [mapExplore]);
+  }, [collapsed]);
 
   useEffect(() => {
     if (loading || profileLoading || !user) return;
@@ -117,84 +112,83 @@ export default function HomePage() {
   const displayName = isGuest ? null : getFirstName(profile?.full_name);
 
   return (
-    <div className="min-h-screen bg-bg pb-28">
-      {/* Header קומפקטי - לוגו TRIPLACE בלבד, מוצג רק במצב Map Explore
-          (סעיף 3 בפרומפט: "בחלק העליון נשאר Header קטן ונקי עם לוגו
-          TRIPLACE בלבד"). fixed כדי שיישאר צמוד למעלה גם כשהמפה תופסת
-          כמעט את כל גובה המסך. /images/triplace-logo-black.png - אותו
-          קובץ לוגו בדיוק שכבר משמש את כל שאר ה-headers הפשוטים באפליקציה
-          (SimpleAppHeader וכו'), לא נכס חדש. */}
-      <div
-        className={`fixed inset-x-0 top-0 z-40 flex justify-center bg-bg/95 py-3 shadow-[0_2px_10px_rgba(16,24,40,0.06)] backdrop-blur-sm transition-opacity duration-300 ${
-          mapExplore ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      >
-        <div className="mx-auto w-full max-w-xl px-5">
-          <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={110} height={34} className="object-contain" />
-        </div>
+    <div className="min-h-screen bg-bg">
+      {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). לא מושפעת
+          מהקיפול/גלילה למטה בכלל - היא כבר "מלאה" תמיד. */}
+      <div className="fixed inset-0 z-0">
+        <HomeMap className="h-full w-full" />
       </div>
 
-      <div className="mx-auto max-w-xl">
-        <div className="overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
-          {/* האזור האפור/לבנדר - זהה עיצובית/מבנית למה שהיה קיים
-              (לוגו+ברכה+חיפוש+קטגוריות עגולות), בלי לגעת בעיצוב שלו.
-              השינוי היחיד בו: שורת החיפוש (למטה) הפכה לחיפוש כללי. */}
+      {/* *** תיקון מקיף יותר (Bug נמשך - "המפה עדיין תקועה"): במקום
+          לרדוף אחרי כל div שקוף בנפרד (spacer וכו'), ה-wrapper כולו
+          מקבל pointer-events-none - כל מגע/גרירה "עובר דרכו" ומגיע
+          למפה שמתחתיו כברירת מחדל. רק האזור שבאמת צריך לחסום את המפה
+          (הכרטיס האפור האטום עצמו - header/hero/לוגו/ברכה/חיפוש/
+          קטגוריות) מקבל בחזרה pointer-events-auto במפורש, כי זה
+          התוכן היחיד שבאמת אמור להיות אטום/אינטראקטיבי. */}
+      <div className="pointer-events-none relative z-10 mx-auto max-w-xl">
+        <div className="pointer-events-auto overflow-hidden rounded-b-[50px]" style={{ backgroundColor: "#e5e6f4" }}>
+          {/* Header - אווטאר/מיקום/פעמון - נשאר קבוע לגמרי, לא חלק
+              מהקיפול (אושר מפורשות). */}
+          <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+
+          {/* HERO - מתקפל ונעלם בגלילה למטה. */}
           <div
             className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: mapExplore ? "0fr" : "1fr" }}
+            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
           >
-            <div className={mapExplore ? "overflow-hidden" : "overflow-visible"}>
-              <HomeHeader avatarUrl={profile?.avatar_url} loading={loading || profileLoading} />
+            <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
               <HomeHero />
-
-              <div className="flex flex-col">
-                <GreetingBlock name={displayName} loading={loading || profileLoading} />
-                <div className="mt-4">
-                  {/* *** סעיף 1 בפרומפט - "יש לבטל את ההתנהגות הזאת
-                      [קשירה ל-TripMatch] ולהפוך את השדה לחיפוש כללי
-                      בתוך TRIPLACE... בחירה בתוצאה צריכה לפתוח את עמוד
-                      המקום המתאים". SearchBarLink כבר תומך בדיוק בזה
-                      כברירת המחדל שלו (destinationMode=false, לא מועבר
-                      כאן יותר): autocomplete כללי מול
-                      /api/places/search-autocomplete, ובחירה מנווטת
-                      ל-/search/result?placeId=... (עמוד המקום). לא
-                      נבנה מנוע חיפוש חדש - רק הוסרו ה-props
-                      (destinationMode/onSelectDestination) שקישרו את
-                      השדה ל-TripMatch. */}
-                  <SearchBarLink />
-                </div>
-              </div>
-
-              <div className="pb-6 pt-7">
-                <QuickCategories />
-              </div>
             </div>
+          </div>
+
+          {/* לוגו TRIPLACE - ללא רקע/כרית, חופף מעט את ה-HERO במצב
+              הרגיל. במצב מקופל (HERO בגובה 0) אותו margin שלילי היה
+              מצמיד אותו יותר מדי ל-Header שמעליו - לכן פחות margin
+              שלילי (רווח קצת יותר גדול מ"המיקום שלי") רק כשמקופלים. */}
+          <div className={`relative z-10 flex justify-center ${collapsed ? "-mt-1" : "-mt-5"}`}>
+            <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={140} height={43} className="object-contain" />
+          </div>
+
+          {/* ברכה אישית - מתקפלת ונעלמת בגלילה למטה, יחד עם ה-HERO
+              (שני grid-ים נפרדים עם אותו state, כדי שהלוגו יוכל לשבת
+              קבוע ביניהם בלי להיות חלק מאף אחד מהם). */}
+          <div
+            className="grid transition-[grid-template-rows] duration-300 ease-out"
+            style={{ gridTemplateRows: collapsed ? "0fr" : "1fr" }}
+          >
+            <div className={collapsed ? "overflow-hidden" : "overflow-visible"}>
+              <GreetingBlock name={displayName} loading={loading || profileLoading} />
+            </div>
+          </div>
+
+          {/* *** סעיף 1 - שורת חיפוש כללית (destinationMode לא מועבר,
+              ברירת המחדל של SearchBarLink כבר תומכת בחיפוש מקומות
+              כללי + ניווט לעמוד המקום). נשארת קבועה, לא חלק מהקיפול. */}
+          <div className={collapsed ? "mt-1" : "mt-4"}>
+            <SearchBarLink />
+          </div>
+
+          {/* קטגוריות/סוגי הטיול - נשארות קבועות, לא חלק מהקיפול. */}
+          <div className={collapsed ? "pb-6 pt-4" : "pb-6 pt-7"}>
+            <HomeQuickCategories />
           </div>
         </div>
 
-        {/* *** סעיף 2 בפרומפט - "מיד לאחר סיום האזור האפור/לבנדר יש
-            להציג מפה גדולה... המפה מחליפה את התוכן שמופיע כיום מתחת
-            לאזור העליון". כל תוכן ה"עוד בשבילך" הקודם (DiscoverCard/
-            MyTripsSection/TrendingSection/PersonalizedMatchesSection/
-            NearbySection/CommunitySection/PartnersSection) לא נמחק -
-            הקומפוננטות והלוגיקה שלהן נשארות בקוד בדיוק כפי שהיו
-            (src/screens/home/*.tsx), רק כבר לא מיובאות/מוצגות כאן.
-            הן יעברו לעמוד TripWorld בפרומפט נפרד. */}
-        <div
-          className="relative w-full overflow-hidden transition-[height] duration-300 ease-out"
-          style={{ height: mapExplore ? "calc(100dvh - 148px)" : MAP_HEIGHT_DEFAULT }}
-        >
-          <HomeMap className="h-full w-full" />
-        </div>
-
         {/* Spacer שקוף - נותן לדף גובה גלילה אמיתי כדי שמחוות הגלילה
-            למטה (סעיף 3) תיקלט בכלל, כשאין עוד תוכן קבוע מתחת למפה.
-            מתכווץ יחד עם הכניסה ל-Map Explore, לא רכיב תוכן. */}
-        <div aria-hidden style={{ height: mapExplore ? 0 : "40vh" }} />
+            למטה תיקלט בכלל (המפה עצמה fixed, לא תלויה בזה). נעלם
+            כשמקופלים - אין תוכן קבוע נוסף שדורש גובה בהמשך.
+            *** תיקון (Bug - "למה אני לא מצליח לגלול במפה?"): בלי
+            pointer-events-none, ה-div הזה (למרות שהוא שקוף/לא-נראה)
+            עדיין "תופס" כל מגע/גרירה שקורה בשטח שלו - בדיוק השטח שבו
+            רואים את המפה "מציצה" מתחתיו. המגע היה נבלע כאן ולא מגיע
+            בכלל למפה. pointer-events-none נותן למגע "לעבור דרכו" -
+            עדיין תופס גובה-גלילה לצורך הקיפול, אבל לא חוסם אינטראקציה
+            עם מה שמתחתיו. */}
+        <div aria-hidden className="pointer-events-none" style={{ height: collapsed ? 0 : "35vh" }} />
+
       </div>
 
-      {/* כפתור הוספת מקום - צף מעל ה-Bottom Navigation, נגיש בשני
-          המצבים (סעיף 4). לחיצה פותחת רק Modal, בלי גלילה/Bottom Sheet. */}
       <AddPlaceFab onClick={() => setAddPlaceOpen(true)} />
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
 

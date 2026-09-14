@@ -133,19 +133,25 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
           onKeyDown={(e) => {
             if (e.key === "Enter") handleEnter();
           }}
-          placeholder="מה הmatch שלך ליעד הבא?"
+          placeholder={destinationMode ? "מה הmatch שלך ליעד הבא?" : "חפש מסעדה, מלון, אטרקציה..."}
           className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
         />
-        {/* לוגו TripMatch קטן ומעומעם בצד שמאל של השורה - filter: grayscale
-            מוריד ממנו את הצבע, opacity מעדן אותו עוד. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/trip-tripmatch-logo.png"
-          alt=""
-          aria-hidden="true"
-          className="h-6 w-auto shrink-0 object-contain"
-          style={{ filter: "grayscale(1)", opacity: 0.35 }}
-        />
+        {/* *** תיקון (Bug - "לא נראה טוב"): לוגו/פלייסהולדר TripMatch
+            נשארו מוצגים גם אחרי שהחיפוש הפך לחיפוש מקומות כללי (ברירת
+            המחדל, destinationMode=false) - חוסר עקביות ויזואלית מול
+            ההתנהגות בפועל. עכשיו הלוגו הזה (ו-placeholder ה"match")
+            מוצגים רק כש-destinationMode=true בפועל - השימוש היחיד
+            שנותר עבורו הוא עתידי/חיצוני, לא נמחק, רק מוצג בהקשר הנכון. */}
+        {destinationMode && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/images/trip-tripmatch-logo.png"
+            alt=""
+            aria-hidden="true"
+            className="h-6 w-auto shrink-0 object-contain"
+            style={{ filter: "grayscale(1)", opacity: 0.35 }}
+          />
+        )}
       </div>
 
       {!destinationMode && focused && placeSuggestions.length > 0 && (

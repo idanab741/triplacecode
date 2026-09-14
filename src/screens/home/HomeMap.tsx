@@ -73,13 +73,41 @@ function RecenterOnLocation({ center }: { center: [number, number] }) {
 }
 
 /**
- * מפה אינטראקטיבית גדולה לעמוד הבית (סעיף 2+5 בפרומפט - "לא תמונת
- * רקע", "להשתמש בתשתית המפות שכבר קיימת ולא ליצור מערכת מפות חדשה
- * במקביל"). ממחזרת בדיוק את אותה שכבת בסיס/גיבוי כמו
- * DiscoveryPlacesMap.tsx ו-ResultMap.tsx (MapTilerBaseLayer + fallback
- * ל-OSM), רק בפריסה מלאה (h-full/w-full דרך ה-container שמגדיר את
- * הגובה מבחוץ) ועם zoom/scroll פעילים - כאן המפה היא חוויית המסך
- * המרכזית, לא כרטיס קטן בתוך עמוד.
+ * *** תיקון (Bug - "המפה נראית שבורה/רק חלק קטן שלה נטען"): Leaflet
+ * מודד את גודל ה-container שלו **פעם אחת** בזמן האתחול (getSize) ולא
+ * מזהה לבד שינויי גודל מאוחרים יותר - הוא פשוט ממשיך לצייר אריחים
+ * לפי המידה המקורית ההיא. אצלנו זה קורה בשני מקרים בדיוק: (1) הטעינה
+ * הדינמית (dynamic import, ssr:false) לפעמים ממריאה לפני שההורה (עם
+ * ה-height שמגיע מ-style חיצוני) התייצב לגמרי בפריסה, אז Leaflet
+ * "תופס" מידה קטנה/שגויה כבר בהתחלה; (2) המעבר ל-Map Explore משנה את
+ * גובה ה-container באנימציה (transition על height) - שינוי גודל
+ * לגיטימי לגמרי אחרי שה-map כבר קיים, ש-Leaflet לא מודע אליו כלל בלי
+ * שמישהו קורא ל-invalidateSize() באופן מפורש.
+ *
+ * הפתרון הסטנדרטי (מתועד רשמית ב-Leaflet): ResizeObserver על ה-DOM
+ * element האמיתי של המפה (map.getContainer()) שקורא ל-invalidateSize()
+ * בכל שינוי מידה בפועל - כולל המדידה הראשונה מיד עם ה-observe (מתקן
+ * גם את (1)), וכל שינוי מאוחר יותר כתוצאה מהאנימציה (מתקן גם את (2)).
+ * לא תלוי בניחוש טיימינג/setTimeout - תגובתי לגודל האמיתי בפועל.
+ */
+function InvalidateSizeOnResize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+/**
+ * מפה אינטראקטיבית לעמוד הבית - כרטיס בגודל קבוע (לא מסך מלא, ר'
+ * הערה ב-page.tsx). ממחזרת בדיוק את אותה שכבת בסיס/גיבוי כמו
+ * DiscoveryPlacesMap.tsx/ResultMap.tsx (MapTilerBaseLayer + fallback
+ * ל-OSM) - לא נבנתה תשתית מפות חדשה.
  *
  * חובה לייבא רכיב זה עם `dynamic(..., { ssr: false })` (כמו ש-
  * NearbySection.tsx כבר עושה ל-DiscoveryPlacesMap) - Leaflet משתמש
@@ -101,15 +129,23 @@ export function HomeMap({ places = [], className }: HomeMapProps) {
   }, []);
 
   return (
-    <div className={`${IS_USING_FALLBACK_TILES ? "map-branded" : ""} ${className ?? ""}`}>
+    <div
+      className={`home-map-fixed-gesture ${IS_USING_FALLBACK_TILES ? "map-branded" : ""} ${className ?? ""}`}
+      // *** גיבוי מפורש נוסף (מעבר ל-h-full/w-full דרך ה-className) -
+      // מבטיח שה-wrapper עצמו תמיד תופס 100% מההורה שלו (שכבר קובע
+      // גובה אמיתי ב-px/calc משלו ב-page.tsx), גם אם משהו בשרשרת
+      // ה-Tailwind classes לא נטען כמצופה. לא סותר את ה-className.
+      style={{ position: "relative", height: "100%", width: "100%" }}
+    >
       <MapContainer
         center={center}
         zoom={DEFAULT_ZOOM}
-        scrollWheelZoom
+        scrollWheelZoom={false}
         zoomControl
-        className="h-full w-full"
+        style={{ height: "100%", width: "100%" }}
         attributionControl={false}
       >
+        <InvalidateSizeOnResize />
         <AttributionControl position="bottomright" prefix={false} />
         {IS_USING_FALLBACK_TILES ? (
           <TileLayer

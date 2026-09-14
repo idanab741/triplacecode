@@ -77,6 +77,32 @@ body {
   filter: grayscale(1) brightness(1.15) sepia(0.6) hue-rotate(185deg) saturate(2.2) contrast(0.95);
 }
 
+/* *** תיקון (Bug - עיגול "N"/מצפן ובקרת זום כפולה): ה-canvas שה-SDK
+   של MapTiler (MapLibre GL) מצייר עליו לא תמיד יורש את touch-action
+   שקובץ ה-CSS הרשמי של Leaflet מגדיר על .leaflet-container - אם מחוות
+   מגע (pinch) "בורחת" מה-canvas הזה, היא עלולה להתפרש כפינץ'-זום על
+   כל הדף. קיבוע מפורש שומר את המחווה כלואה בתוך המפה בלבד. */
+.home-map-fixed-gesture,
+.home-map-fixed-gesture canvas {
+  touch-action: none;
+}
+
+/* *** תיקון ודאי (Bug - עיגול "N"/מצפן ובקרת זום כפולה עדיין מופיעים
+   למרות navigationControl:false שהועבר ל-MaptilerLayer): ה-constructor
+   option לא בהכרח מיושם ע"י כל גרסה של @maptiler/leaflet-maptilersdk
+   (יכול להיות surface מצומצם יותר מ-maptilersdk.Map המלא) - אי אפשר
+   להמר שוב על ניחוש API. זו הסרה **ודאית** ברמת ה-CSS: כל הבקרות
+   שה-canvas הפנימי של MapLibre GL (לא Leaflet עצמו!) מוסיף לעצמו
+   נושאות תמיד את המחלקות הסטנדרטיות maplibregl-ctrl-* - מסתירים אותן
+   לגמרי בכל מקום בתוך מפת Leaflet, בלי תלות בשום JS option. נשארת
+   רק בקרת הזום המקורית של Leaflet עצמו (leaflet-control-zoom). */
+.leaflet-container .maplibregl-ctrl-top-right,
+.leaflet-container .maplibregl-ctrl-top-left,
+.leaflet-container .maplibregl-ctrl-bottom-right,
+.leaflet-container .maplibregl-ctrl-bottom-left {
+  display: none !important;
+}
+
 /* *** תיקון (בקשת המשתמש - "למה זה נראה ככה??" - כמעט ריק/לבן):
    הפילטר הזה כוון במקור מול אריחי OSM הרוויים-בצבע. DATAVIZ (סגנון
    MapTiler) כבר בהיר וחיוור בעצמו - brightness/contrast חזקים "שורפים"
