@@ -20,17 +20,34 @@ function PlusIcon() {
 }
 
 function AddPlaceIcon() {
+  // *** תיקון (בקשה מפורשת - "ביקשתי שהמזוודה תהיה רק על ה-+ השני!!!"):
+  // התיק-טיול שייך לכאן - האייקון הקטן של פעולת "הוספת מקום" בתפריט
+  // שנפתח - לא לכפתור הראשי (שחוזר להיות "+" רגיל, ר' PlusIcon למעלה).
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 5v14M5 12h14" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 6V5a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v1" />
+      <rect x="3" y="6" width="18" height="14" rx="3" />
+      <line x1="9" y1="6" x2="9" y2="20" />
+      <line x1="15" y1="6" x2="15" y2="20" />
     </svg>
   );
 }
 
 function FilterIcon() {
+  // *** תיקון (בקשה מפורשת - "זה במקום הסימן של הפילטר"): אייקון
+  // "סליידרים" (שלוש שורות, כל אחת עם ידית/עיגול במיקום שונה לאורכה) -
+  // במקום שלוש הבארים הפשוטות שהיו קודם.
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6h16M7 12h10M10 18h4" />
+      <line x1="21" y1="5" x2="14" y2="5" />
+      <line x1="10" y1="5" x2="3" y2="5" />
+      <circle cx="12" cy="5" r="2.2" />
+      <line x1="21" y1="12" x2="12" y2="12" />
+      <line x1="8" y1="12" x2="3" y2="12" />
+      <circle cx="10" cy="12" r="2.2" />
+      <line x1="21" y1="19" x2="16" y2="19" />
+      <line x1="12" y1="19" x2="3" y2="19" />
+      <circle cx="14" cy="19" r="2.2" />
     </svg>
   );
 }

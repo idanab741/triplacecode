@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMap } from "react-leaflet";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite } from "@/services/favorites/favoritesService";
@@ -28,6 +29,7 @@ import type { HomeMapPlace } from "./HomeMap";
 export function HomeMapPlacePopupContent({ place }: { place: HomeMapPlace }) {
   const { user } = useAuth();
   const map = useMap();
+  const router = useRouter();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -100,6 +102,7 @@ export function HomeMapPlacePopupContent({ place }: { place: HomeMapPlace }) {
       onClose={() => map.closePopup()}
       onToggleSave={handleToggleSave}
       onShare={handleShare}
+      onNameClick={() => router.push(`/place/${place.id}`)}
     />
   );
 }

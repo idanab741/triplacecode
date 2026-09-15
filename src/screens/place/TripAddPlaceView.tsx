@@ -1,12 +1,25 @@
+import Image from "next/image";
 import { PlaceHeroActions } from "./PlaceHeroActions";
 import { PlaceNavigationCard } from "./PlaceNavigationCard";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { Icon } from "@/components/ui/Icon";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
+import { parseOpeningHoursForDay, minutesToTimeLabel } from "@/utils/openingHours";
 import type { TripAddPlace } from "@/services/tripadd/tripAddPlaceService";
 
 interface TripAddPlaceViewProps {
   place: TripAddPlace;
   savedCount: number;
+}
+
+function StarIcon({ size = 14 }: { size?: number }) {
+  // *** אותו path/צבע בדיוק כמו PlaceMapPopupCard.tsx (StarIcon) - לא אייקון חדש.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
+      <path d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.3 6.6L12 17l-5.9 3.4 1.3-6.6-4.9-4.5 6.6-.7L12 2.5z" />
+    </svg>
+  );
 }
 
 /** סרט/סימנייה מלא - אותו איקון בדיוק כמו PlaceCommunityStatsSection.tsx
@@ -24,14 +37,29 @@ function BookmarkIcon() {
  * *** גרסה מקבילה, עצמאית, ל-/place/[id]/page.tsx הישן - למקומות
  * שמקורם ב-tripadd_submissions (לא בטבלת places הישנה). לא ממוחזר
  * מהעמוד הישן במלואו כי הוא תלוי עמוק ב-TripMatch/מערכת ה-swiping
- * הישנה (trip_type_tags/cuisine_tags, PlaceCommunityStatsSection עם
- * לייק/דיסלייק) - שלא רלוונטית כאן. PlaceHeroActions ו-
- * PlaceNavigationCard כן גנריים לגמרי (מקבלים placeId/placeType כפרמטר)
- * ולכן כן ממוחזרים כמות שהם.
+ * הישנה - לא רלוונטית כאן.
+ *
+ * *** עיצוב-מחדש (בקשה מפורשת - "נראה על הפנים, אני רוצה את הפרטים
+ * של החלונית שעשינו"): שורת הדירוגים, שורת הכתובת+פתוח/סגור, ושורת
+ * קטגוריה+נגישות בנויות עכשיו בדיוק לפי אותה שפה חזותית של
+ * PlaceMapPopupCard.tsx (לוגו TripLace/Google אמיתיים, לא טקסט
+ * גולמי; טווח מחירים ב-₪; אייקוני Waze/Google Maps אמיתיים דרך
+ * PlaceNavigationCard) - לא מומצא עיצוב חדש, רק "מוגדל" לגרסת עמוד
+ * מלא במקום חלונית קומפקטית.
  */
 export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
   const categoryLabel = HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category;
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.address ?? place.city ?? ""}`)}`;
+  const categoryIconSrc = HOME_QUICK_CATEGORIES.find((c) => c.id === place.category)?.imageSrc ?? null;
+  const googleReviewsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.address ?? place.city ?? ""}`)}`;
+
+  // *** אותה לוגיקת פתוח/סגור בדיוק כמו PlaceMapPopupCard.tsx - שים
+  // לב: opening_hours כמעט תמיד null היום ב-tripadd_submissions (לא
+  // מולא ע"י שום תהליך enrichment קיים כרגע) - השורה הזו פשוט לא
+  // תוצג עד שזה יתווסף, לא באג בקומפוננטה עצמה.
+  const today = parseOpeningHoursForDay(place.openingHours, new Date().getDay());
+  const isOpen = today === "closed" ? false : today ? isWithinToday(today) : null;
+  const hoursLabel =
+    today && today !== "closed" ? `${minutesToTimeLabel(today.openMinutes)}–${minutesToTimeLabel(today.closeMinutes)}` : null;
 
   return (
     <div className="min-h-screen bg-white pb-28">
@@ -43,10 +71,11 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
         )}
       </div>
 
-      {/* *** גלריית תמונות נוספות - תוספת מעבר לעמוד הישן, כי כאן (בשונה
-          מ-place.image_urls הישן) יכולות להיות כמה תמונות אמיתיות
-          שמשתמשים שונים העלו, לא רק תמונה בודדת. מוצג רק אם יש יותר
-          מתמונה אחת - אחרת מיותר (ה-HERO כבר מציג את היחידה). */}
+      {/* *** גלריית תמונות נוספות שאנשים מעלים (בקשה מפורשת) - כל
+          התמונות שהצטברו מכל הביקורות על המקום הזה (לא רק ממי
+          שיצר אותו) - ר' upsertTripAddReview, שמוסיף תמונות לאותה
+          גלריה משותפת. מוצג רק אם יש יותר מתמונה אחת - אחרת מיותר
+          (ה-HERO כבר מציג את היחידה). */}
       {place.photoUrls.length > 1 && (
         <div className="flex gap-2 overflow-x-auto px-5 pt-3" style={{ scrollbarWidth: "none" }}>
           {place.photoUrls.slice(1).map((url) => (
@@ -57,76 +86,115 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
       )}
 
       <div className="flex flex-col gap-5 px-5 pt-5">
-        {(place.rating != null || place.googleRating != null) && (
-          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold text-ink">
-            {place.rating != null && (
-              <span className="flex items-center gap-1.5">
-                <span className="text-amber-500">★</span>
-                <span>{place.rating.toFixed(1)}</span>
-                <span className="font-normal text-ink-secondary">
-                  TripLace{place.reviewCount > 0 ? ` · ${place.reviewCount} ביקורות` : ""}
-                </span>
+        {/* *** שורת דירוגים - לוגואים אמיתיים (לא טקסט "Google" גולמי),
+            בדיוק לפי PlaceMapPopupCard.tsx. + טווח מחירים (₪) על אותה
+            שורה, שם היה קיים בחלונית ונעדר לגמרי מהעמוד. */}
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          {place.rating != null && (
+            <div className="flex items-center gap-1.5">
+              <Image src="/images/triplace-logo-black.png" alt="TripLace" width={70} height={22} className="h-[18px] w-auto object-contain" />
+              <span className="flex items-center gap-1 text-sm font-bold text-ink">
+                <StarIcon size={14} />
+                {place.rating.toFixed(1)}
               </span>
-            )}
-            {place.googleRating != null && (
-              <span className="flex items-center gap-1.5">
-                <span className="text-amber-500">★</span>
-                <span>{place.googleRating.toFixed(1)}</span>
-                <span className="font-normal text-ink-secondary">
-                  Google{place.googleRatingCount != null ? ` · ${place.googleRatingCount}` : ""}
+              {place.reviewCount > 0 && <span className="text-xs text-ink-secondary">({place.reviewCount})</span>}
+            </div>
+          )}
+
+          {place.googleRating != null && (
+            <>
+              <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
+              <a href={googleReviewsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+                <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-[18px] w-auto object-contain" />
+                <span className="flex items-center gap-1 text-sm font-bold text-ink">
+                  <StarIcon size={14} />
+                  {place.googleRating.toFixed(1)}
                 </span>
+                {place.googleRatingCount != null && (
+                  <span className="text-xs text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
+                )}
+              </a>
+            </>
+          )}
+
+          {place.priceLevel != null && (
+            <>
+              <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
+              <span className="text-sm font-bold text-ink" aria-label="טווח מחירים">
+                {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
               </span>
-            )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-extrabold text-ink">{place.name}</h1>
-          {/* *** שינוי (בקשה מפורשת - "הביקורות מסודרות למטה"): כאן
-              מוצג רק תיאור כללי (short_description, ממולא ע"י AI) -
-              לא עוד place.description (זה היה בפועל הטקסט האישי של
-              *מגיש אחד ספציפי*, לא תיאור כללי של המקום). הטקסט האישי
-              של כל אחד עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
+          {/* תיאור כללי (short_description, ממולא ע"י AI) - הטקסט האישי
+              של כל מגיש/ה עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
           {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}
-          {(place.address || place.city) && (
-            <p className="text-sm text-ink-secondary">{[place.address, place.city].filter(Boolean).join(" · ")}</p>
-          )}
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
-            {categoryLabel}
-          </span>
-          {place.subcategory && (
-            <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
-              {place.subcategory}
-            </span>
-          )}
-          {place.accessible && (
-            <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
-              נגיש לנכים
-            </span>
-          )}
-        </div>
-
-        {/* *** "כמה שמרו" בלבד (בקשה מפורשת - "לא של tripmatch") -
-            מוצג רק אם יש לפחות שמירה אחת, כדי שלא ייראה כמו "0 שמרו"
-            על כל מקום חדש (אותו עיקרון כמו PlaceCommunityStatsSection
-            הישן). */}
-        {savedCount > 0 && (
-          <div className="flex items-center gap-3 rounded-card border border-ink-secondary/10 bg-white p-4">
-            <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-            >
-              <BookmarkIcon />
-            </span>
-            <p className="text-sm text-ink">
-              <span className="font-extrabold">{savedCount}</span> {savedCount === 1 ? "משתמש שמר" : "משתמשים שמרו"} את המקום הזה
-            </p>
+          {/* *** כתובת + פתוח/סגור על אותה שורה, בדיוק כמו PlaceMapPopupCard.tsx. */}
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {isOpen != null && (
+              <span className="flex shrink-0 items-center gap-1.5">
+                {hoursLabel && <span className="text-ink-secondary">{hoursLabel}</span>}
+                <span className={`h-1.5 w-1.5 rounded-full ${isOpen ? "bg-[var(--color-category-green)]" : "bg-danger"}`} />
+                <span className={`font-semibold ${isOpen ? "text-[var(--color-category-green)]" : "text-danger"}`}>
+                  {isOpen ? "פתוח עכשיו" : "סגור עכשיו"}
+                </span>
+              </span>
+            )}
+            {isOpen != null && (place.address || place.city) && <span className="h-3.5 w-px shrink-0 bg-ink-secondary/20" />}
+            {(place.address || place.city) && (
+              <span className="flex items-center gap-1 text-ink-secondary">
+                <Icon name="location-pin" size={12} className="shrink-0 opacity-70" />
+                {[place.address, place.city].filter(Boolean).join(" · ")}
+              </span>
+            )}
           </div>
-        )}
+        </div>
 
+        {/* *** קטגוריה+תת-קטגוריה עם אייקון עגול, בדיוק כמו PlaceMapPopupCard.tsx -
+            במקום צ'יפים גנריים. נגישות צמודה לאותה שורה, לא צ'יפ נפרד. */}
+        <div className="flex items-center gap-2.5">
+          {categoryIconSrc && (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={categoryIconSrc} alt="" className="h-6 w-6 object-contain" />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-semibold text-ink">{categoryLabel}</span>
+            {place.subcategory && <span className="truncate text-xs text-ink-secondary">{place.subcategory}</span>}
+          </div>
+          {place.accessible === true && (
+            <span className="mr-auto shrink-0 text-sm font-semibold text-ink">♿ נגיש</span>
+          )}
+        </div>
+
+        {/* *** "כמה שמרו" - תמיד מוצג (בקשה מפורשת - "פרטים כמה זה
+            פופולרי"), גם ב-0, עם ניסוח מזמין במקום להסתתר לגמרי -
+            כדי שהפיצ'ר יהיה גלוי וברור שהוא קיים, לא רק כשיש כבר נתונים. */}
+        <div className="flex items-center gap-3 rounded-card border border-ink-secondary/10 bg-white p-4">
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+          >
+            <BookmarkIcon />
+          </span>
+          <p className="text-sm text-ink">
+            {savedCount > 0 ? (
+              <>
+                <span className="font-extrabold">{savedCount}</span> {savedCount === 1 ? "משתמש שמר" : "משתמשים שמרו"} את המקום הזה
+              </>
+            ) : (
+              "עדיין אף אחד לא שמר את המקום הזה - היה/י הראשון/ה!"
+            )}
+          </p>
+        </div>
+
+        {/* *** ניווט - Waze + Google Maps (בקשה מפורשת - "יש לנו
+            אייקונים מאפס"), + תצוגת מפה ו"זמן הגעה משוער". */}
         <PlaceNavigationCard placeId={place.id} latitude={place.latitude} longitude={place.longitude} />
 
         {place.phone && (
@@ -168,34 +236,12 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
           </div>
         )}
 
-        {place.googleRating != null && (
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between rounded-card border border-ink-secondary/15 bg-white px-4 py-3"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🌐</span>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-ink">דירוגי Google</span>
-                <span className="text-xs text-ink-secondary">
-                  {place.googleRating.toFixed(1)} ★
-                  {place.googleRatingCount != null ? ` · ${place.googleRatingCount} ביקורות` : ""}
-                </span>
-              </div>
-            </div>
-            <span className="text-ink-secondary">›</span>
-          </a>
-        )}
-
         {/* *** ביקורות (בקשה מפורשת - "צריכות להיות רשומות למטה
             מסודרות"): כל השורות מ-tripadd_reviews של המקום הזה (ר'
             migration 0081) - כולל, אחרי איחוד מקומות כפולים, ביקורות
             שהצטברו מכמה הוספות נפרדות של אותו מקום פיזי. מסודרות
-            מהחדשה לישנה (ר' ה-order ב-getTripAddPlaceById). בלי שם/
-            זהות של אף כותב/ת - אותו עיקרון בדיוק כמו שאר האפליקציה
-            (אף מקום לא חושף מי בדיוק כתב מה). */}
+            מהחדשה לישנה. בלי שם/זהות של אף כותב/ת - אותו עיקרון בדיוק
+            כמו שאר האפליקציה (אף מקום לא חושף מי בדיוק כתב מה). */}
         {place.reviews.length > 0 && (
           <div className="flex flex-col gap-3">
             <p className="text-sm font-bold text-ink">ביקורות ({place.reviews.length})</p>
@@ -229,4 +275,14 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
       <MainBottomNav active="home" />
     </div>
   );
+}
+
+/** true אם השעה הנוכחית נמצאת בטווח הפתיחה של היום (תומך במעבר חצות) -
+ *  אותה פונקציה בדיוק כמו PlaceMapPopupCard.tsx. */
+function isWithinToday(today: { openMinutes: number; closeMinutes: number }): boolean {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let closeMinutes = today.closeMinutes;
+  if (closeMinutes <= today.openMinutes) closeMinutes += 24 * 60;
+  return nowMinutes >= today.openMinutes && nowMinutes <= closeMinutes;
 }

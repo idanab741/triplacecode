@@ -71,9 +71,13 @@ interface PlaceMapPopupCardProps {
   onClose: () => void;
   onToggleSave: () => void;
   onShare: () => void;
+  /** *** תוספת (בקשה מפורשת - "לוחצים על השם בחלונית -> מגיעים לעמוד
+   *  האטרקציה"): אופציונלי בכוונה - קומפוננטה גנרית, לא כל מי שמשתמש
+   *  בחלונית הזו חייב לתמוך בניווט לעמוד מקום. */
+  onNameClick?: () => void;
 }
 
-export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: PlaceMapPopupCardProps) {
+export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNameClick }: PlaceMapPopupCardProps) {
   const today = parseOpeningHoursForDay(place.openingHours, new Date().getDay());
   const isOpen = today === "closed" ? false : today ? isWithinToday(today) : null;
   const hoursLabel =
@@ -147,8 +151,18 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
         )}
 
         <div className="px-3 pb-2 pt-1.5">
-          {/* שם המקום */}
-          <h3 className="truncate text-right text-[11px] font-extrabold leading-tight text-ink">{place.name}</h3>
+          {/* שם המקום - לחיץ (בקשה מפורשת) כניסה לעמוד האטרקציה המלא */}
+          {onNameClick ? (
+            <button
+              type="button"
+              onClick={onNameClick}
+              className="block w-full truncate text-right text-[11px] font-extrabold leading-tight text-ink hover:underline"
+            >
+              {place.name}
+            </button>
+          ) : (
+            <h3 className="truncate text-right text-[11px] font-extrabold leading-tight text-ink">{place.name}</h3>
+          )}
 
           {/* כתובת + פתוח/סגור על אותה שורה - חוסך גובה */}
           <div className="mt-1 flex items-center justify-end gap-1.5 text-right text-[9px] leading-snug">
