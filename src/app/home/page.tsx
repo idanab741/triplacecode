@@ -42,8 +42,11 @@ export default function HomePage() {
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [minRating, setMinRating] = useState(0);
   const [allPins, setAllPins] = useState<HomeMapPlace[]>([]);
-  // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
-  const homeMapRef = useRef<HomeMapHandle>(null);
+  // *** תיקון (Bug - "כפתור המצפן לא עובד"): callback prop (onReady)
+  // במקום ref - ר' הערה מפורטת ב-HomeMap.tsx. state, לא useRef, כי
+  // אנחנו צריכים שהעדכון יגרום ל-re-render (LocateMeFab צריך לדעת
+  // מתי ה-handle הופך זמין כדי שה-onClick שלו יעבוד).
+  const [mapHandle, setMapHandle] = useState<HomeMapHandle | null>(null);
 
   // *** בקשה מפורשת - "כל הדאטה הקודם יעלם! רק דאטה חדש שנזין דרך
   // tripadd" + "תעשה שיופיע ישר על המפה, בהמשך נעשה סינון דרך ADMIN":
@@ -242,7 +245,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-bg">
       {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). */}
       <div className="fixed inset-0 z-0">
-        <HomeMap ref={homeMapRef} className="h-full w-full" places={visiblePins} obscuredTopPx={grayCardHeight} />
+        <HomeMap onReady={setMapHandle} className="h-full w-full" places={visiblePins} obscuredTopPx={grayCardHeight} />
       </div>
 
       {/* *** קונטיינר-גלילה פנימי משלנו (לא html/body, שנעולים למעלה) -
@@ -328,7 +331,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} pushedUp={fabOpen} />
+      <LocateMeFab onClick={() => mapHandle?.recenterToUser()} pushedUp={fabOpen} />
       <MapActionsFab
         open={fabOpen}
         onOpenChange={setFabOpen}

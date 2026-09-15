@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, AttributionControl, Marker, Popup, useMap } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
 import L from "leaflet";
@@ -49,10 +49,19 @@ interface HomeMapProps {
    *  *הגלוי בפועל* של המפה, לא במרכז הגיאומטרי של כל ה-container
    *  (שרובו מוסתר מאחורי הכרטיס כשהוא במצב הרגיל/מוגדל). */
   obscuredTopPx?: number;
+  /** *** תיקון (Bug - "הכפתור של המצפן לא עובד, לא קורה כלום"): קודם
+   *  זה נחשף דרך `ref` (forwardRef) - אבל HomeMap נטען דרך
+   *  `next/dynamic` (בגלל SSR), ו-refs **לא עוברים בצורה אמינה** דרך
+   *  קומפוננטה שנטענת ב-dynamic import (מגבלה מתועדת של next/dynamic -
+   *  זה לא forwardRef "אמיתי" מבחינת React, זה wrapper של lazy-loading).
+   *  בפועל homeMapRef.current נשאר null לנצח, אז הלחיצה על הכפתור
+   *  לא עשתה כלום - לא הייתה שום שגיאה כי `?.` פשוט שיתק בשקט. הפתרון:
+   *  callback prop רגיל (onReady) במקום ref - props תמיד עוברים
+   *  נכון דרך dynamic import, זה רק ref שהיה בעייתי. */
+  onReady?: (handle: HomeMapHandle) => void;
 }
 
-/** נחשף החוצה (ref) כדי שכפתור "מצפן"/מיקום-נוכחי שיושב מחוץ לרכיב
- *  הזה (ב-page.tsx, ליד כפתור ה-+ הצף) יוכל להפעיל מירכוז מחדש. */
+/** נחשף דרך callback prop (onReady) - לא ref, ר' הערה למעלה. */
 export interface HomeMapHandle {
   recenterToUser: () => void;
 }
@@ -142,20 +151,18 @@ function InvalidateSizeOnResize() {
  * NearbySection.tsx כבר עושה ל-DiscoveryPlacesMap) - Leaflet משתמש
  * ב-window/DOM ולא ניתן לרנדור בצד השרת.
  */
-export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
-  { places = [], className, obscuredTopPx = 0 },
-  ref
-) {
+export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: HomeMapProps) {
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   // *** ref ל-instance האמיתי של Leaflet (לא useMap - זה תקף רק
   // לרכיבים-ילדים בתוך MapContainer; כאן אנחנו צריכים לקרוא ל-setView
   // מבחוץ, מלחיצה על כפתור חיצוני). react-leaflet v4 תומך ב-ref
-  // ישירות על MapContainer בדיוק לצורך זה.
+  // ישירות על MapContainer בדיוק לצורך זה - זה ref *פנימי* לתוך
+  // הרכיב הזה עצמו, לא ref שמגיע מבחוץ (לכן לא סובל מהבעיה של
+  // next/dynamic - הוא לעולם לא עובר "דרך" גבול ה-dynamic import).
   const mapInstanceRef = useRef<LeafletMap | null>(null);
-  // ref ל-obscuredTopPx העדכני ביותר - כדי ש-recenterToUser (שנקרא
-  // מבחוץ, לא בזמן render) תמיד יקרא את הערך העדכני, לא אחד תקוע
-  // מהרגע שבו ה-useImperativeHandle נוצר.
+  // ref ל-obscuredTopPx העדכני ביותר - כדי ש-recenterToUser תמיד
+  // יקרא את הערך העדכני, לא אחד תקוע מרגע היצירה.
   const obscuredTopPxRef = useRef(obscuredTopPx);
   obscuredTopPxRef.current = obscuredTopPx;
 
@@ -170,29 +177,30 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
       });
   }, []);
 
-  // *** כפתור "מצפן"/מיקום-נוכחי (בקשה מפורשת - "כפתור מצפן מעל ה-+
-  // שיחזיר למיקום הנוכחי שלי"): מאתר מחדש בפועל (לא רק חוזר לנקודה
+  // *** כפתור "מצפן"/מיקום-נוכחי - מאתר מחדש בפועל (לא רק חוזר לנקודה
   // ששמורה מהטעינה הראשונית - המשתמש יכול להיות זז מאז) ומזיז את
-  // המפה + הנקודה הכחולה אליו, כולל אותו תיקון מירכוז לפי השטח הגלוי.
-  useImperativeHandle(
-    ref,
-    () => ({
-      recenterToUser: () => {
-        getCurrentPositionSafe()
-          .then(({ lat, lng }) => {
-            setUserLocation([lat, lng]);
-            mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
-            if (obscuredTopPxRef.current > 0) {
-              mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
-            }
-          })
-          .catch(() => {
-            // אין הרשאה/כשל איתור - אין מיקום אמיתי למרכז אליו, נשארים במקום הנוכחי.
-          });
-      },
-    }),
-    []
-  );
+  // המפה + הנקודה הכחולה אליו, כולל תיקון מירכוז לפי השטח הגלוי.
+  // useCallback עם deps ריקים - קורא הכל דרך refs, אז ה-function
+  // reference עצמו יציב ותקף לנצח, אין צורך לקרוא ל-onReady שוב בכל
+  // רינדור (מספיק פעם אחת ב-mount).
+  const recenterToUser = useCallback(() => {
+    getCurrentPositionSafe()
+      .then(({ lat, lng }) => {
+        setUserLocation([lat, lng]);
+        mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
+        if (obscuredTopPxRef.current > 0) {
+          mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
+        }
+      })
+      .catch(() => {
+        // אין הרשאה/כשל איתור - אין מיקום אמיתי למרכז אליו, נשארים במקום הנוכחי.
+      });
+  }, []);
+
+  useEffect(() => {
+    onReady?.({ recenterToUser });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -261,4 +269,4 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
       </MapContainer>
     </div>
   );
-});
+}
