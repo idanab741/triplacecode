@@ -185,15 +185,15 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
             </PopupAction>
 
             <PopupAction href={place.wazeUrl} label="ניווט ב-Waze">
-              <Icon name="waze" size={24} />
+              <Icon name="waze" size={26} />
             </PopupAction>
 
             <PopupAction onClick={onToggleSave} label="שמירה">
-              <Icon name={place.saved ? "save-active" : "save"} size={24} />
+              <Icon name={place.saved ? "save-active" : "save"} size={22} />
             </PopupAction>
 
             <PopupAction onClick={onShare} label="שיתוף">
-              <Icon name="share" size={24} />
+              <Icon name="share" size={28} />
             </PopupAction>
           </div>
         </div>
