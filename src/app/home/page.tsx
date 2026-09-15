@@ -26,20 +26,6 @@ const HomeMap = dynamic(() => import("@/screens/home/HomeMap").then((m) => m.Hom
 /** סף תזוזה (בפיקסלים) לפני שמחווה נחשבת "כוונה אמיתית", לא רעד קטן. */
 const GESTURE_THRESHOLD_PX = 30;
 
-/** *** מיפוי בין 6 הקטגוריות של שורת "סוגי הטיול" (עמוד הבית) לבין
- *  places.category האמיתי (5 ערכים בלבד - ר' constants/placeCategories.ts).
- *  "שופינג" אין לו קטגוריית places תואמת עדיין - מערך ריק, לא מומצא
- *  ערך חדש (הפילטר פשוט לא יחזיר תוצאות לקטגוריה הזו, זה אמיתי, לא
- *  שגיאה). */
-const CATEGORY_TO_PLACE_CATEGORY: Record<string, string[]> = {
-  attraction: ["attractions"],
-  food: ["restaurants"],
-  shopping: [],
-  nature: ["nature"],
-  nightlife: ["nightlife"],
-  sleep: ["hotels"],
-};
-
 export default function HomePage() {
   const {
     user,
@@ -50,58 +36,37 @@ export default function HomePage() {
   const router = useRouter();
 
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [minRating, setMinRating] = useState(0);
-  const [filteredPlaces, setFilteredPlaces] = useState<HomeMapPlace[]>([]);
+  const [allPins, setAllPins] = useState<HomeMapPlace[]>([]);
   // ref ל-handle של המפה (recenterToUser) - ר' HomeMap.tsx.
   const homeMapRef = useRef<HomeMapHandle>(null);
 
-  // *** סעיף 9-11 בפרומפט + תוספת מפורשת (דירוג + תתי-קטגוריה) -
-  // "שינוי הפילטרים צריך לעדכן את ה-markers של המפה ללא reload". כל
-  // שינוי בבחירות מפעיל מחדש קריאה ל-/api/map/filtered-places.
-  useEffect(() => {
-    if (
-      selectedPeople.length === 0 &&
-      selectedCategories.length === 0 &&
-      selectedSubcategories.length === 0 &&
-      minRating === 0
-    ) {
-      setFilteredPlaces([]);
-      return;
-    }
-    const placeCategoryValues = Array.from(
-      new Set(selectedCategories.flatMap((id) => CATEGORY_TO_PLACE_CATEGORY[id] ?? []))
-    );
-    const params = new URLSearchParams();
-    if (selectedPeople.length > 0) params.set("people", selectedPeople.join(","));
-    if (placeCategoryValues.length > 0) params.set("categories", placeCategoryValues.join(","));
-    if (selectedSubcategories.length > 0) params.set("subcategories", selectedSubcategories.join(","));
-    if (minRating > 0) params.set("minRating", String(minRating));
-
-    let cancelled = false;
-    fetch(`/api/map/filtered-places?${params}`)
+  // *** בקשה מפורשת - "כל הדאטה הקודם יעלם! רק דאטה חדש שנזין דרך
+  // tripadd" + "תעשה שיופיע ישר על המפה, בהמשך נעשה סינון דרך ADMIN":
+  // המקור היחיד למרקרים מעכשיו הוא /api/tripadd/pins - נטען פעם אחת,
+  // ומוצג *ישירות* (בלי תלות בפילטר) אלא אם המשתמש בפועל בחר פילטר.
+  function loadPins() {
+    fetch("/api/tripadd/pins")
       .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        setFilteredPlaces(
-          (data.places ?? []).map((p: { id: string; name: string; latitude: number; longitude: number }) => ({
-            id: p.id,
-            name: p.name,
-            latitude: p.latitude,
-            longitude: p.longitude,
-          }))
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setFilteredPlaces([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedPeople, selectedCategories, selectedSubcategories, minRating]);
+      .then((data) => setAllPins(data.pins ?? []))
+      .catch(() => setAllPins([]));
+  }
+  useEffect(() => {
+    loadPins();
+  }, []);
+
+  // סינון לקוח-צד בלבד, על אותו סט הנתונים היחיד (allPins) - בלי
+  // עוד קריאת שרת, בלי עוד מקור דאטה. בלי פילטר נבחר = מציגים הכל.
+  const visiblePins = allPins.filter((p) => {
+    if (selectedCategories.length > 0 && (!p.category || !selectedCategories.includes(p.category))) return false;
+    if (selectedSubcategories.length > 0 && (!p.subcategory || !selectedSubcategories.includes(p.subcategory))) return false;
+    if (minRating > 0 && (!p.rating || p.rating < minRating)) return false;
+    return true;
+  });
 
   // *** קיפול בגלילה - נשארים רק לוגו/חיפוש/קטגוריות (בקשה מפורשת
   // אחרונה: גם Header - אווטאר/מיקום/פעמון - מתקפל עכשיו יחד עם
@@ -230,7 +195,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-bg">
       {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). */}
       <div className="fixed inset-0 z-0">
-        <HomeMap ref={homeMapRef} className="h-full w-full" places={filteredPlaces} />
+        <HomeMap ref={homeMapRef} className="h-full w-full" places={visiblePins} />
       </div>
 
       {/* *** קונטיינר-גלילה פנימי משלנו (לא html/body, שנעולים למעלה) -
@@ -316,23 +281,27 @@ export default function HomePage() {
         </div>
       </div>
 
-      <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} />
+      <LocateMeFab onClick={() => homeMapRef.current?.recenterToUser()} pushedUp={fabOpen} />
       <MapActionsFab
+        open={fabOpen}
+        onOpenChange={setFabOpen}
         onAddPlace={() => setAddPlaceOpen(true)}
         onFilter={() => setFilterOpen(true)}
-        activeFilterCount={
-          selectedPeople.length + selectedCategories.length + selectedSubcategories.length + (minRating > 0 ? 1 : 0)
-        }
+        activeFilterCount={selectedCategories.length + selectedSubcategories.length + (minRating > 0 ? 1 : 0)}
       />
-      {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
+      {addPlaceOpen && (
+        <AddPlaceModal
+          onClose={() => setAddPlaceOpen(false)}
+          onSaved={loadPins}
+        />
+      )}
       {filterOpen && (
         <FilterModal
           onClose={() => setFilterOpen(false)}
-          selectedPeople={selectedPeople}
+          allPins={allPins}
           selectedCategories={selectedCategories}
           selectedSubcategories={selectedSubcategories}
           minRating={minRating}
-          onChangePeople={setSelectedPeople}
           onChangeCategories={setSelectedCategories}
           onChangeSubcategories={setSelectedSubcategories}
           onChangeMinRating={setMinRating}

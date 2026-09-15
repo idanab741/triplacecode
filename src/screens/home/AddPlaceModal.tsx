@@ -11,6 +11,10 @@ import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 
 interface AddPlaceModalProps {
   onClose: () => void;
+  /** נקרא אחרי שמירה מוצלחת - כדי ש-page.tsx יטען מחדש את הפינים
+   *  מ-tripadd (בקשה מפורשת - "תעשה שיופיע ישר על המפה"): הפין החדש
+   *  אמור להופיע מיד, בלי צורך ברענון ידני של הדף. */
+  onSaved?: () => void;
 }
 
 interface AutocompleteSuggestion {
@@ -65,8 +69,23 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
  * Google עדיין דרך אותו endpoint קיים (search-autocomplete) - זה
  * שירות חיצוני משותף, לא "מאגר" - אין בעיה לחלוק אותו.
  */
-export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
+export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const { user } = useAuth();
+
+  // *** תיקון (בקשה מפורשת - "הכפתור עדיין נבלע!"): במקום להסתמך על
+  // vh/dvh ב-CSS (שכבר גילינו קודם בשיחה הזו שלא תמיד אמין בתוך
+  // WebView של Natively), מודדים את גובה ה-viewport בפועל ב-JS
+  // (window.innerHeight) ומגבילים את ה-Modal לפי זה במפורש - עמיד
+  // בפני כל הבעיות של יחידות CSS-viewport ב-WebView.
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  useEffect(() => {
+    function update() {
+      setViewportHeight(window.innerHeight);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const [media, setMedia] = useState<(UploadedMedia & { previewUrl: string })[]>([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -240,6 +259,7 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
         throw new Error(data.error ?? "שגיאה בשמירת המקום");
       }
       setDone(true);
+      onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
     } finally {
@@ -258,7 +278,10 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-full w-full max-w-sm flex-col overflow-hidden bg-white shadow-soft" style={{ borderRadius: 22 }}>
+      <div
+        className="flex w-full max-w-sm flex-col overflow-hidden bg-white shadow-soft"
+        style={{ borderRadius: 22, maxHeight: viewportHeight ? viewportHeight - 48 : "80vh" }}
+      >
         <div className="flex shrink-0 items-center justify-between border-b border-ink-secondary/10 px-4 py-3">
           <h2 className="text-[16px] font-bold text-ink">הוספת מקום</h2>
           <button
@@ -292,26 +315,13 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
         ) : (
           <>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-              {/* 1. תמונה */}
+              {/* 1. תמונה - *** תיקון (בקשה מפורשת - "השורה צריכה להיות
+                  ריבוע, לא מלבן, וכשלוחצים היא פותחת ריבוע לידו באותו
+                  גודל - לא מעליו"): שורה אחת אופקית, כל הריבועים
+                  (כפתור ההוספה + כל preview) באותו גודל בדיוק (h-20
+                  w-20), אחד ליד השני - לא כפתור-מלבן-רחב עם grid
+                  נפרד מעליו. */}
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-secondary">תמונה</label>
-              {media.length > 0 ? (
-                <div className="mb-2 grid grid-cols-4 gap-2">
-                  {media.map((m) => (
-                    <div key={m.id} className="relative aspect-square overflow-hidden rounded-[12px] bg-bg-secondary">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
-                        aria-label="הסר"
-                        className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[11px] text-white"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
               <input
                 ref={galleryInputRef}
                 type="file"
@@ -320,16 +330,33 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
                 className="hidden"
                 onChange={(e) => handleFilesSelected(e.target.files)}
               />
-              {media.length < 4 && (
-                <button
-                  type="button"
-                  disabled={uploadingMedia}
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="flex h-24 w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-ink-secondary/30 text-[13px] font-medium text-ink-secondary disabled:opacity-50"
-                >
-                  {uploadingMedia ? "מעלה..." : "＋ הוספת תמונה"}
-                </button>
-              )}
+              <div className="flex gap-2 overflow-x-auto pb-0.5">
+                {media.length < 4 && (
+                  <button
+                    type="button"
+                    disabled={uploadingMedia}
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-ink-secondary/30 text-[11px] font-medium text-ink-secondary disabled:opacity-50"
+                  >
+                    <span className="text-lg leading-none">＋</span>
+                    {uploadingMedia ? "מעלה..." : "הוספת תמונה"}
+                  </button>
+                )}
+                {media.map((m) => (
+                  <div key={m.id} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[14px] bg-bg-secondary">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
+                      aria-label="הסר"
+                      className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[11px] text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
 
               {/* 2. שם המקום + autocomplete */}
               <label className="mb-1 mt-4 block text-[12.5px] font-semibold text-ink-secondary">שם המקום</label>

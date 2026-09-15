@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 interface MapActionsFabProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onAddPlace: () => void;
   onFilter: () => void;
   /** מספר הפילטרים הפעילים כרגע - מוצג כ-badge קטן על הכפתור (סעיף 11). */
@@ -35,19 +37,15 @@ function FilterIcon() {
 
 /**
  * *** כפתור ה-(+) הצף מעל המפה + תפריט הפעולות הקטן שנפתח ממנו.
- *
- * *** תיקון (בקשה מפורשת - "העיגול קפץ לימין, צריך שמאל במיקום הקבוע
- * שלו"): חוזר ל-left (אותו X בדיוק כמו LocateMeFab - עמודה אחת קבועה
- * בצד שמאל, שהייתה קיימת כבר בעמוד הבית לפני הפרומפט הזה - לא ממציא
- * מיקום חדש). *** תיקון נוסף (בקשה מפורשת - "הלשוניות בלי השם, רק
- * האייקון"): שתי הפעולות עכשיו עיגולים קטנים עם אייקון בלבד (לא
- * pill עם טקסט) - סטייל תואם לכפתור המצפן (LocateMeFab) הסמוך.
+ * *** תיקון (בקשה מפורשת - "למה יש רווח בין המצפן ל-+? הרווח צריך
+ * להיות רק אחרי שלוחצים על הפלוס"): open/onOpenChange עברו להיות
+ * controlled מ-page.tsx כדי ש-LocateMeFab (רכיב נפרד) יוכל לדעת את
+ * אותו מצב ולהזיז את עצמו רק כשבאמת פתוח - לא state פנימי סגור בתוך
+ * הרכיב הזה בלבד.
  */
-export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapActionsFabProps) {
-  const [open, setOpen] = useState(false);
-
+export function MapActionsFab({ open, onOpenChange, onAddPlace, onFilter, activeFilterCount }: MapActionsFabProps) {
   function close() {
-    setOpen(false);
+    onOpenChange(false);
   }
 
   return (
@@ -94,7 +92,7 @@ export function MapActionsFab({ onAddPlace, onFilter, activeFilterCount }: MapAc
 
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => onOpenChange(!open)}
           aria-label={open ? "סגירת תפריט הפעולות" : "פתיחת תפריט הפעולות"}
           aria-expanded={open}
           className="relative flex items-center justify-center rounded-full text-white shadow-soft transition-transform duration-200 ease-out active:scale-95"

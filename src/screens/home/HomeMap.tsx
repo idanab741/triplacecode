@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { MapContainer, TileLayer, AttributionControl, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, AttributionControl, Marker, Popup, useMap } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -14,6 +14,8 @@ import {
 } from "@/constants/mapTiles";
 import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 /** מרכז ברירת מחדל (תל אביב) - רק עד שמתקבל מיקום אמיתי מהמכשיר, או
  *  כגיבוי אם המשתמש לא אישר הרשאת מיקום. לא "דאטה מדומה" של מקומות -
@@ -22,15 +24,17 @@ import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 const DEFAULT_CENTER: [number, number] = [32.0853, 34.7818];
 const DEFAULT_ZOOM = 13;
 
-/** צורת מקום מוכנה להצגה כ-marker על המפה. לא נוצר/מומצא כאן שום מקור
- *  דאטה - הפרופ אופציונלי ומתחיל ריק, מוכן לחיבור עתידי (הפרומפט:
- *  "להכין אותה להצגת מקומות... אבל לא להמציא כרגע לוגיקה חדשה או
- *  נתוני דמה שאינם קיימים במערכת"). */
+/** צורת מקום מוכנה להצגה כ-marker על המפה - מקור הדאטה היחיד מעכשיו
+ *  הוא tripadd_submissions (בקשה מפורשת - "כל הדאטה הקודם יעלם, רק
+ *  דאטה חדש דרך tripadd"), לא places/destinations הישנים. */
 export interface HomeMapPlace {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
+  category?: HomeQuickCategoryId | null;
+  subcategory?: string | null;
+  rating?: number | null;
 }
 
 interface HomeMapProps {
@@ -195,8 +199,24 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
           <MapTilerBaseLayer />
         )}
 
+        {/* *** בקשה מפורשת ("אם כבר יש נעצים - למה אי אפשר ללחוץ
+            עליהם ולקבל תצוגה מקדימה?"): Popup עם שם/קטגוריה/דירוג -
+            אותו קומפוננטת Popup הרגילה של Leaflet, לא מנגנון חדש. */}
         {places.map((place) => (
-          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON} />
+          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
+            <Popup minWidth={160}>
+              <div className="text-center">
+                <p className="text-[13px] font-bold text-ink">{place.name}</p>
+                {place.category && (
+                  <p className="text-[11.5px] text-ink-secondary">
+                    {HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category}
+                    {place.subcategory ? ` · ${place.subcategory}` : ""}
+                  </p>
+                )}
+                {place.rating ? <p className="text-[11.5px] text-ink-secondary">⭐ {place.rating}</p> : null}
+              </div>
+            </Popup>
+          </Marker>
         ))}
 
         {userLocation && <Marker position={userLocation} icon={USER_LOCATION_ICON} />}

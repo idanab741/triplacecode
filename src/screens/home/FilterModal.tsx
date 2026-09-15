@@ -1,93 +1,64 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { ChipGroup } from "@/components/ui";
 import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import type { HomeMapPlace } from "@/screens/home/HomeMap";
 
-interface Friend {
-  id: string;
-  label: string;
+/** לפחות תו עברי אחד - מסנן החוצה ערכי subcategory שנוצרו/נשמרו
+ *  בשפה אחרת (בקשה מפורשת - "רק קטגוריות בעברית! לא שום דבר בשפה
+ *  אחרת"). */
+function isHebrew(value: string): boolean {
+  return /[\u0590-\u05FF]/.test(value);
 }
-
-/** *** מיפוי בין 6 הקטגוריות של שורת "סוגי הטיול" לבין places.category
- *  האמיתי - נדרש כאן כדי לשלוף תתי-קטגוריה אמיתיות לפי הקטגוריות
- *  שנבחרו (אותו מיפוי בדיוק כמו ב-page.tsx - לא כפילות לוגית, רק
- *  ערכי מחרוזת קבועים). */
-const CATEGORY_TO_PLACE_CATEGORY: Record<string, string[]> = {
-  attraction: ["attractions"],
-  food: ["restaurants"],
-  shopping: [],
-  nature: ["nature"],
-  nightlife: ["nightlife"],
-  sleep: ["hotels"],
-};
 
 interface FilterModalProps {
   onClose: () => void;
-  selectedPeople: string[];
+  /** כל המקומות מ-tripadd (לא מסונן) - ממנו נגזרות תתי-הקטגוריה
+   *  האמיתיות בפועל, לפי הקטגוריות שנבחרו. לא שאילתה נפרדת לשרת. */
+  allPins: HomeMapPlace[];
   selectedCategories: string[];
   selectedSubcategories: string[];
   minRating: number;
-  onChangePeople: (ids: string[]) => void;
   onChangeCategories: (ids: string[]) => void;
   onChangeSubcategories: (values: string[]) => void;
   onChangeMinRating: (value: number) => void;
 }
 
 /**
- * *** ממשק סינון (סעיף 9-11 בפרומפט + תוספת מפורשת - דירוג ותתי-
- * קטגוריה): אנשים (friends אמיתיים) + קטגוריות (6 הקטגוריות הקיימות)
- * + תתי-קטגוריה (אמיתיות, נגזרות מהדאטה בפועל לפי הקטגוריות שנבחרו -
- * לא רשימה קבועה מראש) + דירוג מינימלי. שינוי כל צ'יפ מעדכן מיד
- * (ר' page.tsx - חי, בלי reload). "נקה הכל" מאפס הכל.
+ * *** ממשק סינון על נתוני TripAdd בלבד (בקשה מפורשת - "הנתונים כאן
+ * מנותקים מהנתונים הישנים"). *** תיקון (בקשה מפורשת - "התת-קטגוריה
+ * צריכה להיפתח רק אחרי שלוחצים על הקטגוריה הראשית"): קטע תתי-
+ * הקטגוריה מוצג *רק* אם נבחרה לפחות קטגוריה אחת - לא תמיד גלוי.
+ * *** "אנשים" הוסר בינתיים - אין עדיין מקור נתונים אמיתי לזה ב-
+ * TripAdd (הרעיון של פרופיל Trippy כ"משפיען ראשי" צוין להמשך, לא
+ * מיושם כאן).
  */
 export function FilterModal({
   onClose,
-  selectedPeople,
+  allPins,
   selectedCategories,
   selectedSubcategories,
   minRating,
-  onChangePeople,
   onChangeCategories,
   onChangeSubcategories,
   onChangeMinRating,
 }: FilterModalProps) {
-  const [friends, setFriends] = useState<Friend[] | null>(null);
-  const [friendsError, setFriendsError] = useState(false);
-  const [subcategoryOptions, setSubcategoryOptions] = useState<string[]>([]);
-
-  useEffect(() => {
-    fetch("/api/social/friends")
-      .then((r) => r.json())
-      .then((data) => {
-        const list = (data.friends ?? []) as { friend: { id: string; full_name?: string | null; username?: string | null } }[];
-        setFriends(list.map((f) => ({ id: f.friend.id, label: f.friend.full_name || f.friend.username || "משתמש" })));
-      })
-      .catch(() => setFriendsError(true));
-  }, []);
-
-  // *** תיקון (בקשה מפורשת - "תתי קטגוריות בהתאם לכל סוג"): נטען
-  // מחדש בכל שינוי בקטגוריות שנבחרו - תתי-הקטגוריה תלויות בהן.
-  useEffect(() => {
-    const placeCategoryValues = Array.from(
-      new Set(selectedCategories.flatMap((id) => CATEGORY_TO_PLACE_CATEGORY[id] ?? []))
-    );
-    const params = new URLSearchParams();
-    if (placeCategoryValues.length > 0) params.set("categories", placeCategoryValues.join(","));
-    fetch(`/api/map/category-subtypes?${params}`)
-      .then((r) => r.json())
-      .then((data) => setSubcategoryOptions(data.subcategories ?? []))
-      .catch(() => setSubcategoryOptions([]));
-  }, [selectedCategories]);
-
   const categoryOptions = HOME_QUICK_CATEGORIES.map((c) => ({
     value: c.id,
     label: HOME_QUICK_CATEGORY_LABELS[c.id],
     imageSrc: c.imageSrc,
   }));
 
-  const activeCount = selectedPeople.length + selectedCategories.length + selectedSubcategories.length + (minRating > 0 ? 1 : 0);
+  const subcategoryOptions = useMemo(() => {
+    if (selectedCategories.length === 0) return [];
+    const relevant = allPins.filter((p) => p.category && selectedCategories.includes(p.category));
+    const unique = Array.from(new Set(relevant.map((p) => p.subcategory).filter((s): s is string => Boolean(s) && isHebrew(s))));
+    return unique.sort((a, b) => a.localeCompare(b, "he"));
+  }, [allPins, selectedCategories]);
+
+  const activeCount = selectedCategories.length + selectedSubcategories.length + (minRating > 0 ? 1 : 0);
 
   return (
     <div
@@ -112,31 +83,23 @@ export function FilterModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-          <label className="mb-2 block text-[12.5px] font-semibold text-ink-secondary">אנשים</label>
-          {friendsError && <p className="text-[12.5px] text-ink-secondary">לא הצלחנו לטעון את רשימת החברים שלך.</p>}
-          {!friendsError && friends === null && <p className="text-[12.5px] text-ink-secondary">טוען...</p>}
-          {friends !== null && friends.length === 0 && (
-            <p className="text-[12.5px] text-ink-secondary">אין לך עדיין חברים במערכת - ברגע שיהיו, תוכל לסנן לפיהם כאן.</p>
-          )}
-          {friends !== null && friends.length > 0 && (
-            <ChipGroup
-              options={friends.map((f) => ({ value: f.id, label: f.label }))}
-              selected={selectedPeople}
-              onChange={onChangePeople}
-            />
-          )}
-
-          <label className="mb-2 mt-5 block text-[12.5px] font-semibold text-ink-secondary">קטגוריות</label>
+          <label className="mb-2 block text-[12.5px] font-semibold text-ink-secondary">קטגוריות</label>
           <ChipGroup options={categoryOptions} selected={selectedCategories} onChange={onChangeCategories} />
 
-          {subcategoryOptions.length > 0 && (
+          {/* *** תיקון (בקשה מפורשת, פעמיים - "לא נפתח קטגוריית משנה"):
+              מוצג *אך ורק* אחרי שנבחרה קטגוריה ראשית אחת לפחות. */}
+          {selectedCategories.length > 0 && (
             <>
               <label className="mb-2 mt-5 block text-[12.5px] font-semibold text-ink-secondary">תת-קטגוריה</label>
-              <ChipGroup
-                options={subcategoryOptions.map((s) => ({ value: s, label: s }))}
-                selected={selectedSubcategories}
-                onChange={onChangeSubcategories}
-              />
+              {subcategoryOptions.length > 0 ? (
+                <ChipGroup
+                  options={subcategoryOptions.map((s) => ({ value: s, label: s }))}
+                  selected={selectedSubcategories}
+                  onChange={onChangeSubcategories}
+                />
+              ) : (
+                <p className="text-[12px] text-ink-secondary">אין עדיין תת-קטגוריה זמינה בקטגוריה שנבחרה.</p>
+              )}
             </>
           )}
 
@@ -165,7 +128,6 @@ export function FilterModal({
             <button
               type="button"
               onClick={() => {
-                onChangePeople([]);
                 onChangeCategories([]);
                 onChangeSubcategories([]);
                 onChangeMinRating(0);
