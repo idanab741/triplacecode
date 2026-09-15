@@ -63,7 +63,9 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
               <span className="flex items-center gap-1.5">
                 <span className="text-amber-500">★</span>
                 <span>{place.rating.toFixed(1)}</span>
-                <span className="font-normal text-ink-secondary">TripLace</span>
+                <span className="font-normal text-ink-secondary">
+                  TripLace{place.reviewCount > 0 ? ` · ${place.reviewCount} ביקורות` : ""}
+                </span>
               </span>
             )}
             {place.googleRating != null && (
@@ -80,11 +82,12 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
 
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-extrabold text-ink">{place.name}</h1>
-          {(place.shortDescription || place.description) && (
-            <p className="text-sm leading-relaxed text-ink-secondary">
-              {place.shortDescription ?? place.description}
-            </p>
-          )}
+          {/* *** שינוי (בקשה מפורשת - "הביקורות מסודרות למטה"): כאן
+              מוצג רק תיאור כללי (short_description, ממולא ע"י AI) -
+              לא עוד place.description (זה היה בפועל הטקסט האישי של
+              *מגיש אחד ספציפי*, לא תיאור כללי של המקום). הטקסט האישי
+              של כל אחד עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
+          {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}
           {(place.address || place.city) && (
             <p className="text-sm text-ink-secondary">{[place.address, place.city].filter(Boolean).join(" · ")}</p>
           )}
@@ -184,6 +187,42 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
             </div>
             <span className="text-ink-secondary">›</span>
           </a>
+        )}
+
+        {/* *** ביקורות (בקשה מפורשת - "צריכות להיות רשומות למטה
+            מסודרות"): כל השורות מ-tripadd_reviews של המקום הזה (ר'
+            migration 0081) - כולל, אחרי איחוד מקומות כפולים, ביקורות
+            שהצטברו מכמה הוספות נפרדות של אותו מקום פיזי. מסודרות
+            מהחדשה לישנה (ר' ה-order ב-getTripAddPlaceById). בלי שם/
+            זהות של אף כותב/ת - אותו עיקרון בדיוק כמו שאר האפליקציה
+            (אף מקום לא חושף מי בדיוק כתב מה). */}
+        {place.reviews.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-bold text-ink">ביקורות ({place.reviews.length})</p>
+            <div className="flex flex-col gap-2.5">
+              {place.reviews.map((review) => (
+                <div key={review.id} className="flex flex-col gap-1.5 rounded-card border border-ink-secondary/10 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    {review.rating != null ? (
+                      <div className="flex items-center gap-0.5" aria-hidden="true">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <span key={n} className={n <= review.rating! ? "text-amber-500" : "text-ink-secondary/25"}>
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-[11px] text-ink-secondary">
+                      {new Date(review.createdAt).toLocaleDateString("he-IL")}
+                    </span>
+                  </div>
+                  {review.description && <p className="text-sm leading-relaxed text-ink">{review.description}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
 

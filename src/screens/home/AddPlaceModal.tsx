@@ -115,6 +115,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [mergedIntoExisting, setMergedIntoExisting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -131,7 +132,11 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/places/search-autocomplete?q=${encodeURIComponent(value.trim())}`);
+        // *** תיקון רגרסיה: search-autocomplete הפך לחיפוש ב-TripAdd
+        // בלבד (מקומות שכבר קיימים אצלנו) - כאן, בטופס ההוספה, אנחנו
+        // דווקא מחפשים מקום *חדש* שעוד לא קיים, ולכן חייבים Google.
+        // ר' google-autocomplete/route.ts.
+        const res = await fetch(`/api/places/google-autocomplete?q=${encodeURIComponent(value.trim())}`);
         const data = await res.json();
         if (data.error) {
           setGoogleError(`שגיאה בחיפוש ב-Google: ${data.error}`);
@@ -265,6 +270,12 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "שגיאה בשמירת המקום");
       }
+      // *** תוספת (בקשה מפורשת - "לאחד מקומות כפולים לפי google_place_id"):
+      // אם המקום כבר קיים אצלנו, השרת לא יצר "מקום" שני - הוא רק הוסיף/
+      // עדכן את הביקורת של המשתמש הזה על המקום הקיים. ההודעה כאן משקפת
+      // את זה, כדי שלא יראה כאילו "נוצר" מקום חדש בטעות.
+      const responseData = await res.json().catch(() => ({}));
+      setMergedIntoExisting(Boolean(responseData?.mergedIntoExisting));
       setDone(true);
       onSaved?.();
     } catch (err) {
@@ -306,9 +317,11 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
         {done ? (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <span className="text-3xl">✅</span>
-            <h3 className="text-[15px] font-bold text-ink">המקום נשמר!</h3>
+            <h3 className="text-[15px] font-bold text-ink">{mergedIntoExisting ? "הביקורת שלך נשמרה!" : "המקום נשמר!"}</h3>
             <p className="max-w-xs text-[13px] text-ink-secondary">
-              הפרטים שלך נשמרו וממתינים לבדיקת המערכת. ברגע שהמקום יאושר, הוא ייכנס למאגר ויופיע במפה ובעמוד שלו.
+              {mergedIntoExisting
+                ? "המקום הזה כבר קיים אצלנו - הדירוג והתיאור שלך נוספו לביקורות שלו."
+                : "הפרטים שלך נשמרו וממתינים לבדיקת המערכת. ברגע שהמקום יאושר, הוא ייכנס למאגר ויופיע במפה ובעמוד שלו."}
             </p>
             <button
               type="button"

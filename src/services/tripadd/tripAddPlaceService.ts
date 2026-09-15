@@ -2,6 +2,13 @@ import { createClient } from "@/services/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
+export interface TripAddReview {
+  id: string;
+  rating: number | null;
+  description: string | null;
+  createdAt: string;
+}
+
 export interface TripAddPlace {
   id: string;
   name: string;
@@ -9,7 +16,13 @@ export interface TripAddPlace {
   subcategory: string | null;
   description: string | null;
   shortDescription: string | null;
+  /** *** שינוי (בקשה מפורשת - "הביקורות צריכות להיות מסודרות"): לא
+   *  עוד submissions.rating הבודד - ממוצע אמיתי מתוך tripadd_reviews
+   *  (יכול לכלול כמה משתמשים אחרי איחוד מקומות כפולים, ר' migration
+   *  0081). null אם אין אף ביקורת עם דירוג. */
   rating: number | null;
+  reviewCount: number;
+  reviews: TripAddReview[];
   googleRating: number | null;
   googleRatingCount: number | null;
   accessible: boolean | null;
@@ -31,19 +44,32 @@ export interface TripAddPlace {
  * getPlaceById (placesServerService.ts) אבל למקור-הדאטה החדש. משתמש
  * בלקוח הרגיל (לא admin) - תקין רק אחרי migration 0080 (שפתחה את ה-
  * SELECT policy לכל משתמש מחובר, לא רק ליוצר ה-submission).
+ *
+ * *** שינוי (בקשה מפורשת - "ביקורות מסודרות למטה"): שולף גם את כל
+ * tripadd_reviews של המקום (migration 0081) - לא מסתמך יותר על
+ * submissions.rating/description הבודדים (אלה נשארים בעמודה כהיסטוריה
+ * גולמית בלבד, לא מוצגים). דירוג ה-TripLace המוצג הוא ממוצע אמיתי,
+ * לא הדירוג של המגיש המקורי בלבד.
  */
 export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | null> {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("tripadd_submissions")
-    .select(
-      "id, name, category, subcategory, description, short_description, rating, google_rating, google_rating_count, accessible, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
-    )
-    .eq("id", id)
-    .not("latitude", "is", null)
-    .not("longitude", "is", null)
-    .maybeSingle();
+  const [{ data, error }, { data: reviewRows }] = await Promise.all([
+    supabase
+      .from("tripadd_submissions")
+      .select(
+        "id, name, category, subcategory, description, short_description, google_rating, google_rating_count, accessible, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
+      )
+      .eq("id", id)
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
+      .maybeSingle(),
+    supabase
+      .from("tripadd_reviews")
+      .select("id, rating, description, created_at")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (error || !data) return null;
 
@@ -54,6 +80,16 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     .sort((a, b) => a.sort_order - b.sort_order);
   const photoUrls = (media ?? []).map((m) => m.media_assets!.url);
 
+  const reviews: TripAddReview[] = (reviewRows ?? []).map((r) => ({
+    id: r.id,
+    rating: r.rating,
+    description: r.description,
+    createdAt: r.created_at,
+  }));
+  const ratedReviews = reviews.filter((r) => r.rating != null);
+  const averageRating =
+    ratedReviews.length > 0 ? ratedReviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) / ratedReviews.length : null;
+
   return {
     id: data.id,
     name: data.name,
@@ -61,7 +97,9 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     subcategory: data.subcategory,
     description: data.description,
     shortDescription: data.short_description,
-    rating: data.rating,
+    rating: averageRating,
+    reviewCount: reviews.length,
+    reviews,
     googleRating: data.google_rating,
     googleRatingCount: data.google_rating_count,
     accessible: data.accessible,

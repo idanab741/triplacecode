@@ -364,7 +364,6 @@ export default function HomePage() {
       {filterOpen && (
         <FilterModal
           onClose={() => setFilterOpen(false)}
-          allPins={allPins}
           selectedCategories={selectedCategories}
           selectedSubcategories={selectedSubcategories}
           minRating={minRating}
