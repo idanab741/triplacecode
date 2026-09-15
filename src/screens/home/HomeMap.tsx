@@ -14,8 +14,9 @@ import {
 } from "@/constants/mapTiles";
 import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import { isPlaceOpenNow } from "@/utils/openingHours";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
-import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 /** מרכז ברירת מחדל (תל אביב) - רק עד שמתקבל מיקום אמיתי מהמכשיר, או
  *  כגיבוי אם המשתמש לא אישר הרשאת מיקום. לא "דאטה מדומה" של מקומות -
@@ -34,11 +35,21 @@ export interface HomeMapPlace {
   longitude: number;
   category?: HomeQuickCategoryId | null;
   subcategory?: string | null;
+  /** דירוג TRIPLACE - שהמשתמש עצמו נתן בטופס הוספת המקום. */
   rating?: number | null;
+  /** דירוג ממוצע של Google על אותו מקום - שונה מ-rating (בקשה
+   *  מפורשת - "דירוג triplace ודירוג גוגל", שני דברים נפרדים). */
+  googleRating?: number | null;
+  googleRatingCount?: number | null;
   address?: string | null;
   photoUrl?: string | null;
   /** רמת מחיר 1-4 (כמו שגוגל מספק - לא הומצא מספר מדויק). */
   priceLevel?: number | null;
+  /** שעות פתיחה גולמיות מ-Google (טקסט חופשי, 7 שורות) - לחישוב
+   *  "פתוח/סגור עכשיו" *חי* בזמן אמת (ר' isPlaceOpenNow), לא תמונת
+   *  מצב שמורה שיכולה להתיישן. */
+  openingHours?: string[] | null;
+  accessible?: boolean | null;
 }
 
 interface HomeMapProps {
@@ -90,6 +101,26 @@ const USER_LOCATION_ICON = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 });
+
+/**
+ * *** תיקון-שורש (Bug נמשך פעמיים - "המצפן עדיין לא עובד"): החשד
+ * הקודם היה על ref ש-next/dynamic לא מעביר טוב - זה תוקן, אבל
+ * הבעיה נמשכה. הסיבה האמיתית כנראה עמוקה יותר: `<MapContainer
+ * ref={...}>` לא בהכרח נותן בפועל את ה-instance האמיתי של Leaflet
+ * בכל גרסה/תצורה - זו לא הדרך הרשמית/המתועדת של react-leaflet
+ * לקבל את ה-map. הדרך הרשמית היחידה שמובטחת לעבוד היא ה-hook
+ * `useMap()`, בתוך רכיב-ילד שממש נמצא בתוך <MapContainer>. הרכיב
+ * הקטן הזה עושה בדיוק את זה: תופס את ה-map האמיתי דרך useMap(),
+ * ומעביר אותו החוצה (ל-state של HomeMap, לא ref) ברגע שהוא זמין -
+ * שום ניחוש/הנחה על התנהגות ref יותר.
+ */
+function CaptureMapInstance({ onReady }: { onReady: (map: LeafletMap) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    onReady(map);
+  }, [map, onReady]);
+  return null;
+}
 
 /** ממרכזים בפועל את המפה כשמתקבל מיקום אמיתי (לא רק ה-center ההתחלתי
  *  של MapContainer, שלא מתעדכן מעצמו בשינוי prop). *** תיקון (בקשה
@@ -154,23 +185,32 @@ function InvalidateSizeOnResize() {
 export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: HomeMapProps) {
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  // *** ref ל-instance האמיתי של Leaflet (לא useMap - זה תקף רק
-  // לרכיבים-ילדים בתוך MapContainer; כאן אנחנו צריכים לקרוא ל-setView
-  // מבחוץ, מלחיצה על כפתור חיצוני). react-leaflet v4 תומך ב-ref
-  // ישירות על MapContainer בדיוק לצורך זה - זה ref *פנימי* לתוך
-  // הרכיב הזה עצמו, לא ref שמגיע מבחוץ (לכן לא סובל מהבעיה של
-  // next/dynamic - הוא לעולם לא עובר "דרך" גבול ה-dynamic import).
+  // *** תיקון-שורש (ר' CaptureMapInstance למעלה) - ref פנימי שמתמלא
+  // ע"י ה-hook הרשמי useMap(), לא ע"י ref על MapContainer עצמו.
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const handleMapReady = useCallback((map: LeafletMap) => {
+    mapInstanceRef.current = map;
+  }, []);
   // ref ל-obscuredTopPx העדכני ביותר - כדי ש-recenterToUser תמיד
   // יקרא את הערך העדכני, לא אחד תקוע מרגע היצירה.
   const obscuredTopPxRef = useRef(obscuredTopPx);
   obscuredTopPxRef.current = obscuredTopPx;
+  // *** תיקון (Bug נמשך - "המצפן עדיין לא עובד"): ref למיקום האחרון
+  // הידוע - כדי ש-recenterToUser תמיד יעשה משהו *מיידית וודאי* (למקם
+  // מחדש למיקום שכבר יש לנו), במקום להיות תלוי אך ורק בקריאה טרייה
+  // ל-getCurrentPositionSafe שיכולה לתקוע בשקט בפעם השנייה בתוך
+  // WebView מסוימים (הבקשה הראשונה, בטעינה, כן הצליחה - ראינו את
+  // הנקודה הכחולה - אבל bridge ילידי מסוים עלול לא לקרוא ל-callback
+  // בפעם השנייה ברצף). לא מוותרים על ניסיון לרענן למיקום עדכני יותר -
+  // רק לא תלויים *רק* בו כדי שהכפתור יעשה משהו בכלל.
+  const userLocationRef = useRef<[number, number] | null>(null);
 
   useEffect(() => {
     getCurrentPositionSafe()
       .then(({ lat, lng }) => {
         setCenter([lat, lng]);
         setUserLocation([lat, lng]);
+        userLocationRef.current = [lat, lng];
       })
       .catch(() => {
         // אין הרשאה/כשל איתור - נשארים על ברירת המחדל, בלי שגיאה חוסמת.
@@ -184,16 +224,28 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
   // reference עצמו יציב ותקף לנצח, אין צורך לקרוא ל-onReady שוב בכל
   // רינדור (מספיק פעם אחת ב-mount).
   const recenterToUser = useCallback(() => {
+    function moveTo(lat: number, lng: number) {
+      mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
+      if (obscuredTopPxRef.current > 0) {
+        mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
+      }
+    }
+
+    // מיד ובוודאות - עם המיקום האחרון הידוע, אם יש (בלי לחכות לרשת).
+    if (userLocationRef.current) {
+      moveTo(userLocationRef.current[0], userLocationRef.current[1]);
+    }
+
+    // ברקע - מנסים לרענן למיקום עדכני יותר. אם זה נכשל/תקוע, כבר
+    // עשינו את הפעולה הבסיסית למעלה - הכפתור לא "לא עושה כלום".
     getCurrentPositionSafe()
       .then(({ lat, lng }) => {
         setUserLocation([lat, lng]);
-        mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
-        if (obscuredTopPxRef.current > 0) {
-          mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
-        }
+        userLocationRef.current = [lat, lng];
+        moveTo(lat, lng);
       })
       .catch(() => {
-        // אין הרשאה/כשל איתור - אין מיקום אמיתי למרכז אליו, נשארים במקום הנוכחי.
+        // אין הרשאה/כשל איתור טרי - נשארים עם המיקום האחרון הידוע שכבר הזזנו אליו למעלה.
       });
   }, []);
 
@@ -212,7 +264,6 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
       style={{ position: "relative", height: "100%", width: "100%" }}
     >
       <MapContainer
-        ref={mapInstanceRef}
         center={center}
         zoom={DEFAULT_ZOOM}
         scrollWheelZoom={false}
@@ -220,6 +271,7 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
         style={{ height: "100%", width: "100%" }}
         attributionControl={false}
       >
+        <CaptureMapInstance onReady={handleMapReady} />
         <InvalidateSizeOnResize />
         <AttributionControl position="bottomright" prefix={false} />
         {IS_USING_FALLBACK_TILES ? (
@@ -233,36 +285,104 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
           <MapTilerBaseLayer />
         )}
 
-        {/* *** תיקון (בקשה מפורשת - "יותר יפה החלון... עם התמונה,
-            כתובת, עלות"): כרטיס תצוגה מקדימה אמיתי - תמונה (google_
-            photo_url שכבר נשמר בזמן ההוספה, לא תמונה מומצאת), כתובת,
-            רמת מחיר (₪ לפי price_level 1-4 שגוגל בעצמו מספק - לא
-            הומצא מחיר מדויק). */}
-        {places.map((place) => (
-          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
-            <Popup minWidth={200} maxWidth={240} className="tripadd-popup">
-              <div className="overflow-hidden rounded-[10px]">
-                {place.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={place.photoUrl} alt={place.name} className="-mx-3 -mt-3 mb-2 h-28 w-[calc(100%+24px)] object-cover" />
-                )}
-                <p className="text-[14px] font-bold text-ink">{place.name}</p>
-                {(place.category || place.subcategory) && (
-                  <p className="mt-0.5 text-[12px] text-ink-secondary">
-                    {place.category ? HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category : ""}
-                    {place.category && place.subcategory ? " · " : ""}
-                    {place.subcategory ?? ""}
-                  </p>
-                )}
-                {place.address && <p className="mt-1 text-[11.5px] text-ink-secondary">📍 {place.address}</p>}
-                <div className="mt-1.5 flex items-center gap-3">
-                  {place.rating ? <span className="text-[12.5px] font-semibold text-ink">⭐ {place.rating}</span> : null}
-                  {place.priceLevel ? <span className="text-[12.5px] text-ink-secondary">{"₪".repeat(place.priceLevel)}</span> : null}
+        {/* *** כרטיסיית תצוגה מקדימה - סדר מדויק לפי הבקשה המפורשת,
+            הכל מיושר לימין (dir="rtl" + text-right):
+            1) שורת דירוגים: TRIPLACE (לוגו+כוכב+דירוג) | Google (לוגו+כוכב+דירוג+כמות)
+            2) תמונה עגולה (מהמשתמש בלבד, לא Google) + שם המקום (בולד) באותה שורה
+            3) כתובת
+            4) פתוח/סגור עכשיו - מחושב *חי* (isPlaceOpenNow), לא snapshot ישן
+            5) קטגוריה + אייקון בעיגול
+            6) מחיר (₪ לפי price_level)
+            7) נגישות */}
+        {places.map((place) => {
+          const openNow = isPlaceOpenNow(place.openingHours);
+          const categoryDef = place.category ? HOME_QUICK_CATEGORIES.find((c) => c.id === place.category) : undefined;
+          return (
+            <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
+              <Popup minWidth={230} maxWidth={250} className="tripadd-popup">
+                <div dir="rtl" className="text-right">
+                  {/* 1. שורת דירוגים */}
+                  {(place.rating || place.googleRating) && (
+                    <div className="mb-2 flex items-center justify-end gap-3 border-b border-ink-secondary/10 pb-2">
+                      {place.googleRating ? (
+                        <div className="flex items-center gap-1">
+                          {place.googleRatingCount ? (
+                            <span className="text-[10px] text-ink-secondary">({place.googleRatingCount})</span>
+                          ) : null}
+                          <span className="text-[12px] font-bold text-ink">{place.googleRating}</span>
+                          <span className="text-[11px]">⭐</span>
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#4285F4] text-[9px] font-bold text-white">
+                            G
+                          </span>
+                        </div>
+                      ) : null}
+                      {place.rating ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[12px] font-bold text-ink">{place.rating}</span>
+                          <span className="text-[11px]">⭐</span>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/images/triplace-logo-black.png" alt="TripAdd" className="h-3 w-auto object-contain" />
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* 2. תמונה עגולה + שם באותה שורה */}
+                  <div className="flex items-center justify-end gap-2.5">
+                    <p className="min-w-0 flex-1 text-[14.5px] font-bold leading-snug text-ink">{place.name}</p>
+                    {place.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={place.photoUrl}
+                        alt={place.name}
+                        className="h-14 w-14 shrink-0 rounded-full object-cover shadow-soft"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 shrink-0 rounded-full bg-bg-secondary" />
+                    )}
+                  </div>
+
+                  {/* 3. כתובת */}
+                  {place.address && <p className="mt-2 text-[11.5px] leading-snug text-ink-secondary">{place.address}</p>}
+
+                  {/* 4. פתוח/סגור עכשיו - לא מוצג בכלל אם לא ידוע בוודאות */}
+                  {openNow !== null && (
+                    <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                      <span className="text-[11.5px] font-semibold" style={{ color: openNow ? "#1a9d5c" : "#d94848" }}>
+                        {openNow ? "פתוח עכשיו" : "סגור עכשיו"}
+                      </span>
+                      <span className="h-2 w-2 rounded-full" style={{ background: openNow ? "#1a9d5c" : "#d94848" }} />
+                    </div>
+                  )}
+
+                  {/* 5. קטגוריה + אייקון בעיגול */}
+                  {categoryDef && (
+                    <div className="mt-1.5 flex items-center justify-end gap-1.5">
+                      <span className="text-[11.5px] text-ink-secondary">
+                        {HOME_QUICK_CATEGORY_LABELS[categoryDef.id]}
+                        {place.subcategory ? ` · ${place.subcategory}` : ""}
+                      </span>
+                      <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={categoryDef.imageSrc} alt="" className="h-full w-full object-cover" />
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 6. מחיר */}
+                  {place.priceLevel ? (
+                    <p className="mt-1.5 text-[12px] font-semibold text-ink-secondary">{"₪".repeat(place.priceLevel)}</p>
+                  ) : null}
+
+                  {/* 7. נגישות - לא מוצג בכלל אם לא ידוע */}
+                  {place.accessible !== null && place.accessible !== undefined && (
+                    <p className="mt-1.5 text-[11.5px] text-ink-secondary">{place.accessible ? "♿ נגיש" : "לא נגיש"}</p>
+                  )}
                 </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {userLocation && <Marker position={userLocation} icon={USER_LOCATION_ICON} />}
         {userLocation && <RecenterOnLocation center={userLocation} obscuredTopPx={obscuredTopPx} />}

@@ -42,3 +42,24 @@ export function minutesToTimeLabel(totalMinutes: number): string {
   const m = wrapped % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+/**
+ * *** בקשה מפורשת - "מתחת צריך להיות ב-AI האם הוא פתוח עכשיו! או
+ * סגור": משתמש ב-parseOpeningHoursForDay הקיים למעלה (לא בונה parser
+ * חדש) - בודק את היום/שעה הנוכחיים בפועל מול השורה של היום הזה.
+ * אם הפירוק נכשל (פורמט לא צפוי מ-Google) - מחזיר null (לא בטוח),
+ * כדי שלא נציג "פתוח"/"סגור" בביטחון-שווא כשבאמת לא ידוע.
+ */
+export function isPlaceOpenNow(openingHours: string[] | null | undefined): boolean | null {
+  if (!openingHours || openingHours.length === 0) return null;
+
+  const now = new Date();
+  const today = parseOpeningHoursForDay(openingHours, now.getDay());
+  if (today === null) return null;
+  if (today === "closed") return false;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let closeMinutes = today.closeMinutes;
+  if (closeMinutes <= today.openMinutes) closeMinutes += 24 * 60; // חוצה חצות (בר עד 02:00 למשל)
+  return nowMinutes >= today.openMinutes && nowMinutes <= closeMinutes;
+}

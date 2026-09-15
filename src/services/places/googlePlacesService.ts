@@ -10,6 +10,9 @@ export interface GooglePlaceRaw {
   priceLevel?: string;
   photos?: { name: string }[];
   regularOpeningHours?: { weekdayDescriptions?: string[] };
+  /** האם המקום פתוח *כרגע* בפועל (לא רק לוח השבועי הכללי) - Google
+   *  מחשב את זה בעצמו לפי הזמן האמיתי בזמן הבקשה. */
+  currentOpeningHours?: { openNow?: boolean };
   types?: string[];
   editorialSummary?: { text: string };
   primaryTypeDisplayName?: { text: string };
@@ -30,6 +33,7 @@ const FIELD_MASK = [
   "places.priceLevel",
   "places.photos",
   "places.regularOpeningHours",
+  "places.currentOpeningHours",
   "places.types",
   "places.editorialSummary",
   "places.primaryTypeDisplayName",

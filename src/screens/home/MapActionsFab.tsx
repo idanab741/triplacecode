@@ -37,11 +37,16 @@ function FilterIcon() {
 
 /**
  * *** כפתור ה-(+) הצף מעל המפה + תפריט הפעולות הקטן שנפתח ממנו.
- * *** תיקון (בקשה מפורשת - "למה יש רווח בין המצפן ל-+? הרווח צריך
- * להיות רק אחרי שלוחצים על הפלוס"): open/onOpenChange עברו להיות
- * controlled מ-page.tsx כדי ש-LocateMeFab (רכיב נפרד) יוכל לדעת את
- * אותו מצב ולהזיז את עצמו רק כשבאמת פתוח - לא state פנימי סגור בתוך
- * הרכיב הזה בלבד.
+ * *** תיקון-שורש (Bug - "המצפן אפילו לא לחיץ!"): ה-wrapper הזה נשאר
+ * תמיד באותו גובה (160px) גם כשסגור, כי שני עיגולי הפעולה נשארים
+ * בזרימת ה-flex (רק opacity:0, לא display:none) - ה-div השקוף הזה
+ * חפף פיזית את המיקום של LocateMeFab (אותו z-40, אבל מאוחר יותר
+ * ב-DOM = מצויר מעליו) ובלע לו את כל הלחיצות בשקט, בלי שום שגיאה.
+ * זו לא הייתה בעיה ב-JS/geolocation בכלל - זו הייתה שכבת CSS שחסמה
+ * את הלחיצה לפני שהיא בכלל הגיעה לקוד. עכשיו ה-wrapper עצמו
+ * pointer-events-none, וכל כפתור אמיתי בתוכו מקבל בחזרה
+ * pointer-events-auto במפורש - בדיוק אותו תיקון שכבר עבד ב-page.tsx
+ * הראשי בשביל המפה מתחת לתוכן.
  */
 export function MapActionsFab({ open, onOpenChange, onAddPlace, onFilter, activeFilterCount }: MapActionsFabProps) {
   function close() {
@@ -62,10 +67,11 @@ export function MapActionsFab({ open, onOpenChange, onAddPlace, onFilter, active
       )}
 
       <div
-        className="fixed z-40 flex flex-col items-center gap-2.5"
+        className="pointer-events-none fixed flex flex-col items-center gap-2.5"
         style={{
           left: "1.25rem",
           bottom: "calc(max(env(safe-area-inset-bottom), 22px) + 78px)",
+          zIndex: 9999,
         }}
       >
         <ActionIcon
@@ -95,7 +101,7 @@ export function MapActionsFab({ open, onOpenChange, onAddPlace, onFilter, active
           onClick={() => onOpenChange(!open)}
           aria-label={open ? "סגירת תפריט הפעולות" : "פתיחת תפריט הפעולות"}
           aria-expanded={open}
-          className="relative flex items-center justify-center rounded-full text-white shadow-soft transition-transform duration-200 ease-out active:scale-95"
+          className="pointer-events-auto relative flex items-center justify-center rounded-full text-white shadow-soft transition-transform duration-200 ease-out active:scale-95"
           style={{
             width: 52,
             height: 52,

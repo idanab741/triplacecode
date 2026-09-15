@@ -44,6 +44,8 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       phone?: string | null;
       shortDescription?: string | null;
       openingHours?: string[] | null;
+      googleRating?: number | null;
+      googleRatingCount?: number | null;
     } = {};
 
     // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות"): אם המשתמש כבר
@@ -80,6 +82,12 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
         if (googlePlace.editorialSummary?.text) patch.shortDescription = googlePlace.editorialSummary.text;
         if (googlePlace.regularOpeningHours?.weekdayDescriptions?.length) {
           patch.openingHours = googlePlace.regularOpeningHours.weekdayDescriptions;
+        }
+        if (typeof googlePlace.rating === "number") {
+          patch.googleRating = googlePlace.rating;
+        }
+        if (typeof googlePlace.userRatingCount === "number") {
+          patch.googleRatingCount = googlePlace.userRatingCount;
         }
       }
     } catch {

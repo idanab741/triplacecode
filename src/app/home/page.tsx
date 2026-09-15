@@ -64,9 +64,13 @@ export default function HomePage() {
           category: string | null;
           subcategory: string | null;
           rating: number | null;
+          google_rating: number | null;
+          google_rating_count: number | null;
+          accessible: boolean | null;
           address: string | null;
-          google_photo_url: string | null;
+          photo_url: string | null;
           price_level: number | null;
+          opening_hours: string[] | null;
         }[];
         setAllPins(
           pins.map((p) => ({
@@ -77,9 +81,13 @@ export default function HomePage() {
             category: p.category as HomeMapPlace["category"],
             subcategory: p.subcategory,
             rating: p.rating,
+            googleRating: p.google_rating,
+            googleRatingCount: p.google_rating_count,
+            accessible: p.accessible,
             address: p.address,
-            photoUrl: p.google_photo_url,
+            photoUrl: p.photo_url,
             priceLevel: p.price_level,
+            openingHours: p.opening_hours,
           }))
         );
       })

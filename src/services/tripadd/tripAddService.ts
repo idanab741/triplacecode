@@ -72,6 +72,10 @@ export interface TripAddEnrichmentPatch {
   phone?: string | null;
   shortDescription?: string | null;
   openingHours?: string[] | null;
+  /** דירוג ממוצע שגוגל מספק - שונה מ-rating (הדירוג האישי שהמשתמש
+   *  עצמו נתן בטופס, "דירוג TRIPLACE"). מוצג בנפרד בכרטיסייה. */
+  googleRating?: number | null;
+  googleRatingCount?: number | null;
 }
 
 /** מיושם רק אחרי השמירה, ע"י tripAddEnrichmentService.ts בלבד - לא
@@ -90,6 +94,8 @@ export async function applyTripAddEnrichment(
   if (patch.phone !== undefined) update.phone = patch.phone;
   if (patch.shortDescription !== undefined) update.short_description = patch.shortDescription;
   if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
+  if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
+  if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;
 
   const { error } = await supabase.from("tripadd_submissions").update(update).eq("id", submissionId);
   if (error) throw error;
