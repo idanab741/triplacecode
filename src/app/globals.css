@@ -148,3 +148,19 @@ body {
    כבר בכחול המותג). התאמת צבע מדויקת לבסיס המפה עצמו דורשת את כלי
    ה-Customize של MapTiler (עיצוב סגנון מותאם אישית עם משוב חזותי
    בזמן אמת) - לא CSS filter עיוור. */
+
+.place-map-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.place-map-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+  direction: rtl;
+  font-family: var(--font-sans);
+}
+.place-map-popup .leaflet-popup-tip-container {
+  display: none;
+}
