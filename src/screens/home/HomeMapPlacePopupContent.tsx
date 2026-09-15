@@ -82,6 +82,8 @@ export function HomeMapPlacePopupContent({ place }: { place: HomeMapPlace }) {
         triplaceRating: place.rating ?? null,
         googleRating: place.googleRating ?? null,
         googleRatingCount: place.googleRatingCount ?? null,
+        priceLevel: place.priceLevel ?? null,
+        accessible: place.accessible ?? null,
         openingHours: place.openingHours ?? null,
         // *** אותה נוסחת קישור בדיוק כמו PlaceNavigationCard.tsx (handleStartNavigation) - לא ממציאים פורמט חדש.
         wazeUrl: `https://waze.com/ul?ll=${place.latitude},${place.longitude}&navigate=yes`,

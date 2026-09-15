@@ -54,6 +54,10 @@ export interface PlaceMapPopupData {
   triplaceRating: number | null;
   googleRating: number | null;
   googleRatingCount: number | null;
+  /** רמת מחיר 1-4 מגוגל (priceLevel) - לא מומצא מספר מדויק, רק ₪-₪₪₪₪. */
+  priceLevel: number | null;
+  /** נגישות לכיסא גלגלים מגוגל (accessibilityOptions.wheelchairAccessibleEntrance) - מוצג רק כשידוע וחיובי. */
+  accessible: boolean | null;
   /** אותו מבנה שכבר קיים ב-place.opening_hours (מגוגל, בעברית) - openingHours.ts כבר יודע לפרסר. */
   openingHours: string[] | null;
   wazeUrl: string;
@@ -111,6 +115,15 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
                   <span className="font-normal text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
                 )}
               </a>
+            </>
+          )}
+
+          {place.priceLevel != null && (
+            <>
+              <span className="h-3 w-px shrink-0 bg-ink-secondary/20" />
+              <span className="text-[9px] font-semibold text-ink" aria-label="טווח מחירים">
+                {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
+              </span>
             </>
           )}
 
@@ -172,6 +185,10 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
                 <span className="truncate text-[8px] text-ink-secondary">{place.subcategoryLabel}</span>
               )}
             </div>
+            {/* נגישות - אותה מוסכמה בדיוק כמו TripMatchCard.tsx / admin/discovery (♿ נגיש) - מוצג רק כשידוע וחיובי, בלי "לא נגיש". */}
+            {place.accessible === true && (
+              <span className="mr-auto shrink-0 text-[9px] font-semibold text-ink">♿ נגיש</span>
+            )}
           </div>
 
           <div className="my-1.5 h-px bg-ink-secondary/10" />

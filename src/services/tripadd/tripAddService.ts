@@ -66,12 +66,13 @@ export async function createTripAddSubmission(supabase: SupabaseClient, input: C
 }
 
 export interface TripAddEnrichmentPatch {
+  /** תת-קטגוריה - AI, לא גוגל. */
   subcategory?: string | null;
+  /** מכאן ולמטה: אך ורק 3 השדות שמותר לשלוף ולשמור מגוגל (בקשה
+   *  מפורשת - מינימלי). לא טלפון, לא תיאור, לא שעות פתיחה, לא תמונות -
+   *  המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה. */
   accessible?: boolean | null;
   priceLevel?: number | null;
-  phone?: string | null;
-  shortDescription?: string | null;
-  openingHours?: string[] | null;
   /** דירוג ממוצע שגוגל מספק - שונה מ-rating (הדירוג האישי שהמשתמש
    *  עצמו נתן בטופס, "דירוג TRIPLACE"). מוצג בנפרד בכרטיסייה. */
   googleRating?: number | null;
@@ -91,9 +92,6 @@ export async function applyTripAddEnrichment(
   if (patch.subcategory !== undefined) update.subcategory = patch.subcategory;
   if (patch.accessible !== undefined) update.accessible = patch.accessible;
   if (patch.priceLevel !== undefined) update.price_level = patch.priceLevel;
-  if (patch.phone !== undefined) update.phone = patch.phone;
-  if (patch.shortDescription !== undefined) update.short_description = patch.shortDescription;
-  if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
   if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
   if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;
 
