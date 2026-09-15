@@ -122,21 +122,37 @@ function CaptureMapInstance({ onReady }: { onReady: (map: LeafletMap) => void })
   return null;
 }
 
+/**
+ * *** תיקון-שורש (Bug - "המפה ירדה דרומה, לא קשור למיקום שלי בכלל"):
+ * הגרסה הקודמת עשתה setView (עם animate:true) ואז מיד panBy (גם עם
+ * animate:true) - שתי קריאות אנימציה נפרדות ברצף. בטעינה הראשונית
+ * (מפה "נקייה", בלי אנימציה קודמת) זה נראה נכון במקרה - אבל בלחיצה
+ * על הכפתור, כשהמפה כבר "באמצע" אינטראקציה כלשהי, שרשור כזה של שתי
+ * אנימציות ברצף מיידי לא צפוי ומתנהג בצורה לא עקבית.
+ *
+ * הפתרון הנכון: חישוב מתמטי בודד - ממירים את מיקום המשתמש למרחב
+ * פיקסלים (map.project), מזיזים אותו כלפי *צפון* (Y קטן יותר בפיקסלים
+ * = צפון) בדיוק בחצי מגובה השטח החסום, וממירים בחזרה לקואורדינטות
+ * (map.unproject). merkaz שנקבע צפונה-מהמשתמש גורם למשתמש להיראות
+ * *נמוך יותר על המסך* - בתוך השטח הגלוי, לא מוסתר מאחורי הכרטיס.
+ * קריאה **אחת** אטומית ל-setView, בלי לשרשר שתי אנימציות נפרדות.
+ */
+function computeOffsetCenter(map: LeafletMap, lat: number, lng: number, obscuredTopPx: number): [number, number] {
+  if (obscuredTopPx <= 0) return [lat, lng];
+  const targetPoint = map.project([lat, lng], DEFAULT_ZOOM);
+  const shiftedPoint = targetPoint.subtract([0, obscuredTopPx / 2]);
+  const shiftedLatLng = map.unproject(shiftedPoint, DEFAULT_ZOOM);
+  return [shiftedLatLng.lat, shiftedLatLng.lng];
+}
+
 /** ממרכזים בפועל את המפה כשמתקבל מיקום אמיתי (לא רק ה-center ההתחלתי
- *  של MapContainer, שלא מתעדכן מעצמו בשינוי prop). *** תיקון (בקשה
- *  מפורשת - "כשהמפה קטנה (והחלק האפור גדול) המרכז צריך להיות המיקום
- *  שלי"): setView לבד ממרכז את הנקודה במרכז הגיאומטרי של כל ה-
- *  container, כולל השטח שמוסתר מאחורי הכרטיס האפור למעלה - בפועל
- *  הנקודה נראית *למעלה* מהאמצע של השטח הגלוי בפועל, לא במרכזו.
- *  panBy([0, obscuredTopPx/2]) מזיז את התוכן כלפי מטה בדיוק בחצי
- *  מגובה השטח החסום, כך שהמיקום ייראה במרכז השטח הגלוי בפועל. */
+ *  של MapContainer, שלא מתעדכן מעצמו בשינוי prop). ר' computeOffsetCenter
+ *  למעלה - קריאת setView אחת ואטומית, לא שתי אנימציות משורשרות. */
 function RecenterOnLocation({ center, obscuredTopPx }: { center: [number, number]; obscuredTopPx: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, DEFAULT_ZOOM, { animate: true });
-    if (obscuredTopPx > 0) {
-      map.panBy([0, obscuredTopPx / 2], { animate: true });
-    }
+    const [lat, lng] = computeOffsetCenter(map, center[0], center[1], obscuredTopPx);
+    map.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
   }, [center, obscuredTopPx, map]);
   return null;
 }
@@ -195,22 +211,12 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
   // יקרא את הערך העדכני, לא אחד תקוע מרגע היצירה.
   const obscuredTopPxRef = useRef(obscuredTopPx);
   obscuredTopPxRef.current = obscuredTopPx;
-  // *** תיקון (Bug נמשך - "המצפן עדיין לא עובד"): ref למיקום האחרון
-  // הידוע - כדי ש-recenterToUser תמיד יעשה משהו *מיידית וודאי* (למקם
-  // מחדש למיקום שכבר יש לנו), במקום להיות תלוי אך ורק בקריאה טרייה
-  // ל-getCurrentPositionSafe שיכולה לתקוע בשקט בפעם השנייה בתוך
-  // WebView מסוימים (הבקשה הראשונה, בטעינה, כן הצליחה - ראינו את
-  // הנקודה הכחולה - אבל bridge ילידי מסוים עלול לא לקרוא ל-callback
-  // בפעם השנייה ברצף). לא מוותרים על ניסיון לרענן למיקום עדכני יותר -
-  // רק לא תלויים *רק* בו כדי שהכפתור יעשה משהו בכלל.
-  const userLocationRef = useRef<[number, number] | null>(null);
 
   useEffect(() => {
     getCurrentPositionSafe()
       .then(({ lat, lng }) => {
         setCenter([lat, lng]);
         setUserLocation([lat, lng]);
-        userLocationRef.current = [lat, lng];
       })
       .catch(() => {
         // אין הרשאה/כשל איתור - נשארים על ברירת המחדל, בלי שגיאה חוסמת.
@@ -219,33 +225,23 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
 
   // *** כפתור "מצפן"/מיקום-נוכחי - מאתר מחדש בפועל (לא רק חוזר לנקודה
   // ששמורה מהטעינה הראשונית - המשתמש יכול להיות זז מאז) ומזיז את
-  // המפה + הנקודה הכחולה אליו, כולל תיקון מירכוז לפי השטח הגלוי.
-  // useCallback עם deps ריקים - קורא הכל דרך refs, אז ה-function
-  // reference עצמו יציב ותקף לנצח, אין צורך לקרוא ל-onReady שוב בכל
-  // רינדור (מספיק פעם אחת ב-mount).
+  // המפה + הנקודה הכחולה אליו, עם אותו חישוב מירכוז אטומי בדיוק כמו
+  // RecenterOnLocation (computeOffsetCenter) - לא עוד שרשור נפרד של
+  // שתי אנימציות (זה מה שגרם ל"קפיצה דרומה לא קשורה"). קריאה בודדת
+  // ל-getCurrentPositionSafe בלבד (לא שתיים ברצף) - עכשיו שהלחיצה
+  // עצמה מאושרת עובדת (הטבעת הפועמת), אין צורך בהזזה כפולה שיכלה
+  // לתרום לתוצאה הבלתי-צפויה.
   const recenterToUser = useCallback(() => {
-    function moveTo(lat: number, lng: number) {
-      mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
-      if (obscuredTopPxRef.current > 0) {
-        mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
-      }
-    }
-
-    // מיד ובוודאות - עם המיקום האחרון הידוע, אם יש (בלי לחכות לרשת).
-    if (userLocationRef.current) {
-      moveTo(userLocationRef.current[0], userLocationRef.current[1]);
-    }
-
-    // ברקע - מנסים לרענן למיקום עדכני יותר. אם זה נכשל/תקוע, כבר
-    // עשינו את הפעולה הבסיסית למעלה - הכפתור לא "לא עושה כלום".
     getCurrentPositionSafe()
       .then(({ lat, lng }) => {
         setUserLocation([lat, lng]);
-        userLocationRef.current = [lat, lng];
-        moveTo(lat, lng);
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const [targetLat, targetLng] = computeOffsetCenter(map, lat, lng, obscuredTopPxRef.current);
+        map.setView([targetLat, targetLng], DEFAULT_ZOOM, { animate: true });
       })
       .catch(() => {
-        // אין הרשאה/כשל איתור טרי - נשארים עם המיקום האחרון הידוע שכבר הזזנו אליו למעלה.
+        // אין הרשאה/כשל איתור טרי - אין מיקום אמיתי חדש למרכז אליו.
       });
   }, []);
 
@@ -300,10 +296,10 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
           return (
             <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
               <Popup minWidth={230} maxWidth={250} className="tripadd-popup">
-                <div dir="rtl" className="text-right">
+                <div dir="rtl" className="w-full text-right">
                   {/* 1. שורת דירוגים */}
                   {(place.rating || place.googleRating) && (
-                    <div className="mb-2 flex items-center justify-end gap-3 border-b border-ink-secondary/10 pb-2">
+                    <div dir="rtl" className="mb-2 flex items-center justify-end gap-3 border-b border-ink-secondary/10 pb-2">
                       {place.googleRating ? (
                         <div className="flex items-center gap-1">
                           {place.googleRatingCount ? (
@@ -327,9 +323,12 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
                     </div>
                   )}
 
-                  {/* 2. תמונה עגולה + שם באותה שורה */}
-                  <div className="flex items-center justify-end gap-2.5">
-                    <p className="min-w-0 flex-1 text-[14.5px] font-bold leading-snug text-ink">{place.name}</p>
+                  {/* 2. תמונה עגולה בימין (מובילה) + שם משמאלה, אותו קו -
+                      בקשה מפורשת ("תמונה בימין, השם משמאל לתמונה, הכל
+                      באותו קו"). התמונה קודמת בסדר ה-DOM כדי שב-RTL
+                      היא תשב בצד הימני (תחילת השורה), והשם אחריה
+                      משמאלה. */}
+                  <div dir="rtl" className="flex w-full items-center justify-end gap-2.5">
                     {place.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -340,10 +339,15 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
                     ) : (
                       <div className="h-14 w-14 shrink-0 rounded-full bg-bg-secondary" />
                     )}
+                    <p className="min-w-0 flex-1 break-words text-[14.5px] font-bold leading-snug text-ink">
+                      {place.name}
+                    </p>
                   </div>
 
                   {/* 3. כתובת */}
-                  {place.address && <p className="mt-2 text-[11.5px] leading-snug text-ink-secondary">{place.address}</p>}
+                  {place.address && (
+                    <p className="mt-2 break-words text-[11.5px] leading-snug text-ink-secondary">{place.address}</p>
+                  )}
 
                   {/* 4. פתוח/סגור עכשיו - לא מוצג בכלל אם לא ידוע בוודאות */}
                   {openNow !== null && (

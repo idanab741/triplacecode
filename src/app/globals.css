@@ -88,6 +88,31 @@ body {
   filter: grayscale(1) brightness(1.15) sepia(0.6) hue-rotate(185deg) saturate(2.2) contrast(0.95);
 }
 
+/* *** תיקון (בקשה מפורשת - "תיישר לימין! ימין לשמאל! בגופן שלנו!"):
+   ל-Leaflet יש CSS ברירת מחדל משלו על .leaflet-popup-content (כיוון
+   LTR מובנה, font-family שלא בהכרח = הפונט של האפליקציה) - זה בדיוק
+   מה שדרס את ה-dir="rtl"/text-right שכבר היו על התוכן הפנימי שלנו,
+   וגרם לכרטיסייה להיראות דחוסה לשמאל עם המון רווח ריק מימין. מכוון
+   ספציפית ל-.tripadd-popup (לא לכל popup במערכת) כדי לא לשבור מפות
+   אחרות שמשתמשות ב-Popup רגיל. */
+.tripadd-popup .leaflet-popup-content-wrapper,
+.tripadd-popup .leaflet-popup-content {
+  direction: rtl;
+  text-align: right;
+  font-family: var(--font-sans);
+}
+.tripadd-popup .leaflet-popup-content {
+  width: 100% !important;
+  margin: 12px 14px;
+  /* *** תיקון (בקשה מפורשת - "הטקסט בורח מהחלונית"): Leaflet מודד
+     את רוחב התוכן לפי טקסט *לא-עטוף* לפני שהוא מיישם את מגבלת
+     maxWidth שהוגדרה ב-Popup - בלי word-wrap מפורש, שורה ארוכה (כמו
+     כתובת) יכולה לדחוף את כל התיבה לרוחב גדול יותר ולגלוש מעבר לקצה. */
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 /* *** תיקון (Bug - עיגול "N"/מצפן ובקרת זום כפולה): ה-canvas שה-SDK
    של MapTiler (MapLibre GL) מצייר עליו לא תמיד יורש את touch-action
    שקובץ ה-CSS הרשמי של Leaflet מגדיר על .leaflet-container - אם מחוות
