@@ -14,7 +14,7 @@ import {
 } from "@/constants/mapTiles";
 import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
-import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 import { HomeMapPlacePopupContent } from "./HomeMapPlacePopupContent";
 
 /** מרכז ברירת מחדל (תל אביב) - רק עד שמתקבל מיקום אמיתי מהמכשיר, או
@@ -76,19 +76,37 @@ export interface HomeMapHandle {
   recenterToUser: () => void;
 }
 
-/** אותו סגנון פין בדיוק כמו DiscoveryPlacesMap.tsx - לא ה-icon
- *  הדיפולטי של Leaflet (ששבור מחוץ לקופסה עם bundlers כמו Next.js). */
-const PLACE_ICON = L.divIcon({
-  className: "",
-  html: `<div style="
-    width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
-    background: var(--color-primary-start, #4F7DF3);
-    border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
-    transform: rotate(-45deg);
-  "></div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
-});
+/** מיפוי category -> משתנה-הצבע שלה (אותו colorVar שמוצג כבר מאחורי
+ *  העיגול ב-HomeQuickCategories) - מקור אמת יחיד, לא צבעים כפולים. */
+const CATEGORY_COLOR_VAR: Partial<Record<string, string>> = Object.fromEntries(
+  HOME_QUICK_CATEGORIES.map((c) => [c.id, c.colorVar])
+);
+const DEFAULT_PIN_COLOR_VAR = "--color-primary-start";
+
+/** *** שינוי (בקשה מפורשת - "שברגע שלוחצים על כפתור סינון, הנעצים
+ *  שנשארים יהיו בצבע שמופיע מאחורי העיגול של אותו סוג"): לפני זה כל
+ *  הפינים היו באותו כחול קבוע (PLACE_ICON יחיד) - עכשיו כל פין מקבל
+ *  אייקון בצבע הקטגוריה שלו (או הצבע הדיפולטי אם אין קטגוריה/לא
+ *  מזוהה). ה-cache מונע יצירת L.divIcon מחדש בכל רינדור לכל פין. */
+const placeIconCache = new Map<string, L.DivIcon>();
+function getPlaceIcon(category?: string | null): L.DivIcon {
+  const colorVar = (category && CATEGORY_COLOR_VAR[category]) || DEFAULT_PIN_COLOR_VAR;
+  const cached = placeIconCache.get(colorVar);
+  if (cached) return cached;
+  const icon = L.divIcon({
+    className: "",
+    html: `<div style="
+      width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
+      background: var(${colorVar}, #4F7DF3);
+      border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
+      transform: rotate(-45deg);
+    "></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+  });
+  placeIconCache.set(colorVar, icon);
+  return icon;
+}
 
 const USER_LOCATION_ICON = L.divIcon({
   className: "",
@@ -288,7 +306,7 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
             closeButton={false} - יש לחלונית כפתור X משלה (בהתאם ל-RTL,
             בצד שמאל), לא כפתור ה-X הדיפולטי של Leaflet. */}
         {places.map((place) => (
-          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
+          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={getPlaceIcon(place.category)}>
             <Popup minWidth={300} maxWidth={340} closeButton={false} className="place-map-popup">
               <HomeMapPlacePopupContent place={place} />
             </Popup>

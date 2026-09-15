@@ -43,7 +43,13 @@ export function HomeMapPlacePopupContent({ place }: { place: HomeMapPlace }) {
     setSaved((s) => !s);
     try {
       const supabase = createClient();
-      const status = await toggleFavorite(supabase, user.id, place.id, "place", "saved");
+      // *** תיקון (בקשה מפורשת - "כמה שמרו את האטרקציה"): קודם זה
+      // כתב place_type="place" למרות ש-place.id מגיע בפועל מ-
+      // tripadd_submissions - "favorites יתומים" (ר' ההערה למעלה),
+      // וגם מנע מספירת "כמה שמרו" (tripAddPlaceService.ts) לעבוד,
+      // כי היא סופרת דווקא place_type="tripadd". ר' migration 0080
+      // שהוסיפה את הערך הזה כאפשרות חוקית בעמודה.
+      const status = await toggleFavorite(supabase, user.id, place.id, "tripadd", "saved");
       setSaved(status === "saved");
     } catch {
       setSaved((s) => !s);

@@ -19,6 +19,16 @@
   --color-category-pink: #ff6b9d;
   --color-category-purple: #9f7bff;
   --color-category-green: #3ec28f;
+  /* *** תיקון (Bug שנמצא תוך כדי עבודה על פילטור המפה לפי קטגוריה):
+     homeQuickCategories.ts כבר הפנה את "חיי לילה" ל-colorVar הזה,
+     אבל הוא מעולם לא הוגדר כאן - var(--color-category-blue) היה
+     חסר-ערך (invalid at computed-value time), אז background נפל
+     חזרה לברירת המחדל/שקוף בכל מקום שהסתמך עליו בלי fallback מפורש. */
+  --color-category-blue: #4d7cfe;
+  /* *** תיקון (בקשה מפורשת - "הצבעים לא נכונים! לינה - צהוב"): טוקן
+     חדש לקטגוריית "לינה ואירוח" - קודם היא הצביעה בטעות על אותו
+     color-category-purple שגם "אטרקציות" צריכה בפועל. */
+  --color-category-yellow: #ffc94d;
 
   /* place's - סגול חד ובוהק, נפרד מ-category-purple הרך (בקשה מפורשת:
      "אהבתי את הסגול - אבל הוא צריך להיות חזק וחד יותר"). לא מחליף את
@@ -54,6 +64,8 @@
   --color-category-pink: var(--color-category-pink);
   --color-category-purple: var(--color-category-purple);
   --color-category-green: var(--color-category-green);
+  --color-category-blue: var(--color-category-blue);
+  --color-category-yellow: var(--color-category-yellow);
   --color-places-purple: var(--color-places-purple);
   --color-places-purple-dark: var(--color-places-purple-dark);
   --color-places-violet: var(--color-places-violet);

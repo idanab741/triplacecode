@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface PlaceSuggestion {
-  placeId: string;
+  /** *** שינוי (בקשה מפורשת - "רק ממאגר TRIPADD, לא מגוגל"): מגיע
+   *  מ-tripadd_submissions.id עכשיו - לא Google place_id. */
+  id: string;
   mainText: string;
   secondaryText: string;
 }
@@ -86,8 +88,12 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
     router.push(`/search?q=${encodeURIComponent(q)}`);
   }
 
-  function goToPlaceResult(placeId: string) {
-    router.push(`/search/result?placeId=${encodeURIComponent(placeId)}`);
+  function goToPlaceResult(id: string) {
+    // *** שינוי (בקשה מפורשת - "רק ממאגר TRIPADD"): קודם ניווט
+    // ל-/search/result?placeId=... שמביא פרטים מ-Google Place Details
+    // (לא רלוונטי יותר לתוצאה שכבר הגיעה מ-tripadd_submissions) -
+    // עכשיו ישר לעמוד האטרקציה עצמו (ר' TripAddPlaceView.tsx).
+    router.push(`/place/${encodeURIComponent(id)}`);
   }
 
   function selectDestination(option: DestinationSuggestion) {
@@ -158,10 +164,10 @@ export function SearchBarLink({ destinationMode = false, onSelectDestination }: 
         <div className="absolute inset-x-0 top-full z-20 mt-1 max-h-[120px] overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg">
           {placeSuggestions.map((s) => (
             <button
-              key={s.placeId}
+              key={s.id}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => goToPlaceResult(s.placeId)}
+              onClick={() => goToPlaceResult(s.id)}
               className="flex w-full flex-col items-start gap-0.5 border-b border-ink-secondary/10 px-4 py-2.5 text-start last:border-none hover:bg-bg-secondary"
             >
               <span className="text-sm font-medium text-ink">{s.mainText}</span>
