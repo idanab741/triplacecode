@@ -27,9 +27,9 @@ export async function POST(request: Request) {
   }
 
   const result = await classifySubcategory(category, name.trim(), address);
-  if (!result) {
-    return NextResponse.json({ error: "לא הצלחנו לסווג את המקום" }, { status: 502 });
+  if (!result.data) {
+    return NextResponse.json({ error: result.errorReason ?? "לא הצלחנו לסווג את המקום" }, { status: 502 });
   }
 
-  return NextResponse.json({ group: result.group, tag: result.tag });
+  return NextResponse.json({ group: result.data.group, tag: result.data.tag });
 }

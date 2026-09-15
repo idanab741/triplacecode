@@ -7,6 +7,14 @@ export interface SubcategoryClassification {
   tag: string;
 }
 
+export interface SubcategoryClassificationResult {
+  data: SubcategoryClassification | null;
+  /** סיבת הכשלון בפועל (לא ידידותית למשתמש קצה) - כדי שאפשר יהיה
+   *  להציג/ללוגג את השגיאה האמיתית במקום הודעה גנרית, ולאבחן מהר
+   *  יותר בעיות סביבה (מפתח API חסר, timeout, JSON לא תקין וכו'). */
+  errorReason: string | null;
+}
+
 /**
  * *** סיווג AI סינכרוני, בזמן אמת בתוך AddPlaceModal (לא ברקע אחרי
  * השמירה כמו tripAddEnrichmentService) - בקשה מפורשת: "ברגע שלוחצים
@@ -23,9 +31,11 @@ export async function classifySubcategory(
   category: TripAddCategory,
   placeName: string,
   address?: string | null
-): Promise<SubcategoryClassification | null> {
+): Promise<SubcategoryClassificationResult> {
   const groups = TRIPADD_SUBCATEGORIES[category];
-  if (!groups || groups.length === 0) return null;
+  if (!groups || groups.length === 0) {
+    return { data: null, errorReason: `אין רשימת תת-קטגוריות מוגדרת לקטגוריה "${category}"` };
+  }
 
   const taxonomyText = groups.map((g) => `- ${g.group}: ${g.tags.join(", ")}`).join("\n");
 
@@ -38,19 +48,33 @@ ${taxonomyText}
 השב אך ורק בפורמט JSON תקין, בלי שום טקסט נוסף, בלי מרכאות מסביב, בלי Markdown, בדיוק כך:
 {"group": "<שם הקבוצה בדיוק כפי שמופיע ברשימה>", "tag": "<שם התגית בדיוק כפי שמופיעה ברשימה>"}`;
 
-  try {
-    const { text } = await callClaude(prompt, 128);
-    if (!text) return null;
-
-    const cleaned = text.trim().replace(/^```json\s*|```$/g, "").trim();
-    const parsed = JSON.parse(cleaned) as { group?: string; tag?: string };
-    if (!parsed.group || !parsed.tag) return null;
-
-    const matchedGroup = groups.find((g) => g.group === parsed.group);
-    if (!matchedGroup || !matchedGroup.tags.includes(parsed.tag)) return null;
-
-    return { group: matchedGroup.group, tag: parsed.tag };
-  } catch {
-    return null;
+  const { text, error } = await callClaude(prompt, 128);
+  if (error) {
+    return { data: null, errorReason: `קריאת Claude נכשלה: ${error}` };
   }
+  if (!text) {
+    return { data: null, errorReason: "קריאת Claude חזרה ריקה (בלי טקסט)" };
+  }
+
+  const cleaned = text.trim().replace(/^```json\s*|```$/g, "").trim();
+  let parsed: { group?: string; tag?: string };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return { data: null, errorReason: `תשובת Claude לא הייתה JSON תקין: "${cleaned.slice(0, 200)}"` };
+  }
+
+  if (!parsed.group || !parsed.tag) {
+    return { data: null, errorReason: `תשובת Claude חסרה group/tag: ${JSON.stringify(parsed).slice(0, 200)}` };
+  }
+
+  const matchedGroup = groups.find((g) => g.group === parsed.group);
+  if (!matchedGroup) {
+    return { data: null, errorReason: `הקבוצה "${parsed.group}" שהוחזרה לא קיימת ברשימה של "${category}"` };
+  }
+  if (!matchedGroup.tags.includes(parsed.tag)) {
+    return { data: null, errorReason: `התגית "${parsed.tag}" לא קיימת בקבוצה "${matchedGroup.group}"` };
+  }
+
+  return { data: { group: matchedGroup.group, tag: parsed.tag }, errorReason: null };
 }

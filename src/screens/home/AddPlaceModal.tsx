@@ -197,7 +197,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
       });
       const data = await res.json();
       if (!res.ok || !data.tag) {
-        setClassifyError("לא הצלחנו לזהות תת-קטגוריה אוטומטית");
+        setClassifyError(data.error || "לא הצלחנו לזהות תת-קטגוריה אוטומטית");
         return;
       }
       setSubcategoryGroup(data.group ?? null);
@@ -416,9 +416,6 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                   אפשר יהיה לשמור את האטרקציה" - הבחירה נעולה עד שיש
                   התאמת Google אמיתית (selected.placeId). */}
               <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-secondary">סוג</label>
-              {!selected?.placeId && (
-                <p className="mb-2 text-[11.5px] text-ink-secondary">יש לבחור קודם מקום מתוצאות החיפוש של Google למעלה.</p>
-              )}
               <div className={`flex flex-wrap gap-2 ${!selected?.placeId ? "pointer-events-none opacity-40" : ""}`}>
                 {HOME_QUICK_CATEGORIES.map((c) => (
                   <ImageOptionRow
