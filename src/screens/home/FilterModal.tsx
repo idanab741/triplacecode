@@ -54,7 +54,7 @@ export function FilterModal({
   const subcategoryOptions = useMemo(() => {
     if (selectedCategories.length === 0) return [];
     const relevant = allPins.filter((p) => p.category && selectedCategories.includes(p.category));
-    const unique = Array.from(new Set(relevant.map((p) => p.subcategory).filter((s): s is string => Boolean(s) && isHebrew(s))));
+    const unique = Array.from(new Set(relevant.map((p) => p.subcategory).filter((s): s is string => typeof s === "string" && isHebrew(s))));
     return unique.sort((a, b) => a.localeCompare(b, "he"));
   }, [allPins, selectedCategories]);
 

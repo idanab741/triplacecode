@@ -35,6 +35,10 @@ export interface HomeMapPlace {
   category?: HomeQuickCategoryId | null;
   subcategory?: string | null;
   rating?: number | null;
+  address?: string | null;
+  photoUrl?: string | null;
+  /** רמת מחיר 1-4 (כמו שגוגל מספק - לא הומצא מספר מדויק). */
+  priceLevel?: number | null;
 }
 
 interface HomeMapProps {
@@ -199,21 +203,32 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
           <MapTilerBaseLayer />
         )}
 
-        {/* *** בקשה מפורשת ("אם כבר יש נעצים - למה אי אפשר ללחוץ
-            עליהם ולקבל תצוגה מקדימה?"): Popup עם שם/קטגוריה/דירוג -
-            אותו קומפוננטת Popup הרגילה של Leaflet, לא מנגנון חדש. */}
+        {/* *** תיקון (בקשה מפורשת - "יותר יפה החלון... עם התמונה,
+            כתובת, עלות"): כרטיס תצוגה מקדימה אמיתי - תמונה (google_
+            photo_url שכבר נשמר בזמן ההוספה, לא תמונה מומצאת), כתובת,
+            רמת מחיר (₪ לפי price_level 1-4 שגוגל בעצמו מספק - לא
+            הומצא מחיר מדויק). */}
         {places.map((place) => (
           <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
-            <Popup minWidth={160}>
-              <div className="text-center">
-                <p className="text-[13px] font-bold text-ink">{place.name}</p>
-                {place.category && (
-                  <p className="text-[11.5px] text-ink-secondary">
-                    {HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category}
-                    {place.subcategory ? ` · ${place.subcategory}` : ""}
+            <Popup minWidth={200} maxWidth={240} className="tripadd-popup">
+              <div className="overflow-hidden rounded-[10px]">
+                {place.photoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={place.photoUrl} alt={place.name} className="-mx-3 -mt-3 mb-2 h-28 w-[calc(100%+24px)] object-cover" />
+                )}
+                <p className="text-[14px] font-bold text-ink">{place.name}</p>
+                {(place.category || place.subcategory) && (
+                  <p className="mt-0.5 text-[12px] text-ink-secondary">
+                    {place.category ? HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category : ""}
+                    {place.category && place.subcategory ? " · " : ""}
+                    {place.subcategory ?? ""}
                   </p>
                 )}
-                {place.rating ? <p className="text-[11.5px] text-ink-secondary">⭐ {place.rating}</p> : null}
+                {place.address && <p className="mt-1 text-[11.5px] text-ink-secondary">📍 {place.address}</p>}
+                <div className="mt-1.5 flex items-center gap-3">
+                  {place.rating ? <span className="text-[12.5px] font-semibold text-ink">⭐ {place.rating}</span> : null}
+                  {place.priceLevel ? <span className="text-[12.5px] text-ink-secondary">{"₪".repeat(place.priceLevel)}</span> : null}
+                </div>
               </div>
             </Popup>
           </Marker>

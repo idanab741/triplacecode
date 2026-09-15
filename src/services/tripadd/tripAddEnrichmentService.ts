@@ -29,7 +29,7 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
   try {
     const { data: submission, error } = await supabase
       .from("tripadd_submissions")
-      .select("id, name, category, city, address, google_place_id")
+      .select("id, name, category, city, address, google_place_id, subcategory")
       .eq("id", submissionId)
       .maybeSingle();
 
@@ -46,17 +46,22 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       openingHours?: string[] | null;
     } = {};
 
-    try {
-      const categoryLabel = HOME_QUICK_CATEGORY_LABELS[submission.category as TripAddCategory] ?? submission.category;
-      const prompt = `מקום בשם "${submission.name}", קטגוריה ראשית: ${categoryLabel}.
+    // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות"): אם המשתמש כבר
+    // בחר תת-קטגוריה בעצמו בטופס (מהרשימה הקבועה), לא דורסים אותה
+    // בניחוש AI - מכבדים את הבחירה שלו.
+    if (!submission.subcategory) {
+      try {
+        const categoryLabel = HOME_QUICK_CATEGORY_LABELS[submission.category as TripAddCategory] ?? submission.category;
+        const prompt = `מקום בשם "${submission.name}", קטגוריה ראשית: ${categoryLabel}.
 מה תת-הקטגוריה הכי מדויקת שלו? (לדוגמה: בית קפה / מסעדה איטלקית / בר קוקטיילים / חוף ים / קניון / מלון בוטיק וכו')
 השב אך ורק במילה או צירוף קצר בעברית, בלי שום טקסט נוסף, בלי מרכאות.`;
-      const { text } = await callClaude(prompt, 64);
-      if (text) {
-        patch.subcategory = text.trim().replace(/^["']|["']$/g, "").slice(0, 60);
+        const { text } = await callClaude(prompt, 64);
+        if (text) {
+          patch.subcategory = text.trim().replace(/^["']|["']$/g, "").slice(0, 60);
+        }
+      } catch {
+        // לא קריטי - ממשיכים בלי subcategory
       }
-    } catch {
-      // לא קריטי - ממשיכים בלי subcategory
     }
 
     try {

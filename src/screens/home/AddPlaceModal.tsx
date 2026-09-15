@@ -7,6 +7,7 @@ import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
 import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import { TRIPADD_SUBCATEGORIES } from "@/constants/tripAddSubcategories";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 
 interface AddPlaceModalProps {
@@ -100,8 +101,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [googleError, setGoogleError] = useState<string | null>(null);
 
   const [category, setCategory] = useState<TripAddCategory | null>(null);
-  const [suggestedSubcategory, setSuggestedSubcategory] = useState<string | null>(null);
-  const [suggestingSubcategory, setSuggestingSubcategory] = useState(false);
+  const [subcategory, setSubcategory] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [description, setDescription] = useState("");
 
@@ -110,35 +110,6 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [done, setDone] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // *** תיקון (בקשה מפורשת - "איפה תת-הקטגוריה?"): תלוי רק בשם
-  // המוקלד + קטגוריה - לא ב-selected (שקודם היה מתאפס אם המשתמש
-  // עדיין לא בחר הצעה מ-Google, מה שמנע את הרמז מלהופיע). עובד גם
-  // בהוספה ידנית, לא רק אחרי בחירה מ-Google.
-  useEffect(() => {
-    setSuggestedSubcategory(null);
-    const name = nameQuery.trim();
-    if (!category || name.length < 2) return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      setSuggestingSubcategory(true);
-      fetch(`/api/tripadd/suggest-subcategory?name=${encodeURIComponent(name)}&category=${category}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (!cancelled) setSuggestedSubcategory(data.subcategory ?? null);
-        })
-        .catch(() => {
-          if (!cancelled) setSuggestedSubcategory(null);
-        })
-        .finally(() => {
-          if (!cancelled) setSuggestingSubcategory(false);
-        });
-    }, 500);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [category, nameQuery]);
 
   function handleNameChange(value: string) {
     setNameQuery(value);
@@ -249,6 +220,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
           latitude: isManual || Number.isNaN(selected?.latitude) ? undefined : selected?.latitude,
           longitude: isManual || Number.isNaN(selected?.longitude) ? undefined : selected?.longitude,
           description: description.trim() || undefined,
+          subcategory: subcategory ?? undefined,
           googlePlaceId: isManual ? undefined : selected?.placeId,
           googlePhotoUrl: selected?.photoUrl ?? undefined,
           mediaIds: media.map((m) => m.id),
@@ -416,7 +388,10 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                   <ImageOptionRow
                     key={c.id}
                     selected={category === c.id}
-                    onClick={() => setCategory(c.id)}
+                    onClick={() => {
+                      setCategory(c.id);
+                      setSubcategory(null);
+                    }}
                     label={HOME_QUICK_CATEGORY_LABELS[c.id]}
                     imageSrc={c.imageSrc}
                     textSize={12.5}
@@ -424,16 +399,33 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                 ))}
               </div>
 
-              {category && nameQuery.trim().length >= 2 && (
-                <p className="mt-2 text-[11.5px] text-ink-secondary">
-                  {suggestingSubcategory ? (
-                    "מציע תת-קטגוריה..."
-                  ) : suggestedSubcategory ? (
-                    <>
-                      תת-קטגוריה מוצעת (AI): <b className="text-ink">{suggestedSubcategory}</b>
-                    </>
-                  ) : null}
-                </p>
+              {/* *** תיקון (בקשה מפורשת - "הוא לא מציע שום תת-קטגוריה!
+                  בוא נגדיר את כל תתי הקטגוריה שיש לכל סוג"): רשימה
+                  קבועה וסגורה (לא AI חי שיכול להיכשל בשקט) - מוצגת
+                  ברגע שנבחרה קטגוריה, המשתמש בוחר אחת (אופציונלי). */}
+              {category && (
+                <>
+                  <label className="mb-1.5 mt-3 block text-[12.5px] font-semibold text-ink-secondary">תת-קטגוריה (אופציונלי)</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRIPADD_SUBCATEGORIES[category].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSubcategory((prev) => (prev === s ? null : s))}
+                        className={`rounded-pill px-3 py-1.5 text-[12px] font-medium transition ${
+                          subcategory === s ? "text-white" : "bg-bg-secondary text-ink-secondary"
+                        }`}
+                        style={
+                          subcategory === s
+                            ? { background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }
+                            : undefined
+                        }
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
 
               {/* 4. דירוג */}

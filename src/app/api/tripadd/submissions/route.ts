@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       category,
       description: body?.description,
       rating,
+      subcategory: body?.subcategory,
       city: body?.city,
       address: body?.address,
       latitude: body?.latitude,

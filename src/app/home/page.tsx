@@ -52,7 +52,34 @@ export default function HomePage() {
   function loadPins() {
     fetch("/api/tripadd/pins")
       .then((r) => r.json())
-      .then((data) => setAllPins(data.pins ?? []))
+      .then((data) => {
+        const pins = (data.pins ?? []) as {
+          id: string;
+          name: string;
+          latitude: number;
+          longitude: number;
+          category: string | null;
+          subcategory: string | null;
+          rating: number | null;
+          address: string | null;
+          google_photo_url: string | null;
+          price_level: number | null;
+        }[];
+        setAllPins(
+          pins.map((p) => ({
+            id: p.id,
+            name: p.name,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            category: p.category as HomeMapPlace["category"],
+            subcategory: p.subcategory,
+            rating: p.rating,
+            address: p.address,
+            photoUrl: p.google_photo_url,
+            priceLevel: p.price_level,
+          }))
+        );
+      })
       .catch(() => setAllPins([]));
   }
   useEffect(() => {

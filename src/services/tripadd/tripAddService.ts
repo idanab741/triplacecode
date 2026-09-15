@@ -12,6 +12,7 @@ export interface CreateTripAddSubmissionInput {
   category: TripAddCategory;
   description?: string;
   rating?: number;
+  subcategory?: string;
   city?: string;
   address?: string;
   latitude?: number;
@@ -38,6 +39,11 @@ export async function createTripAddSubmission(supabase: SupabaseClient, input: C
       category: input.category,
       description: input.description ?? null,
       rating: input.rating ?? null,
+      // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות לכל סוג"): המשתמש
+      // יכול לבחור תת-קטגוריה בעצמו מרשימה סגורה בטופס - נשמר ישירות,
+      // לא רק מחכה ל-AI אחרי השמירה (ר' tripAddEnrichmentService, שם
+      // מכבד ערך קיים ולא דורס אותו).
+      subcategory: input.subcategory ?? null,
       city: input.city ?? null,
       address: input.address ?? null,
       latitude: input.latitude ?? null,

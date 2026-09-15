@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("tripadd_submissions")
-    .select("id, name, category, subcategory, rating, latitude, longitude")
+    .select("id, name, category, subcategory, rating, latitude, longitude, address, google_photo_url, price_level")
     .not("latitude", "is", null)
     .not("longitude", "is", null)
     .order("created_at", { ascending: false })
