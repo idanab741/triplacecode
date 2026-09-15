@@ -100,6 +100,26 @@ export default function HomePage() {
   // ה-HERO/ברכה, כך שהלוגו הופך לעליון ביותר במצב מקופל).
   const [collapsed, setCollapsed] = useState(false);
   const grayCardRef = useRef<HTMLDivElement>(null);
+  // *** בקשה מפורשת - "כשהמפה קטנה (החלק האפור גדול) המרכז צריך
+  // להיות המיקום שלי": צריך לדעת כמה בפועל מהמפה חסום מלמעלה ע"י
+  // הכרטיס האפור, כדי ש-HomeMap יוכל למרכז את המיקום בתוך השטח הגלוי
+  // בפועל (לא במרכז הגיאומטרי של כל ה-container, שרובו מוסתר).
+  // ResizeObserver - לא מספר קבוע מנוחש - מתעדכן אוטומטית גם במעבר
+  // בין המצב הרגיל למצב מקופל (גובה שונה לגמרי).
+  const [grayCardHeight, setGrayCardHeight] = useState(0);
+  useEffect(() => {
+    const card = grayCardRef.current;
+    if (!card) return;
+    const observer = new ResizeObserver(() => {
+      // *** לא entry.contentRect (זה תוחם את תיבת ה-content בלבד, בלי
+      // padding - וה-padding-top של safe-area-inset-top על הכרטיס
+      // *כן* חלק מהשטח שבפועל חוסם את המפה מלמעלה). getBoundingClientRect
+      // נותן את הגובה המלא שהכרטיס תופס בפועל על המסך.
+      setGrayCardHeight(card.getBoundingClientRect().height);
+    });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
 
   // *** תיקון יסודי (Bug נמשך פעמיים - "גוררים למטה ורואים את המפה
   // מלמעלה", "החיפוש נעלם עם המקלדת"): אישרת שזה נבדק בתוך אפליקציית
@@ -222,7 +242,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-bg">
       {/* שכבת המפה - רקע קבוע, מסך מלא, מתחת לכל השאר (z-0). */}
       <div className="fixed inset-0 z-0">
-        <HomeMap ref={homeMapRef} className="h-full w-full" places={visiblePins} />
+        <HomeMap ref={homeMapRef} className="h-full w-full" places={visiblePins} obscuredTopPx={grayCardHeight} />
       </div>
 
       {/* *** קונטיינר-גלילה פנימי משלנו (לא html/body, שנעולים למעלה) -

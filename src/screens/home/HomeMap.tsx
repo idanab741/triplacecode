@@ -44,6 +44,11 @@ export interface HomeMapPlace {
 interface HomeMapProps {
   places?: HomeMapPlace[];
   className?: string;
+  /** גובה (px) של האזור שחוסם את חלק העליון של המפה מלמעלה (הכרטיס
+   *  האפור בעמוד הבית) - נדרש כדי למרכז את מיקום המשתמש בתוך השטח
+   *  *הגלוי בפועל* של המפה, לא במרכז הגיאומטרי של כל ה-container
+   *  (שרובו מוסתר מאחורי הכרטיס כשהוא במצב הרגיל/מוגדל). */
+  obscuredTopPx?: number;
 }
 
 /** נחשף החוצה (ref) כדי שכפתור "מצפן"/מיקום-נוכחי שיושב מחוץ לרכיב
@@ -78,12 +83,21 @@ const USER_LOCATION_ICON = L.divIcon({
 });
 
 /** ממרכזים בפועל את המפה כשמתקבל מיקום אמיתי (לא רק ה-center ההתחלתי
- *  של MapContainer, שלא מתעדכן מעצמו בשינוי prop). */
-function RecenterOnLocation({ center }: { center: [number, number] }) {
+ *  של MapContainer, שלא מתעדכן מעצמו בשינוי prop). *** תיקון (בקשה
+ *  מפורשת - "כשהמפה קטנה (והחלק האפור גדול) המרכז צריך להיות המיקום
+ *  שלי"): setView לבד ממרכז את הנקודה במרכז הגיאומטרי של כל ה-
+ *  container, כולל השטח שמוסתר מאחורי הכרטיס האפור למעלה - בפועל
+ *  הנקודה נראית *למעלה* מהאמצע של השטח הגלוי בפועל, לא במרכזו.
+ *  panBy([0, obscuredTopPx/2]) מזיז את התוכן כלפי מטה בדיוק בחצי
+ *  מגובה השטח החסום, כך שהמיקום ייראה במרכז השטח הגלוי בפועל. */
+function RecenterOnLocation({ center, obscuredTopPx }: { center: [number, number]; obscuredTopPx: number }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, DEFAULT_ZOOM, { animate: true });
-  }, [center, map]);
+    if (obscuredTopPx > 0) {
+      map.panBy([0, obscuredTopPx / 2], { animate: true });
+    }
+  }, [center, obscuredTopPx, map]);
   return null;
 }
 
@@ -129,7 +143,7 @@ function InvalidateSizeOnResize() {
  * ב-window/DOM ולא ניתן לרנדור בצד השרת.
  */
 export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
-  { places = [], className },
+  { places = [], className, obscuredTopPx = 0 },
   ref
 ) {
   const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
@@ -139,6 +153,11 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
   // מבחוץ, מלחיצה על כפתור חיצוני). react-leaflet v4 תומך ב-ref
   // ישירות על MapContainer בדיוק לצורך זה.
   const mapInstanceRef = useRef<LeafletMap | null>(null);
+  // ref ל-obscuredTopPx העדכני ביותר - כדי ש-recenterToUser (שנקרא
+  // מבחוץ, לא בזמן render) תמיד יקרא את הערך העדכני, לא אחד תקוע
+  // מהרגע שבו ה-useImperativeHandle נוצר.
+  const obscuredTopPxRef = useRef(obscuredTopPx);
+  obscuredTopPxRef.current = obscuredTopPx;
 
   useEffect(() => {
     getCurrentPositionSafe()
@@ -154,7 +173,7 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
   // *** כפתור "מצפן"/מיקום-נוכחי (בקשה מפורשת - "כפתור מצפן מעל ה-+
   // שיחזיר למיקום הנוכחי שלי"): מאתר מחדש בפועל (לא רק חוזר לנקודה
   // ששמורה מהטעינה הראשונית - המשתמש יכול להיות זז מאז) ומזיז את
-  // המפה + הנקודה הכחולה אליו.
+  // המפה + הנקודה הכחולה אליו, כולל אותו תיקון מירכוז לפי השטח הגלוי.
   useImperativeHandle(
     ref,
     () => ({
@@ -163,6 +182,9 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
           .then(({ lat, lng }) => {
             setUserLocation([lat, lng]);
             mapInstanceRef.current?.setView([lat, lng], DEFAULT_ZOOM, { animate: true });
+            if (obscuredTopPxRef.current > 0) {
+              mapInstanceRef.current?.panBy([0, obscuredTopPxRef.current / 2], { animate: true });
+            }
           })
           .catch(() => {
             // אין הרשאה/כשל איתור - אין מיקום אמיתי למרכז אליו, נשארים במקום הנוכחי.
@@ -235,7 +257,7 @@ export const HomeMap = forwardRef<HomeMapHandle, HomeMapProps>(function HomeMap(
         ))}
 
         {userLocation && <Marker position={userLocation} icon={USER_LOCATION_ICON} />}
-        {userLocation && <RecenterOnLocation center={userLocation} />}
+        {userLocation && <RecenterOnLocation center={userLocation} obscuredTopPx={obscuredTopPx} />}
       </MapContainer>
     </div>
   );
