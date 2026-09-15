@@ -31,10 +31,10 @@ function StarIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-function CloseIcon() {
+function CloseIcon({ size = 16 }: { size?: number }) {
   // *** אותו path בדיוק כמו CloseIcon ב-PopupCard.tsx - לא אייקון חדש.
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   );
@@ -76,18 +76,19 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
     today && today !== "closed" ? `${minutesToTimeLabel(today.openMinutes)}–${minutesToTimeLabel(today.closeMinutes)}` : null;
 
   return (
-    <div dir="rtl" className="relative mx-auto w-[92vw] max-w-[420px]" data-popup-build="2026-09-15-v9">
-      <div className="mb-1 rounded-lg bg-red-600 px-2 py-1 text-center text-[11px] font-bold text-white">
-        גרסה חדשה נטענה ✓ (את השורה הזו נמחק ברגע שהכל יעבוד)
-      </div>
+    <div dir="rtl" className="relative mx-auto w-[64vw] max-w-[294px]">
       <div className="overflow-hidden rounded-card bg-white shadow-soft">
-        {/* דירוגים + סגירה - שורה קומפקטית אחת */}
-        <div className="flex items-center gap-2.5 px-4 pt-2.5 pb-2">
+        {/* דירוגים + סגירה. הלוגואים (triplace + Google) נשארים בגודל המקורי שלהם (h-5) בכוונה - לא
+            מוקטנים עם שאר החלונית. תוצאה ישירה של זה: ברוחב הקטן החדש שני הלוגואים ביחד כבר לא
+            נכנסים בשורה אחת - אז השורה עוברת ל-flex-wrap (שתי שורות) במקום להיחתך/לגלוש. כפתור
+            הסגירה מקובע מוחלט בפינה השמאלית-עליונה (position absolute) כדי שהוא לא "יקפוץ" לשורה
+            השנייה יחד עם שאר התוכן. */}
+        <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-1 py-2 pr-3 pl-6">
           <div className="flex items-center gap-1">
             <Image src="/images/triplace-logo-black.png" alt="TripLace" width={62} height={19} className="h-5 w-auto object-contain" />
             {place.triplaceRating != null && (
-              <span className="flex items-center gap-0.5 text-xs font-bold text-ink">
-                <StarIcon />
+              <span className="flex items-center gap-0.5 text-[9px] font-bold text-ink">
+                <StarIcon size={9} />
                 {place.triplaceRating.toFixed(1)}
               </span>
             )}
@@ -95,16 +96,16 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
 
           {place.googleRating != null && (
             <>
-              <span className="h-3.5 w-px shrink-0 bg-ink-secondary/20" />
+              <span className="h-3 w-px shrink-0 bg-ink-secondary/20" />
               <a
                 href={place.googleReviewsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs font-semibold text-ink"
+                className="flex items-center gap-1 text-[9px] font-semibold text-ink"
                 aria-label="דירוגי Google - פתיחת ביקורות"
               >
                 <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-5 w-auto object-contain" />
-                <StarIcon />
+                <StarIcon size={9} />
                 <span>{place.googleRating.toFixed(1)}</span>
                 {place.googleRatingCount != null && (
                   <span className="font-normal text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
@@ -113,95 +114,93 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare }: Pla
             </>
           )}
 
-          <span className="flex-1" />
-
           <button
             type="button"
             onClick={onClose}
             aria-label="סגירה"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-bg-secondary hover:text-ink"
+            className="absolute left-1.5 top-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-bg-secondary hover:text-ink"
           >
-            <CloseIcon />
+            <CloseIcon size={11} />
           </button>
         </div>
 
         {/* תמונת המקום - יחס רחב ונמוך בכוונה (לא 16:9) כדי שהחלונית כולה תישאר שטוחה */}
         {place.imageUrl && (
-          <div className="px-4">
-            <div className="relative aspect-[3/1] w-full overflow-hidden rounded-2xl bg-bg-secondary">
-              <Image src={place.imageUrl} alt={place.name} fill sizes="420px" className="object-cover" />
+          <div className="px-3">
+            <div className="relative aspect-[3/1] w-full overflow-hidden rounded-xl bg-bg-secondary">
+              <Image src={place.imageUrl} alt={place.name} fill sizes="294px" className="object-cover" />
             </div>
           </div>
         )}
 
-        <div className="px-4 pb-3 pt-2">
+        <div className="px-3 pb-2 pt-1.5">
           {/* שם המקום */}
-          <h3 className="truncate text-right text-[16px] font-extrabold leading-tight text-ink">{place.name}</h3>
+          <h3 className="truncate text-right text-[11px] font-extrabold leading-tight text-ink">{place.name}</h3>
 
           {/* כתובת + פתוח/סגור על אותה שורה - חוסך גובה */}
-          <div className="mt-1 flex items-center justify-end gap-2 text-right text-[12.5px] leading-snug">
+          <div className="mt-1 flex items-center justify-end gap-1.5 text-right text-[9px] leading-snug">
             {isOpen != null && (
               <span className="flex shrink-0 items-center gap-1">
                 {hoursLabel && <span className="text-ink-secondary">{hoursLabel}</span>}
-                <span className={`h-1.5 w-1.5 rounded-full ${isOpen ? "bg-[var(--color-category-green)]" : "bg-danger"}`} />
+                <span className={`h-1 w-1 rounded-full ${isOpen ? "bg-[var(--color-category-green)]" : "bg-danger"}`} />
                 <span className={`font-semibold ${isOpen ? "text-[var(--color-category-green)]" : "text-danger"}`}>
                   {isOpen ? "פתוח עכשיו" : "סגור עכשיו"}
                 </span>
               </span>
             )}
-            {isOpen != null && place.address && <span className="h-3 w-px shrink-0 bg-ink-secondary/20" />}
+            {isOpen != null && place.address && <span className="h-2.5 w-px shrink-0 bg-ink-secondary/20" />}
             {place.address && (
               <span className="flex min-w-0 items-center gap-1 truncate text-ink-secondary">
                 <span className="truncate">{place.address}</span>
-                <Icon name="location-pin" size={12} className="shrink-0 opacity-70" />
+                <Icon name="location-pin" size={9} className="shrink-0 opacity-70" />
               </span>
             )}
           </div>
 
-          <div className="my-2 h-px bg-ink-secondary/10" />
+          <div className="my-1.5 h-px bg-ink-secondary/10" />
 
           {/* קטגוריה + תת-קטגוריה - האייקון מוביל בימין (RTL), הטקסט אחריו */}
-          <div className="flex items-center justify-start gap-2">
+          <div className="flex items-center justify-start gap-1.5">
             {place.categoryIconSrc && (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
-                <Image src={place.categoryIconSrc} alt="" width={18} height={18} className="h-[18px] w-[18px] object-contain" />
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary">
+                <Image src={place.categoryIconSrc} alt="" width={13} height={13} className="h-[13px] w-[13px] object-contain" />
               </div>
             )}
             <div className="flex min-w-0 flex-col text-right">
-              {place.categoryLabel && <span className="truncate text-[13px] font-semibold text-ink">{place.categoryLabel}</span>}
+              {place.categoryLabel && <span className="truncate text-[9px] font-semibold text-ink">{place.categoryLabel}</span>}
               {place.subcategoryLabel && (
-                <span className="truncate text-[12px] text-ink-secondary">{place.subcategoryLabel}</span>
+                <span className="truncate text-[8px] text-ink-secondary">{place.subcategoryLabel}</span>
               )}
             </div>
           </div>
 
-          <div className="my-2 h-px bg-ink-secondary/10" />
+          <div className="my-1.5 h-px bg-ink-secondary/10" />
 
           {/* פעולות: Waze / Google Maps / שמירה / שיתוף - רק אייקונים, בלי כיתוב מתחת.
-              כולם באותה קופסה בדיוק (20px, בגודל של שמירה) - בלי יוצאים מן הכלל.
+              כולם באותה קופסה בדיוק (24px) - בלי יוצאים מן הכלל.
               הכי ימני: גוגל מפות. אחריו: Waze. אחריו: שמירה. הכי שמאלי: שיתוף. */}
           <div className="flex items-stretch justify-between">
             <PopupAction href={place.googleMapsDirectionsUrl} label="ניווט בגוגל מפות">
-              <Icon name="google-maps" size={20} />
+              <Icon name="google-maps" size={24} />
             </PopupAction>
 
             <PopupAction href={place.wazeUrl} label="ניווט ב-Waze">
-              <Icon name="waze" size={20} />
+              <Icon name="waze" size={24} />
             </PopupAction>
 
             <PopupAction onClick={onToggleSave} label="שמירה">
-              <Icon name={place.saved ? "save-active" : "save"} size={20} />
+              <Icon name={place.saved ? "save-active" : "save"} size={24} />
             </PopupAction>
 
             <PopupAction onClick={onShare} label="שיתוף">
-              <Icon name="share" size={20} />
+              <Icon name="share" size={24} />
             </PopupAction>
           </div>
         </div>
       </div>
 
       {/* שפיץ קטן שמצביע על המיקום במפה */}
-      <div className="mx-auto -mt-px h-3 w-3 rotate-45 rounded-[2px] bg-white shadow-soft" />
+      <div className="mx-auto -mt-px h-2.5 w-2.5 rotate-45 rounded-[2px] bg-white shadow-soft" />
     </div>
   );
 }
@@ -210,21 +209,18 @@ function PopupAction({
   href,
   onClick,
   label,
-  boxSize = 20,
+  boxSize = 24,
   children,
 }: {
   href?: string;
   onClick?: () => void;
   label: string;
-  /** גודל קופסת האייקון בפיקסלים - ברירת מחדל 20. חלק מהאייקונים (Waze,
-   *  שיתוף) נראים "קטנים" יותר מאחרים באותה קופסה בדיוק, כי הצורה/עובי
-   *  הקו שלהם נותן פחות "דיו" חזותי - אז לפעמים קופסה מעט גדולה יותר
-   *  נדרשת כדי שהמשקל החזותי (לא רק ה-bounding box הטכני) יתאים לשאר. */
+  /** גודל קופסת האייקון בפיקסלים - קבוע ואחיד לכל 4 האייקונים (24px). */
   boxSize?: number;
   children: React.ReactNode;
 }) {
   const className =
-    "flex flex-1 items-center justify-center rounded-xl py-2 text-ink-secondary transition-colors hover:bg-bg-secondary hover:text-ink";
+    "flex flex-1 items-center justify-center rounded-xl py-1.5 text-ink-secondary transition-colors hover:bg-bg-secondary hover:text-ink";
 
   const content = (
     <span className="flex items-center justify-center" style={{ width: boxSize, height: boxSize }}>
