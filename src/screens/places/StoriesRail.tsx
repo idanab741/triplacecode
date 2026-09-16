@@ -181,46 +181,53 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     <div className="flex items-start justify-center gap-4 overflow-x-auto px-4 py-4" style={{ scrollbarWidth: "none" }}>
       {renderSide(rightSide, "right", true)}
 
-      <button
-        type="button"
-        onClick={handleCenterClick}
-        className="flex w-[94px] shrink-0 flex-col items-center gap-2 transition-transform active:scale-95"
-      >
-        {/* *** תיקון (בקשה מפורשת - "העיגול באמצע צריך להיות ממורכז
-            במרכז החלוניות, והטקסט שלו באותו גובה כמו שאר החלוניות"):
-            העיגול (76px) קטן מגובה חלון הצד (92px) - בלי התיקון הזה
-            הוא נדבק לחלק העליון (items-start בשורה החיצונית), מה
-            שמזיז את הטקסט שמתחתיו גבוה יותר מהטקסט שמתחת לחלונות
-            הצד. עטיפה בגובה 92px קבוע, עם items-center, ממרכזת את
-            העיגול בתוכה בדיוק כמו שהחלונות הצדדיים תופסים 92px - כך
-            שכל הכיתובים מתחילים מאותו קו בדיוק. */}
+      {/* *** תיקון (בקשה מפורשת - "איך אני מוסיף עוד סטורי?? ברגע
+          שהעלית כבר אחד"): קודם, ברגע שהיה סטורי פעיל, תג ה-"+"
+          נעלם לגמרי - קליק על העיגול תמיד פתח *צפייה* בסטורי הקיים,
+          ולא הייתה שום דרך גלויה להוסיף עוד אחד. עכשיו זה div (לא
+          button יחיד) עם שני יעדי-קליק נפרדים: קליק על העיגול עצמו
+          עדיין פותח צפייה בסטורי הקיים (אם יש) / יצירה (אם אין) -
+          בלי שינוי; קליק על תג ה-"+" **תמיד** פותח יצירת סטורי חדש,
+          גם כשכבר יש סטורי פעיל - זה עכשיו קבוע ולא נעלם, כי זו
+          הדרך היחידה להוסיף עוד. */}
+      <div className="flex w-[94px] shrink-0 flex-col items-center gap-2">
         <span className="flex h-[92px] w-[87px] items-center justify-center">
           <span className="relative">
-            <CenterCircle
-              gradient={
-                selfEntry?.hasUnviewed
-                  ? "linear-gradient(135deg, var(--color-places-purple) 0%, var(--color-places-violet) 55%, #ec4899 100%)"
-                  : "var(--color-bg-secondary, #eee)"
-              }
-              glow={Boolean(selfEntry?.hasUnviewed)}
+            <button
+              type="button"
+              onClick={handleCenterClick}
+              className="block transition-transform active:scale-95"
+              aria-label={selfEntry ? "צפייה בסטורי שלי" : "צור סטורי"}
             >
-              <Avatar url={viewerAvatarUrl ?? null} />
-            </CenterCircle>
-            {/* תג ה-"+" מוצג רק כשאין עדיין סטורי פעיל משלי - ברגע שיש,
-                הקליק פותח את הסטורי הקיים, לא יוצר עוד אחד. */}
-            {!selfEntry && (
-              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-soft">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-places-purple)" strokeWidth="3" strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </span>
-            )}
+              <CenterCircle
+                gradient={
+                  selfEntry?.hasUnviewed
+                    ? "linear-gradient(135deg, var(--color-places-purple) 0%, var(--color-places-violet) 55%, #ec4899 100%)"
+                    : "var(--color-bg-secondary, #eee)"
+                }
+                glow={Boolean(selfEntry?.hasUnviewed)}
+              >
+                <Avatar url={viewerAvatarUrl ?? null} />
+              </CenterCircle>
+            </button>
+            <button
+              type="button"
+              onClick={onCreateStory}
+              aria-label="הוסף סטורי"
+              className="absolute -bottom-1.5 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-soft transition-transform active:scale-90"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-places-purple)" strokeWidth="3" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </span>
         </span>
-        <span className="w-full truncate text-center text-[11.5px] font-bold text-ink">
-          {selfEntry ? (viewerName?.trim() || "הסטורי שלי") : "צור סטורי"}
-        </span>
-      </button>
+        <button type="button" onClick={handleCenterClick} className="w-full">
+          <span className="w-full truncate text-center text-[11.5px] font-bold text-ink">
+            {selfEntry ? (viewerName?.trim() || "הסטורי שלי") : "צור סטורי"}
+          </span>
+        </button>
+      </div>
 
       {renderSide(leftSide, "left", false)}
     </div>

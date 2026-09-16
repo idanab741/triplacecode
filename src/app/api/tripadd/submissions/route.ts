@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import {
   createTripAddSubmission,
+  createTripAddSharePost,
   findTripAddSubmissionByGooglePlaceId,
   getMyTripAddSubmissions,
   upsertTripAddReview,
@@ -56,6 +57,10 @@ export async function POST(request: Request) {
   }
 
   const googlePlaceId = body?.googlePlaceId as string | undefined;
+  // *** תוספת (בקשה מפורשת - "שיתוף ב-place's", ברירת מחדל מסומן):
+  // undefined (שדה לא נשלח בכלל, קליינט ישן) מתייחס כמו true - רק
+  // false מפורש (המשתמש הוריד את הסימון) מבטל את השיתוף.
+  const shareToPlaces = body?.shareToPlaces !== false;
 
   try {
     if (googlePlaceId) {
@@ -68,6 +73,14 @@ export async function POST(request: Request) {
           description: body?.description,
           mediaIds: body?.mediaIds,
         });
+        if (shareToPlaces) {
+          await createTripAddSharePost(supabase, {
+            userId: user.id,
+            submissionId: existing.id,
+            text: body?.description,
+            mediaIds: body?.mediaIds,
+          }).catch(() => {});
+        }
         // המקום כבר קיים ומועשר - אין צורך להריץ enrichment שוב.
         return NextResponse.json({ id: existing.id, mergedIntoExisting: true }, { status: 200 });
       }
@@ -92,6 +105,17 @@ export async function POST(request: Request) {
 
     // fire-and-forget - לא מעכב את התשובה למשתמש, כשלון לא מכשיל את השמירה.
     enrichTripAddSubmission(id).catch(() => {});
+
+    if (shareToPlaces) {
+      // *** גם כאן fire-and-forget - כשלון ביצירת הפוסט לא אמור
+      // להכשיל את שמירת המקום עצמו (הפעולה העיקרית שהמשתמש ביקש).
+      createTripAddSharePost(supabase, {
+        userId: user.id,
+        submissionId: id,
+        text: body?.description,
+        mediaIds: body?.mediaIds,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ id, mergedIntoExisting: false }, { status: 201 });
   } catch (err) {

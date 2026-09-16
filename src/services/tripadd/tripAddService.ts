@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 /** אותם 6 ערכים בדיוק כמו HomeQuickCategoryId (שורת "סוגי הטיול" בעמוד
@@ -82,8 +82,42 @@ export async function createTripAddSubmission(supabase: SupabaseClient, input: C
 }
 
 /**
- * *** תוספת (בקשה מפורשת - "לבנות איחוד מקומות כפולים לפי
- * google_place_id"): נבדק *לפני* יצירת submission חדש - אם מקום עם
+ * *** תוספת (בקשה מפורשת - "כשמוסיפים אטרקציה בעמוד הבית, שזה יופיע
+ * גם כפוסט ב-place's, בפרופיל של המשתמש ובפיד"): יוצר שורה רגילה
+ * בטבלת posts הכללית (לא טבלה נפרדת) - עם tripadd_submission_id
+ * (migration 0083) במקום place_id הישן, אותו טקסט אישי שהמשתמש כתב,
+ * ואותן תמונות שהוא כבר העלה (mediaIds - אין העלאה כפולה, אותם
+ * media_assets מקושרים גם לפוסט וגם ל-tripadd_submission).
+ * visibility: 'public' - זה בדיוק העניין ("שיתוף"), לא טיוטה פרטית.
+ */
+export async function createTripAddSharePost(
+  supabase: SupabaseClient,
+  input: { userId: string; submissionId: string; text?: string; mediaIds?: string[] }
+): Promise<string> {
+  const { data: post, error } = await supabase
+    .from("posts")
+    .insert({
+      author_id: input.userId,
+      text: input.text?.trim() || null,
+      post_type: input.mediaIds?.length ? "photo" : "place_recommendation",
+      tripadd_submission_id: input.submissionId,
+      visibility: "public",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  if (input.mediaIds?.length) {
+    const rows = input.mediaIds.map((mediaId, sortOrder) => ({ post_id: post.id, media_id: mediaId, sort_order: sortOrder }));
+    const { error: mediaError } = await supabase.from("post_media").insert(rows);
+    if (mediaError) throw mediaError;
+  }
+
+  return post.id as string;
+}
+
+/**
+ * *** לוגיקה של זיהוי-כפילות (דה-דופ) - אם מקום עם
  * אותו google_place_id כבר קיים במאגר, לא נוצר "מקום" שני (זו הייתה
  * הסיבה ל-"Jasmino מופיע פעמיים") - במקום זה נוסף/מתעדכן רק ביקורת
  * על המקום הקיים (ר' upsertTripAddReview). מקומות בלי google_place_id

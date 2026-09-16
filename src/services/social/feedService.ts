@@ -47,7 +47,7 @@ export async function getFeed(
 
   let query = supabase
     .from("posts")
-    .select("id, author_id, text, post_type, place_id, destination_id, created_at")
+    .select("id, author_id, text, post_type, place_id, destination_id, tripadd_submission_id, created_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -68,13 +68,26 @@ export async function getFeed(
   const authorIds = [...new Set(posts.map((p) => p.author_id))];
   const placeIds = [...new Set(posts.map((p) => p.place_id).filter(Boolean))] as string[];
   const destinationIds = [...new Set(posts.map((p) => p.destination_id).filter(Boolean))] as string[];
+  // *** תוספת (בקשה מפורשת - "כשמוסיפים אטרקציה בעמוד הבית, שזה יופיע
+  // גם כפוסט ב-place's"): posts.tripadd_submission_id (migration 0083) -
+  // נפרד לגמרי מ-place_id הישן, ר' AddPlaceModal.tsx.
+  const tripAddIds = [...new Set(posts.map((p) => p.tripadd_submission_id).filter(Boolean))] as string[];
 
-  const [authorsRes, placesRes, destinationsRes, mediaRes, likesRes, commentsRes, viewerLikesRes, viewerSavesRes, followingRes] =
+  const [authorsRes, placesRes, destinationsRes, tripAddRes, mediaRes, likesRes, commentsRes, viewerLikesRes, viewerSavesRes, followingRes] =
     await Promise.all([
       supabase.from("profiles").select("id, username, full_name, avatar_url, is_creator").in("id", authorIds),
       placeIds.length ? supabase.from("places").select("id, name, image_urls").in("id", placeIds) : Promise.resolve({ data: [] }),
       destinationIds.length
         ? supabase.from("destinations").select("id, name").in("id", destinationIds)
+        : Promise.resolve({ data: [] }),
+      // אותה סיבה בדיוק כמו ה-admin client על post_media למטה - RLS על
+      // tripadd_submissions/media_assets מוגבל, וכאן זה "רק להשלים תצוגה"
+      // לפוסטים שכבר עברו RLS filtering מלא בשאילתת posts למעלה.
+      tripAddIds.length
+        ? createAdminClient()
+            .from("tripadd_submissions")
+            .select("id, name, tripadd_submission_media(sort_order, media_assets(url))")
+            .in("id", tripAddIds)
         : Promise.resolve({ data: [] }),
       // *** תיקון באג (בקשה מפורשת - "התמונות לא מופיעות לכל המשתמשים"):
       // media_assets ב-RLS מגביל SELECT לבעלים בלבד (auth.uid()=owner_id,
@@ -110,6 +123,20 @@ export async function getFeed(
     ])
   );
   const destinationsById = new Map((destinationsRes.data ?? []).map((d) => [d.id, d]));
+  const tripAddPlacesById = new Map(
+    (tripAddRes.data ?? []).map(
+      (t: {
+        id: string;
+        name: string;
+        tripadd_submission_media?: { sort_order: number; media_assets: { url: string } | null }[] | null;
+      }) => {
+        const sorted = (t.tripadd_submission_media ?? [])
+          .filter((m) => m.media_assets?.url)
+          .sort((a, b) => a.sort_order - b.sort_order);
+        return [t.id, { id: t.id, name: t.name, imageUrl: sorted[0]?.media_assets?.url ?? null }];
+      }
+    )
+  );
   const mediaByPost = new Map<string, { id: string; type: string; url: string; thumbnailUrl: string | null }[]>();
   for (const row of mediaRes.data ?? []) {
     const media = row.media as unknown as { id: string; type: string; url: string; thumbnail_url: string | null };
@@ -139,7 +166,18 @@ export async function getFeed(
         isCreator: author?.is_creator ?? false,
       },
       media: mediaByPost.get(post.id) ?? [],
-      place: post.place_id ? placesById.get(post.place_id) ?? null : null,
+      // *** תוספת (בקשה מפורשת - פוסט משותף מהוספת אטרקציה): אם לפוסט
+      // יש tripadd_submission_id, זה תמיד המקום המוצג (לא post.place_id
+      // הישן - הם בלעדיים הדדית בפועל, נוצרים ע"י מסלולים שונים
+      // לגמרי). ה-`place` ב-DTO משמש לשניהם בכוונה - אותה צורה בדיוק
+      // ({id, name, imageUrl}), כך שהקישור הקיים ב-PostCard.tsx
+      // (`/place/${item.place.id}`) עובד ללא שינוי - הוא כבר בודק
+      // tripadd_submissions קודם (ר' app/place/[id]/page.tsx).
+      place: post.tripadd_submission_id
+        ? tripAddPlacesById.get(post.tripadd_submission_id) ?? null
+        : post.place_id
+          ? placesById.get(post.place_id) ?? null
+          : null,
       destination: post.destination_id ? destinationsById.get(post.destination_id) ?? null : null,
       stats: { likes: likeCountByPost.get(post.id) ?? 0, comments: commentCountByPost.get(post.id) ?? 0 },
       viewerState: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { ImageOptionRow } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
@@ -111,6 +112,9 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [classifyError, setClassifyError] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [description, setDescription] = useState("");
+  // *** תוספת (בקשה מפורשת - "שיתוף ב-place's, מסומן כברירת מחדל"):
+  // true כברירת מחדל - המשתמש מוריד את הסימון אם הוא לא רוצה לשתף.
+  const [shareToPlaces, setShareToPlaces] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -264,6 +268,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
           googlePlaceId: selected.placeId,
           googlePhotoUrl: selected.photoUrl ?? undefined,
           mediaIds: media.map((m) => m.id),
+          shareToPlaces,
         }),
       });
       if (!res.ok) {
@@ -480,10 +485,25 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                 className="w-full resize-none rounded-[14px] border border-ink-secondary/20 p-3 text-[13.5px] focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
 
+              {/* 6. שיתוף ב-place's - בקשה מפורשת: מסומן כברירת מחדל,
+                  עם לוגו place's כדי שיהיה ברור בדיוק לאן זה משותף. */}
+              <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-[14px] border border-ink-secondary/15 p-3">
+                <input
+                  type="checkbox"
+                  checked={shareToPlaces}
+                  onChange={(e) => setShareToPlaces(e.target.checked)}
+                  className="h-5 w-5 shrink-0 accent-accent"
+                />
+                <span className="flex flex-1 items-center gap-1.5 text-[13px] font-medium text-ink">
+                  שיתוף ב-
+                  <Image src="/images/places-logo.png" alt="place's" width={62} height={20} className="object-contain" />
+                </span>
+              </label>
+
               {error && <p className="mt-3 text-[12.5px] text-red-500">{error}</p>}
             </div>
 
-            {/* 6. שמירה - פוטר קבוע, כולל safe-area, תמיד גלוי */}
+            {/* 7. שמירה - פוטר קבוע, כולל safe-area, תמיד גלוי */}
             <div
               className="shrink-0 border-t border-ink-secondary/10 px-4 pt-3"
               style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
