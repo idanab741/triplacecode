@@ -21,9 +21,17 @@ interface StoriesRailProps {
 // url==null (אין תמונה בכלל) => תמונת ברירת המחדל (getAvatarUrl).
 // כשיש כתובת אמיתית - מוצגת כרגיל.
 function Avatar({ url }: { url: string | null }) {
+  // *** תיקון (בקשה מפורשת - "התמונה בסטורי נחתכת ולא מלאה בצורת
+  // האליפסה"): תמונת ברירת המחדל (default-avatar.png) עצמה מוקפת
+  // ברווח לבן מובנה בתוך הקובץ - object-cover לא ממלא את החלון כי
+  // הריבוע השקוף/הרווח הזה נחשב חלק מהתמונה. מגדילים (scale) רק את
+  // ברירת המחדל (לא תמונות אמיתיות שהמשתמשים העלו - אין להן את
+  // הבעיה הזו, והגדלה מיותרת רק הייתה חותכת מהתמונה האמיתית שלהם) -
+  // אותה טכניקה בדיוק כמו scale-125 על אייקוני הקטגוריות בעמוד הבית.
+  const isDefault = !url || url.trim().length === 0;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={getAvatarUrl(url)} alt="" className="h-full w-full object-cover" />
+    <img src={getAvatarUrl(url)} alt="" className={`h-full w-full object-cover ${isDefault ? "scale-150" : ""}`} />
   );
 }
 
