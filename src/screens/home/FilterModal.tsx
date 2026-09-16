@@ -207,7 +207,6 @@ export function FilterModal({
                           key={t.key}
                           selected={selectedSubcategories.includes(t.tag)}
                           onClick={() => (selectedSubcategories.includes(t.tag) ? removeTag(t.tag) : selectTag(t.tag))}
-                          size="sm"
                         >
                           {t.tag}
                         </Chip>
@@ -229,7 +228,6 @@ export function FilterModal({
                           key={t.key}
                           selected={selectedSubcategories.includes(t.tag)}
                           onClick={() => (selectedSubcategories.includes(t.tag) ? removeTag(t.tag) : selectTag(t.tag))}
-                          size="sm"
                         >
                           {t.tag}
                         </Chip>
@@ -281,3 +279,4 @@ export function FilterModal({
     </div>
   );
 }
+
