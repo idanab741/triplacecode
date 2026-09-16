@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useRef, useState } from "react";
 import { Chip } from "@/components/ui";
@@ -23,13 +23,15 @@ interface FilterModalProps {
  * *** עיצוב מחדש (בקשה מפורשת - הפילטרים הישנים "לא רלוונטי"):
  * שורה אחת עם 6 סוגי הטיול (בלי גלילה - כולם נראים ביחד, grid של 6
  * עמודות), ואז - ברגע שנבחר סוג אחד לפחות - שדה חיפוש עם השלמה
- * עצמית (autocomplete) על כל הטקסונומיה של הסוג שנבחר.
+ * עצמית (autocomplete) על כל הטקסונומיה של הסוג שנבחר: קטגוריות-
+ * המשנה (TRIPADD_SUBCATEGORIES) ותתי-הקטגוריות (התגיות) שבתוכן.
  *
- * *** תיקון (חוסר-התאמת טיפוסים): TRIPADD_SUBCATEGORIES היא רשימה
- * שטוחה של תגיות (string[]) לכל קטגוריה - לא קבוצות (group+tags).
- * הלוגיקה כאן הותאמה לעבוד ישירות עם תגיות בודדות. ה-personalization
- * (INTEREST_SUBCATEGORY_GROUPS) ממשיך לעבוד רק עבור מקרים שבהם שם
- * ה"group" הממופה תואם בדיוק לאחת התגיות בפועל.
+ * לפני הקלדה - השדה כבר מציג רשימה דפדפת מלאה (כל קבוצה + כל
+ * התגיות שלה), בדיוק לפי הבקשה "נפתח שורת חיפוש עם כל קטגוריות
+ * המשנה - ואז תתי הקטגוריות". תוך כדי הקלדה הרשימה מצטמצמת לפי
+ * התאמת טקסט (בשם הקבוצה או בשם התגית עצמה) - "השלמה עצמית של כל
+ * האפשרויות שלנו". לחיצה על תגית מוסיפה/מסירה אותה מהפילטר בפועל
+ * (selectedSubcategories) - זה הערך היחיד שבאמת מסנן פינים על המפה.
  */
 export function FilterModal({
   onClose,
@@ -50,8 +52,9 @@ export function FilterModal({
     );
   }
 
-  // מפתחות "קטגוריה::תגית" שרלוונטיים לתחומי-העניין שנבחרו בפרופיל.
-  const personalizedTagKeys = useMemo(() => {
+  // מפתחות "קטגוריה::קבוצה" שרלוונטיים לתחומי-העניין שנבחרו בפרופיל -
+  // אותה לוגיקה בדיוק כמו קודם (ר' interestSubcategoryGroups.ts).
+  const personalizedGroupKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const interest of preferences?.interests ?? []) {
       for (const { category, group } of INTEREST_SUBCATEGORY_GROUPS[interest] ?? []) {
@@ -61,30 +64,36 @@ export function FilterModal({
     return keys;
   }, [preferences]);
 
-  // כל התגיות של כל הקטגוריות שנבחרו, מהטקסונומיה הקבועה (רשימה
-  // שטוחה) - המותאמות-אישית קודם.
-  const tags = useMemo(() => {
+  // כל קבוצות-המשנה של כל הקטגוריות שנבחרו, מהטקסונומיה הקבועה -
+  // המותאמות-אישית קודם, בדיוק כמו קודם.
+  const groups = useMemo(() => {
     const list = selectedCategories.flatMap((categoryId) =>
-      (TRIPADD_SUBCATEGORIES[categoryId as TripAddCategory] ?? []).map((tag) => ({
-        tag,
+      (TRIPADD_SUBCATEGORIES[categoryId as TripAddCategory] ?? []).map((g) => ({
+        group: g.group,
+        tags: g.tags,
         category: categoryId,
-        key: `${categoryId}::${tag}`,
-        personalized: personalizedTagKeys.has(`${categoryId}::${tag}`),
+        key: `${categoryId}::${g.group}`,
+        personalized: personalizedGroupKeys.has(`${categoryId}::${g.group}`),
       }))
     );
     return [...list].sort((a, b) => Number(b.personalized) - Number(a.personalized));
-  }, [selectedCategories, personalizedTagKeys]);
+  }, [selectedCategories, personalizedGroupKeys]);
 
-  // תוצאות החיפוש בפועל: בלי טקסט - כל התגיות. עם טקסט - רק תגיות
-  // שהשם שלהן תואם את החיפוש.
-  const filteredTags = useMemo(() => {
+  // תוצאות החיפוש בפועל: בלי טקסט - כל הקבוצות עם כל התגיות (רשימה
+  // דפדפת מלאה). עם טקסט - נשארות רק קבוצות עם התאמה (בשם הקבוצה
+  // עצמה, או בשם אחת מהתגיות שבתוכה) - ובתוך קבוצה שהתאמה שלה הגיעה
+  // מהתגית, מוצגות רק התגיות התואמות (לא כל הקבוצה).
+  const filteredGroups = useMemo(() => {
     const q = query.trim();
-    if (!q) return tags;
-    return tags.filter((t) => t.tag.includes(q));
-  }, [tags, query]);
-
-  const personalizedResults = useMemo(() => filteredTags.filter((t) => t.personalized), [filteredTags]);
-  const otherResults = useMemo(() => filteredTags.filter((t) => !t.personalized), [filteredTags]);
+    if (!q) return groups;
+    return groups
+      .map((g) => {
+        const groupNameMatches = g.group.includes(q);
+        const tags = groupNameMatches ? g.tags : g.tags.filter((tag) => tag.includes(q));
+        return { ...g, tags };
+      })
+      .filter((g) => g.tags.length > 0);
+  }, [groups, query]);
 
   function selectTag(tag: string) {
     if (!selectedSubcategories.includes(tag)) {
@@ -124,6 +133,7 @@ export function FilterModal({
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           <label className="mb-2 block text-[12.5px] font-semibold text-ink-secondary">סוג הטיול</label>
+          {/* שורה אחת, 6 העמודות - כל הסוגים נראים ביחד, בלי גלילה. */}
           <div className="grid grid-cols-6 gap-1">
             {HOME_QUICK_CATEGORIES.map((category) => {
               const isSelected = selectedCategories.includes(category.id);
@@ -158,10 +168,12 @@ export function FilterModal({
             })}
           </div>
 
+          {/* *** תיקון (בקשה מפורשת - "נפתח שורת חיפוש רק אחרי שבוחרים
+              סוג טיול"): מוצג רק אחרי שנבחרה קטגוריה אחת לפחות. */}
           {selectedCategories.length > 0 && (
             <>
               <label className="mb-2 mt-5 block text-[12.5px] font-semibold text-ink-secondary">
-                תת-קטגוריה
+                תת-קטגוריה ותתי-קטגוריה
               </label>
 
               <input
@@ -192,49 +204,31 @@ export function FilterModal({
               )}
 
               <div className="mt-3 flex flex-col gap-3">
-                {filteredTags.length === 0 && (
+                {filteredGroups.length === 0 && (
                   <p className="py-3 text-center text-[12px] text-ink-secondary">לא נמצאו תוצאות תואמות</p>
                 )}
-
-                {personalizedResults.length > 0 && (
-                  <div>
+                {filteredGroups.map((g) => (
+                  <div key={g.key}>
                     <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-ink-secondary">
-                      מותאם לך
+                      {g.group}
+                      {g.personalized && (
+                        <span
+                          className="rounded-pill px-1.5 py-0.5 text-[9.5px] font-semibold text-white"
+                          style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                        >
+                          מותאם לך
+                        </span>
+                      )}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {personalizedResults.map((t) => (
-                        <Chip
-                          key={t.key}
-                          selected={selectedSubcategories.includes(t.tag)}
-                          onClick={() => (selectedSubcategories.includes(t.tag) ? removeTag(t.tag) : selectTag(t.tag))}
-                        >
-                          {t.tag}
+                      {g.tags.map((tag) => (
+                        <Chip key={tag} selected={selectedSubcategories.includes(tag)} onClick={() => (selectedSubcategories.includes(tag) ? removeTag(tag) : selectTag(tag))} size="sm">
+                          {tag}
                         </Chip>
                       ))}
                     </div>
                   </div>
-                )}
-
-                {otherResults.length > 0 && (
-                  <div>
-                    {personalizedResults.length > 0 && (
-                      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-ink-secondary">
-                        עוד אפשרויות
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      {otherResults.map((t) => (
-                        <Chip
-                          key={t.key}
-                          selected={selectedSubcategories.includes(t.tag)}
-                          onClick={() => (selectedSubcategories.includes(t.tag) ? removeTag(t.tag) : selectTag(t.tag))}
-                        >
-                          {t.tag}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
             </>
           )}
@@ -279,4 +273,3 @@ export function FilterModal({
     </div>
   );
 }
-
