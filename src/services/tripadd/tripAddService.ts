@@ -21,6 +21,9 @@ export interface CreateTripAddSubmissionInput {
   mediaIds?: string[];
   googlePlaceId?: string;
   googlePhotoUrl?: string;
+  /** *** תוספת (מסמך העדכון, סעיפים 5,7,29 - migration 0087) */
+  googleMatchStatus?: "matched" | "unmatched";
+  googleMatchConfidence?: number;
 }
 
 /**
@@ -58,6 +61,8 @@ export async function createTripAddSubmission(supabase: SupabaseClient, input: C
       website: input.website ?? null,
       google_place_id: input.googlePlaceId ?? null,
       google_photo_url: input.googlePhotoUrl ?? null,
+      google_match_status: input.googleMatchStatus ?? null,
+      google_match_confidence: input.googleMatchConfidence ?? null,
     })
     .select("id")
     .single();

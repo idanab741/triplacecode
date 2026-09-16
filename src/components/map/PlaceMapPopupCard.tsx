@@ -61,6 +61,9 @@ export interface PlaceMapPopupData {
   accessibleParking?: boolean | null;
   accessibleRestroom?: boolean | null;
   accessibleSeating?: boolean | null;
+  /** *** תוספת (מסמך העדכון, סעיף 5 - "נקודת התאמה ירוקה"): מוצג רק
+   *  אם "matched" (או "manual" - Admin קבע ידנית) - לא "unmatched". */
+  googleMatchStatus?: string | null;
   /** אותו מבנה שכבר קיים ב-place.opening_hours (מגוגל, בעברית) - openingHours.ts כבר יודע לפרסר. */
   openingHours: string[] | null;
   wazeUrl: string;
@@ -154,17 +157,36 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
         )}
 
         <div className="px-3 pb-2 pt-1.5">
-          {/* שם המקום - לחיץ (בקשה מפורשת) כניסה לעמוד האטרקציה המלא */}
+          {/* שם המקום - לחיץ (בקשה מפורשת) כניסה לעמוד האטרקציה המלא.
+              *** תוספת (מסמך העדכון, סעיף 5 - "נקודת התאמה ירוקה"):
+              עיגול ירוק קטן צמוד לשם, רק כשיש התאמת Google - "אינדיקציה
+              ויזואלית קטנה, לא משתלטת על שם המקום" (ציטוט מהמסמך). */}
           {onNameClick ? (
             <button
               type="button"
               onClick={onNameClick}
-              className="block w-full truncate text-right text-[11px] font-extrabold leading-tight text-ink hover:underline"
+              className="flex w-full items-center justify-end gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink hover:underline"
             >
-              {place.name}
+              {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "var(--color-category-green)" }}
+                  title="התאמה מאומתת ל-Google"
+                />
+              )}
+              <span className="truncate">{place.name}</span>
             </button>
           ) : (
-            <h3 className="truncate text-right text-[11px] font-extrabold leading-tight text-ink">{place.name}</h3>
+            <h3 className="flex w-full items-center justify-end gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink">
+              {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: "var(--color-category-green)" }}
+                  title="התאמה מאומתת ל-Google"
+                />
+              )}
+              <span className="truncate">{place.name}</span>
+            </h3>
           )}
 
           {/* כתובת + פתוח/סגור על אותה שורה - חוסך גובה */}

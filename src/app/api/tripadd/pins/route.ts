@@ -28,7 +28,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, rating, google_rating, google_rating_count, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
+      "id, name, category, subcategory, rating, google_rating, google_rating_count, google_match_status, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
     )
     .not("latitude", "is", null)
     .not("longitude", "is", null)
@@ -53,6 +53,7 @@ export async function GET() {
       rating: row.rating,
       google_rating: row.google_rating,
       google_rating_count: row.google_rating_count,
+      googleMatchStatus: row.google_match_status,
       accessible: row.accessible,
       accessibleParking: row.accessible_parking,
       accessibleRestroom: row.accessible_restroom,

@@ -6,6 +6,7 @@ import { ImageOptionRow } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
+import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
@@ -18,19 +19,20 @@ interface AddPlaceModalProps {
   onSaved?: () => void;
 }
 
-interface AutocompleteSuggestion {
-  placeId: string;
-  mainText: string;
-  secondaryText: string;
-}
-
-interface GoogleDetails {
-  placeId: string;
-  name: string;
-  address: string;
+/** *** תוספת (בקשה מפורשת - מסמך העדכון, סעיפים 2-6: "לא להציג
+ *  autocomplete גלוי - matching מאחורי הקלעים"): תוצאה סופית אחת
+ *  מ-/api/tripadd/match-place, לא רשימת הצעות לבחירה. matched=false
+ *  עדיין תקין (יש קואורדינטות, פשוט לא נמצאה ישות Google תואמת). */
+interface MatchResult {
+  matched: boolean;
+  googlePlaceId: string | null;
+  address: string | null;
+  city: string | null;
   latitude: number;
   longitude: number;
-  photoUrl?: string | null;
+  rating: number | null;
+  ratingCount: number | null;
+  confidence: number | null;
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -93,11 +95,24 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [nameQuery, setNameQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [selected, setSelected] = useState<GoogleDetails | null>(null);
-  const [noResultsYet, setNoResultsYet] = useState(false);
-  const [googleError, setGoogleError] = useState<string | null>(null);
+  // *** תוספת (בקשה מפורשת - מסמך העדכון, סעיפים 2-6): מיקום GPS
+  // תמיד ראשון - זה קובע איפה המקום ימוקם על המפה, בלי קשר לתוצאת
+  // ה-matching מול גוגל (שתי דאגות נפרדות: "איפה זה" ו-"מה זה זוהה
+  // כ-" - ר' matchGooglePlaceByLocation.ts).
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [manualAddress, setManualAddress] = useState("");
+  const [matching, setMatching] = useState(false);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [matchError, setMatchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCurrentPositionSafe()
+      .then((pos) => setCoords(pos))
+      .catch((err) => setLocationError(err instanceof Error ? err.message : "לא הצלחנו לאתר את המיקום שלך"))
+      .finally(() => setLocating(false));
+  }, []);
 
   const [category, setCategory] = useState<TripAddCategory | null>(null);
   // *** תיקון (בקשה מפורשת - "ברגע שלוחצים קטגוריה - ה-AI אמור להשלים
@@ -121,88 +136,70 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [done, setDone] = useState(false);
   const [mergedIntoExisting, setMergedIntoExisting] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleNameChange(value: string) {
-    setNameQuery(value);
-    setSelected(null);
-    setNoResultsYet(false);
-    setGoogleError(null);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (value.trim().length < 3) {
-      setSuggestions(null);
+  /**
+   * *** תוספת (בקשה מפורשת - מסמך העדכון, סעיף 2: "לא להציג
+   * autocomplete בזמן שהמשתמש מקליד... matching מאחורי הקלעים") +
+   * סעיף 30 (ביצועים - "לא לבצע Google request על כל תו"): נקרא פעם
+   * אחת, כשהמשתמש לוחץ "אתר מיקום" - לא ב-onChange של השדה. אם יש
+   * GPS - שולח name+coords ל-matching (עם locationBias, לא טקסט
+   * חופשי - סעיף 4). אם אין GPS - נופל לכתובת ידנית (geocoding בלבד,
+   * בלי ניסיון התאמה לישות גוגל - סעיף 6, אפשרות A).
+   */
+  async function handleFindLocation() {
+    if (!nameQuery.trim() && !coords) {
+      setMatchError("הזן שם מקום");
       return;
     }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        // *** תיקון רגרסיה: search-autocomplete הפך לחיפוש ב-TripAdd
-        // בלבד (מקומות שכבר קיימים אצלנו) - כאן, בטופס ההוספה, אנחנו
-        // דווקא מחפשים מקום *חדש* שעוד לא קיים, ולכן חייבים Google.
-        // ר' google-autocomplete/route.ts.
-        const res = await fetch(`/api/places/google-autocomplete?q=${encodeURIComponent(value.trim())}`);
-        const data = await res.json();
-        if (data.error) {
-          setGoogleError(`שגיאה בחיפוש ב-Google: ${data.error}`);
-          setSuggestions([]);
-          setNoResultsYet(false);
-          return;
-        }
-        setSuggestions(data.suggestions ?? []);
-        setNoResultsYet((data.suggestions ?? []).length === 0);
-      } catch {
-        setGoogleError("שגיאת רשת בחיפוש ב-Google");
-        setSuggestions([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 400);
-  }
-
-  async function handleSelectSuggestion(suggestion: AutocompleteSuggestion) {
-    setSuggestions(null);
-    setNameQuery(suggestion.mainText);
-    setError(null);
+    if (!coords && !manualAddress.trim()) {
+      setMatchError("לא זיהינו את מיקומך - הזן כתובת כדי שנוכל למקם את המקום על המפה");
+      return;
+    }
+    setMatching(true);
+    setMatchError(null);
     try {
-      const detailsRes = await fetch(`/api/places/search-result-details?placeId=${encodeURIComponent(suggestion.placeId)}`).then((r) =>
-        r.json()
-      );
-      setSelected({
-        placeId: suggestion.placeId,
-        name: detailsRes.name ?? suggestion.mainText,
-        address: detailsRes.address ?? suggestion.secondaryText,
-        latitude: detailsRes.latitude,
-        longitude: detailsRes.longitude,
-        photoUrl: detailsRes.imageUrl ?? null,
+      const body = coords
+        ? { name: nameQuery.trim(), latitude: coords.lat, longitude: coords.lng }
+        : { address: manualAddress.trim() };
+      const res = await fetch("/api/tripadd/match-place", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setMatchError(data.error ?? "שגיאה באיתור המקום");
+        return;
+      }
+      setMatchResult(data);
     } catch {
-      setError("שגיאה בטעינת פרטי המקום מגוגל");
+      setMatchError("שגיאת רשת באיתור המקום");
+    } finally {
+      setMatching(false);
     }
   }
 
   /**
-   * *** בקשה מפורשת - "אם המשתמש לא בחר מקום מגוגל - אז אי אפשר יהיה
-   * לשמור את האטרקציה!": בניגוד לגרסה הקודמת, אין יותר אפשרות "המשך
-   * בהוספה ידנית" - חובה להתאים למקום אמיתי מ-Google (יש placeId),
-   * כי הסיווג האוטומטי של תת-הקטגוריה (AI) ושמירת המקום תלויים בזה.
-   *
-   * ברגע שנבחרה קטגוריה (אחרי שכבר יש selected.placeId), קוראים
-   * ל-AI שמסווג אוטומטית קבוצה+תגית מתוך הרשימה הסגורה של
-   * tripAddSubcategories.ts - בלי מעורבות ידנית של המשתמש.
+   * *** שינוי (מסמך העדכון, סעיף 6 - "אם Google לא מצליח לזהות, עדיין
+   * אפשר לשמור עם כתובת/מיקום"): קודם הייתה כאן דרישה מפורשת של
+   * המשתמש - "אם לא נבחר מקום מגוגל, אי אפשר לשמור" - זה **מבוטל
+   * במפורש** לפי המסמך החדש: matchResult (גם matched=false, כל עוד
+   * יש קואורדינטות) מספיק כדי להמשיך. הסיווג עצמו (AI) עובד עם השם
+   * + הכתובת אם יש (matched) או רק השם אם אין (unmatched) - לא תלוי
+   * יותר ב-placeId ספציפי.
    */
   async function handleSelectCategory(c: TripAddCategory) {
     setCategory(c);
     setSubcategory(null);
     setSubcategoryGroup(null);
     setClassifyError(null);
-    if (!selected?.placeId) return;
+    if (!matchResult) return;
 
     setClassifying(true);
     try {
       const res = await fetch("/api/tripadd/classify-subcategory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: selected.name, address: selected.address, category: c }),
+        body: JSON.stringify({ name: nameQuery.trim(), address: matchResult.address ?? undefined, category: c }),
       });
       const data = await res.json();
       if (!res.ok || !data.tag) {
@@ -237,13 +234,13 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
 
   async function handleSubmit() {
     if (submitting) return;
-    if (!selected?.placeId) {
-      setError("יש לבחור מקום מתוך תוצאות החיפוש של Google");
+    const finalName = nameQuery.trim();
+    if (!finalName) {
+      setError("הזן שם מקום");
       return;
     }
-    const finalName = selected.name.trim();
-    if (!finalName) {
-      setError("הזן שם מקום, או בחר הצעה מהחיפוש");
+    if (!matchResult) {
+      setError("יש לאתר מיקום למקום (כפתור \"אתר מיקום\" למעלה) לפני השמירה");
       return;
     }
     if (!category) {
@@ -260,13 +257,17 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
           name: finalName,
           category,
           rating: rating > 0 ? rating : undefined,
-          address: selected.address,
-          latitude: Number.isNaN(selected.latitude) ? undefined : selected.latitude,
-          longitude: Number.isNaN(selected.longitude) ? undefined : selected.longitude,
+          address: matchResult.address ?? (manualAddress.trim() || undefined),
+          latitude: matchResult.latitude,
+          longitude: matchResult.longitude,
           description: description.trim() || undefined,
           subcategory: subcategory ?? undefined,
-          googlePlaceId: selected.placeId,
-          googlePhotoUrl: selected.photoUrl ?? undefined,
+          googlePlaceId: matchResult.googlePlaceId ?? undefined,
+          // *** תוספת (מסמך העדכון, סעיפים 5,7,29 - נקודת התאמה ירוקה +
+          // מעקב Admin עתידי): matched -> "matched" (עוד לא מאומת ע"י
+          // Admin, ר' migration 0087), unmatched -> "unmatched".
+          googleMatchStatus: matchResult.matched ? "matched" : "unmatched",
+          googleMatchConfidence: matchResult.confidence ?? undefined,
           mediaIds: media.map((m) => m.id),
           shareToPlaces,
         }),
@@ -383,58 +384,90 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                 ))}
               </div>
 
-              {/* 2. שם המקום + autocomplete */}
+              {/* 2. שם המקום - *** תיקון (בקשה מפורשת - מסמך העדכון,
+                  סעיף 2: "לא להציג autocomplete גלוי - שדה טקסט רגיל
+                  שבו המשתמש כותב את שם המקום בעצמו"): בלי שום רשימת
+                  הצעות מתחת לשדה, אף פעם. */}
               <label className="mb-1 mt-4 block text-[12.5px] font-semibold text-ink-secondary">שם המקום</label>
-              <div className="relative">
-                <input
-                  value={nameQuery}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="לדוגמה: קפה השעון"
-                  className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
-                />
-                {(searching || (suggestions && suggestions.length > 0)) && (
-                  <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-52 overflow-y-auto rounded-card bg-white shadow-soft ring-1 ring-black/5">
-                    {searching && <p className="p-3 text-center text-[12.5px] text-ink-secondary">מחפש...</p>}
-                    {!searching &&
-                      suggestions?.map((s) => (
-                        <button
-                          key={s.placeId}
-                          type="button"
-                          onClick={() => handleSelectSuggestion(s)}
-                          className="block w-full px-3 py-2.5 text-start hover:bg-bg-secondary"
-                        >
-                          <span className="block text-[13.5px] font-semibold text-ink">{s.mainText}</span>
-                          <span className="block text-[11.5px] text-ink-secondary">{s.secondaryText}</span>
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
+              <input
+                value={nameQuery}
+                onChange={(e) => {
+                  setNameQuery(e.target.value);
+                  setMatchResult(null);
+                  setMatchError(null);
+                }}
+                placeholder="לדוגמה: קפה השעון"
+                className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+              />
 
-              {googleError && <p className="mt-2 text-[12px] text-red-500">{googleError}</p>}
-
-              {!selected && !googleError && noResultsYet && nameQuery.trim().length >= 3 && (
-                <p className="mt-2 text-[12.5px] text-ink-secondary">
-                  לא מצאנו את המקום הזה ב-Google - נסה/י לחפש בשם מעט שונה (לדוגמה בלי ניקוד, או עם שם העיר).
-                </p>
+              {/* *** תוספת (סעיף 6, אפשרות A): שדה כתובת ידני - מוצג רק
+                  אם GPS לא הצליח (locationError) ועדיין אין תוצאת
+                  מיקום. אם GPS הצליח, אין צורך לבקש כתובת בכלל - יש
+                  כבר קואורדינטות אמיתיות מהמכשיר. */}
+              {locationError && !matchResult && (
+                <div className="mt-2">
+                  <p className="mb-1 text-[12px] text-ink-secondary">{locationError} - הזן כתובת במקום:</p>
+                  <input
+                    value={manualAddress}
+                    onChange={(e) => {
+                      setManualAddress(e.target.value);
+                      setMatchResult(null);
+                    }}
+                    placeholder="כתובת המקום"
+                    className="w-full rounded-pill border border-ink-secondary/25 bg-bg px-4 py-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  />
+                </div>
               )}
 
-              {selected && selected.name && (
+              {!matchResult && (
+                <button
+                  type="button"
+                  onClick={handleFindLocation}
+                  disabled={locating || matching || !nameQuery.trim() || (!coords && !manualAddress.trim())}
+                  className="mt-2 w-full rounded-pill py-2.5 text-[13px] font-bold text-white disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                >
+                  {locating ? "מאתר את מיקומך..." : matching ? "מאתר את המקום..." : "אתר מיקום"}
+                </button>
+              )}
+
+              {matchError && <p className="mt-2 text-[12px] text-red-500">{matchError}</p>}
+
+              {/* *** תוצאת ה-matching - בדיוק שורה אחת, בלי רשימת
+                  הצעות. נקודה ירוקה (סעיף 5) רק אם matched=true - לא
+                  מוצגת בכלל אם matched=false, כדי לא "להמציא" אימות
+                  שלא קיים (סעיף 26). */}
+              {matchResult && (
                 <div className="mt-2 flex items-center gap-2 rounded-card bg-bg-secondary px-3 py-2.5">
                   <span style={{ color: "var(--color-primary-start)" }}>📍</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold text-ink">{selected.name}</span>
-                    {selected.address && <span className="block truncate text-[11.5px] text-ink-secondary">{selected.address}</span>}
+                    <span className="flex items-center gap-1.5 truncate text-[13px] font-semibold text-ink">
+                      {matchResult.matched && (
+                        <span
+                          className="inline-block h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: "var(--color-category-green)" }}
+                          title="זוהתה התאמה אוטומטית ל-Google"
+                        />
+                      )}
+                      {nameQuery.trim()}
+                    </span>
+                    {matchResult.address && <span className="block truncate text-[11.5px] text-ink-secondary">{matchResult.address}</span>}
+                    {!matchResult.matched && (
+                      <span className="block text-[11px] text-ink-secondary">לא זוהתה התאמה ב-Google - נשמר לפי המיקום/כתובת שסיפקת</span>
+                    )}
                   </span>
+                  <button type="button" onClick={() => setMatchResult(null)} className="shrink-0 text-[11.5px] text-ink-secondary underline">
+                    שנה
+                  </button>
                 </div>
               )}
 
               {/* 3. סוג - אותן 6 קטגוריות בדיוק כמו שורת "סוגי הטיול" בבית.
-                  *** בקשה מפורשת - "אם המשתמש לא בחר מקום מגוגל - אז אי
-                  אפשר יהיה לשמור את האטרקציה" - הבחירה נעולה עד שיש
-                  התאמת Google אמיתית (selected.placeId). */}
+                  *** שינוי (מסמך העדכון, סעיף 6): נעול עד שיש matchResult
+                  (מיקום כלשהו - matched או לא), לא עד שיש דווקא Google
+                  match מאומת. */}
               <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-secondary">סוג</label>
-              <div className={`flex flex-wrap gap-2 ${!selected?.placeId ? "pointer-events-none opacity-40" : ""}`}>
+              <div className={`flex flex-wrap gap-2 ${!matchResult ? "pointer-events-none opacity-40" : ""}`}>
                 {HOME_QUICK_CATEGORIES.map((c) => (
                   <ImageOptionRow
                     key={c.id}

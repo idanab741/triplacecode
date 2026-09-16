@@ -29,6 +29,7 @@ export interface TripAddPlace {
   accessibleParking: boolean | null;
   accessibleRestroom: boolean | null;
   accessibleSeating: boolean | null;
+  googleMatchStatus: string | null;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -61,7 +62,7 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     supabase
       .from("tripadd_submissions")
       .select(
-        "id, name, category, subcategory, description, short_description, google_rating, google_rating_count, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
+        "id, name, category, subcategory, description, short_description, google_rating, google_rating_count, google_match_status, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
       )
       .eq("id", id)
       .not("latitude", "is", null)
@@ -109,6 +110,7 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     accessibleParking: data.accessible_parking,
     accessibleRestroom: data.accessible_restroom,
     accessibleSeating: data.accessible_seating,
+    googleMatchStatus: data.google_match_status,
     latitude: data.latitude as number,
     longitude: data.longitude as number,
     address: data.address,

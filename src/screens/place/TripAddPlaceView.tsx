@@ -128,7 +128,17 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-extrabold text-ink">{place.name}</h1>
+          {/* *** תוספת (מסמך העדכון, סעיף 5 - "נקודת התאמה ירוקה") */}
+          <h1 className="flex items-center gap-1.5 text-2xl font-extrabold text-ink">
+            {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: "var(--color-category-green)" }}
+                title="התאמה מאומתת ל-Google"
+              />
+            )}
+            {place.name}
+          </h1>
           {/* תיאור כללי (short_description, ממולא ע"י AI) - הטקסט האישי
               של כל מגיש/ה עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
           {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}

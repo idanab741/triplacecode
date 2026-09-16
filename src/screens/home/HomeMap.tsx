@@ -52,6 +52,7 @@ export interface HomeMapPlace {
   accessibleParking?: boolean | null;
   accessibleRestroom?: boolean | null;
   accessibleSeating?: boolean | null;
+  googleMatchStatus?: string | null;
 }
 
 interface HomeMapProps {

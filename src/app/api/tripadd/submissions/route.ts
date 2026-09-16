@@ -101,6 +101,8 @@ export async function POST(request: Request) {
       mediaIds: body?.mediaIds,
       googlePlaceId: body?.googlePlaceId,
       googlePhotoUrl: body?.googlePhotoUrl,
+      googleMatchStatus: body?.googleMatchStatus,
+      googleMatchConfidence: body?.googleMatchConfidence,
     });
 
     // fire-and-forget - לא מעכב את התשובה למשתמש, כשלון לא מכשיל את השמירה.
