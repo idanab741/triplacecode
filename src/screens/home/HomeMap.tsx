@@ -91,24 +91,50 @@ const DEFAULT_PIN_COLOR_VAR = "--color-primary-start";
  *  שנשארים יהיו בצבע שמופיע מאחורי העיגול של אותו סוג"): לפני זה כל
  *  הפינים היו באותו כחול קבוע (PLACE_ICON יחיד) - עכשיו כל פין מקבל
  *  אייקון בצבע הקטגוריה שלו (או הצבע הדיפולטי אם אין קטגוריה/לא
- *  מזוהה). ה-cache מונע יצירת L.divIcon מחדש בכל רינדור לכל פין. */
+ *  מזוהה). ה-cache מונע יצירת L.divIcon מחדש בכל רינדור לכל פין.
+ *
+ * *** תוספת (בקשה מפורשת - "עיגול עם תמונה קטנה של היעד בתוך הנעץ"):
+ * אם יש photoUrl - נעץ גדול יותר (36px) עם עיגול-תמונה פנימי (26px,
+ * מסובב בחזרה +45deg כדי שהתמונה עצמה תיראה זקופה, לא מוטה) - אותו
+ * אפקט בדיוק כמו הפינים המוכרים של Google Maps. בלי תמונה - נשאר
+ * בדיוק כמו שהיה (נעץ צבעוני פשוט, 28px) - לא ממציאים תמונה שאין.
+ * מפתח ה-cache כולל את ה-URL עכשיו (לא רק הצבע), כי כל נעץ עם תמונה
+ * אחרת הוא אייקון שונה. */
 const placeIconCache = new Map<string, L.DivIcon>();
-function getPlaceIcon(category?: string | null): L.DivIcon {
+function getPlaceIcon(category?: string | null, photoUrl?: string | null): L.DivIcon {
   const colorVar = (category && CATEGORY_COLOR_VAR[category]) || DEFAULT_PIN_COLOR_VAR;
-  const cached = placeIconCache.get(colorVar);
+  const cacheKey = `${colorVar}|${photoUrl ?? ""}`;
+  const cached = placeIconCache.get(cacheKey);
   if (cached) return cached;
+
+  const safePhotoUrl = photoUrl?.replace(/['"]/g, "");
+
+  const html = safePhotoUrl
+    ? `<div style="
+        width: 36px; height: 36px; border-radius: 50% 50% 50% 0;
+        background: var(${colorVar}, #4F7DF3);
+        border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
+        transform: rotate(-45deg);
+        display: flex; align-items: center; justify-content: center;
+      "><div style="
+        width: 26px; height: 26px; border-radius: 50%;
+        background-image: url('${safePhotoUrl}'); background-size: cover; background-position: center;
+        border: 2px solid white; transform: rotate(45deg);
+      "></div></div>`
+    : `<div style="
+        width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
+        background: var(${colorVar}, #4F7DF3);
+        border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
+        transform: rotate(-45deg);
+      "></div>`;
+
   const icon = L.divIcon({
     className: "",
-    html: `<div style="
-      width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
-      background: var(${colorVar}, #4F7DF3);
-      border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
-      transform: rotate(-45deg);
-    "></div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
+    html,
+    iconSize: safePhotoUrl ? [36, 36] : [28, 28],
+    iconAnchor: safePhotoUrl ? [18, 36] : [14, 28],
   });
-  placeIconCache.set(colorVar, icon);
+  placeIconCache.set(cacheKey, icon);
   return icon;
 }
 
@@ -310,7 +336,7 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
             closeButton={false} - יש לחלונית כפתור X משלה (בהתאם ל-RTL,
             בצד שמאל), לא כפתור ה-X הדיפולטי של Leaflet. */}
         {places.map((place) => (
-          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={getPlaceIcon(place.category)}>
+          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={getPlaceIcon(place.category, place.photoUrl)}>
             <Popup minWidth={300} maxWidth={340} closeButton={false} className="place-map-popup">
               <HomeMapPlacePopupContent place={place} />
             </Popup>
