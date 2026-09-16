@@ -50,6 +50,22 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [uploadingCover, setUploadingCover] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const [savingBio, setSavingBio] = useState(false);
+  // *** תוספת (בקשה מפורשת - עיצוב מחדש בסגנון אינסטגרם):
+  // scrolled שולט על מתי הבר העליון עובר משקוף (מעל הקאבר) ללבן אטום.
+  const [scrolled, setScrolled] = useState(false);
+  // הביו מוצג כטקסט קבוע כברירת מחדל - נכנס למצב עריכה רק בלחיצה על
+  // "ערוך פרופיל" (לא תמיד פתוח כמו קודם).
+  const [editingBio, setEditingBio] = useState(false);
+  const [activeProfileTab, setActiveProfileTab] = useState<"media" | "trips" | "reviews">("media");
+
+  useEffect(() => {
+    function handleScroll() {
+      setScrolled(window.scrollY > 24);
+    }
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -83,6 +99,11 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     } finally {
       setSavingBio(false);
     }
+  }
+
+  async function handleBioSaveAndClose() {
+    await handleBioBlur();
+    setEditingBio(false);
   }
 
   useEffect(() => {
@@ -207,9 +228,14 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      <PlacesHeader onBack={() => router.back()} />
+      <PlacesHeader onBack={() => router.back()} transparent={!scrolled} overlay menuHref="/profile" />
 
-      <div className="relative h-28 w-full bg-bg-secondary">
+      {/* *** תיקון (בקשה מפורשת - "הקאבר צריך לכסות גם את הבר העליון
+          כשהוא שקוף, עד שגוללים ואז הוא לבן"): הקאבר מתחיל מ-y=0 (אין
+          עוד ריווח-פיצוי מעל, כי הבר עצמו fixed/מחוץ לזרימה) - כך
+          שהוא נמצא *מתחת* לבר, לא אחריו. גובה גדל קצת (h-40 במקום
+          h-28) כדי שיהיה מקום נשימה אמיתי מתחת לבר השקוף. */}
+      <div className="relative h-40 w-full bg-bg-secondary">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
         {profile.viewerState.isSelf && (
@@ -227,18 +253,25 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
       </div>
 
       <div className="px-4">
-        <div className="-mt-10 flex items-end justify-between">
+        {/* *** תיקון (בקשה מפורשת - "העיגול קטן מדי" + "+/מחיקה - עיגול
+            קטן שמוצמד לפינת התמונה, כמו אינסטגרם"): 104px -> 128px,
+            ומצב fluid של AvatarUploader (שכבר בנוי בדיוק לאפקט הזה -
+            תגי +/מחיקה כעיגולים קטנים בפינות, לא כפתורים נפרדים
+            מתחת) במקום המצב הרגיל. */}
+        <div className="-mt-14 flex items-end justify-between">
           {profile.viewerState.isSelf && user ? (
-            <AvatarUploader
-              userId={user.id}
-              initialUrl={profile.avatarUrl}
-              size={104}
-              bordered
-              onUploaded={(url) => setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev))}
-              onRemoved={() => setProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev))}
-            />
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-full border-4 border-white shadow-soft">
+              <AvatarUploader
+                userId={user.id}
+                initialUrl={profile.avatarUrl}
+                fluid
+                bordered={false}
+                onUploaded={(url) => setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev))}
+                onRemoved={() => setProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev))}
+              />
+            </div>
           ) : (
-            <span className="h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-bg-secondary">
+            <span className="h-32 w-32 shrink-0 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
             </span>
@@ -286,35 +319,79 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           </div>
         )}
 
+        {/* *** תיקון (בקשה מפורשת - "הביו שאפשר לערוך אותו בכפתור ערוך
+            פרופיל"): קודם הטקסטאריה הייתה תמיד פתוחה אצל isSelf - עכשיו
+            ברירת המחדל היא תצוגה סטטית + כפתור "ערוך פרופיל", ומצב
+            העריכה נפתח רק בלחיצה עליו (בדיוק כמו Edit profile
+            באינסטגרם - לא שדה עריכה שיושב שם תמיד). */}
         {profile.viewerState.isSelf ? (
-          <div className="mt-2">
-            <textarea
-              value={bioDraft}
-              onChange={(e) => setBioDraft(e.target.value)}
-              onBlur={handleBioBlur}
-              placeholder="קצת עליי..."
-              rows={2}
-              className="w-full resize-none rounded-card border border-ink-secondary/15 p-2.5 text-[13.5px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
-            />
-            {savingBio && <p className="mt-1 text-[11px] text-ink-secondary">שומר...</p>}
-          </div>
+          editingBio ? (
+            <div className="mt-2">
+              <textarea
+                value={bioDraft}
+                onChange={(e) => setBioDraft(e.target.value)}
+                placeholder="קצת עליי..."
+                rows={2}
+                autoFocus
+                className="w-full resize-none rounded-card border border-ink-secondary/15 p-2.5 text-[13.5px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+              />
+              <div className="mt-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleBioSaveAndClose}
+                  disabled={savingBio}
+                  className="rounded-pill px-3.5 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
+                  style={{ background: "var(--color-places-purple)" }}
+                >
+                  {savingBio ? "שומר..." : "שמירה"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBioDraft(profile.bio ?? "");
+                    setEditingBio(false);
+                  }}
+                  className="rounded-pill px-3.5 py-1.5 text-[12px] font-semibold text-ink-secondary"
+                >
+                  ביטול
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>}
+              <button
+                type="button"
+                onClick={() => setEditingBio(true)}
+                className="mt-3 w-full rounded-pill border border-ink-secondary/20 py-2 text-[13px] font-bold text-ink"
+              >
+                ערוך פרופיל
+              </button>
+            </>
+          )
         ) : (
           profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>
         )}
 
+        {/* *** תיקון (בקשה מפורשת - "טיולים - עוקבים - במעקב", בסגנון
+            אינסטגרם): הוחלף לגמרי מ"עוקבים/עוקב/חברים". "טיולים" הוא
+            כרגע מספר הפוסטים שנטענו לעמוד הזה (posts.length) - אין
+            עדיין ספירה ייעודית ל"טיולים" בבסיס הנתונים, זו קירוב-זמני
+            הגון, לא הכפלה של ה-tab "טיולים" למטה (שגם הוא עדיין ללא
+            תוכן ממשי משלו, ר' ההערה שם). */}
         <div className="mt-4 flex gap-5 border-y border-ink-secondary/10 py-3 text-center">
+          <div className="flex-1">
+            <div className="text-[15px] font-bold text-ink">{posts?.length ?? 0}</div>
+            <div className="text-[11.5px] text-ink-secondary">טיולים</div>
+          </div>
           <Link href={`/places/profile/${username}/followers`} className="flex-1">
             <div className="text-[15px] font-bold text-ink">{profile.counts.followers}</div>
             <div className="text-[11.5px] text-ink-secondary">עוקבים</div>
           </Link>
           <Link href={`/places/profile/${username}/following`} className="flex-1">
             <div className="text-[15px] font-bold text-ink">{profile.counts.following}</div>
-            <div className="text-[11.5px] text-ink-secondary">עוקב</div>
+            <div className="text-[11.5px] text-ink-secondary">במעקב</div>
           </Link>
-          <div className="flex-1">
-            <div className="text-[15px] font-bold text-ink">{profile.counts.friends}</div>
-            <div className="text-[11.5px] text-ink-secondary">חברים</div>
-          </div>
         </div>
 
         {profile.viewerState.isSelf && (
@@ -328,11 +405,45 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             צור תוכן חדש
           </button>
         )}
-
       </div>
 
-      <div className="mt-4 border-t border-ink-secondary/10 px-3 pt-3">
-        <h3 className="mb-2 px-1 text-[13px] font-bold text-ink">פוסטים</h3>
+      {/* *** תוספת (בקשה מפורשת - "החלוקה כמו שיש, עם מדיה-טיולים-
+          ביקורות"): לא הייתה קודם שום מערכת טאבים אמיתית בעמוד הזה
+          (רק כותרת "פוסטים" קבועה) - זו בנייה חדשה, בהשראת עיצוב
+          הטאבים הקיים כבר ב-FeedTabs.tsx (עבורך/חברים) לעקביות ויזואלית.
+          *** מגבלה שכדאי לדעת עליה: רק טאב "מדיה" מציג בפועל תוכן אמיתי
+          כרגע (אותה רשימת הפוסטים שהייתה) - "טיולים" ו"ביקורות" הם
+          placeholder בלבד, כי אין עדיין הפרדת-תוכן אמיתית בין הסוגים
+          האלה במסד הנתונים/ב-API. */}
+      <div className="mt-4 flex justify-center gap-6 border-t border-ink-secondary/10 pt-2">
+        {(
+          [
+            { id: "media", label: "מדיה" },
+            { id: "trips", label: "טיולים" },
+            { id: "reviews", label: "ביקורות" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveProfileTab(tab.id)}
+            className="relative pb-2.5 pt-1.5 text-[13.5px] font-bold transition-colors"
+            style={{ color: activeProfileTab === tab.id ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
+          >
+            {tab.label}
+            {activeProfileTab === tab.id && (
+              <span className="absolute inset-x-0 -bottom-px h-[2.5px] rounded-full" style={{ background: "var(--color-places-purple)" }} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {activeProfileTab !== "media" ? (
+        <p className="py-10 text-center text-[13px] text-ink-secondary">
+          {activeProfileTab === "trips" ? "תוכן הטיולים יופיע כאן בקרוב" : "הביקורות יופיעו כאן בקרוב"}
+        </p>
+      ) : (
+      <div className="mt-2 px-3 pt-3">
         {posts === null && (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 2 }).map((_, i) => (
@@ -369,6 +480,7 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           </div>
         )}
       </div>
+      )}
 
       <MainBottomNav active="profile" />
 

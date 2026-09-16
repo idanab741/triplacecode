@@ -9,6 +9,23 @@ interface PlacesHeaderProps {
   /** אם לא מועבר - זהו עמוד הבית: מוצג רק כפתור חזרה בצד שמאל בעמודי
    *  משנה. הפעמון תמיד בצד שמאל (בדיוק כמו triplace). */
   onBack?: () => void;
+  /** *** תוספת (בקשה מפורשת - "הקאבר צריך לכסות גם את הבר העליון
+   *  כשהוא על רקע שקוף - עד שגוללים למטה, ואז הוא נהיה על רקע לבן"):
+   *  כשמועבר true - הבר עצמו שקוף (בלי רקע/צל), כדי שתמונת הקאבר
+   *  שמתחתיו תיראה דרכו. ההורה (עמוד הפרופיל) אחראי להחליט מתי true
+   *  (לפני גלילה) ומתי false (אחרי גלילה, רקע לבן רגיל). ברירת מחדל
+   *  false - כל שאר עמודי place's לא מושפעים. */
+  transparent?: boolean;
+  /** *** תוספת: true = הבר "צף" מעל התוכן (fixed, לא תופס מקום בזרימה
+   *  הרגילה) - נדרש כדי שהקאבר בעמוד הפרופיל יוכל להתחיל מ-y=0
+   *  ולהיראות *דרך* הבר כשהוא transparent. ברירת מחדל false (sticky,
+   *  ההתנהגות הרגילה שכל שאר עמודי place's מסתמכים עליה) - כדי לא
+   *  לשבור עמודים אחרים שמניחים שהבר תופס את המקום שלו בזרימה. */
+  overlay?: boolean;
+  /** *** תוספת (בקשה מפורשת): קישור לתפריט שלוש-הפסים - כשמועבר,
+   *  מחליף את כפתור הצ'אט בפינה הנגדית לתפריט שמוביל לשם (בעמוד
+   *  הפרופיל: /profile, עמוד החשבון הכללי - לא /places). */
+  menuHref?: string;
 }
 
 /** Header אחיד לכל עמודי place's.
@@ -23,10 +40,21 @@ interface PlacesHeaderProps {
  *  ב-`left-5` כדי ליישר בדיוק מתחת לפעמון (שגם הוא ב-left-5, כאן).
  *  right-3.5 (14px) על קבוצת הצ'אט - שנשאר לבד עכשיו - לא שונה, כדי
  *  לא לשבור את היישור מול עיגול הפרופיל ב-CreatePostBar (ר' ההסבר
- *  המקורי: 14+20=34px מהקצה, זהה ל-16+18=34px של עיגול הפרופיל). */
-export function PlacesHeader({ onBack }: PlacesHeaderProps) {
+ *  המקורי: 14+20=34px מהקצה, זהה ל-16+18=34px של עיגול הפרופיל).
+ *
+ *  *** תיקון (בקשה מפורשת - עמוד פרופיל, אפקט קאבר-מתחת-לבר): fixed
+ *  במקום sticky - sticky לא היה מאפשר לבר "לצוף" מעל הקאבר מהרגע
+ *  הראשון (הוא רק "נדבק" לאחר שהיה כבר בזרימה הרגילה וגללת אותו).
+ *  ההורה שמעביר transparent=true חייב לפצות עם ריווח עליון מקביל
+ *  לגובה הבר (h-16) על שאר התוכן - חוץ מהקאבר עצמו, שאמור להתחיל
+ *  מ-y=0 כדי שהבר יצוף מעליו ולא מעל רווח לבן. */
+export function PlacesHeader({ onBack, transparent = false, overlay = false, menuHref }: PlacesHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full bg-white">
+    <header
+      className={`left-0 right-0 top-0 z-30 w-full transition-colors ${overlay ? "fixed" : "sticky"} ${
+        transparent ? "bg-transparent" : "bg-white shadow-[0_1px_0_rgba(16,24,40,0.06)]"
+      }`}
+    >
       <div className="relative h-16 px-5">
         {/* *** תיקון (בקשה מפורשת - "תוריד מעט את הלוגו למטה ותקטין
             אותו ב-10%"): 130x42 -> 117x38 (מוכפל ב-0.9, מעוגל).
@@ -48,13 +76,30 @@ export function PlacesHeader({ onBack }: PlacesHeaderProps) {
         )}
 
         <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          <Link
-            href="/places/chat"
-            aria-label="צ'אט"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
-          >
-            <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
-          </Link>
+          {/* *** תוספת (בקשה מפורשת - "שלוש פסים בצד שני, שמעביר
+              לעמוד הפרופיל של דף הבית"): כשמועבר menuHref, מחליף
+              לגמרי את כפתור הצ'אט הרגיל - לא מוסיף עליו. ברירת מחדל
+              (לא מועבר) - כל שאר עמודי place's ממשיכים לראות צ'אט,
+              בלי שינוי. */}
+          {menuHref ? (
+            <Link
+              href={menuHref}
+              aria-label="תפריט"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              </svg>
+            </Link>
+          ) : (
+            <Link
+              href="/places/chat"
+              aria-label="צ'אט"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+            >
+              <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
+            </Link>
+          )}
         </div>
       </div>
     </header>
