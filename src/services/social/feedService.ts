@@ -1,4 +1,4 @@
-﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/services/supabase/admin";
 
 export type FeedTab = "for_you" | "friends" | "following";
@@ -128,12 +128,12 @@ export async function getFeed(
       (t: {
         id: string;
         name: string;
-        tripadd_submission_media?: { sort_order: number; media_assets: { url: string }[] | null }[] | null;
+        tripadd_submission_media?: { sort_order: number; media_assets: { url: string } | null }[] | null;
       }) => {
         const sorted = (t.tripadd_submission_media ?? [])
-          .filter((m) => m.media_assets?.[0]?.url)
+          .filter((m) => m.media_assets?.url)
           .sort((a, b) => a.sort_order - b.sort_order);
-        return [t.id, { id: t.id, name: t.name, imageUrl: sorted[0]?.media_assets?.[0]?.url ?? null }];
+        return [t.id, { id: t.id, name: t.name, imageUrl: sorted[0]?.media_assets?.url ?? null }];
       }
     )
   );
@@ -209,4 +209,3 @@ function countBy<T extends Record<string, unknown>>(rows: T[], key: keyof T): Ma
 export async function getNewUserFeed(supabase: SupabaseClient, viewerId: string, limit = 15) {
   return getFeed(supabase, viewerId, "for_you", limit);
 }
-

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { classifySubcategory } from "@/services/tripadd/subcategoryClassifier";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
@@ -31,6 +31,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.errorReason ?? "לא הצלחנו לסווג את המקום" }, { status: 502 });
   }
 
-  return NextResponse.json({ tag: result.data.tag });
+  return NextResponse.json({ group: result.data.group, tag: result.data.tag });
 }
-
