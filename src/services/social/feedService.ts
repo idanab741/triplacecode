@@ -92,7 +92,11 @@ export async function getFeed(
         .in("post_id", postIds)
         .order("sort_order", { ascending: true }),
       supabase.from("post_likes").select("post_id").in("post_id", postIds),
-      supabase.from("comments").select("post_id").in("post_id", postIds).is("deleted_at", null),
+      // *** תיקון (בקשה מפורשת - "לכל תמונה תגובות משלה"): הספירה כאן
+      // היא רק לתגובות הכלליות על הפוסט (media_id IS NULL) - בדיוק
+      // מה שנפתח inline מתחת לשורה. תגובות על תמונות ספציפיות נספרות
+      // בנפרד, בתוך חלון-הצפייה של כל תמונה.
+      supabase.from("comments").select("post_id").in("post_id", postIds).is("deleted_at", null).is("media_id", null),
       supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", viewerId),
       supabase.from("social_saves").select("target_id").in("target_id", postIds).eq("user_id", viewerId).eq("target_type", "post"),
       supabase.from("follows").select("following_id").eq("follower_id", viewerId).in("following_id", authorIds),

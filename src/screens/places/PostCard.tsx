@@ -7,6 +7,7 @@ import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import { getAvatarUrl } from "@/constants/avatar";
 import { PostMediaViewerModal } from "./PostMediaViewerModal";
+import { PostInlineComments } from "./PostInlineComments";
 
 interface PostCardProps {
   item: FeedItemDto;
@@ -51,6 +52,11 @@ export function PostCard({
   // onOpenComments (שניווט ל-/places/post/[id]).
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  // *** תוספת (בקשה מפורשת - "תגובות הפוסט ייפתחו מתחת לשורה, לא
+  // בחלון ולא בעמוד"): מצב נפרד לגמרי מ-viewerOpen - קליק על תמונה
+  // פותח את החלון (viewerOpen), קליק על "תגובה"/מספר התגובות מרחיב
+  // inline (commentsExpanded). שני דברים שונים באותו כרטיס.
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
 
   function openViewer(index: number) {
     setViewerIndex(index);
@@ -251,7 +257,7 @@ export function PostCard({
       <div className="mb-2 flex items-center gap-1 text-[12px] text-ink-secondary">
         {likeCount > 0 && <span>{likeCount} לייקים</span>}
         {item.stats.comments > 0 && (
-          <button type="button" onClick={() => openViewer(0)} className="hover:underline">
+          <button type="button" onClick={() => setCommentsExpanded((v) => !v)} className="hover:underline">
             · {item.stats.comments} תגובות
           </button>
         )}
@@ -265,42 +271,44 @@ export function PostCard({
             setLiked(newLiked);
             setLikeCount((c) => c + (newLiked ? 1 : -1));
           }}
-          className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold"
+          aria-label="לייק"
+          className="flex flex-1 items-center justify-center py-1.5"
           style={{ color: liked ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
         >
           <Image
             src={liked ? "/images/places-like-filled.png" : "/images/places-like-outline.png"}
-            alt=""
+            alt="לייק"
             width={18}
             height={16}
             className="object-contain"
           />
-          לייק
         </button>
         <button
           type="button"
-          onClick={() => openViewer(0)}
-          className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold text-ink-secondary"
+          onClick={() => setCommentsExpanded((v) => !v)}
+          aria-label="תגובה"
+          className="flex flex-1 items-center justify-center py-1.5 text-ink-secondary"
         >
-          <Image src="/images/places-comment-icon.png" alt="" width={17} height={16} className="object-contain" />
-          תגובה
+          <Image src="/images/places-comment-icon.png" alt="תגובה" width={17} height={16} className="object-contain" />
         </button>
         <button
           type="button"
           onClick={async () => setSaved(await onSaveToggle(item.id))}
-          className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold"
+          aria-label="שמור"
+          className="flex flex-1 items-center justify-center py-1.5"
           style={{ color: saved ? "var(--color-places-purple)" : "var(--color-ink-secondary, #8a94a6)" }}
         >
           <Image
             src={saved ? "/images/places-save-filled.png" : "/images/places-save-outline.png"}
-            alt=""
+            alt="שמור"
             width={15}
             height={18}
             className="object-contain"
           />
-          שמור
         </button>
       </div>
+
+      {commentsExpanded && <PostInlineComments postId={item.id} />}
 
       {viewerOpen && (
         <PostMediaViewerModal
@@ -308,6 +316,9 @@ export function PostCard({
           media={item.media}
           initialIndex={viewerIndex}
           onClose={() => setViewerOpen(false)}
+          authorName={item.author.fullName ?? item.author.username ?? "מטייל"}
+          authorAvatarUrl={item.author.avatarUrl}
+          createdAt={item.createdAt}
         />
       )}
     </article>

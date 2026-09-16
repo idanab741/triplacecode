@@ -78,11 +78,20 @@ export async function addComment(
   postId: string,
   authorId: string,
   text: string,
-  parentCommentId?: string
+  parentCommentId?: string,
+  /** *** תוספת (בקשה מפורשת - "לכל תמונה תגובות משלה"): undefined/null =
+   *  תגובה כללית על הפוסט; אחרת - תגובה על תמונה ספציפית (media_assets.id). */
+  mediaId?: string | null
 ) {
   const { data, error } = await supabase
     .from("comments")
-    .insert({ post_id: postId, author_id: authorId, text, parent_comment_id: parentCommentId ?? null })
+    .insert({
+      post_id: postId,
+      author_id: authorId,
+      text,
+      parent_comment_id: parentCommentId ?? null,
+      media_id: mediaId ?? null,
+    })
     .select("id")
     .single();
   if (error) throw error;
@@ -98,7 +107,21 @@ export async function deleteComment(supabase: SupabaseClient, commentId: string,
   if (error) throw error;
 }
 
-export async function getComments(supabase: SupabaseClient, postId: string, limit = 30, before?: string) {
+/**
+ * *** שינוי (בקשה מפורשת - "לכל תמונה תגובות משלה, לא רק לפוסט"):
+ * `mediaId` קובע איזה "מאגר תגובות" בדיוק נשלף - `undefined`/לא
+ * מועבר = תגובות כלליות על הפוסט (media_id IS NULL, בדיוק מה שנפתח
+ * inline מתחת לשורה בפיד); מחרוזת אמיתית = תגובות על אותה תמונה
+ * ספציפית בלבד (media_id = אותו ה-id, בדיוק מה שנפתח בתוך חלון-הצפייה
+ * בתמונה). שני "מאגרים" נפרדים לגמרי - לא מתערבבים.
+ */
+export async function getComments(
+  supabase: SupabaseClient,
+  postId: string,
+  limit = 30,
+  before?: string,
+  mediaId?: string | null
+) {
   let query = supabase
     .from("comments")
     .select("id, text, created_at, parent_comment_id, author:profiles!comments_author_id_fkey(id, username, full_name, avatar_url)")
@@ -106,6 +129,7 @@ export async function getComments(supabase: SupabaseClient, postId: string, limi
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(limit);
+  query = mediaId ? query.eq("media_id", mediaId) : query.is("media_id", null);
   if (before) query = query.lt("created_at", before);
   const { data, error } = await query;
   if (error) throw error;

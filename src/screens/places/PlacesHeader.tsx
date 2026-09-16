@@ -15,15 +15,15 @@ interface PlacesHeaderProps {
  *  מרווחים: px-5 מהקצה (20px) - בדיוק כמו HomeHeader של triplace
  *  (grid-cols-[40px_1fr_40px] px-5). הפעמון תופס את אותו מיקום שהפעמון
  *  תופס שם, וכפתור הצ'אט תופס בדיוק את המיקום שתמונת הפרופיל תופסת שם
- *  (העמודה הנגדית). כפתור חיפוש חדש יושב לצד הצ'אט, שניהם בלי מסגרת/
- *  רקע עגול - רק האייקון, באותו עובי קו כמו הפעמון.
+ *  (העמודה הנגדית).
  *
- *  תיקון (בקשה מפורשת - "שהצ'אט יהיה בדיוק מעל עיגול הפרופיל למטה"):
- *  אחרי שכפתורי הצ'אט/חיפוש הפכו לעיגולים h-10 w-10 (כמו הפעמון), חצי
- *  הרוחב שלהם הוא 20px - אז קבוצת האייקונים זזה מ-right-4 ל-right-3.5
- *  (14px), כדי שמרכז כפתור הצ'אט (הראשון בקבוצה, מיושר עם הקצה) ייצא
- *  בדיוק 14+20=34px מהקצה - זהה למרכז עיגול הפרופיל ב-CreatePostBar
- *  (px-4 + חצי מ-h-9 w-9 = 16+18=34px). */
+ *  *** תיקון (בקשה מפורשת - "תעביר את הזכוכית המגדלת לקצה השמאלי של
+ *  שורת 'כתבו את הטיול שלכם', בקו ישר מתחת לפעמון"): כפתור החיפוש
+ *  שהיה כאן ליד הצ'אט הוסר לגמרי - עבר ל-CreatePostBar.tsx, ממוקם שם
+ *  ב-`left-5` כדי ליישר בדיוק מתחת לפעמון (שגם הוא ב-left-5, כאן).
+ *  right-3.5 (14px) על קבוצת הצ'אט - שנשאר לבד עכשיו - לא שונה, כדי
+ *  לא לשבור את היישור מול עיגול הפרופיל ב-CreatePostBar (ר' ההסבר
+ *  המקורי: 14+20=34px מהקצה, זהה ל-16+18=34px של עיגול הפרופיל). */
 export function PlacesHeader({ onBack }: PlacesHeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full bg-white">
@@ -54,13 +54,6 @@ export function PlacesHeader({ onBack }: PlacesHeaderProps) {
             className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
           >
             <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
-          </Link>
-          <Link
-            href="/places/search"
-            aria-label="חיפוש"
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
-          >
-            <Image src="/images/places-search-icon.png" alt="" width={21} height={20} className="object-contain" />
           </Link>
         </div>
       </div>

@@ -125,9 +125,10 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     return saved;
   }
 
-  function handleOpenComments(postId: string) {
-    router.push(`/places/post/${postId}`);
-  }
+  // *** תיקון (בקשה מפורשת - "התגובות לא ייפתחו בעמוד נפרד"):
+  // handleOpenComments (שניווט ל-/places/post/[id]) הוסר - PostCard
+  // פותח עכשיו בעצמו מודל מסך-מלא + תגובות inline, בלי מעורבות של
+  // העמוד הזה בכלל.
 
   async function handleEditPost(postId: string, newText: string) {
     await fetchJson(`/api/social/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ text: newText }) });
@@ -350,7 +351,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
                 item={item}
                 onLikeToggle={handleLikeToggle}
                 onSaveToggle={handleSaveToggle}
-                onOpenComments={handleOpenComments}
                 onWriteReview={(placeId) => router.push(`/place/${placeId}`)}
                 onEditPost={handleEditPost}
                 onDeletePost={handleDeletePost}
