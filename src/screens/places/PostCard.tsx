@@ -6,12 +6,12 @@ import Image from "next/image";
 import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import { getAvatarUrl } from "@/constants/avatar";
+import { PostMediaViewerModal } from "./PostMediaViewerModal";
 
 interface PostCardProps {
   item: FeedItemDto;
   onLikeToggle: (postId: string) => Promise<boolean>;
   onSaveToggle: (postId: string) => Promise<boolean>;
-  onOpenComments: (postId: string) => void;
   onWriteReview: (placeId: string, placeName: string) => void;
   onEditPost: (postId: string, newText: string) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
@@ -33,7 +33,6 @@ export function PostCard({
   item,
   onLikeToggle,
   onSaveToggle,
-  onOpenComments,
   onWriteReview,
   onEditPost,
   onDeletePost,
@@ -47,6 +46,16 @@ export function PostCard({
   const [displayText, setDisplayText] = useState(item.text);
   const [deleted, setDeleted] = useState(false);
   const [busy, setBusy] = useState(false);
+  // *** תוספת (בקשה מפורשת - "התמונה תיפתח במסך מלא, בלי לעבור לעמוד
+  // נפרד להערות"): מצב מקומי לגמרי בתוך הכרטיס - לא צריך עוד את
+  // onOpenComments (שניווט ל-/places/post/[id]).
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  function openViewer(index: number) {
+    setViewerIndex(index);
+    setViewerOpen(true);
+  }
 
   if (deleted) return null;
 
@@ -95,6 +104,12 @@ export function PostCard({
             {TYPE_LABEL[item.type] ? ` · ${TYPE_LABEL[item.type]}` : ""}
           </span>
         </div>
+        {/* *** תיקון (בקשה מפורשת - "השלוש נקודות לא רלוונטיות אם זה
+            לא הפוסט של המשתמש עצמו"): קודם הכפתור תמיד הוצג, ולפוסט
+            של מישהו אחר פשוט נפתח תפריט עם "אין פעולות זמינות" - תפריט
+            ריק לגמרי. במקום זה, הכפתור כולו לא מוצג בכלל כשזה לא
+            הפוסט שלי - אין מה "לפתוח". */}
+        {item.viewerState.isSelf && (
         <button
           type="button"
           aria-label="עוד"
@@ -110,48 +125,41 @@ export function PostCard({
             <>
               <span className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
               <span className="absolute end-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-card bg-white text-start shadow-soft ring-1 ring-black/5">
-                {item.viewerState.isSelf ? (
-                  <>
-                    <span
-                      role="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setEditing(true);
-                      }}
-                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-bg-secondary"
-                    >
-                      <Image src="/images/places-edit-icon.png" alt="" width={14} height={14} className="object-contain" />
-                      ערוך
-                    </span>
-                    <span
-                      role="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        handleDelete();
-                      }}
-                      className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-bg-secondary"
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      מחק
-                    </span>
-                  </>
-                ) : (
-                  <span className="block w-full px-3.5 py-2.5 text-[13px] font-semibold text-ink-secondary">
-                    אין פעולות זמינות
-                  </span>
-                )}
+                <span
+                  role="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setEditing(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-ink hover:bg-bg-secondary"
+                >
+                  <Image src="/images/places-edit-icon.png" alt="" width={14} height={14} className="object-contain" />
+                  ערוך
+                </span>
+                <span
+                  role="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleDelete();
+                  }}
+                  className="flex w-full items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-bg-secondary"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  מחק
+                </span>
               </span>
             </>
           )}
         </button>
+        )}
       </div>
 
       {editing ? (
@@ -190,8 +198,13 @@ export function PostCard({
 
       {item.media.length > 0 && (
         <div className={`mb-3 grid gap-1 overflow-hidden rounded-card ${item.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-          {item.media.slice(0, 4).map((media) => (
-            <div key={media.id} className="relative aspect-square bg-bg-secondary">
+          {item.media.slice(0, 4).map((media, i) => (
+            <button
+              key={media.id}
+              type="button"
+              onClick={() => openViewer(i)}
+              className="relative aspect-square bg-bg-secondary"
+            >
               {media.type === "video" ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -204,7 +217,7 @@ export function PostCard({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={media.url} alt="" className="h-full w-full object-cover" />
               )}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -238,7 +251,7 @@ export function PostCard({
       <div className="mb-2 flex items-center gap-1 text-[12px] text-ink-secondary">
         {likeCount > 0 && <span>{likeCount} לייקים</span>}
         {item.stats.comments > 0 && (
-          <button type="button" onClick={() => onOpenComments(item.id)} className="hover:underline">
+          <button type="button" onClick={() => openViewer(0)} className="hover:underline">
             · {item.stats.comments} תגובות
           </button>
         )}
@@ -266,7 +279,7 @@ export function PostCard({
         </button>
         <button
           type="button"
-          onClick={() => onOpenComments(item.id)}
+          onClick={() => openViewer(0)}
           className="flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[13px] font-semibold text-ink-secondary"
         >
           <Image src="/images/places-comment-icon.png" alt="" width={17} height={16} className="object-contain" />
@@ -288,6 +301,15 @@ export function PostCard({
           שמור
         </button>
       </div>
+
+      {viewerOpen && (
+        <PostMediaViewerModal
+          postId={item.id}
+          media={item.media}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
     </article>
   );
 }
