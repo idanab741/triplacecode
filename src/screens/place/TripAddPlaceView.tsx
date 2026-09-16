@@ -172,6 +172,34 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
           )}
         </div>
 
+        {/* *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל"): פירוט
+            4 עובדות הנגישות שגוגל בפועל מספק - מוצגות רק אלה שידועות
+            וחיוביות (לא מומצא "לא נגיש" למה שלא ידוע). */}
+        {(place.accessible || place.accessibleParking || place.accessibleRestroom || place.accessibleSeating) && (
+          <div className="flex flex-wrap gap-2">
+            {place.accessible && (
+              <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
+                ♿ כניסה נגישה
+              </span>
+            )}
+            {place.accessibleParking && (
+              <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
+                🅿️ חניה נגישה
+              </span>
+            )}
+            {place.accessibleRestroom && (
+              <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
+                🚻 שירותים נגישים
+              </span>
+            )}
+            {place.accessibleSeating && (
+              <span className="rounded-pill bg-bg-secondary px-3 py-1.5 text-xs font-medium text-ink-secondary">
+                💺 ישיבה נגישה
+              </span>
+            )}
+          </div>
+        )}
+
         {/* *** "כמה שמרו" - תמיד מוצג (בקשה מפורשת - "פרטים כמה זה
             פופולרי"), גם ב-0, עם ניסוח מזמין במקום להסתתר לגמרי -
             כדי שהפיצ'ר יהיה גלוי וברור שהוא קיים, לא רק כשיש כבר נתונים. */}

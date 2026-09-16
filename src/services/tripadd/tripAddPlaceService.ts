@@ -1,4 +1,3 @@
-import { createClient } from "@/services/supabase/server";
 import { createAdminClient } from "@/services/supabase/admin";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
@@ -26,6 +25,10 @@ export interface TripAddPlace {
   googleRating: number | null;
   googleRatingCount: number | null;
   accessible: boolean | null;
+  /** *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל", migration 0085) */
+  accessibleParking: boolean | null;
+  accessibleRestroom: boolean | null;
+  accessibleSeating: boolean | null;
   latitude: number;
   longitude: number;
   address: string | null;
@@ -41,24 +44,24 @@ export interface TripAddPlace {
 
 /**
  * מקום בודד מ-tripadd_submissions, לעמוד /place/[id] - המקבילה של
- * getPlaceById (placesServerService.ts) אבל למקור-הדאטה החדש. משתמש
- * בלקוח הרגיל (לא admin) - תקין רק אחרי migration 0080 (שפתחה את ה-
- * SELECT policy לכל משתמש מחובר, לא רק ליוצר ה-submission).
+ * getPlaceById (placesServerService.ts) אבל למקור-הדאטה החדש.
  *
- * *** שינוי (בקשה מפורשת - "ביקורות מסודרות למטה"): שולף גם את כל
- * tripadd_reviews של המקום (migration 0081) - לא מסתמך יותר על
- * submissions.rating/description הבודדים (אלה נשארים בעמודה כהיסטוריה
- * גולמית בלבד, לא מוצגים). דירוג ה-TripLace המוצג הוא ממוצע אמיתי,
- * לא הדירוג של המגיש המקורי בלבד.
+ * *** תיקון (בקשה מפורשת - מסמך העדכון, סעיף 10 - תמונות משותפות):
+ * admin client, לא הלקוח הרגיל - בדיוק אותה סיבה כמו ב-pins/route.ts
+ * (media_assets שומרת RLS מוגבל-לבעלים ברמת הטבלה בכוונה, ר' migration
+ * 0067 - זה DTO ציבורי מפורש, לא הרפיית RLS על טבלה משותפת).
+ * tripadd_submissions/tripadd_submission_media עצמן כבר פתוחות לכל
+ * משתמש מחובר (migrations 0080/0086), אז אין כאן שום דבר שדורש את
+ * ה-cookies/session של המבקר הספציפי בכל מקרה.
  */
 export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | null> {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const [{ data, error }, { data: reviewRows }] = await Promise.all([
     supabase
       .from("tripadd_submissions")
       .select(
-        "id, name, category, subcategory, description, short_description, google_rating, google_rating_count, accessible, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
+        "id, name, category, subcategory, description, short_description, google_rating, google_rating_count, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, city, website, phone, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
       )
       .eq("id", id)
       .not("latitude", "is", null)
@@ -103,6 +106,9 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     googleRating: data.google_rating,
     googleRatingCount: data.google_rating_count,
     accessible: data.accessible,
+    accessibleParking: data.accessible_parking,
+    accessibleRestroom: data.accessible_restroom,
+    accessibleSeating: data.accessible_seating,
     latitude: data.latitude as number,
     longitude: data.longitude as number,
     address: data.address,

@@ -49,6 +49,9 @@ export interface HomeMapPlace {
    *  מצב שמורה שיכולה להתיישן. */
   openingHours?: string[] | null;
   accessible?: boolean | null;
+  accessibleParking?: boolean | null;
+  accessibleRestroom?: boolean | null;
+  accessibleSeating?: boolean | null;
 }
 
 interface HomeMapProps {

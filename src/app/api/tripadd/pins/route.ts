@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/services/supabase/server";
+import { createAdminClient } from "@/services/supabase/admin";
 
 /**
  * *** תיקון (בקשה מפורשת - "ביקשתי רק מהתמונות שלי! לא מגוגל! מה
@@ -12,14 +12,23 @@ import { createClient } from "@/services/supabase/server";
  * "תעשה שיופיע ישר על המפה, בהמשך נעשה סינון דרך ADMIN"): המקור
  * היחיד למרקרים מעכשיו הוא tripadd_submissions - **לא** places/
  * destinations הישנים, ולא מסונן ע"י status (pending/approved) כרגע.
+ *
+ * *** תיקון (בקשה מפורשת - מסמך העדכון, סעיף 10 - "משתמש B לא רואה
+ * תמונה שמשתמש A העלה"): admin client, לא הלקוח הרגיל - media_assets
+ * (הטבלה שמאחורי tripadd_submission_media.media_id) שומרת בכוונה
+ * SELECT RLS מוגבל-לבעלים ברמת הטבלה עצמה (ר' migration 0067 - כדי
+ * להגן על מדיה פרטית בפוסטים/סטוריז/הודעות), וחושפת מידע ציבורי רק
+ * דרך DTO צד-שרת מפורש. ה-route הזה *הוא* בדיוק אותו DTO ציבורי -
+ * הנתיב הנכון לחשוף אותו הוא admin client כאן, לא הרפיית ה-RLS על
+ * הטבלה המשותפת עצמה (שהייתה חושפת גם מדיה פרטית של פיצ'רים אחרים).
  */
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { data, error } = await supabase
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, rating, google_rating, google_rating_count, accessible, latitude, longitude, address, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
+      "id, name, category, subcategory, rating, google_rating, google_rating_count, accessible, accessible_parking, accessible_restroom, accessible_seating, latitude, longitude, address, price_level, opening_hours, tripadd_submission_media(sort_order, media_assets(url))"
     )
     .not("latitude", "is", null)
     .not("longitude", "is", null)
@@ -45,6 +54,9 @@ export async function GET() {
       google_rating: row.google_rating,
       google_rating_count: row.google_rating_count,
       accessible: row.accessible,
+      accessibleParking: row.accessible_parking,
+      accessibleRestroom: row.accessible_restroom,
+      accessibleSeating: row.accessible_seating,
       latitude: row.latitude,
       longitude: row.longitude,
       address: row.address,

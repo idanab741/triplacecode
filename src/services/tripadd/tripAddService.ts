@@ -1,4 +1,4 @@
-﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 /** אותם 6 ערכים בדיוק כמו HomeQuickCategoryId (שורת "סוגי הטיול" בעמוד
@@ -114,10 +114,7 @@ export async function createTripAddSharePost(
   }
 
   return post.id as string;
-}
-
-/**
- * *** לוגיקה של זיהוי-כפילות (דה-דופ) - אם מקום עם
+} - אם מקום עם
  * אותו google_place_id כבר קיים במאגר, לא נוצר "מקום" שני (זו הייתה
  * הסיבה ל-"Jasmino מופיע פעמיים") - במקום זה נוסף/מתעדכן רק ביקורת
  * על המקום הקיים (ר' upsertTripAddReview). מקומות בלי google_place_id
@@ -188,10 +185,16 @@ export async function upsertTripAddReview(
 export interface TripAddEnrichmentPatch {
   /** תת-קטגוריה - AI, לא גוגל. */
   subcategory?: string | null;
-  /** מכאן ולמטה: אך ורק 3 השדות שמותר לשלוף ולשמור מגוגל (בקשה
+  /** מכאן ולמטה: אך ורק השדות שמותר לשלוף ולשמור מגוגל (בקשה
    *  מפורשת - מינימלי). לא טלפון, לא תיאור, לא שעות פתיחה, לא תמונות -
    *  המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה. */
   accessible?: boolean | null;
+  /** *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל", migration
+   *  0085): שלוש עוד עובדות נגישות שגוגל מספק, מעבר לכניסה נגישה
+   *  (accessible) שכבר הייתה. */
+  accessibleParking?: boolean | null;
+  accessibleRestroom?: boolean | null;
+  accessibleSeating?: boolean | null;
   priceLevel?: number | null;
   /** דירוג ממוצע שגוגל מספק - שונה מ-rating (הדירוג האישי שהמשתמש
    *  עצמו נתן בטופס, "דירוג TRIPLACE"). מוצג בנפרד בכרטיסייה. */
@@ -211,6 +214,9 @@ export async function applyTripAddEnrichment(
   const update: Record<string, unknown> = { enrichment_status: status };
   if (patch.subcategory !== undefined) update.subcategory = patch.subcategory;
   if (patch.accessible !== undefined) update.accessible = patch.accessible;
+  if (patch.accessibleParking !== undefined) update.accessible_parking = patch.accessibleParking;
+  if (patch.accessibleRestroom !== undefined) update.accessible_restroom = patch.accessibleRestroom;
+  if (patch.accessibleSeating !== undefined) update.accessible_seating = patch.accessibleSeating;
   if (patch.priceLevel !== undefined) update.price_level = patch.priceLevel;
   if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
   if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;

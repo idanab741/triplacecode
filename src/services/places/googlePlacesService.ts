@@ -16,7 +16,12 @@ export interface GooglePlaceRaw {
   types?: string[];
   editorialSummary?: { text: string };
   primaryTypeDisplayName?: { text: string };
-  accessibilityOptions?: { wheelchairAccessibleEntrance?: boolean };
+  accessibilityOptions?: {
+    wheelchairAccessibleEntrance?: boolean;
+    wheelchairAccessibleParking?: boolean;
+    wheelchairAccessibleRestroom?: boolean;
+    wheelchairAccessibleSeating?: boolean;
+  };
   nationalPhoneNumber?: string;
   websiteUri?: string;
   googleMapsUri?: string;

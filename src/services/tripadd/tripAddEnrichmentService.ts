@@ -37,13 +37,17 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       return;
     }
 
+    // *** בקשה מפורשת (מינימלי): מגוגל נשלפים ונשמרים אך ורק דירוג,
+    // נגישות וטווח מחירים - לא תמונות, לא טלפון, לא תיאור, לא שעות
+    // פתיחה. המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה
+    // (autocomplete), לא כאן.
     const patch: {
       subcategory?: string | null;
       accessible?: boolean | null;
+      accessibleParking?: boolean | null;
+      accessibleRestroom?: boolean | null;
+      accessibleSeating?: boolean | null;
       priceLevel?: number | null;
-      phone?: string | null;
-      shortDescription?: string | null;
-      openingHours?: string[] | null;
       googleRating?: number | null;
       googleRatingCount?: number | null;
     } = {};
@@ -73,16 +77,22 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       const googlePlace = query ? await searchCityPlace(query) : null;
 
       if (googlePlace) {
+        // *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל", migration
+        // 0085): כל 4 עובדות הנגישות שגוגל בפועל מספק - לא רק כניסה.
         if (googlePlace.accessibilityOptions?.wheelchairAccessibleEntrance !== undefined) {
           patch.accessible = googlePlace.accessibilityOptions.wheelchairAccessibleEntrance;
         }
+        if (googlePlace.accessibilityOptions?.wheelchairAccessibleParking !== undefined) {
+          patch.accessibleParking = googlePlace.accessibilityOptions.wheelchairAccessibleParking;
+        }
+        if (googlePlace.accessibilityOptions?.wheelchairAccessibleRestroom !== undefined) {
+          patch.accessibleRestroom = googlePlace.accessibilityOptions.wheelchairAccessibleRestroom;
+        }
+        if (googlePlace.accessibilityOptions?.wheelchairAccessibleSeating !== undefined) {
+          patch.accessibleSeating = googlePlace.accessibilityOptions.wheelchairAccessibleSeating;
+        }
         const priceLevel = priceLevelFromGoogle(googlePlace.priceLevel);
         if (priceLevel !== null) patch.priceLevel = priceLevel;
-        if (googlePlace.nationalPhoneNumber) patch.phone = googlePlace.nationalPhoneNumber;
-        if (googlePlace.editorialSummary?.text) patch.shortDescription = googlePlace.editorialSummary.text;
-        if (googlePlace.regularOpeningHours?.weekdayDescriptions?.length) {
-          patch.openingHours = googlePlace.regularOpeningHours.weekdayDescriptions;
-        }
         if (typeof googlePlace.rating === "number") {
           patch.googleRating = googlePlace.rating;
         }

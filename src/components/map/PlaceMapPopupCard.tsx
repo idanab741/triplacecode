@@ -58,6 +58,9 @@ export interface PlaceMapPopupData {
   priceLevel: number | null;
   /** נגישות לכיסא גלגלים מגוגל (accessibilityOptions.wheelchairAccessibleEntrance) - מוצג רק כשידוע וחיובי. */
   accessible: boolean | null;
+  accessibleParking?: boolean | null;
+  accessibleRestroom?: boolean | null;
+  accessibleSeating?: boolean | null;
   /** אותו מבנה שכבר קיים ב-place.opening_hours (מגוגל, בעברית) - openingHours.ts כבר יודע לפרסר. */
   openingHours: string[] | null;
   wazeUrl: string;
@@ -199,9 +202,23 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
                 <span className="truncate text-[8px] text-ink-secondary">{place.subcategoryLabel}</span>
               )}
             </div>
-            {/* נגישות - אותה מוסכמה בדיוק כמו TripMatchCard.tsx / admin/discovery (♿ נגיש) - מוצג רק כשידוע וחיובי, בלי "לא נגיש". */}
-            {place.accessible === true && (
-              <span className="mr-auto shrink-0 text-[9px] font-semibold text-ink">♿ נגיש</span>
+            {/* נגישות - אותה מוסכמה בדיוק כמו TripMatchCard.tsx / admin/discovery (♿ נגיש) - מוצג רק כשידוע וחיובי, בלי "לא נגיש".
+                *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל"): הבאדג' מוצג אם *לפחות אחת* מ-4 העובדות חיובית (לא רק כניסה),
+                עם title שמפרט בדיוק אילו - בלי להרחיב את גודל החלונית הקומפקטית הזו. */}
+            {(place.accessible || place.accessibleParking || place.accessibleRestroom || place.accessibleSeating) && (
+              <span
+                className="mr-auto shrink-0 text-[9px] font-semibold text-ink"
+                title={[
+                  place.accessible && "כניסה נגישה",
+                  place.accessibleParking && "חניה נגישה",
+                  place.accessibleRestroom && "שירותים נגישים",
+                  place.accessibleSeating && "ישיבה נגישה",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
+                ♿ נגיש
+              </span>
             )}
           </div>
 
