@@ -124,18 +124,17 @@ export async function getFeed(
   );
   const destinationsById = new Map((destinationsRes.data ?? []).map((d) => [d.id, d]));
   const tripAddPlacesById = new Map(
-    (tripAddRes.data ?? []).map(
-      (t: {
+    (tripAddRes.data ?? []).map((t) => {
+      const row = t as unknown as {
         id: string;
         name: string;
         tripadd_submission_media?: { sort_order: number; media_assets: { url: string } | null }[] | null;
-      }) => {
-        const sorted = (t.tripadd_submission_media ?? [])
-          .filter((m) => m.media_assets?.url)
-          .sort((a, b) => a.sort_order - b.sort_order);
-        return [t.id, { id: t.id, name: t.name, imageUrl: sorted[0]?.media_assets?.url ?? null }];
-      }
-    )
+      };
+      const sorted = (row.tripadd_submission_media ?? [])
+        .filter((m) => m.media_assets?.url)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      return [row.id, { id: row.id, name: row.name, imageUrl: sorted[0]?.media_assets?.url ?? null }] as const;
+    })
   );
   const mediaByPost = new Map<string, { id: string; type: string; url: string; thumbnailUrl: string | null }[]>();
   for (const row of mediaRes.data ?? []) {
