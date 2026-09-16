@@ -29,6 +29,13 @@ export interface CreateTripAddSubmissionInput {
  * place_submissions - זה בדיוק מה שגרם לבלבול הקודם ("כבר קיים
  * אצלנו"). tripadd_submissions היא טבלה נפרדת, RLS נפרד, לא נוגעת
  * במאגר הישן בשום צורה.
+ *
+ * *** תיקון (בקשה מפורשת - "הביקורות צריכות להיות רשומות מסודרות"):
+ * זה עדיין יוצר "מקום" חדש - אבל עכשיו גם יוצר לו את הביקורת
+ * הראשונה שלו (tripadd_reviews), כדי שממש מהתחלה יש ל-tripadd_place
+ * רשימת ביקורות אחידה, לא תלויה בשדות rating/description הישנים
+ * שיושבים על tripadd_submissions עצמה. ר' findTripAddSubmissionByGooglePlaceId
+ * למטה - הוספה *שנייה* לאותו מקום לא עוברת כאן בכלל.
  */
 export async function createTripAddSubmission(supabase: SupabaseClient, input: CreateTripAddSubmissionInput): Promise<string> {
   const { data: submission, error } = await supabase
@@ -62,16 +69,96 @@ export async function createTripAddSubmission(supabase: SupabaseClient, input: C
     if (mediaError) throw mediaError;
   }
 
+  // הביקורת הראשונה על המקום החדש - אותו rating/description שכבר
+  // נשמרו למעלה, רק גם דרך הטבלה החדשה (ר' ההערה מעל הפונקציה).
+  await upsertTripAddReview(supabase, {
+    submissionId: submission.id as string,
+    userId: input.submittedBy,
+    rating: input.rating,
+    description: input.description,
+  });
+
   return submission.id as string;
 }
 
+/**
+ * *** תוספת (בקשה מפורשת - "לבנות איחוד מקומות כפולים לפי
+ * google_place_id"): נבדק *לפני* יצירת submission חדש - אם מקום עם
+ * אותו google_place_id כבר קיים במאגר, לא נוצר "מקום" שני (זו הייתה
+ * הסיבה ל-"Jasmino מופיע פעמיים") - במקום זה נוסף/מתעדכן רק ביקורת
+ * על המקום הקיים (ר' upsertTripAddReview). מקומות בלי google_place_id
+ * (המשתמש המשיך ידנית כי גוגל לא מצא) לא ניתנים לזיהוי-כפילות
+ * אוטומטי - נשארים כמקומות נפרדים, זו מגבלה מודעת.
+ */
+export async function findTripAddSubmissionByGooglePlaceId(
+  supabase: SupabaseClient,
+  googlePlaceId: string
+): Promise<{ id: string } | null> {
+  const { data } = await supabase
+    .from("tripadd_submissions")
+    .select("id")
+    .eq("google_place_id", googlePlaceId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+export interface UpsertTripAddReviewInput {
+  submissionId: string;
+  userId: string;
+  rating?: number;
+  description?: string;
+  mediaIds?: string[];
+}
+
+/**
+ * מוסיף ביקורת, או מעדכן את הביקורת הקיימת של אותו משתמש על אותו
+ * מקום (unique(submission_id, user_id) ב-migration 0081) - אדם אחד
+ * לא "מצטבר" לכמה ביקורות על אותו מקום, רק מעדכן את שלו. תמונות
+ * שמצורפות לביקורת השנייה נוספות לגלריה המשותפת של המקום (אותו
+ * submission_id ב-tripadd_submission_media, sort_order ממשיך מהמקסימום
+ * הקיים - לא מתחיל מ-0 ודורס תמונות קודמות).
+ */
+export async function upsertTripAddReview(
+  supabase: SupabaseClient,
+  input: UpsertTripAddReviewInput
+): Promise<void> {
+  const { error } = await supabase.from("tripadd_reviews").upsert(
+    {
+      submission_id: input.submissionId,
+      user_id: input.userId,
+      rating: input.rating ?? null,
+      description: input.description ?? null,
+    },
+    { onConflict: "submission_id,user_id" }
+  );
+  if (error) throw error;
+
+  if (input.mediaIds?.length) {
+    const { data: existingMedia } = await supabase
+      .from("tripadd_submission_media")
+      .select("sort_order")
+      .eq("submission_id", input.submissionId)
+      .order("sort_order", { ascending: false })
+      .limit(1);
+    const nextSortOrder = (existingMedia?.[0]?.sort_order ?? -1) + 1;
+    const rows = input.mediaIds.map((mediaId, i) => ({
+      submission_id: input.submissionId,
+      media_id: mediaId,
+      sort_order: nextSortOrder + i,
+    }));
+    const { error: mediaError } = await supabase.from("tripadd_submission_media").insert(rows);
+    if (mediaError) throw mediaError;
+  }
+}
+
 export interface TripAddEnrichmentPatch {
+  /** תת-קטגוריה - AI, לא גוגל. */
   subcategory?: string | null;
+  /** מכאן ולמטה: אך ורק 3 השדות שמותר לשלוף ולשמור מגוגל (בקשה
+   *  מפורשת - מינימלי). לא טלפון, לא תיאור, לא שעות פתיחה, לא תמונות -
+   *  המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה. */
   accessible?: boolean | null;
   priceLevel?: number | null;
-  phone?: string | null;
-  shortDescription?: string | null;
-  openingHours?: string[] | null;
   /** דירוג ממוצע שגוגל מספק - שונה מ-rating (הדירוג האישי שהמשתמש
    *  עצמו נתן בטופס, "דירוג TRIPLACE"). מוצג בנפרד בכרטיסייה. */
   googleRating?: number | null;
@@ -91,9 +178,6 @@ export async function applyTripAddEnrichment(
   if (patch.subcategory !== undefined) update.subcategory = patch.subcategory;
   if (patch.accessible !== undefined) update.accessible = patch.accessible;
   if (patch.priceLevel !== undefined) update.price_level = patch.priceLevel;
-  if (patch.phone !== undefined) update.phone = patch.phone;
-  if (patch.shortDescription !== undefined) update.short_description = patch.shortDescription;
-  if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
   if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
   if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;
 

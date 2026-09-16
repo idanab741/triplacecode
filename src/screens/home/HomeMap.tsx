@@ -14,9 +14,8 @@ import {
 } from "@/constants/mapTiles";
 import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
-import { isPlaceOpenNow } from "@/utils/openingHours";
-import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
 import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { HomeMapPlacePopupContent } from "./HomeMapPlacePopupContent";
 
 /** מרכז ברירת מחדל (תל אביב) - רק עד שמתקבל מיקום אמיתי מהמכשיר, או
  *  כגיבוי אם המשתמש לא אישר הרשאת מיקום. לא "דאטה מדומה" של מקומות -
@@ -77,19 +76,37 @@ export interface HomeMapHandle {
   recenterToUser: () => void;
 }
 
-/** אותו סגנון פין בדיוק כמו DiscoveryPlacesMap.tsx - לא ה-icon
- *  הדיפולטי של Leaflet (ששבור מחוץ לקופסה עם bundlers כמו Next.js). */
-const PLACE_ICON = L.divIcon({
-  className: "",
-  html: `<div style="
-    width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
-    background: var(--color-primary-start, #4F7DF3);
-    border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
-    transform: rotate(-45deg);
-  "></div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
-});
+/** מיפוי category -> משתנה-הצבע שלה (אותו colorVar שמוצג כבר מאחורי
+ *  העיגול ב-HomeQuickCategories) - מקור אמת יחיד, לא צבעים כפולים. */
+const CATEGORY_COLOR_VAR: Partial<Record<string, string>> = Object.fromEntries(
+  HOME_QUICK_CATEGORIES.map((c) => [c.id, c.colorVar])
+);
+const DEFAULT_PIN_COLOR_VAR = "--color-primary-start";
+
+/** *** שינוי (בקשה מפורשת - "שברגע שלוחצים על כפתור סינון, הנעצים
+ *  שנשארים יהיו בצבע שמופיע מאחורי העיגול של אותו סוג"): לפני זה כל
+ *  הפינים היו באותו כחול קבוע (PLACE_ICON יחיד) - עכשיו כל פין מקבל
+ *  אייקון בצבע הקטגוריה שלו (או הצבע הדיפולטי אם אין קטגוריה/לא
+ *  מזוהה). ה-cache מונע יצירת L.divIcon מחדש בכל רינדור לכל פין. */
+const placeIconCache = new Map<string, L.DivIcon>();
+function getPlaceIcon(category?: string | null): L.DivIcon {
+  const colorVar = (category && CATEGORY_COLOR_VAR[category]) || DEFAULT_PIN_COLOR_VAR;
+  const cached = placeIconCache.get(colorVar);
+  if (cached) return cached;
+  const icon = L.divIcon({
+    className: "",
+    html: `<div style="
+      width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
+      background: var(${colorVar}, #4F7DF3);
+      border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
+      transform: rotate(-45deg);
+    "></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+  });
+  placeIconCache.set(colorVar, icon);
+  return icon;
+}
 
 const USER_LOCATION_ICON = L.divIcon({
   className: "",
@@ -281,112 +298,20 @@ export function HomeMap({ places = [], className, obscuredTopPx = 0, onReady }: 
           <MapTilerBaseLayer />
         )}
 
-        {/* *** כרטיסיית תצוגה מקדימה - סדר מדויק לפי הבקשה המפורשת,
-            הכל מיושר לימין (dir="rtl" + text-right):
-            1) שורת דירוגים: TRIPLACE (לוגו+כוכב+דירוג) | Google (לוגו+כוכב+דירוג+כמות)
-            2) תמונה עגולה (מהמשתמש בלבד, לא Google) + שם המקום (בולד) באותה שורה
-            3) כתובת
-            4) פתוח/סגור עכשיו - מחושב *חי* (isPlaceOpenNow), לא snapshot ישן
-            5) קטגוריה + אייקון בעיגול
-            6) מחיר (₪ לפי price_level)
-            7) נגישות */}
-        {places.map((place) => {
-          const openNow = isPlaceOpenNow(place.openingHours);
-          const categoryDef = place.category ? HOME_QUICK_CATEGORIES.find((c) => c.id === place.category) : undefined;
-          return (
-            <Marker key={place.id} position={[place.latitude, place.longitude]} icon={PLACE_ICON}>
-              <Popup minWidth={230} maxWidth={250} className="tripadd-popup">
-                <div dir="rtl" className="w-full text-right">
-                  {/* 1. שורת דירוגים */}
-                  {(place.rating || place.googleRating) && (
-                    <div dir="rtl" className="mb-2 flex items-center justify-end gap-3 border-b border-ink-secondary/10 pb-2">
-                      {place.googleRating ? (
-                        <div className="flex items-center gap-1">
-                          {place.googleRatingCount ? (
-                            <span className="text-[10px] text-ink-secondary">({place.googleRatingCount})</span>
-                          ) : null}
-                          <span className="text-[12px] font-bold text-ink">{place.googleRating}</span>
-                          <span className="text-[11px]">⭐</span>
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#4285F4] text-[9px] font-bold text-white">
-                            G
-                          </span>
-                        </div>
-                      ) : null}
-                      {place.rating ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[12px] font-bold text-ink">{place.rating}</span>
-                          <span className="text-[11px]">⭐</span>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src="/images/triplace-logo-black.png" alt="TripAdd" className="h-3 w-auto object-contain" />
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {/* 2. תמונה עגולה בימין (מובילה) + שם משמאלה, אותו קו -
-                      בקשה מפורשת ("תמונה בימין, השם משמאל לתמונה, הכל
-                      באותו קו"). התמונה קודמת בסדר ה-DOM כדי שב-RTL
-                      היא תשב בצד הימני (תחילת השורה), והשם אחריה
-                      משמאלה. */}
-                  <div dir="rtl" className="flex w-full items-center justify-end gap-2.5">
-                    {place.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={place.photoUrl}
-                        alt={place.name}
-                        className="h-14 w-14 shrink-0 rounded-full object-cover shadow-soft"
-                      />
-                    ) : (
-                      <div className="h-14 w-14 shrink-0 rounded-full bg-bg-secondary" />
-                    )}
-                    <p className="min-w-0 flex-1 break-words text-[14.5px] font-bold leading-snug text-ink">
-                      {place.name}
-                    </p>
-                  </div>
-
-                  {/* 3. כתובת */}
-                  {place.address && (
-                    <p className="mt-2 break-words text-[11.5px] leading-snug text-ink-secondary">{place.address}</p>
-                  )}
-
-                  {/* 4. פתוח/סגור עכשיו - לא מוצג בכלל אם לא ידוע בוודאות */}
-                  {openNow !== null && (
-                    <div className="mt-1.5 flex items-center justify-end gap-1.5">
-                      <span className="text-[11.5px] font-semibold" style={{ color: openNow ? "#1a9d5c" : "#d94848" }}>
-                        {openNow ? "פתוח עכשיו" : "סגור עכשיו"}
-                      </span>
-                      <span className="h-2 w-2 rounded-full" style={{ background: openNow ? "#1a9d5c" : "#d94848" }} />
-                    </div>
-                  )}
-
-                  {/* 5. קטגוריה + אייקון בעיגול */}
-                  {categoryDef && (
-                    <div className="mt-1.5 flex items-center justify-end gap-1.5">
-                      <span className="text-[11.5px] text-ink-secondary">
-                        {HOME_QUICK_CATEGORY_LABELS[categoryDef.id]}
-                        {place.subcategory ? ` · ${place.subcategory}` : ""}
-                      </span>
-                      <span className="h-5 w-5 shrink-0 overflow-hidden rounded-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={categoryDef.imageSrc} alt="" className="h-full w-full object-cover" />
-                      </span>
-                    </div>
-                  )}
-
-                  {/* 6. מחיר */}
-                  {place.priceLevel ? (
-                    <p className="mt-1.5 text-[12px] font-semibold text-ink-secondary">{"₪".repeat(place.priceLevel)}</p>
-                  ) : null}
-
-                  {/* 7. נגישות - לא מוצג בכלל אם לא ידוע */}
-                  {place.accessible !== null && place.accessible !== undefined && (
-                    <p className="mt-1.5 text-[11.5px] text-ink-secondary">{place.accessible ? "♿ נגיש" : "לא נגיש"}</p>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {/* *** חלונית המקום - עוצבה מחדש (ר' PlaceMapPopupCard.tsx):
+            קומפקטית, RTL אמיתי, רק אייקונים/נכסים קיימים. כל הלוגיקה
+            (דירוגים/תמונה/שם/כתובת/פתוח-סגור/קטגוריה/Waze/גוגל-מפות/
+            שמירה-אמיתית/שיתוף) עברה ל-HomeMapPlacePopupContent, כדי
+            שה-JSX כאן יישאר פשוט ולא יתנפח עם עוד תיקון-על-גבי-תיקון.
+            closeButton={false} - יש לחלונית כפתור X משלה (בהתאם ל-RTL,
+            בצד שמאל), לא כפתור ה-X הדיפולטי של Leaflet. */}
+        {places.map((place) => (
+          <Marker key={place.id} position={[place.latitude, place.longitude]} icon={getPlaceIcon(place.category)}>
+            <Popup minWidth={300} maxWidth={340} closeButton={false} className="place-map-popup">
+              <HomeMapPlacePopupContent place={place} />
+            </Popup>
+          </Marker>
+        ))}
 
         {userLocation && <Marker position={userLocation} icon={USER_LOCATION_ICON} />}
         {userLocation && <RecenterOnLocation center={userLocation} obscuredTopPx={obscuredTopPx} />}
