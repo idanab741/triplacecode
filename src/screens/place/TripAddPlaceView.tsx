@@ -89,29 +89,36 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
         {/* *** שורת דירוגים - לוגואים אמיתיים (לא טקסט "Google" גולמי),
             בדיוק לפי PlaceMapPopupCard.tsx. + טווח מחירים (₪) על אותה
             שורה, שם היה קיים בחלונית ונעדר לגמרי מהעמוד. */}
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        {/* *** תיקון (בקשה מפורשת - מסמך העדכון, סעיף 9: "TRIPLACE +
+            Google חייבים להישאר באותה שורה בכל גודל מסך, לעולם לא
+            לשבור לשתי שורות, גם לא במסכים קטנים"): flex-wrap הוחלף
+            ב-flex-nowrap - זו הייתה הפרה ממשית של הכלל, לא רק תיאורטית.
+            shrink-0 על כל קבוצה מונע מהתוכן להידחס/להיחתך; אם הכל לא
+            נכנס ברוחב המסך, overflow-x-auto מאפשר גלילה אופקית מבוקרת
+            (הטכניקה שהמסמך עצמו מתיר) - במקום לשבור שורה. */}
+        <div className="flex flex-nowrap items-center gap-x-2.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {place.rating != null && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5">
               <Image src="/images/triplace-logo-black.png" alt="TripLace" width={70} height={22} className="h-[18px] w-auto object-contain" />
-              <span className="flex items-center gap-1 text-sm font-bold text-ink">
+              <span className="flex items-center gap-1 text-sm font-bold text-ink whitespace-nowrap">
                 <StarIcon size={14} />
                 {place.rating.toFixed(1)}
               </span>
-              {place.reviewCount > 0 && <span className="text-xs text-ink-secondary">({place.reviewCount})</span>}
+              {place.reviewCount > 0 && <span className="whitespace-nowrap text-xs text-ink-secondary">({place.reviewCount})</span>}
             </div>
           )}
 
           {place.googleRating != null && (
             <>
               <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
-              <a href={googleReviewsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+              <a href={googleReviewsUrl} target="_blank" rel="noopener noreferrer" className="flex shrink-0 items-center gap-1.5">
                 <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-[18px] w-auto object-contain" />
-                <span className="flex items-center gap-1 text-sm font-bold text-ink">
+                <span className="flex items-center gap-1 text-sm font-bold text-ink whitespace-nowrap">
                   <StarIcon size={14} />
                   {place.googleRating.toFixed(1)}
                 </span>
                 {place.googleRatingCount != null && (
-                  <span className="text-xs text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
+                  <span className="whitespace-nowrap text-xs text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
                 )}
               </a>
             </>
@@ -120,7 +127,7 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
           {place.priceLevel != null && (
             <>
               <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
-              <span className="text-sm font-bold text-ink" aria-label="טווח מחירים">
+              <span className="shrink-0 whitespace-nowrap text-sm font-bold text-ink" aria-label="טווח מחירים">
                 {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
               </span>
             </>

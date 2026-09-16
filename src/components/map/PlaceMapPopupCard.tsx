@@ -92,16 +92,20 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
   return (
     <div dir="rtl" className="relative mx-auto w-[64vw] max-w-[294px]">
       <div className="overflow-hidden rounded-card bg-white shadow-soft">
-        {/* דירוגים + סגירה. הלוגואים (triplace + Google) נשארים בגודל המקורי שלהם (h-5) בכוונה - לא
-            מוקטנים עם שאר החלונית. תוצאה ישירה של זה: ברוחב הקטן החדש שני הלוגואים ביחד כבר לא
-            נכנסים בשורה אחת - אז השורה עוברת ל-flex-wrap (שתי שורות) במקום להיחתך/לגלוש. כפתור
-            הסגירה מקובע מוחלט בפינה השמאלית-עליונה (position absolute) כדי שהוא לא "יקפוץ" לשורה
-            השנייה יחד עם שאר התוכן. */}
-        <div className="relative flex flex-wrap items-center gap-x-1.5 gap-y-1 py-2 pr-3 pl-6">
-          <div className="flex items-center gap-1">
-            <Image src="/images/triplace-logo-black.png" alt="TripLace" width={62} height={19} className="h-5 w-auto object-contain" />
+        {/* דירוגים + סגירה.
+            *** תיקון (בקשה מפורשת - מסמך העדכון, סעיף 9: "לעולם לא
+            לשבור TRIPLACE/Google לשתי שורות, גם לא במסכים קטנים"):
+            זו הייתה הפרה ממשית של הכלל - flex-wrap כאן היה מתוכנן
+            בכוונה לשבור לשתי שורות ברוחב הצר של החלונית. עכשיו:
+            הלוגואים קטנים במעט (h-4 במקום h-5) - "להקטין מעט טיפוגרפיה"
+            לפני "overflow מבוקר", בדיוק לפי סדר העדיפויות שבמסמך -
+            ו-flex-nowrap עם overflow-x-auto כרשת ביטחון נוספת, למקרה
+            שגם ברוחב המוקטן זה לא ייכנס במכשיר קיצוני. */}
+        <div className="relative flex flex-nowrap items-center gap-x-1.5 overflow-x-auto py-2 pr-3 pl-6" style={{ scrollbarWidth: "none" }}>
+          <div className="flex shrink-0 items-center gap-1">
+            <Image src="/images/triplace-logo-black.png" alt="TripLace" width={62} height={19} className="h-4 w-auto object-contain" />
             {place.triplaceRating != null && (
-              <span className="flex items-center gap-0.5 text-[9px] font-bold text-ink">
+              <span className="flex items-center gap-0.5 whitespace-nowrap text-[9px] font-bold text-ink">
                 <StarIcon size={9} />
                 {place.triplaceRating.toFixed(1)}
               </span>
@@ -115,10 +119,10 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
                 href={place.googleReviewsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[9px] font-semibold text-ink"
+                className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-semibold text-ink"
                 aria-label="דירוגי Google - פתיחת ביקורות"
               >
-                <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-5 w-auto object-contain" />
+                <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-4 w-auto object-contain" />
                 <StarIcon size={9} />
                 <span>{place.googleRating.toFixed(1)}</span>
                 {place.googleRatingCount != null && (
@@ -131,7 +135,7 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
           {place.priceLevel != null && (
             <>
               <span className="h-3 w-px shrink-0 bg-ink-secondary/20" />
-              <span className="text-[9px] font-semibold text-ink" aria-label="טווח מחירים">
+              <span className="shrink-0 whitespace-nowrap text-[9px] font-semibold text-ink" aria-label="טווח מחירים">
                 {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
               </span>
             </>

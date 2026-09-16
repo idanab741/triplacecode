@@ -119,7 +119,11 @@ export async function createTripAddSharePost(
   }
 
   return post.id as string;
-} - אם מקום עם
+}
+
+/**
+ * *** תוספת (בקשה מפורשת - "לבנות איחוד מקומות כפולים לפי
+ * google_place_id"): נבדק *לפני* יצירת submission חדש - אם מקום עם
  * אותו google_place_id כבר קיים במאגר, לא נוצר "מקום" שני (זו הייתה
  * הסיבה ל-"Jasmino מופיע פעמיים") - במקום זה נוסף/מתעדכן רק ביקורת
  * על המקום הקיים (ר' upsertTripAddReview). מקומות בלי google_place_id
