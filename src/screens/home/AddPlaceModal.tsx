@@ -7,6 +7,7 @@ import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
 import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import { TRIPADD_SUBCATEGORIES } from "@/constants/tripAddSubcategories";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 
 interface AddPlaceModalProps {
@@ -95,33 +96,25 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<GoogleDetails | null>(null);
+  const [manualEntry, setManualEntry] = useState(false);
   const [noResultsYet, setNoResultsYet] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
 
   const [category, setCategory] = useState<TripAddCategory | null>(null);
-  // *** תיקון (בקשה מפורשת - "ברגע שלוחצים קטגוריה - ה-AI אמור להשלים
-  // באופן אוטומטי גם את הקטגוריה משנה וגם את תת הקטגוריה"): subcategory
-  // כבר לא נבחר ידנית מצ'יפים - הוא מסווג אוטומטית ע"י AI מיד עם בחירת
-  // הקטגוריה, לפי שם/כתובת המקום שכבר נבחר מ-Google (ר' handleSelectCategory).
-  // subcategoryGroup הוא רק לתצוגה (הקבוצה מתוך tripAddSubcategories.ts) -
-  // לא נשמר בטופס, רק ה-tag הסופי נשמר בשדה subcategory הקיים.
   const [subcategory, setSubcategory] = useState<string | null>(null);
-  const [subcategoryGroup, setSubcategoryGroup] = useState<string | null>(null);
-  const [classifying, setClassifying] = useState(false);
-  const [classifyError, setClassifyError] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [description, setDescription] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  const [mergedIntoExisting, setMergedIntoExisting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleNameChange(value: string) {
     setNameQuery(value);
     setSelected(null);
+    setManualEntry(false);
     setNoResultsYet(false);
     setGoogleError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -132,11 +125,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        // *** תיקון רגרסיה: search-autocomplete הפך לחיפוש ב-TripAdd
-        // בלבד (מקומות שכבר קיימים אצלנו) - כאן, בטופס ההוספה, אנחנו
-        // דווקא מחפשים מקום *חדש* שעוד לא קיים, ולכן חייבים Google.
-        // ר' google-autocomplete/route.ts.
-        const res = await fetch(`/api/places/google-autocomplete?q=${encodeURIComponent(value.trim())}`);
+        const res = await fetch(`/api/places/search-autocomplete?q=${encodeURIComponent(value.trim())}`);
         const data = await res.json();
         if (data.error) {
           setGoogleError(`שגיאה בחיפוש ב-Google: ${data.error}`);
@@ -176,42 +165,16 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
     }
   }
 
-  /**
-   * *** בקשה מפורשת - "אם המשתמש לא בחר מקום מגוגל - אז אי אפשר יהיה
-   * לשמור את האטרקציה!": בניגוד לגרסה הקודמת, אין יותר אפשרות "המשך
-   * בהוספה ידנית" - חובה להתאים למקום אמיתי מ-Google (יש placeId),
-   * כי הסיווג האוטומטי של תת-הקטגוריה (AI) ושמירת המקום תלויים בזה.
-   *
-   * ברגע שנבחרה קטגוריה (אחרי שכבר יש selected.placeId), קוראים
-   * ל-AI שמסווג אוטומטית קבוצה+תגית מתוך הרשימה הסגורה של
-   * tripAddSubcategories.ts - בלי מעורבות ידנית של המשתמש.
-   */
-  async function handleSelectCategory(c: TripAddCategory) {
-    setCategory(c);
-    setSubcategory(null);
-    setSubcategoryGroup(null);
-    setClassifyError(null);
-    if (!selected?.placeId) return;
-
-    setClassifying(true);
-    try {
-      const res = await fetch("/api/tripadd/classify-subcategory", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: selected.name, address: selected.address, category: c }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.tag) {
-        setClassifyError(data.error || "לא הצלחנו לזהות תת-קטגוריה אוטומטית");
-        return;
-      }
-      setSubcategoryGroup(data.group ?? null);
-      setSubcategory(data.tag);
-    } catch {
-      setClassifyError("שגיאת רשת בזיהוי תת-הקטגוריה");
-    } finally {
-      setClassifying(false);
-    }
+  function continueManually() {
+    setManualEntry(true);
+    setSuggestions(null);
+    setSelected({
+      placeId: "",
+      name: nameQuery.trim(),
+      address: "",
+      latitude: NaN,
+      longitude: NaN,
+    });
   }
 
   async function handleFilesSelected(files: FileList | null) {
@@ -233,11 +196,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
 
   async function handleSubmit() {
     if (submitting) return;
-    if (!selected?.placeId) {
-      setError("יש לבחור מקום מתוך תוצאות החיפוש של Google");
-      return;
-    }
-    const finalName = selected.name.trim();
+    const finalName = selected?.name.trim() || nameQuery.trim();
     if (!finalName) {
       setError("הזן שם מקום, או בחר הצעה מהחיפוש");
       return;
@@ -249,6 +208,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
     setSubmitting(true);
     setError(null);
     try {
+      const isManual = !selected?.placeId;
       const res = await fetch("/api/tripadd/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -256,13 +216,13 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
           name: finalName,
           category,
           rating: rating > 0 ? rating : undefined,
-          address: selected.address,
-          latitude: Number.isNaN(selected.latitude) ? undefined : selected.latitude,
-          longitude: Number.isNaN(selected.longitude) ? undefined : selected.longitude,
+          address: isManual ? undefined : selected?.address,
+          latitude: isManual || Number.isNaN(selected?.latitude) ? undefined : selected?.latitude,
+          longitude: isManual || Number.isNaN(selected?.longitude) ? undefined : selected?.longitude,
           description: description.trim() || undefined,
           subcategory: subcategory ?? undefined,
-          googlePlaceId: selected.placeId,
-          googlePhotoUrl: selected.photoUrl ?? undefined,
+          googlePlaceId: isManual ? undefined : selected?.placeId,
+          googlePhotoUrl: selected?.photoUrl ?? undefined,
           mediaIds: media.map((m) => m.id),
         }),
       });
@@ -270,12 +230,6 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "שגיאה בשמירת המקום");
       }
-      // *** תוספת (בקשה מפורשת - "לאחד מקומות כפולים לפי google_place_id"):
-      // אם המקום כבר קיים אצלנו, השרת לא יצר "מקום" שני - הוא רק הוסיף/
-      // עדכן את הביקורת של המשתמש הזה על המקום הקיים. ההודעה כאן משקפת
-      // את זה, כדי שלא יראה כאילו "נוצר" מקום חדש בטעות.
-      const responseData = await res.json().catch(() => ({}));
-      setMergedIntoExisting(Boolean(responseData?.mergedIntoExisting));
       setDone(true);
       onSaved?.();
     } catch (err) {
@@ -287,7 +241,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
       style={{
         paddingTop: "max(env(safe-area-inset-top), 24px)",
         paddingBottom: "max(env(safe-area-inset-bottom), 24px)",
@@ -317,11 +271,9 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
         {done ? (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <span className="text-3xl">✅</span>
-            <h3 className="text-[15px] font-bold text-ink">{mergedIntoExisting ? "הביקורת שלך נשמרה!" : "המקום נשמר!"}</h3>
+            <h3 className="text-[15px] font-bold text-ink">המקום נשמר!</h3>
             <p className="max-w-xs text-[13px] text-ink-secondary">
-              {mergedIntoExisting
-                ? "המקום הזה כבר קיים אצלנו - הדירוג והתיאור שלך נוספו לביקורות שלו."
-                : "הפרטים שלך נשמרו וממתינים לבדיקת המערכת. ברגע שהמקום יאושר, הוא ייכנס למאגר ויופיע במפה ובעמוד שלו."}
+              הפרטים שלך נשמרו וממתינים לבדיקת המערכת. ברגע שהמקום יאושר, הוא ייכנס למאגר ויופיע במפה ובעמוד שלו.
             </p>
             <button
               type="button"
@@ -409,9 +361,13 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
               {googleError && <p className="mt-2 text-[12px] text-red-500">{googleError}</p>}
 
               {!selected && !googleError && noResultsYet && nameQuery.trim().length >= 3 && (
-                <p className="mt-2 text-[12.5px] text-ink-secondary">
-                  לא מצאנו את המקום הזה ב-Google - נסה/י לחפש בשם מעט שונה (לדוגמה בלי ניקוד, או עם שם העיר).
-                </p>
+                <button
+                  type="button"
+                  onClick={continueManually}
+                  className="mt-2 w-full rounded-card border border-dashed border-ink-secondary/30 py-2.5 text-[12.5px] font-semibold text-ink-secondary"
+                >
+                  לא מצאנו את המקום ב-Google - המשך בהוספה ידנית
+                </button>
               )}
 
               {selected && selected.name && (
@@ -420,21 +376,22 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-ink">{selected.name}</span>
                     {selected.address && <span className="block truncate text-[11.5px] text-ink-secondary">{selected.address}</span>}
+                    {manualEntry && <span className="block text-[11px] text-ink-secondary">הוספה ידנית - ידרוש אישור מערכת</span>}
                   </span>
                 </div>
               )}
 
-              {/* 3. סוג - אותן 6 קטגוריות בדיוק כמו שורת "סוגי הטיול" בבית.
-                  *** בקשה מפורשת - "אם המשתמש לא בחר מקום מגוגל - אז אי
-                  אפשר יהיה לשמור את האטרקציה" - הבחירה נעולה עד שיש
-                  התאמת Google אמיתית (selected.placeId). */}
+              {/* 3. סוג - אותן 6 קטגוריות בדיוק כמו שורת "סוגי הטיול" בבית */}
               <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-secondary">סוג</label>
-              <div className={`flex flex-wrap gap-2 ${!selected?.placeId ? "pointer-events-none opacity-40" : ""}`}>
+              <div className="flex flex-wrap gap-2">
                 {HOME_QUICK_CATEGORIES.map((c) => (
                   <ImageOptionRow
                     key={c.id}
                     selected={category === c.id}
-                    onClick={() => handleSelectCategory(c.id)}
+                    onClick={() => {
+                      setCategory(c.id);
+                      setSubcategory(null);
+                    }}
                     label={HOME_QUICK_CATEGORY_LABELS[c.id]}
                     imageSrc={c.imageSrc}
                     textSize={12.5}
@@ -442,28 +399,33 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                 ))}
               </div>
 
-              {/* *** תיקון (בקשה מפורשת - "ברגע שלוחצים קטגוריה - ה-AI
-                  אמור להשלים באופן אוטומטי גם את הקטגוריה משנה וגם
-                  את תת הקטגוריה"): אין יותר צ'יפים לבחירה ידנית - ה-AI
-                  מסווג אוטומטית מתוך הרשימה הסגורה (tripAddSubcategories.ts)
-                  מיד עם בחירת הקטגוריה, ומוצג כאן כתוצאה בלבד. */}
+              {/* *** תיקון (בקשה מפורשת - "הוא לא מציע שום תת-קטגוריה!
+                  בוא נגדיר את כל תתי הקטגוריה שיש לכל סוג"): רשימה
+                  קבועה וסגורה (לא AI חי שיכול להיכשל בשקט) - מוצגת
+                  ברגע שנבחרה קטגוריה, המשתמש בוחר אחת (אופציונלי). */}
               {category && (
-                <div className="mt-3">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-secondary">תת-קטגוריה</label>
-                  {classifying && <p className="text-[12.5px] text-ink-secondary">מזהה תת-קטגוריה אוטומטית...</p>}
-                  {!classifying && subcategory && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
-                      {subcategoryGroup && <span className="text-ink-secondary">{subcategoryGroup} ·</span>}
-                      <span
-                        className="rounded-pill px-3 py-1.5 font-semibold text-white"
-                        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                <>
+                  <label className="mb-1.5 mt-3 block text-[12.5px] font-semibold text-ink-secondary">תת-קטגוריה (אופציונלי)</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRIPADD_SUBCATEGORIES[category].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSubcategory((prev) => (prev === s ? null : s))}
+                        className={`rounded-pill px-3 py-1.5 text-[12px] font-medium transition ${
+                          subcategory === s ? "text-white" : "bg-bg-secondary text-ink-secondary"
+                        }`}
+                        style={
+                          subcategory === s
+                            ? { background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }
+                            : undefined
+                        }
                       >
-                        {subcategory}
-                      </span>
-                    </div>
-                  )}
-                  {!classifying && classifyError && <p className="text-[12px] text-red-500">{classifyError}</p>}
-                </div>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
 
               {/* 4. דירוג */}

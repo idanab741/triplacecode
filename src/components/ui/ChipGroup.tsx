@@ -17,12 +17,10 @@ interface ChipGroupProps {
   options: ChipOption[];
   selected: string[];
   onChange: (values: string[]) => void;
-  /** מועבר הלאה ל-Chip - ר' הערה שם. ברירת מחדל "md". */
-  size?: "md" | "sm";
 }
 
 /** קבוצת צ'יפים לבחירה מרובה, עוטפת את Chip ומנהלת את מערך הבחירות. */
-export function ChipGroup({ options, selected, onChange, size = "md" }: ChipGroupProps) {
+export function ChipGroup({ options, selected, onChange }: ChipGroupProps) {
   function toggle(value: string) {
     if (selected.includes(value)) {
       onChange(selected.filter((v) => v !== value));
@@ -34,7 +32,7 @@ export function ChipGroup({ options, selected, onChange, size = "md" }: ChipGrou
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((option) => (
-        <Chip key={option.value} selected={selected.includes(option.value)} onClick={() => toggle(option.value)} size={size}>
+        <Chip key={option.value} selected={selected.includes(option.value)} onClick={() => toggle(option.value)}>
           <ChipIcon option={option} />
           {option.label}
         </Chip>

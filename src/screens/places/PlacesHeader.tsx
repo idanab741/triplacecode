@@ -28,13 +28,8 @@ export function PlacesHeader({ onBack }: PlacesHeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full bg-white">
       <div className="relative h-16 px-5">
-        {/* *** תיקון (בקשה מפורשת - "תוריד מעט את הלוגו למטה ותקטין
-            אותו ב-10%"): 130x42 -> 117x38 (מוכפל ב-0.9, מעוגל).
-            top-1/2 היה ממורכז מדויק - top-[57%] מזיז אותו מעט מטה
-            בתוך ה-header (h-16=64px), במקום להזיז את כל שאר הפריטים
-            בשורה גם כן. */}
-        <span className="absolute left-1/2 top-[57%] -translate-x-1/2 -translate-y-1/2 select-none">
-          <Image src="/images/places-logo.png" alt="place's" width={117} height={38} className="object-contain" priority />
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none">
+          <Image src="/images/places-logo.png" alt="place's" width={130} height={42} className="object-contain" priority />
         </span>
 
         {onBack ? (

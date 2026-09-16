@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Icon } from "@/components/ui/Icon";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -68,14 +67,6 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`, "_blank");
   }
 
-  // *** תוספת (בקשה מפורשת - "אפשר לעשות ניווט ב-Waze, יש לנו את
-  // האייקון מאפס"): אותה נוסחת קישור בדיוק כמו ב-HomeMapPlacePopupContent.tsx/
-  // PlaceMapPopupCard.tsx - לא ממציאים פורמט חדש. משותף (לא רק ל-
-  // TripAdd) כי כל מקום עם lat/lng נהנה מזה באותה מידה.
-  function handleStartWaze() {
-    window.open(`https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`, "_blank");
-  }
-
   return (
     <div className="flex flex-col gap-3">
       {!locationDenied && (
@@ -107,33 +98,14 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
           ל-Google בכלל. */}
       <ResultMap stops={[{ stopId: placeId, name: "", latitude, longitude }]} />
 
-      {/* *** תיקון (בקשה מפורשת - "אייקונים של וויז וגוגל מאפס"): שני
-          כפתורי ניווט זה לצד זה במקום כפתור גנרי בודד - בדיוק אותם
-          שני האייקונים הקיימים כבר בחלונית המפה (PlaceMapPopupCard). */}
-      {/* *** תיקון (בקשה מפורשת - "שני הכפתורים אותו צבע, עדיף לא
-          כחול"): קודם Google Maps היה גרדיאנט כחול ו-Waze לבן - שני
-          סגנונות שונים גרמו לזה להיראות כאילו אחד "עיקרי" והשני
-          "משני", בלי שהייתה כוונה כזו. עכשיו שניהם באותו סגנון ניטרלי
-          בדיוק (רקע אפור בהיר, טקסט כהה) - ההבחנה היחידה בין השתיים
-          היא האייקון הצבעוני של כל שירות, לא צבע הרקע של הכפתור. */}
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleStartNavigation}
-          className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-4 text-base font-bold text-ink"
-        >
-          <Icon name="google-maps" size={22} />
-          Google Maps
-        </button>
-        <button
-          type="button"
-          onClick={handleStartWaze}
-          className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-4 text-base font-bold text-ink"
-        >
-          <Icon name="waze" size={26} />
-          Waze
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={handleStartNavigation}
+        className="w-full rounded-pill py-4 text-base font-bold text-white shadow-soft"
+        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+      >
+        התחל ניווט
+      </button>
     </div>
   );
 }

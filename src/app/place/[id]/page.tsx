@@ -6,10 +6,8 @@ import { PlaceHeroActions } from "@/screens/place/PlaceHeroActions";
 import { PlaceNavigationCard } from "@/screens/place/PlaceNavigationCard";
 import { PlaceCommunityStatsSection } from "@/screens/place/PlaceCommunityStatsSection";
 import { TripLaceRatingSection } from "@/screens/place/TripLaceRatingSection";
-import { TripAddPlaceView } from "@/screens/place/TripAddPlaceView";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { getPlaceCommunityStats } from "@/services/places/placeCommunityStatsService";
-import { getTripAddPlaceById, getTripAddSavedCount } from "@/services/tripadd/tripAddPlaceService";
 
 interface PlacePageProps {
   params: Promise<{ id: string }>;
@@ -27,26 +25,11 @@ interface PlacePageProps {
  * שיתוף+שמירה, תמונת HERO בגודל קבוע, דירוג, שם+תיאור+מיקום, קטגוריות,
  * מפה, וכפתורי דירוג (Google - קישור בלבד, לא קריאת API; TripLace -
  * דירוג פנימי אמיתי עם אפשרות למשתמשים לדרג).
- *
- * *** תוספת (בקשה מפורשת - "אמורים לעשות עמוד לכל אטרקציה שקיימת
- * במאגר [TripAdd]"): tripadd_submissions נבדק **ראשון** - זה מקור
- * הדאטה החי מעכשיו (ר' HomeMap.tsx/pins route). אם המקום נמצא שם,
- * מוצג ב-TripAddPlaceView (עיצוב מקביל, לא תלוי ב-TripMatch/במבנה
- * הישן) - בלי בכלל לגעת ב-getPlaceById. הנפילה-חזרה לטבלת places
- * הישנה (הקוד שממשיך למטה) נשארת בשביל קישורים ישנים שכבר קיימים,
- * לא מוסרת.
  */
 export default async function PlacePage({ params, searchParams }: PlacePageProps) {
   const { id } = await params;
   const { from } = await searchParams;
   const activeNavTab = from === "ai" ? "ai" : "favorites";
-
-  const tripAddPlace = await getTripAddPlaceById(id);
-  if (tripAddPlace) {
-    const savedCount = await getTripAddSavedCount(tripAddPlace.id);
-    return <TripAddPlaceView place={tripAddPlace} savedCount={savedCount} />;
-  }
-
   const place = await getPlaceById(id);
 
   if (!place) {

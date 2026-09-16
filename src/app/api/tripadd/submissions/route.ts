@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
-import {
-  createTripAddSubmission,
-  findTripAddSubmissionByGooglePlaceId,
-  getMyTripAddSubmissions,
-  upsertTripAddReview,
-  type TripAddCategory,
-} from "@/services/tripadd/tripAddService";
+import { createTripAddSubmission, getMyTripAddSubmissions, type TripAddCategory } from "@/services/tripadd/tripAddService";
 import { enrichTripAddSubmission } from "@/services/tripadd/tripAddEnrichmentService";
 
 const VALID_CATEGORIES: TripAddCategory[] = ["attraction", "food", "shopping", "nature", "nightlife", "sleep"];
@@ -23,19 +17,10 @@ export async function GET() {
 }
 
 /**
- * *** מאגר עצמאי (TripAdd) - בכוונה **אין** כאן בדיקת כפילות מול
- * places/destinations/place_submissions הישנים (בקשה מפורשת - "המאגר
- * הזה מנותק מהמאגר שהיה"). כל שמירה נכנסת כ-pending בטבלה העצמאית
+ * *** מאגר עצמאי (TripAdd) - בכוונה **אין כאן שום בדיקת כפילות** מול
+ * places/destinations/place_submissions (בקשה מפורשת - "המאגר הזה
+ * מנותק מהמאגר שהיה"). כל שמירה נכנסת כ-pending בטבלה העצמאית
  * tripadd_submissions.
- *
- * *** תיקון (בקשה מפורשת - "Jasmino מופיע פעמיים... לאחד לפי
- * google_place_id"): זה כן נבדק בתוך המאגר העצמאי עצמו - אם יש כבר
- * submission עם אותו google_place_id, לא נוצר "מקום" שני; במקום זה
- * המשתמש מקבל/מעדכן ביקורת על המקום הקיים (ר' upsertTripAddReview).
- * הבחנה חשובה: זה שונה לגמרי מהבדיקה שהוסרה במפורש מול המאגר הישן -
- * שם המשתמש רצה בכוונה למנוע חסימה על "כבר קיים אצלנו" (טבלה אחרת,
- * דאטה ישן); כאן מדובר באותה טבלה בדיוק, אותו מקור אמת, ומטרת הבדיקה
- * הפוכה - לרכז ביקורות על אותו מקום קיים, לא לחסום הוספה.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -55,24 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "דירוג חייב להיות בין 1 ל-5" }, { status: 422 });
   }
 
-  const googlePlaceId = body?.googlePlaceId as string | undefined;
-
   try {
-    if (googlePlaceId) {
-      const existing = await findTripAddSubmissionByGooglePlaceId(supabase, googlePlaceId);
-      if (existing) {
-        await upsertTripAddReview(supabase, {
-          submissionId: existing.id,
-          userId: user.id,
-          rating,
-          description: body?.description,
-          mediaIds: body?.mediaIds,
-        });
-        // המקום כבר קיים ומועשר - אין צורך להריץ enrichment שוב.
-        return NextResponse.json({ id: existing.id, mergedIntoExisting: true }, { status: 200 });
-      }
-    }
-
     const id = await createTripAddSubmission(supabase, {
       submittedBy: user.id,
       name: name.trim(),
@@ -93,7 +61,7 @@ export async function POST(request: Request) {
     // fire-and-forget - לא מעכב את התשובה למשתמש, כשלון לא מכשיל את השמירה.
     enrichTripAddSubmission(id).catch(() => {});
 
-    return NextResponse.json({ id, mergedIntoExisting: false }, { status: 201 });
+    return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה" }, { status: 400 });
   }

@@ -102,15 +102,16 @@ body {
   font-family: var(--font-sans);
 }
 .tripadd-popup .leaflet-popup-content {
-  width: 100% !important;
   margin: 12px 14px;
-  /* *** תיקון (בקשה מפורשת - "הטקסט בורח מהחלונית"): Leaflet מודד
-     את רוחב התוכן לפי טקסט *לא-עטוף* לפני שהוא מיישם את מגבלת
-     maxWidth שהוגדרה ב-Popup - בלי word-wrap מפורש, שורה ארוכה (כמו
-     כתובת) יכולה לדחוף את כל התיבה לרוחב גדול יותר ולגלוש מעבר לקצה. */
+  /* *** תיקון (בקשה מפורשת - "הטקסט בורח מהחלונית") - גרסה מתוקנת:
+     ה-word-break/overflow-wrap שהיו כאן קודם היו הטעות עצמה, לא
+     הפתרון - הן גרמו ל-Leaflet למדוד את התוכן כשכל מילה כבר "שבירה",
+     ולכן הוא חישב רוחב צר מדי ושבר מילים כמו "Jasmino" באמצען.
+     white-space:normal בלבד (ירידת שורה רגילה בין מילים, לא בתוכן)
+     זה כל מה שבאמת היה צריך. גם הוסר width:100% - משאירים את הרוחב
+     להיקבע רק לפי minWidth/maxWidth שכבר מוגדרים על <Popup> עצמו,
+     לא דורסים אותו מבחוץ. */
   white-space: normal !important;
-  overflow-wrap: break-word;
-  word-break: break-word;
 }
 
 /* *** תיקון (Bug - עיגול "N"/מצפן ובקרת זום כפולה): ה-canvas שה-SDK
@@ -148,19 +149,3 @@ body {
    כבר בכחול המותג). התאמת צבע מדויקת לבסיס המפה עצמו דורשת את כלי
    ה-Customize של MapTiler (עיצוב סגנון מותאם אישית עם משוב חזותי
    בזמן אמת) - לא CSS filter עיוור. */
-
-.place-map-popup .leaflet-popup-content-wrapper {
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
-  box-shadow: none;
-}
-.place-map-popup .leaflet-popup-content {
-  margin: 0;
-  width: auto !important;
-  direction: rtl;
-  font-family: var(--font-sans);
-}
-.place-map-popup .leaflet-popup-tip-container {
-  display: none;
-}

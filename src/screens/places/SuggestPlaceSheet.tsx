@@ -86,10 +86,7 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        // *** תיקון רגרסיה: search-autocomplete הפך לחיפוש ב-TripAdd
-        // בלבד - כאן (הצעת מקום חדש למאגר הישן) עדיין צריך Google
-        // כדי לאתר מקום שעוד לא קיים בשום מאגר. ר' google-autocomplete/route.ts.
-        const res = await fetch(`/api/places/google-autocomplete?q=${encodeURIComponent(value.trim())}`);
+        const res = await fetch(`/api/places/search-autocomplete?q=${encodeURIComponent(value.trim())}`);
         const data = await res.json();
         setSuggestions(data.suggestions ?? []);
       } finally {

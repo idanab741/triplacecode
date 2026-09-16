@@ -62,12 +62,8 @@ export function LocateMeFab({ onClick, pushedUp }: LocateMeFabProps) {
         }}
       />
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {/* *** תיקון (בקשה מפורשת - "אני רוצה את המצפן במקום האייקון
-            הזה"): מחליף את אייקון ה-crosshair (עיגול+4 קווים) באייקון
-            מצפן אמיתי - עיגול עם מחט/יהלום מסתובב, אותו path הסטנדרטי
-            של אייקון "compass" (Feather Icons). */}
-        <circle cx="12" cy="12" r="10" />
-        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
       </svg>
     </button>
   );

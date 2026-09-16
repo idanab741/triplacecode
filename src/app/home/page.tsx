@@ -18,7 +18,6 @@ import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { FilterModal } from "@/screens/home/FilterModal";
 import { LocateMeFab } from "@/screens/home/LocateMeFab";
 import type { HomeMapHandle, HomeMapPlace } from "@/screens/home/HomeMap";
-import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 // אותו דפוס דינמי-import בדיוק כמו NearbySection.tsx/DiscoveryPlacesMap -
 // Leaflet משתמש ב-window/DOM, לא ניתן לרנדר ב-SSR.
@@ -39,15 +38,8 @@ export default function HomePage() {
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState<HomeQuickCategoryId[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
-
-  // *** בקשה מפורשת - "כפתורי סוגי הטיול הופכים לכפתורי סינון": בחירה
-  // מרובה (אפשר כמה קטגוריות ביחד), וקליק חוזר על אותה קטגוריה מבטל
-  // אותה (טוגל) - בדיוק כמו ChipGroup.toggle הקיים, רק על המערך הזה.
-  function toggleCategory(id: HomeQuickCategoryId) {
-    setSelectedCategories((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
-  }
   const [minRating, setMinRating] = useState(0);
   const [allPins, setAllPins] = useState<HomeMapPlace[]>([]);
   // *** תיקון (Bug - "כפתור המצפן לא עובד"): callback prop (onReady)
@@ -341,7 +333,7 @@ export default function HomePage() {
 
             {/* קטגוריות/סוגי הטיול - נשארות קבועות, לא חלק מהקיפול. */}
             <div className={collapsed ? "pb-6 pt-4" : "pb-6 pt-7"}>
-              <HomeQuickCategories selected={selectedCategories} onToggle={toggleCategory} />
+              <HomeQuickCategories />
             </div>
           </div>
         </div>
@@ -364,6 +356,7 @@ export default function HomePage() {
       {filterOpen && (
         <FilterModal
           onClose={() => setFilterOpen(false)}
+          allPins={allPins}
           selectedCategories={selectedCategories}
           selectedSubcategories={selectedSubcategories}
           minRating={minRating}

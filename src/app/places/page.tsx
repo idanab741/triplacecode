@@ -128,10 +128,9 @@ export default function PlacesHomePage() {
     return saved;
   }
 
-  // *** תיקון (בקשה מפורשת - "התגובות לא ייפתחו בעמוד נפרד"):
-  // handleOpenComments (שניווט ל-/places/post/[id]) הוסר - PostCard
-  // פותח עכשיו מודל מסך-מלא פנימי בעצמו (PostMediaViewerModal), בלי
-  // מעורבות של העמוד הזה בכלל.
+  function handleOpenComments(postId: string) {
+    router.push(`/places/post/${postId}`);
+  }
 
   async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[]) {
     await fetchJson("/api/social/posts", {
@@ -191,9 +190,8 @@ export default function PlacesHomePage() {
     <div className="min-h-screen bg-places-bg pb-24">
       <PlacesHeader />
 
-      {/* *** תיקון (בקשה מפורשת - "השורה של 'כתבו את הטיול שלכם' צריכה
-          לרדת מתחת לסטוריז"): הוזזה לגמרי - שורת הסטוריז עכשיו ראשונה,
-          מיד אחרי ה-header, ושורת הכתיבה באה אחריה. */}
+      <CreatePostBar avatarUrl={profile?.avatar_url} onClick={() => setCreateMenuOpen(true)} />
+
       <div className="bg-white">
         {storyRail === null ? (
           <div className="flex gap-4 px-4 py-3">
@@ -206,14 +204,11 @@ export default function PlacesHomePage() {
             rail={storyRail}
             viewerId={user.id}
             viewerAvatarUrl={profile?.avatar_url}
-            viewerName={profile?.full_name}
             onOpenStory={handleOpenStory}
             onCreateStory={() => router.push("/places/story/create")}
           />
         )}
       </div>
-
-      <CreatePostBar avatarUrl={profile?.avatar_url} onClick={() => setCreateMenuOpen(true)} />
 
       {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}
 
@@ -278,6 +273,7 @@ export default function PlacesHomePage() {
                 item={item}
                 onLikeToggle={handleLikeToggle}
                 onSaveToggle={handleSaveToggle}
+                onOpenComments={handleOpenComments}
                 onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
                 onEditPost={handleEditPost}
                 onDeletePost={handleDeletePost}

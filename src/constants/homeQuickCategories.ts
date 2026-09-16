@@ -28,10 +28,7 @@ export interface HomeQuickCategoryDefinition {
 export const HOME_QUICK_CATEGORIES: HomeQuickCategoryDefinition[] = [
   {
     id: "attraction",
-    // *** תיקון (בקשה מפורשת - "הצבעים לא נכונים! אטרקציות - סגול
-    // כמו בתמונה"): זה הצבע שבאמת מופיע ברקע cat-attraction.png -
-    // primary-start (כחול) לא תאם בפועל לתמונה.
-    colorVar: "--color-category-purple",
+    colorVar: "--color-primary-start",
     imageSrc: "/images/categories/cat-attraction.png",
   },
   {
@@ -56,9 +53,7 @@ export const HOME_QUICK_CATEGORIES: HomeQuickCategoryDefinition[] = [
   },
   {
     id: "sleep",
-    // *** תיקון (בקשה מפורשת - "לינה - צהוב"): קודם הצביעה בטעות על
-    // color-category-purple, שבפועל שייך ל"אטרקציות" (ר' למעלה).
-    colorVar: "--color-category-yellow",
+    colorVar: "--color-category-purple",
     imageSrc: "/images/categories/cat-sleep.png",
   },
 ];

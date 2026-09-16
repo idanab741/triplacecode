@@ -4,7 +4,7 @@ import { getUnifiedPlace, type UnifiedPlace } from "@/services/places/unifiedPla
 import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
 
 export type FavoriteStatus = "liked" | "saved" | "skipped";
-export type PlaceType = "place" | "destination" | "tripadd";
+export type PlaceType = "place" | "destination";
 /** מקור הפעולה - איזה פיצ'ר יצר את הלייק/שמירה הזו. אותה טבלת favorites
  *  משותפת לכל האפליקציה (TripMatch, בניית מסלולים וכו') - המקור מאפשר
  *  למסכים ספציפיים (כמו "לייקים" בעמוד "כל הטיולים") להציג רק מה שנוצר
