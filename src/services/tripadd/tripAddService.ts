@@ -194,9 +194,6 @@ export async function upsertTripAddReview(
 export interface TripAddEnrichmentPatch {
   /** תת-קטגוריה - AI, לא גוגל. */
   subcategory?: string | null;
-  /** מכאן ולמטה: אך ורק השדות שמותר לשלוף ולשמור מגוגל (בקשה
-   *  מפורשת - מינימלי). לא טלפון, לא תיאור, לא שעות פתיחה, לא תמונות -
-   *  המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה. */
   accessible?: boolean | null;
   /** *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל", migration
    *  0085): שלוש עוד עובדות נגישות שגוגל מספק, מעבר לכניסה נגישה
@@ -209,6 +206,14 @@ export interface TripAddEnrichmentPatch {
    *  עצמו נתן בטופס, "דירוג TRIPLACE"). מוצג בנפרד בכרטיסייה. */
   googleRating?: number | null;
   googleRatingCount?: number | null;
+  /** *** תיקון (בקשה מפורשת - "למה זה לא נשמר אוטומטית עם שעות
+   *  פעילות?? רק האטרקציות החדשות"): זה בעצם היה כבר מגיע מגוגל
+   *  בקריאה הקיימת (FIELD_MASK כבר כלל את זה) - פשוט אף אחד לא קרא
+   *  את השדה ולא שמר אותו. לא עלות Google נוספת בכלל, אותה קריאה
+   *  בדיוק. weekdayDescriptions בעברית (googlePlacesService מבקש
+   *  languageCode:"he") - בדיוק הפורמט ש-isPlaceOpenNow (utils/
+   *  openingHours.ts) כבר יודע לפרש, לא בונים parser חדש. */
+  openingHours?: string[] | null;
 }
 
 /** מיושם רק אחרי השמירה, ע"י tripAddEnrichmentService.ts בלבד - לא
@@ -227,6 +232,7 @@ export async function applyTripAddEnrichment(
   if (patch.accessibleRestroom !== undefined) update.accessible_restroom = patch.accessibleRestroom;
   if (patch.accessibleSeating !== undefined) update.accessible_seating = patch.accessibleSeating;
   if (patch.priceLevel !== undefined) update.price_level = patch.priceLevel;
+  if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
   if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
   if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;
 

@@ -136,7 +136,11 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
 
         <div className="flex flex-col gap-2">
           {/* *** תוספת (מסמך העדכון, סעיף 5 - "נקודת התאמה ירוקה") */}
-          <h1 className="flex items-center gap-1.5 text-2xl font-extrabold text-ink">
+          {/* *** תיקון (בקשה מפורשת - "השם של המקום מיושר משמאל לימין,
+              אני רוצה מימין לשמאל"): הוספתי text-right ו-justify-end
+              במפורש - לא מסתמכים על הירושה של dir="rtl" הגלובלי
+              בלבד, כדי שלא יהיה שום ספק. */}
+          <h1 className="flex items-center justify-end gap-1.5 text-right text-2xl font-extrabold text-ink">
             {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
@@ -144,14 +148,14 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
                 title="התאמה מאומתת ל-Google"
               />
             )}
-            {place.name}
+            <span dir="rtl">{place.name}</span>
           </h1>
           {/* תיאור כללי (short_description, ממולא ע"י AI) - הטקסט האישי
               של כל מגיש/ה עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
           {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}
 
           {/* *** כתובת + פתוח/סגור על אותה שורה, בדיוק כמו PlaceMapPopupCard.tsx. */}
-          <div className="flex flex-wrap items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-right text-sm">
             {isOpen != null && (
               <span className="flex shrink-0 items-center gap-1.5">
                 {hoursLabel && <span className="text-ink-secondary">{hoursLabel}</span>}

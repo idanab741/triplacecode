@@ -111,15 +111,15 @@ function getPlaceIcon(category?: string | null, photoUrl?: string | null): L.Div
 
   const html = safePhotoUrl
     ? `<div style="
-        width: 36px; height: 36px; border-radius: 50% 50% 50% 0;
+        width: 38px; height: 38px; border-radius: 50% 50% 50% 0;
         background: var(${colorVar}, #4F7DF3);
-        border: 2px solid white; box-shadow: 0 2px 6px rgba(16,24,40,0.35);
+        border: 2px solid white; box-shadow: 0 2px 8px rgba(16,24,40,0.4);
         transform: rotate(-45deg);
         display: flex; align-items: center; justify-content: center;
       "><div style="
-        width: 26px; height: 26px; border-radius: 50%;
+        width: 32px; height: 32px; border-radius: 50%;
         background-image: url('${safePhotoUrl}'); background-size: cover; background-position: center;
-        border: 2px solid white; transform: rotate(45deg);
+        transform: rotate(45deg);
       "></div></div>`
     : `<div style="
         width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
@@ -131,8 +131,8 @@ function getPlaceIcon(category?: string | null, photoUrl?: string | null): L.Div
   const icon = L.divIcon({
     className: "",
     html,
-    iconSize: safePhotoUrl ? [36, 36] : [28, 28],
-    iconAnchor: safePhotoUrl ? [18, 36] : [14, 28],
+    iconSize: safePhotoUrl ? [38, 38] : [28, 28],
+    iconAnchor: safePhotoUrl ? [19, 38] : [14, 28],
   });
   placeIconCache.set(cacheKey, icon);
   return icon;

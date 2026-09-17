@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { Icon } from "@/components/ui/Icon";
@@ -169,7 +169,7 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
             <button
               type="button"
               onClick={onNameClick}
-              className="flex w-full items-center justify-end gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink hover:underline"
+              className="flex w-full items-center justify-start gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink hover:underline"
             >
               {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
                 <span
@@ -178,10 +178,21 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
                   title="התאמה מאומתת ל-Google"
                 />
               )}
-              <span className="truncate">{place.name}</span>
+              {/* *** תיקון-שורש (בקשה מפורשת - "מיושר משמאל לימין, לא
+                  ימין-לשמאל"): text-right ו-justify-end כבר היו כאן -
+                  זה לא היה מספיק כי שם המקום יכול להיות מחרוזת
+                  מעורבת (למשל "Malka by Eyal Shani - מלכה") - כשטקסט
+                  מתחיל באותיות לועזיות, אלגוריתם ה-bidi של הדפדפן
+                  יכול "לעגן" את כל השורה משמאל, גם כשה-CSS אומר
+                  text-align:right. dir="rtl" **כתכונת HTML מפורשת על
+                  האלמנט הזה עצמו** (לא רק ירושה) הוא הפתרון האמיתי -
+                  זה כופה את פתרון הפסקה של הדפדפן, לא רק את היישור. */}
+              <span dir="rtl" className="truncate">
+                {place.name}
+              </span>
             </button>
           ) : (
-            <h3 className="flex w-full items-center justify-end gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink">
+            <h3 className="flex w-full items-center justify-start gap-1 truncate text-right text-[11px] font-extrabold leading-tight text-ink">
               {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
                 <span
                   className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -189,7 +200,9 @@ export function PlaceMapPopupCard({ place, onClose, onToggleSave, onShare, onNam
                   title="התאמה מאומתת ל-Google"
                 />
               )}
-              <span className="truncate">{place.name}</span>
+              <span dir="rtl" className="truncate">
+                {place.name}
+              </span>
             </h3>
           )}
 

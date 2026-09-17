@@ -1,5 +1,5 @@
-import { createAdminClient } from "@/services/supabase/admin";
-import { searchCityPlace } from "@/services/places/googlePlacesService";
+﻿import { createAdminClient } from "@/services/supabase/admin";
+import { searchCityPlace, matchGooglePlaceByLocation } from "@/services/places/googlePlacesService";
 import { callClaude } from "@/services/ai/claudeService";
 import { applyTripAddEnrichment } from "@/services/tripadd/tripAddService";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
@@ -29,7 +29,7 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
   try {
     const { data: submission, error } = await supabase
       .from("tripadd_submissions")
-      .select("id, name, category, city, address, google_place_id, subcategory")
+      .select("id, name, category, city, address, google_place_id, subcategory, latitude, longitude")
       .eq("id", submissionId)
       .maybeSingle();
 
@@ -50,6 +50,7 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       priceLevel?: number | null;
       googleRating?: number | null;
       googleRatingCount?: number | null;
+      openingHours?: string[] | null;
     } = {};
 
     // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות"): אם המשתמש כבר
@@ -71,10 +72,14 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
     }
 
     try {
-      const query = submission.google_place_id
-        ? submission.name
-        : `${submission.name} ${submission.city ?? submission.address ?? ""}`.trim();
-      const googlePlace = query ? await searchCityPlace(query) : null;
+      const googlePlace =
+        submission.latitude != null && submission.longitude != null
+          ? await matchGooglePlaceByLocation({
+              name: submission.name,
+              latitude: submission.latitude,
+              longitude: submission.longitude,
+            })
+          : await searchCityPlace(`${submission.name} ${submission.city ?? submission.address ?? ""}`.trim());
 
       if (googlePlace) {
         // *** תוספת (בקשה מפורשת - "נגישות = מה שיש בגוגל", migration
@@ -98,6 +103,13 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
         }
         if (typeof googlePlace.userRatingCount === "number") {
           patch.googleRatingCount = googlePlace.userRatingCount;
+        }
+        // *** תיקון (בקשה מפורשת - "למה זה לא נשמר אוטומטית עם שעות
+        // פעילות"): אותה קריאה בדיוק, שדה שכבר חוזר מגוגל ופשוט לא
+        // נקרא עד עכשיו. weekdayDescriptions בעברית - הפורמט ש-
+        // isPlaceOpenNow (utils/openingHours.ts) כבר יודע לפרש.
+        if (googlePlace.regularOpeningHours?.weekdayDescriptions) {
+          patch.openingHours = googlePlace.regularOpeningHours.weekdayDescriptions;
         }
       }
     } catch {

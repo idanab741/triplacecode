@@ -10,6 +10,23 @@ import { createAdminClient } from "@/services/supabase/admin";
  * תוכן אדמין מאושר שמיועד להצגה ציבורית על המפה (כמו tripadd pins),
  * לא מוגבל ל-RLS של המשתמש הצופה.
  */
+/**
+ * *** תיקון (בקשה מפורשת - "למה זה לא לפי הסוגים החדשים?! זה אמור
+ * להיות מסונכרן"): places.category הישן (5 ערכים: restaurants,
+ * nightlife, attractions, nature, hotels - ר' constants/placeCategories.ts)
+ * הוא מערכת שונה לגמרי מ-HomeQuickCategoryId החדש (attraction, food,
+ * shopping, nature, nightlife, sleep) - הצבעים בפין היו נופלים
+ * ל-ברירת-מחדל כי המחרוזות פשוט לא תאמו. מיפוי מפורש, לא ניחוש.
+ * "shopping" בכוונה בלי ערך מקביל - אין קטגוריית קניות במערכת הישנה.
+ */
+const OLD_CATEGORY_TO_NEW: Record<string, string> = {
+  restaurants: "food",
+  nightlife: "nightlife",
+  attractions: "attraction",
+  nature: "nature",
+  hotels: "sleep",
+};
+
 export async function GET() {
   const supabase = createAdminClient();
 
@@ -27,7 +44,7 @@ export async function GET() {
   const pins = (data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
-    category: row.category,
+    category: OLD_CATEGORY_TO_NEW[row.category] ?? null,
     latitude: row.latitude,
     longitude: row.longitude,
   }));
