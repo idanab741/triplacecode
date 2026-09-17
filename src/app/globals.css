@@ -164,3 +164,11 @@ body {
 .place-map-popup .leaflet-popup-tip-container {
   display: none;
 }
+
+/* *** תוספת (StoriesRail.tsx - הסתרת פס-גלילה): scrollbarWidth:"none"
+   ב-inline style מכסה רק Firefox - דפדפני WebKit/Chromium (Chrome,
+   Safari, Edge) צריכים את הכלל הזה בנפרד, אין לו מקבילה ב-inline
+   style בכלל (זה pseudo-element). */
+.stories-rail-track::-webkit-scrollbar {
+  display: none;
+}

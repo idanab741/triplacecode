@@ -41,10 +41,24 @@ function WindowFrame({ gradient, glow, children }: { gradient: string; glow: boo
 
 /** עיגול אמיתי - רק למשתמש עצמו. בלי רקע. */
 function MyStoryCircle({ gradient, glow, children }: { gradient: string; glow: boolean; children: ReactNode }) {
+  // *** תיקון (בדקתי לפני שליחה): gradient מגיע כאן בשני סוגים שונים -
+  // לפעמים פונקציית gradient אמיתית ("linear-gradient(...)"), לפעמים
+  // צבע שטוח ("#e2e2e8") כשאין סטורי פעיל. backgroundImage מקבל רק
+  // gradient/image - לא צבע שטוח (זה היה נכשל בשקט על #e2e2e8).
+  const isRealGradient = gradient.includes("gradient(");
   return (
     <span
       className="flex h-[92px] w-[92px] items-center justify-center rounded-full p-[3px]"
-      style={{ background: gradient, boxShadow: glow ? "0 6px 18px -4px rgba(124,58,237,0.55)" : "none" }}
+      style={{
+        // שכבת ביטחון אטומה *בצורת העיגול עצמו בדיוק* (rounded-full
+        // כבר גוזר את הצורה) - בקשה מפורשת: לא מלבנית מסביב לעיגול.
+        // *** תיקון (בדיקה עצמית): var(--surface-2) הוא טוקן שלא קיים
+        // בכלל בפרויקט הזה - הפולבק #fff תמיד היה מה שבאמת קורה, אבל
+        // בצורה עמומה. לבן מפורש, בלי תלות במשתנה CSS שלא קיים.
+        backgroundColor: isRealGradient ? "#ffffff" : gradient,
+        backgroundImage: isRealGradient ? gradient : "none",
+        boxShadow: glow ? "0 6px 18px -4px rgba(124,58,237,0.55)" : "none",
+      }}
     >
       <span className="h-full w-full overflow-hidden rounded-full border-[3px] border-white">{children}</span>
     </span>
@@ -53,10 +67,16 @@ function MyStoryCircle({ gradient, glow, children }: { gradient: string; glow: b
 
 const ITEM_WIDTH = 70;
 const ITEM_GAP = 24; // *** בקשה מפורשת (סעיף 13) - "gap: 24px" קבוע, לא space-between.
-const STEP = ITEM_WIDTH + ITEM_GAP;
-/** הרווח הקבוע בין המרכז לצדדים (בקשה מפורשת, סעיף 4+13 - "מספיק
- *  גדול כדי ליצור separation ברור"). */
-const SPACER_WIDTH = 230;
+/** *** תיקון-ארכיטקטורה נוסף (בקשה מפורשת - "יש פתאום פער בצד? רווח
+ *  גדול כזה?"): הרווחן המיוחד בוטל לגמרי. הוא יצר "עצירה" נדירה מדי
+ *  (פעם אחת לכל מחזור שלם) - גרירה רגילה לא הגיעה לחצי המרחק אליה
+ *  ותמיד "קפצה בחזרה" לאותה עצירה, ובנוסף - ברגע שהיו כמה רווחנים
+ *  גלויים בו-זמנית בתוך אותה תצוגה, הופיע רווח גדול במקום אקראי,
+ *  לא דווקא ליד העיגול שלי. עכשיו: שורה אחידה לגמרי, כל פריט הוא
+ *  עצירה (scroll-snap-align על כל אחד), בלי אלמנט מיוחד בכלל. ההגנה
+ *  על העיגול שלי (בקשה מפורשת - "עיגול עם רקע בדיוק בגודל העיגול")
+ *  עברה ל-MyStoryCircle עצמו - הוא אטום, מסתיר לגמרי מה שמתחתיו,
+ *  בלי תלות באלמנט-רווח נפרד בתוך הנתונים. */
 
 const GENERIC_PLACEHOLDER_IMAGES = [
   "/images/mascot-happy.png",
@@ -84,6 +104,21 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   const others = rail.filter((entry) => entry.author.id !== viewerId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // *** תיקון (בקשה מפורשת - "איפה שני הצדדים?!"): 50vw מודד מול
+  // ה-viewport הגלובלי של הדפדפן - לא מול הרוחב האמיתי של הקונטיינר
+  // הזה. ברוב המקרים באפליקציה מובייל זה מתלכד, אבל זו הנחה שיכולה
+  // להישבר (מסכים רחבים, קונטיינר עם max-width וכו') - עכשיו נמדד
+  // בפועל עם ResizeObserver, לא מונח.
+  const [padWidth, setPadWidth] = useState(0);
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const update = () => setPadWidth(container.clientWidth / 2);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
   const hasDraggedRef = useRef(false);
   const dragStateRef = useRef<{ active: boolean; startX: number; startScrollLeft: number } | null>(null);
 
@@ -110,30 +145,77 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     return [...real, ...placeholders];
   }, [others]);
 
-  // כל חזרה מסתיימת ברווחן אחד - זה מה שסימני scroll-snap-align
-  // "center" יושבים עליו (לא על הפריטים עצמם).
+  // שורה אחידה - כל עותק של מחזור-הבסיס מיד אחרי הקודם, בלי רווחן
+  // מיוחד בין המחזורים.
   const repeatedItems = useMemo(() => {
     if (baseCycle.length === 0) return [];
-    const out: ({ type: "item"; item: CycleItem; renderKey: string } | { type: "spacer"; renderKey: string })[] = [];
+    const out: { item: CycleItem; renderKey: string }[] = [];
     for (let rep = 0; rep < REPEAT_COUNT; rep++) {
-      baseCycle.forEach((item) => out.push({ type: "item", item, renderKey: `${rep}-${item.renderKey}` }));
-      out.push({ type: "spacer", renderKey: `spacer-${rep}` });
+      baseCycle.forEach((item) => out.push({ item, renderKey: `${rep}-${item.renderKey}` }));
     }
     return out;
   }, [baseCycle]);
 
-  const middleSpacerKey = repeatedItems.length > 0 ? `spacer-${Math.floor(REPEAT_COUNT / 2)}` : null;
+  // פריט האמצע המדויק (לא רווחן - אין יותר כזה) - זה מה שהגלילה
+  // הראשונית ממרכזת מתחת לעיגול שלי.
+  const middleItemKey =
+    repeatedItems.length > 0 ? repeatedItems[Math.floor(repeatedItems.length / 2)].renderKey : null;
 
-  // *** מיקום התחלתי - גלילה (לא transform, לא חישוב) עד שהרווחן
+  // *** מיקום התחלתי - גלילה (לא transform, לא חישוב) עד שהפריט
   // האמצעי נמצא בדיוק במרכז הקונטיינר. scrollIntoView הוא API דפדפן
   // סטנדרטי - עושה בדיוק את זה בעצמו, בלי שאצטרך לחשב שום פיקסל.
   useLayoutEffect(() => {
-    if (!middleSpacerKey) return;
+    if (!middleItemKey) return;
     const container = scrollRef.current;
     if (!container) return;
-    const el = container.querySelector<HTMLElement>(`[data-key="${middleSpacerKey}"]`);
+    const el = container.querySelector<HTMLElement>(`[data-key="${middleItemKey}"]`);
     if (el) el.scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" as ScrollBehavior });
-  }, [middleSpacerKey]);
+  }, [middleItemKey]);
+
+  /**
+   * *** תוספת (בקשה מפורשת - "ברגע שהסטורי שנופל במרכז - הטקסט
+   * והחלונית עצמה מתבטלים! יישאר במרכז רק הסטורי שלי"): פתרון שונה
+   * לגמרי מכל הניסיונות הקודמים - במקום לנסות "להסתיר" את השכן עם
+   * רקע/רווח, הפריט שבפועל הכי קרוב למרכז הקונטיינר **נעלם לגמרי**
+   * (opacity: 0) - כך שאין בכלל תוכן מתחרה שם, לא רק תוכן מוסתר-חלקית.
+   * נמדד בפועל (getBoundingClientRect) על כל גלילה, לא מחושב מראש.
+   */
+  const [hiddenItemKey, setHiddenItemKey] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    let ticking = false;
+    function updateHiddenItem() {
+      ticking = false;
+      const track = scrollRef.current;
+      if (!track) return;
+      const trackRect = track.getBoundingClientRect();
+      const centerX = trackRect.left + trackRect.width / 2;
+      const candidates = Array.from(track.querySelectorAll<HTMLElement>("[data-key]"));
+      let closestKey: string | null = null;
+      let closestDist = Infinity;
+      candidates.forEach((el: HTMLElement) => {
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.left + rect.width / 2 - centerX);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestKey = el.dataset.key ?? null;
+        }
+      });
+      // סף של 45px - בערך חצי-רוחב חלונית - כדי לא "לבטל" פריט
+      // שרק במקרה קרוב יחסית, אבל עדיין לא ממש חופף.
+      setHiddenItemKey(closestDist < 45 ? closestKey : null);
+    }
+    function onScroll() {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(updateHiddenItem);
+      }
+    }
+    updateHiddenItem();
+    container.addEventListener("scroll", onScroll);
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [repeatedItems.length]);
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     const container = scrollRef.current;
@@ -169,13 +251,15 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   }
 
   function renderCycleItem({ item, renderKey }: { item: CycleItem; renderKey: string }) {
+    // הפריט שכרגע הכי קרוב למרכז - נעלם לגמרי (לא רק מוסתר-חלקית).
+    const isHidden = hiddenItemKey === renderKey;
     if (item.kind === "placeholder") {
       return (
         <div
           key={renderKey}
           data-key={renderKey}
           className="flex shrink-0 flex-col items-start gap-2 opacity-60"
-          style={{ width: ITEM_WIDTH }}
+          style={{ width: ITEM_WIDTH, scrollSnapAlign: "center", opacity: isHidden ? 0 : undefined }}
         >
           <WindowFrame gradient="#e2e2e8" glow={false}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -198,7 +282,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
           onOpenStory(rail.indexOf(entry));
         }}
         className="flex shrink-0 flex-col items-start gap-2"
-        style={{ width: ITEM_WIDTH }}
+        style={{ width: ITEM_WIDTH, scrollSnapAlign: "center", opacity: isHidden ? 0 : 1, pointerEvents: isHidden ? "none" : "auto" }}
       >
         <WindowFrame
           gradient={
@@ -218,13 +302,13 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   }
 
   return (
-    <div className="relative pb-4 pt-12" style={{ height: 152 }}>
+    <div className="relative pb-4 pt-20" style={{ height: 160 }}>
       {/* מסלול-גלילה אמיתי של הדפדפן - לא transform מחושב. z-0, שכבה
           תחתונה - "מתחת" לעיגול שלי. */}
       <div
         ref={scrollRef}
-        className="absolute inset-0 flex touch-pan-y select-none items-start overflow-x-auto"
-        style={{ gap: STEP - ITEM_WIDTH, scrollSnapType: "x mandatory", scrollbarWidth: "none", zIndex: 0 }}
+        className="stories-rail-track absolute inset-0 flex touch-pan-y select-none items-start overflow-x-auto"
+        style={{ gap: ITEM_GAP, scrollSnapType: "x mandatory", scrollbarWidth: "none", zIndex: 0 }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -233,30 +317,38 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
         {/* ריפוד בתחילת/סוף המסלול - כדי שגם הפריטים הראשונים/אחרונים
             יוכלו להגיע למרכז המסך בזמן גלילה (בלי זה הגלילה הייתה
             "נתקעת" בקצה לפני שהאלמנט הראשון מגיע למרכז). */}
-        <div className="shrink-0" style={{ width: "50vw" }} aria-hidden />
-        {repeatedItems.map((row) =>
-          row.type === "spacer" ? (
-            <div
-              key={row.renderKey}
-              data-key={row.renderKey}
-              aria-hidden
-              className="shrink-0"
-              style={{ width: SPACER_WIDTH, scrollSnapAlign: "center" }}
-            />
-          ) : (
-            renderCycleItem(row)
-          )
-        )}
-        <div className="shrink-0" style={{ width: "50vw" }} aria-hidden />
+        <div className="shrink-0" style={{ width: padWidth }} aria-hidden />
+        {repeatedItems.map((row) => renderCycleItem(row))}
+        <div className="shrink-0" style={{ width: padWidth }} aria-hidden />
       </div>
 
       {/* הסטורי שלי - קבוע, לא חלק מהגלילה, לא ב-transform, לא ב-
           scroll position של המסלול בכלל - ממורכז מוחלט מעל הכל. */}
       <div className="pointer-events-none absolute inset-0 flex items-start justify-center" style={{ zIndex: 10 }}>
+        {/* *** תיקון (בקשה מפורשת - הראה לי בעיגול אדום איפה בדיוק):
+            הרמת העיגול עם translateY יצרה פער קטן (כ-8px) בין תחתית
+            העיגול (שזז ויזואלית) לתחילת הכיתוב (שנשאר במקומו בזרימה
+            הרגילה - בכוונה, כדי לשמור על baseline משותף) - בפער הקטן
+            הזה בדיוק לא היה שום דבר שמכסה את המסלול הגולל מתחתיו.
+            הפתרון: רקע לבן אחד רציף על **כל העמודה** (עיגול+פער+כיתוב
+            יחד), לא שני רקעים נפרדים עם חור ביניהם - לבן על לבן
+            נשאר בלתי-נראה (לא "מסגרת"), אבל סוגר את הפער לחלוטין. */}
+        {/* *** תיקון (בקשה מפורשת - "לא רקע שהוא לא שקוף מאחורי
+            הסטורי שלי"): הרקע הלבן על כל העמודה (rounded-2xl,
+            padding) היה תיקון-יתר - זה כן נראה כמו "קופסה" נראית
+            לעין, לא כמו שקיפות. חוזר לעמודה שקופה רגילה, בלי רקע
+            כלל - כמו שאושר קודם לגבי העיגול עצמו (שנשאר עם המילוי
+            האטום שלו בלבד, לא משהו נוסף מסביבו). */}
         <div className="pointer-events-auto flex w-[92px] shrink-0 flex-col items-center gap-2">
           {/* רק התמונה מורמת - הטקסט מתחת לא זז, נשאר על אותו
               baseline כמו כל שאר הטקסטים (בקשה מפורשת, סעיף 8). */}
-          <span className="relative -mt-2">
+          {/* *** תיקון (בקשה מפורשת - "החלק העליון של הסטורי שלי
+              חתוך"): transform: translateY, לא margin שלילי - margin
+              שלילי יכול "למשוך" את האלמנט אל מחוץ לתיבת-התוכן של
+              ההורה בצורה שגורמת לגזירה ע"י overflow/מדידת-גובה של
+              אבות בשרשרת; translateY מזיז רק את הציור עצמו, לא את
+              תיבת-הפריסה - בלי הסיכון הזה. */}
+          <span className="relative" style={{ transform: "translateY(-4px)" }}>
             <button type="button" onClick={handleMyStoryClick} className="block transition-transform active:scale-95">
               <MyStoryCircle
                 gradient={
@@ -280,7 +372,9 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
               </svg>
             </button>
           </span>
-          <button type="button" onClick={handleMyStoryClick} className="w-full">
+          <button type="button" onClick={handleMyStoryClick} className="flex w-full justify-center">
+            {/* כיתוב פשוט, זהה בדיוק לכיתובי שאר הסטוריז - בלי
+                רקע/כרית משלו (בקשה מפורשת - שקוף לגמרי). */}
             <span className="w-full truncate text-center text-[11.5px] font-bold text-ink">
               {selfEntry ? (viewerName?.trim() || "הסטורי שלי") : "צור סטורי"}
             </span>
