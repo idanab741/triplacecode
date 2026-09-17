@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode, PointerEvent as ReactPointerEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { StoryRailAuthorDto } from "@/services/social/storyService";
 import { getAvatarUrl } from "@/constants/avatar";
 
@@ -167,8 +167,11 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     setDragOffset((prev) => prev + bestDelta);
   }
 
-  // נחיתה מדויקת גם בפתיחה הראשונית של הדף - לא רק אחרי גרירה.
-  useEffect(() => {
+  // *** תיקון (באג אמיתי, לא רק קובץ ישן): נחיתה מדויקת גם בפתיחה
+  // הראשונית - useLayoutEffect (לא useEffect) כדי שהתיקון יקרה *לפני*
+  // שהדפדפן מצייר, לא אחרי - אחרת יש הבזק קצר של מיקום שגוי ברגע
+  // הראשון.
+  useLayoutEffect(() => {
     snapToNearestSpacer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repeatedItems.length]);
@@ -201,6 +204,8 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     setDragOffset(state.startOffset + totalDelta);
   }
 
+  const TRANSITION_MS = 450;
+
   function handlePointerUp() {
     const state = dragStateRef.current;
     if (!state?.active) return;
@@ -208,8 +213,15 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     setIsDragging(false);
     // תנופה קלה (momentum) לפי מהירות השחרור, ואז נחיתה מדויקת (בפועל
     // נמדדת) על מרכז הרווחן הקרוב - לא "עצירה יבשה" בלי תנועה.
+    //
+    // *** תיקון באג אמיתי (לא קובץ ישן): requestAnimationFrame רץ
+    // ~16ms אחרי - הרבה לפני שה-transition של 450ms על התנופה עצמה
+    // בכלל הספיק להתקדם, לא כל שכן להסתיים. המדידה קרתה תוך כדי
+    // שהאלמנטים עדיין באמצע תנועה - זה בדיוק מה שגרם לתיקון השגוי/
+    // לחוסר-רווח שראית. עכשיו ממתינים בפועל למשך ה-transition המלא
+    // (setTimeout, לא frame בודד) לפני שמודדים ומתקנים סופית.
     setDragOffset((prev) => prev + state.velocity * 90);
-    requestAnimationFrame(snapToNearestSpacer);
+    window.setTimeout(snapToNearestSpacer, TRANSITION_MS + 20);
   }
 
   function renderCycleItem({ item, renderKey }: { item: CycleItem; renderKey: string }) {
@@ -268,7 +280,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
             style={{
               gap: ITEM_GAP,
               transform: `translateX(${dragOffset}px)`,
-              transition: isDragging ? "none" : "transform 450ms cubic-bezier(0.22, 1, 0.36, 1)",
+              transition: isDragging ? "none" : `transform ${TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
               cursor: isDragging ? "grabbing" : "grab",
             }}
             onPointerDown={handlePointerDown}
