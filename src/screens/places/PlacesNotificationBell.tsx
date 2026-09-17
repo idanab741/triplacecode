@@ -119,7 +119,7 @@ export function PlacesNotificationBell() {
         aria-expanded={open}
         className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
       >
-        <Image src="/icons/bell.png" alt="" width={22} height={22} />
+        <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
         {unreadCount != null && unreadCount > 0 && (
           <span
             className="absolute -left-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white"

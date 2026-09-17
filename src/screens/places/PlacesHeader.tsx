@@ -62,7 +62,14 @@ export function PlacesHeader({ onBack, transparent = false, overlay = false, men
             בתוך ה-header (h-16=64px), במקום להזיז את כל שאר הפריטים
             בשורה גם כן. */}
         <span className="absolute left-1/2 top-[57%] -translate-x-1/2 -translate-y-1/2 select-none">
-          <Image src="/images/places-logo.png" alt="place's" width={117} height={38} className="object-contain" priority />
+          <Image
+            src="/images/places-logo.png"
+            alt="place's"
+            width={117}
+            height={38}
+            className="h-[38px] w-[117px] object-contain"
+            priority
+          />
         </span>
 
         {onBack ? (

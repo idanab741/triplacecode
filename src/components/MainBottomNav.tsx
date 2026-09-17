@@ -22,7 +22,7 @@ function NavIcon({
   return (
     <span className="relative flex h-6 w-6 items-center justify-center">
       <span className="relative h-full w-full" style={{ transform: `scale(${scale})` }}>
-        <Image src={active ? activeSrc : inactiveSrc} alt={alt} fill className="object-contain" />
+        <Image src={active ? activeSrc : inactiveSrc} alt={alt} fill sizes="24px" className="object-contain" />
       </span>
     </span>
   );

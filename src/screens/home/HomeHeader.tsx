@@ -165,7 +165,7 @@ export function HomeHeader({ avatarUrl, loading }: HomeHeaderProps) {
           aria-expanded={notifOpen}
           className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
         >
-          <Image src="/icons/bell.png" alt="" width={22} height={22} />
+          <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
           {/* Badge - קטן, אלגנטי, לא משתלט על האייקון. 99+ מעל 99, לא מוצג אם 0/null. */}
           {unreadCount != null && unreadCount > 0 && (
             <span

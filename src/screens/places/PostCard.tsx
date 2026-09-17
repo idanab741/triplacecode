@@ -303,7 +303,7 @@ export function PostCard({
             alt="שמור"
             width={15}
             height={18}
-            className="object-contain"
+            className="h-[18px] w-[15px] object-contain"
           />
         </button>
       </div>
