@@ -32,27 +32,12 @@ function Avatar({ url }: { url: string | null }) {
   );
 }
 
-/** "חלון מטוס" - צורה אליפטית מוארכת, לכל שאר הסטוריז (לא שלי - ר'
- *  MyStoryCircle למטה). */
+/** "חלון מטוס" - צורה אליפטית מוארכת, לכל הסטוריז (כולל שלי - בקשה
+ *  מפורשת: "לא צריך שהעיגול שלי יהיה שונה/מיוחד, פשוט הכי ימני"). */
 function WindowFrame({ gradient, glow, children }: { gradient: string; glow: boolean; children: ReactNode }) {
   return (
     <span
       className="flex h-[92px] w-[68px] items-center justify-center rounded-full p-[3px]"
-      style={{ background: gradient, boxShadow: glow ? "0 6px 18px -4px rgba(124,58,237,0.55)" : "none" }}
-    >
-      <span className="h-full w-full overflow-hidden rounded-full border-[3px] border-white">{children}</span>
-    </span>
-  );
-}
-
-/** *** תיקון (בקשה מפורשת - "ביקשתי שהסטורי שלי, רק הוא, יהיה עגול!
- *  והשאר באותה צורה"): עיגול אמיתי (92x92, לא אליפסה מוארכת כמו
- *  WindowFrame) - רק למשתמש עצמו, כדי שיהיה ברור ויזואלית מי אני
- *  מבין כל השורה, גם כשהוא לא במרכז יותר. */
-function MyStoryCircle({ gradient, glow, children }: { gradient: string; glow: boolean; children: ReactNode }) {
-  return (
-    <span
-      className="flex h-[92px] w-[92px] items-center justify-center rounded-full p-[3px]"
       style={{ background: gradient, boxShadow: glow ? "0 6px 18px -4px rgba(124,58,237,0.55)" : "none" }}
     >
       <span className="h-full w-full overflow-hidden rounded-full border-[3px] border-white">{children}</span>
@@ -140,14 +125,13 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
 
   return (
     <div className="flex gap-3 overflow-x-auto px-4 py-4" style={{ scrollbarWidth: "none" }}>
-      {/* הסטורי שלי - תמיד ראשון (הכי ימני ב-RTL), אבל עגול (בקשה
-          מפורשת - "רק הסטורי שלי יהיה עגול, השאר באותה צורה" -
-          MyStoryCircle, לא WindowFrame). תג ה-"+" תמיד קיים (גם אם
-          כבר יש סטורי פעיל) - זו הדרך היחידה להוסיף עוד אחד. */}
-      <div className="flex w-[92px] shrink-0 flex-col items-center gap-2">
+      {/* הסטורי שלי - תמיד ראשון (הכי ימני ב-RTL), בלי עיצוב מיוחד -
+          אותה חלונית אליפטית בדיוק כמו כל השאר. תג ה-"+" תמיד קיים
+          (גם אם כבר יש סטורי פעיל) - זו הדרך היחידה להוסיף עוד אחד. */}
+      <div className="flex w-[70px] shrink-0 flex-col items-center gap-2">
         <span className="relative">
           <button type="button" onClick={handleMyStoryClick} className="block transition-transform active:scale-95">
-            <MyStoryCircle
+            <WindowFrame
               gradient={
                 selfEntry?.hasUnviewed
                   ? "linear-gradient(135deg, var(--color-places-purple) 0%, var(--color-places-violet) 55%, #ec4899 100%)"
@@ -156,7 +140,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
               glow={Boolean(selfEntry?.hasUnviewed)}
             >
               <Avatar url={viewerAvatarUrl ?? null} />
-            </MyStoryCircle>
+            </WindowFrame>
           </button>
           <button
             type="button"

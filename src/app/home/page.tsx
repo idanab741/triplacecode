@@ -37,6 +37,23 @@ export default function HomePage() {
   const router = useRouter();
 
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
+
+  // *** תוספת (בקשה מפורשת - "מיקום חדש שמביא ישר לעמוד הבית איפה
+  // שהעלאת אטרקציה"): כשמגיעים לכאן מ-CreateMenuSheet בעמוד הפרופיל
+  // (/places), הפרמטר הזה פותח את AddPlaceModal אוטומטית עם הטעינה.
+  // *** תיקון: נקרא ישירות מ-window.location (לא useSearchParams) -
+  // כדי לא לדרוש Suspense boundary סביב כל עמוד הבית רק בשביל פרמטר
+  // חד-פעמי בטעינה; זה בכל מקרה רץ רק בצד-לקוח בתוך useEffect.
+  // מסירים את הפרמטר מה-URL אחרי הפתיחה (replace, לא push) - כדי
+  // שרענון/כפתור-חזור לא יפתחו אותו שוב.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openAddPlace") === "1") {
+      setAddPlaceOpen(true);
+      router.replace("/home");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [fabOpen, setFabOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<HomeQuickCategoryId[]>([]);

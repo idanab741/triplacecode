@@ -213,7 +213,7 @@ export default function PlacesHomePage() {
         )}
       </div>
 
-      <CreatePostBar avatarUrl={profile?.avatar_url} onClick={() => setCreateMenuOpen(true)} />
+      <CreatePostBar onClick={() => setCreateMenuOpen(true)} />
 
       {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}
 

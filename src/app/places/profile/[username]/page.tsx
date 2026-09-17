@@ -13,7 +13,6 @@ import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
 import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
-import { AvatarUploader } from "@/components/AvatarUploader";
 import { getAvatarUrl } from "@/constants/avatar";
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { createClient } from "@/services/supabase/client";
@@ -48,15 +47,13 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [bioDraft, setBioDraft] = useState("");
-  const [savingBio, setSavingBio] = useState(false);
   // *** תוספת (בקשה מפורשת - עיצוב מחדש בסגנון אינסטגרם):
   // scrolled שולט על מתי הבר העליון עובר משקוף (מעל הקאבר) ללבן אטום.
   const [scrolled, setScrolled] = useState(false);
-  // הביו מוצג כטקסט קבוע כברירת מחדל - נכנס למצב עריכה רק בלחיצה על
-  // "ערוך פרופיל" (לא תמיד פתוח כמו קודם).
-  const [editingBio, setEditingBio] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState<"media" | "trips" | "reviews">("media");
+  // *** תוספת (בקשה מפורשת - "טיול חדש בקרוב"): הודעה קצרה שנעלמת
+  // לבד, במקום alert() דפדפן גס.
+  const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
 
   useEffect(() => {
     function handleScroll() {
@@ -70,7 +67,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   useEffect(() => {
     if (profile) {
       setCoverUrl(profile.coverUrl);
-      setBioDraft(profile.bio ?? "");
     }
   }, [profile]);
 
@@ -88,22 +84,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     } finally {
       setUploadingCover(false);
     }
-  }
-
-  async function handleBioBlur() {
-    if (!profile || bioDraft === (profile.bio ?? "")) return;
-    setSavingBio(true);
-    try {
-      await fetchJson("/api/social/profile/me", { method: "PATCH", body: JSON.stringify({ bio: bioDraft }) });
-      setProfile((p) => (p ? { ...p, bio: bioDraft } : p));
-    } finally {
-      setSavingBio(false);
-    }
-  }
-
-  async function handleBioSaveAndClose() {
-    await handleBioBlur();
-    setEditingBio(false);
   }
 
   useEffect(() => {
@@ -228,7 +208,12 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      <PlacesHeader onBack={() => router.back()} transparent={!scrolled} overlay menuHref="/profile" />
+      <PlacesHeader
+        onBack={() => router.back()}
+        transparent={!scrolled}
+        overlay
+        menuHref={profile.viewerState.isSelf ? "/profile" : undefined}
+      />
 
       {/* *** תיקון (בקשה מפורשת - "הקאבר צריך לכסות גם את הבר העליון
           כשהוא שקוף, עד שגוללים ואז הוא לבן"): הקאבר מתחיל מ-y=0 (אין
@@ -253,29 +238,37 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
       </div>
 
       <div className="px-4">
-        {/* *** תיקון (בקשה מפורשת - "העיגול קטן מדי" + "+/מחיקה - עיגול
-            קטן שמוצמד לפינת התמונה, כמו אינסטגרם"): 104px -> 128px,
-            ומצב fluid של AvatarUploader (שכבר בנוי בדיוק לאפקט הזה -
-            תגי +/מחיקה כעיגולים קטנים בפינות, לא כפתורים נפרדים
-            מתחת) במקום המצב הרגיל. */}
+        {/* *** תיקון (בקשה מפורשת - "העיגול של הפלוס צריך להיות חיצוני
+            וגדול יותר, לא בתוך התמונה, בצבע סגול שלנו - והוא מביא
+            לעמוד צור תוכן חדש"): גיליתי שהבנתי לא נכון בסבב הקודם -
+            ה"+" הזה הוא לא כפתור העלאת-תמונה בכלל (זה עבר לגמרי לעמוד
+            עריכת הפרופיל הנפרד) - הוא פותח את CreateMenuSheet, בדיוק
+            כמו כפתור "צור תוכן חדש" הישן. AvatarUploader/fluid הוסר
+            מכאן לגמרי - עיגול תמונה רגיל (זהה לתצוגה אצל isSelf ואצל
+            מבקר, "עמוד זהה למשתמשים אחרים" כמו שביקשת), עם "+" חיצוני
+            צמוד לפינה התחתונה-חיצונית של העיגול (לא חופף אותו), 44px,
+            צבע var(--color-places-purple). בלי X בכלל - מחיקת תמונה
+            עברה לעמוד עריכת הפרופיל. */}
         <div className="-mt-14 flex items-end justify-between">
-          {profile.viewerState.isSelf && user ? (
-            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-full border-4 border-white shadow-soft">
-              <AvatarUploader
-                userId={user.id}
-                initialUrl={profile.avatarUrl}
-                fluid
-                bordered={false}
-                onUploaded={(url) => setProfile((prev) => (prev ? { ...prev, avatarUrl: url } : prev))}
-                onRemoved={() => setProfile((prev) => (prev ? { ...prev, avatarUrl: null } : prev))}
-              />
-            </div>
-          ) : (
-            <span className="h-32 w-32 shrink-0 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
+          <div className="relative h-32 w-32 shrink-0">
+            <span className="block h-32 w-32 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
             </span>
-          )}
+            {profile.viewerState.isSelf && (
+              <button
+                type="button"
+                onClick={() => setCreateMenuOpen(true)}
+                aria-label="צור תוכן חדש"
+                className="absolute -bottom-1 -end-1 flex h-11 w-11 items-center justify-center rounded-full text-white shadow-soft"
+                style={{ background: "var(--color-places-purple)" }}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
@@ -324,53 +317,18 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             ברירת המחדל היא תצוגה סטטית + כפתור "ערוך פרופיל", ומצב
             העריכה נפתח רק בלחיצה עליו (בדיוק כמו Edit profile
             באינסטגרם - לא שדה עריכה שיושב שם תמיד). */}
-        {profile.viewerState.isSelf ? (
-          editingBio ? (
-            <div className="mt-2">
-              <textarea
-                value={bioDraft}
-                onChange={(e) => setBioDraft(e.target.value)}
-                placeholder="קצת עליי..."
-                rows={2}
-                autoFocus
-                className="w-full resize-none rounded-card border border-ink-secondary/15 p-2.5 text-[13.5px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
-              />
-              <div className="mt-1.5 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleBioSaveAndClose}
-                  disabled={savingBio}
-                  className="rounded-pill px-3.5 py-1.5 text-[12px] font-bold text-white disabled:opacity-50"
-                  style={{ background: "var(--color-places-purple)" }}
-                >
-                  {savingBio ? "שומר..." : "שמירה"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBioDraft(profile.bio ?? "");
-                    setEditingBio(false);
-                  }}
-                  className="rounded-pill px-3.5 py-1.5 text-[12px] font-semibold text-ink-secondary"
-                >
-                  ביטול
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>}
-              <button
-                type="button"
-                onClick={() => setEditingBio(true)}
-                className="mt-3 w-full rounded-pill border border-ink-secondary/20 py-2 text-[13px] font-bold text-ink"
-              >
-                ערוך פרופיל
-              </button>
-            </>
-          )
-        ) : (
-          profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>
+        {/* *** תיקון (בקשה מפורשת - "עריכת פרופיל צריכה להביא אותי
+            לעמוד נוסף"): לא עוד toggle פנימי לעריכת ביו בלבד - "ערוך
+            פרופיל" מנווט לעמוד עצמאי חדש (/places/profile/edit) עם כל
+            השדות (שם משתמש/שם מלא/מייל/עיר/ביו/תאריך לידה/סיסמה/תמונה). */}
+        {profile.bio && <p className="mt-2 text-[13.5px] text-ink">{profile.bio}</p>}
+        {profile.viewerState.isSelf && (
+          <Link
+            href="/places/profile/edit"
+            className="mt-3 block w-full rounded-pill border border-ink-secondary/20 py-2 text-center text-[13px] font-bold text-ink"
+          >
+            ערוך פרופיל
+          </Link>
         )}
 
         {/* *** תיקון (בקשה מפורשת - "טיולים - עוקבים - במעקב", בסגנון
@@ -394,17 +352,9 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           </Link>
         </div>
 
-        {profile.viewerState.isSelf && (
-          <button
-            type="button"
-            onClick={() => setCreateMenuOpen(true)}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-pill py-2.5 text-[13.5px] font-bold text-white"
-            style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[15px] leading-none">+</span>
-            צור תוכן חדש
-          </button>
-        )}
+        {/* *** תיקון (בקשה מפורשת - "לא צריך את כפתור צור תוכן חדש - יש
+            אותו בפלוס"): הוסר לגמרי - ה"+" הצמוד לעיגול התמונה למעלה
+            עושה בדיוק את זה עכשיו. */}
       </div>
 
       {/* *** תוספת (בקשה מפורשת - "החלוקה כמו שיש, עם מדיה-טיולים-
@@ -489,9 +439,25 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           onClose={() => setCreateMenuOpen(false)}
           onSelectPost={() => setCreatePostOpen(true)}
           onSelectReview={() => setReviewPickerOpen(true)}
-          onSelectPlace={() => setSuggestPlaceOpen(true)}
-          onSelectTrip={() => router.push("/tripmatch")}
+          // *** תיקון (בקשה מפורשת - "מיקום חדש שמביא ישר לעמוד הבית
+          // איפה שהעלאת אטרקציה"): לא עוד SuggestPlaceSheet (המאגר
+          // הישן) - מנווט ישירות לעמוד הבית עם פרמטר ש-home/page.tsx
+          // קורא כדי לפתוח את AddPlaceModal אוטומטית עם הטעינה.
+          onSelectPlace={() => router.push("/home?openAddPlace=1")}
+          // *** תיקון (בקשה מפורשת - "טיול חדש (בקרוב)"): לא עוד ניווט
+          // ל-tripmatch - הודעה קצרה שנעלמת לבד.
+          onSelectTrip={() => {
+            setCreateMenuOpen(false);
+            setComingSoonMessage("בניית טיולים תגיע בקרוב!");
+            setTimeout(() => setComingSoonMessage(null), 2500);
+          }}
         />
+      )}
+
+      {comingSoonMessage && (
+        <div className="fixed inset-x-4 bottom-24 z-50 rounded-pill bg-ink px-4 py-3 text-center text-[13px] font-semibold text-white shadow-soft">
+          {comingSoonMessage}
+        </div>
       )}
 
       {createPostOpen && (
