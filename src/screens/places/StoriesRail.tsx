@@ -218,6 +218,15 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   }, [repeatedItems.length]);
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    // *** תיקון (בקשה מפורשת - "באג שמקשה על החלקה בטאץ'"): במגע,
+    // overflow-x-auto כבר נותן גלילה טבעית עם פיזיקה/תנופה מובנית של
+    // הדפדפן - הלוגיקה הידנית כאן (scrollLeft שמוגדר ידנית) נועדה
+    // במקור *רק* לעכבר (שאין לו גרירה-לגלילה טבעית). כששני המנגנונים
+    // רצים יחד על מגע - הם "מתאבקים" זה עם זה, וזה בדיוק מה שהרגיש
+    // כמו "קשה להחליק". עכשיו: על מגע/עט, לא מפעילים בכלל את הלוגיקה
+    // הידנית - נותנים לדפדפן לטפל בזה method לגמרי לבד, כמו שהוא
+    // כבר יודע.
+    if (e.pointerType !== "mouse") return;
     const container = scrollRef.current;
     if (!container) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -230,6 +239,7 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") return;
     const state = dragStateRef.current;
     const container = scrollRef.current;
     if (!state?.active || !container) return;
@@ -240,7 +250,8 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     container.scrollLeft = state.startScrollLeft + dx;
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") return;
     const state = dragStateRef.current;
     const container = scrollRef.current;
     if (!state?.active || !container) return;
@@ -301,14 +312,35 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     );
   }
 
+  // *** תיקון-שורש (בקשה מפורשת, כמה פעמים - "הרווח מהבר העליון קטן
+  // מדי"): הגישה הקודמת (padding-top על ההורה + inset-0 על הילדים)
+  // הסתמכה על ההנחה ש-inset-0 מכבד את ה-padding של ההורה. חישבתי
+  // מחדש את המספרים וגיליתי בעיה נפרדת: height:160 עם pt-20(80)+
+  // pb-4(16)=96px padding משאיר רק 64px לתוכן - אבל התוכן (עיגול
+  // 92px + רווח 8px + כיתוב ~16px) צריך בערך 116px! זה חוסר-מקום
+  // מתמטי של ממש, לא רק "התחושה" של רווח קטן. עכשיו: קבועים מפורשים,
+  // לא ניחוש - TOP_OFFSET ו-BOTTOM_OFFSET מוגדרים ישירות כ-top/bottom
+  // על כל ילד (לא inset-0 + padding בנפרד) - אין יותר שום עמימות
+  // לגבי מה שבאמת קורה.
+  const TOP_OFFSET = 34;
+  const BOTTOM_OFFSET = 16;
+  const CONTENT_HEIGHT = 120; // עיגול 92 + רווח 8 + שורת כיתוב ~20, מעוגל למעלה לביטחון.
+
   return (
-    <div className="relative pb-4 pt-20" style={{ height: 160 }}>
+    <div className="relative" style={{ height: TOP_OFFSET + CONTENT_HEIGHT + BOTTOM_OFFSET }}>
       {/* מסלול-גלילה אמיתי של הדפדפן - לא transform מחושב. z-0, שכבה
           תחתונה - "מתחת" לעיגול שלי. */}
       <div
         ref={scrollRef}
-        className="stories-rail-track absolute inset-0 flex touch-pan-y select-none items-start overflow-x-auto"
-        style={{ gap: ITEM_GAP, scrollSnapType: "x mandatory", scrollbarWidth: "none", zIndex: 0 }}
+        className="stories-rail-track absolute left-0 right-0 flex select-none items-start overflow-x-auto touch-pan-x"
+        style={{
+          top: TOP_OFFSET,
+          bottom: BOTTOM_OFFSET,
+          gap: ITEM_GAP,
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          zIndex: 0,
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -324,7 +356,10 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
 
       {/* הסטורי שלי - קבוע, לא חלק מהגלילה, לא ב-transform, לא ב-
           scroll position של המסלול בכלל - ממורכז מוחלט מעל הכל. */}
-      <div className="pointer-events-none absolute inset-0 flex items-start justify-center" style={{ zIndex: 10 }}>
+      <div
+        className="pointer-events-none absolute left-0 right-0 flex items-start justify-center"
+        style={{ top: TOP_OFFSET, bottom: BOTTOM_OFFSET, zIndex: 10 }}
+      >
         {/* *** תיקון (בקשה מפורשת - הראה לי בעיגול אדום איפה בדיוק):
             הרמת העיגול עם translateY יצרה פער קטן (כ-8px) בין תחתית
             העיגול (שזז ויזואלית) לתחילת הכיתוב (שנשאר במקומו בזרימה
