@@ -128,14 +128,24 @@ export function StoryViewerModal({ rail, startAuthorIndex, viewerId, onClose, on
       </div>
 
       <div className="flex items-center justify-between px-3 py-3">
-        <div className="flex items-center gap-2">
+        {/* *** תוספת (בקשה מפורשת - "כשלוחצים על השם של המשתמש בסטורי
+            שיעביר לעמוד הפרופיל שלו"): כפתור, לא Link - כי זה בתוך
+            מודל מלא-מסך שממילא סוגר/עוצר את הפעלת הסטורי כשעוברים
+            הלאה (לא ניווט "רגיל" בתוך זרימת הדף). */}
+        <button
+          type="button"
+          onClick={() => {
+            if (author.author.username) router.push(`/places/profile/${author.author.username}`);
+          }}
+          className="flex items-center gap-2"
+        >
           <span className="h-8 w-8 overflow-hidden rounded-full bg-white/20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={getAvatarUrl(author.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
           </span>
           <span className="text-[13px] font-semibold text-white">{author.author.fullName ?? author.author.username}</span>
           <span className="text-[12px] text-white/70">{timeAgo(story.createdAt)}</span>
-        </div>
+        </button>
         <div className="flex items-center gap-1">
           {isOwnStory && (
             <button

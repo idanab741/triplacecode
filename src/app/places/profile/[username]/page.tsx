@@ -152,20 +152,9 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     setPostsNextCursor(nextCursor);
   }
 
-  async function handleFollowToggle() {
-    if (!profile) return;
-    setBusy(true);
-    try {
-      if (profile.viewerState.following) {
-        await fetchJson(`/api/social/follows?userId=${profile.id}`, { method: "DELETE" });
-      } else {
-        await fetchJson("/api/social/follows", { method: "POST", body: JSON.stringify({ userId: profile.id }) });
-      }
-      setProfile((p) => (p ? { ...p, viewerState: { ...p.viewerState, following: !p.viewerState.following } } : p));
-    } finally {
-      setBusy(false);
-    }
-  }
+  // *** הוסר (בקשה מפורשת - "לבטל follow לגמרי, רק friends"):
+  // handleFollowToggle. friend request (handleFriendAction, למטה)
+  // מכסה עכשיו את כל הזרימה - הוסף חבר -> בקשה נשלחה -> חברים.
 
   async function handleFriendAction() {
     if (!profile) return;
@@ -249,8 +238,18 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             צמוד לפינה התחתונה-חיצונית של העיגול (לא חופף אותו), 44px,
             צבע var(--color-places-purple). בלי X בכלל - מחיקת תמונה
             עברה לעמוד עריכת הפרופיל. */}
-        <div className="-mt-14 flex items-end justify-between">
-          <div className="relative h-32 w-32 shrink-0">
+        {/* *** עיצוב-מחדש (בקשה מפורשת - "להעביר את השם משמאל לתמונת
+            הפרופיל, לא מתחתיה - רק ה-BIO נשאר מתחת לתמונה", גם
+            בפרופיל שלי וגם באחרים): שורה אחת - עיגול (שלא זז), ולידו
+            (בצד שמאל, ב-RTL: הילד השני ב-DOM) שם מלא + username. */}
+        {/* *** תיקון (בקשה מפורשת - "זה חותך את השם!!"): ה-mt- שלילי
+            היה על כל השורה - זה משך גם את השם למעלה, לתוך האזור
+            שנחתך ע"י תיבת הקאבר. עכשיו ה-mt- השלילי רק על העיגול
+            עצמו (כמו שהיה קודם, לפני האיחוד) - השורה עצמה במקומה
+            הרגיל, עם items-end כך שהשם מיושר לתחתית העיגול (האזור
+            הגלוי, לא-חתוך שלו). */}
+        <div className="flex items-end gap-3">
+          <div className="relative -mt-14 h-32 w-32 shrink-0">
             <span className="block h-32 w-32 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
@@ -269,46 +268,45 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
               </button>
             )}
           </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-2">
+            <h2 className="flex items-baseline gap-1 truncate text-[17px] font-bold text-ink">
+              {profile.fullName}
+              {profile.isCreator && (
+                <span className="ms-1" style={{ color: "var(--color-places-purple)" }}>
+                  ✓
+                </span>
+              )}
+            </h2>
+            {/* *** תיקון (בקשה מפורשת - "היוזרניים צריך להיות גם מימין
+                לשמאל!"): dir="ltr" הוסר - שם המשתמש (טקסט לטיני) זורם
+                עכשיו בהקשר ה-RTL הכללי של הדף, לא כפוי ל-LTR בנפרד. */}
+            {profile.username && <span className="truncate text-[13px] text-ink-secondary">@{profile.username}</span>}
+          </div>
         </div>
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <h2 className="text-[17px] font-bold text-ink">
-            {profile.fullName}
-            {profile.isCreator && (
-              <span className="ms-1" style={{ color: "var(--color-places-purple)" }}>
-                ✓
-              </span>
-            )}
-          </h2>
-          {profile.username && (
-            <span dir="ltr" className="text-[13px] text-ink-secondary">
-              @{profile.username}
-            </span>
-          )}
-        </div>
-
+        {/* *** תיקון (בקשה מפורשת - "עוקב/בקשה נשלחה זה אותו כפתור! לא
+            צריך שתי מערכות" - בירור: follow ו-friend request היו שתי
+            מערכות נפרדות לגמרי באפליקציה, כמו אינסטגרם מול פייסבוק -
+            הוחלט לבטל follow לגמרי ולהשאיר רק friend request, שכבר
+            עושה בדיוק את זה שביקשת: הוסף חבר -> בקשה נשלחה -> חברים). */}
         {!profile.viewerState.isSelf && (
           <div className="mt-3">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleFriendAction}
-                className="rounded-pill px-3.5 py-1.5 text-[12.5px] font-bold disabled:opacity-50"
-                style={{ border: "1px solid var(--color-places-purple)", color: "var(--color-places-purple)" }}
-              >
-                {friendLabel}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleFollowToggle}
-                className="rounded-pill px-3.5 py-1.5 text-[12.5px] font-bold text-white disabled:opacity-50"
-                style={{ background: "var(--color-places-purple)" }}
-              >
-                {profile.viewerState.following ? "עוקב" : "עקוב"}
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleFriendAction}
+              className={`w-full rounded-pill px-3.5 py-2 text-[13px] font-bold disabled:opacity-50 ${
+                profile.viewerState.friendStatus === "accepted" ? "text-white" : ""
+              }`}
+              style={
+                profile.viewerState.friendStatus === "accepted"
+                  ? { background: "var(--color-places-purple)" }
+                  : { border: "1px solid var(--color-places-purple)", color: "var(--color-places-purple)" }
+              }
+            >
+              {friendLabel}
+            </button>
           </div>
         )}
 
@@ -337,19 +335,28 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             עדיין ספירה ייעודית ל"טיולים" בבסיס הנתונים, זו קירוב-זמני
             הגון, לא הכפלה של ה-tab "טיולים" למטה (שגם הוא עדיין ללא
             תוכן ממשי משלו, ר' ההערה שם). */}
+        {/* *** תיקון (בקשה מפורשת - "לבטל follow לגמרי, רק friends"):
+            הוחלפו "עוקבים"+"במעקב" (שני stats שהתבססו על follow, מערכת
+            שבוטלה) בstat יחיד - "חברים" (friendships, מערכת סימטרית -
+            אין הבדל בין "עוקבים" ל"במעקב" כשזה הדדי). */}
         <div className="mt-4 flex gap-5 border-y border-ink-secondary/10 py-3 text-center">
           <div className="flex-1">
             <div className="text-[15px] font-bold text-ink">{posts?.length ?? 0}</div>
             <div className="text-[11.5px] text-ink-secondary">טיולים</div>
           </div>
-          <Link href={`/places/profile/${username}/followers`} className="flex-1">
+          {/* *** תיקון (בקשה מפורשת - "לא צריך גם חברים וגם עוקבים/
+              במעקב! רק עוקבים/במעקב"): הוסר "חברים" מהסטטיסטיקה -
+              נשאר רק עוקבים/במעקב. כפתור הפעולה עצמו (הוסף חבר/בקשה
+              נשלחה/חברים, למעלה) לא השתנה - זה שינוי בשורת הסטטיסטיקה
+              בלבד, לא בזרימת הפעולה. */}
+          <div className="flex-1">
             <div className="text-[15px] font-bold text-ink">{profile.counts.followers}</div>
             <div className="text-[11.5px] text-ink-secondary">עוקבים</div>
-          </Link>
-          <Link href={`/places/profile/${username}/following`} className="flex-1">
+          </div>
+          <div className="flex-1">
             <div className="text-[15px] font-bold text-ink">{profile.counts.following}</div>
             <div className="text-[11.5px] text-ink-secondary">במעקב</div>
-          </Link>
+          </div>
         </div>
 
         {/* *** תיקון (בקשה מפורשת - "לא צריך את כפתור צור תוכן חדש - יש

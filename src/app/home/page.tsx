@@ -77,11 +77,19 @@ export default function HomePage() {
   // tripadd" + "תעשה שיופיע ישר על המפה, בהמשך נעשה סינון דרך ADMIN":
   // המקור היחיד למרקרים מעכשיו הוא /api/tripadd/pins - נטען פעם אחת,
   // ומוצג *ישירות* (בלי תלות בפילטר) אלא אם המשתמש בפועל בחר פילטר.
+  //
+  // *** תוספת (בקשה מפורשת - "המקומות שלנו ב-Admin Places, על המפה,
+  // בלי תמונה, בלי לעלות שקל ב-Google Cloud"): מקור שני, נפרד לגמרי -
+  // /api/admin-places/pins. קריאה בלבד מנתונים שכבר קיימים ב-DB (לא
+  // שום קריאת Google חדשה - ר' ההערה ב-route.ts עצמו). photoUrl תמיד
+  // null במפורש כאן - "בלי תמונה" בכוונה, לא כי אין לנו תמונה בפועל.
   function loadPins() {
-    fetch("/api/tripadd/pins")
-      .then((r) => r.json())
-      .then((data) => {
-        const pins = (data.pins ?? []) as {
+    Promise.all([
+      fetch("/api/tripadd/pins").then((r) => r.json()),
+      fetch("/api/admin-places/pins").then((r) => r.json()),
+    ])
+      .then(([tripAddData, adminPlacesData]) => {
+        const pins = (tripAddData.pins ?? []) as {
           id: string;
           name: string;
           latitude: number;
@@ -97,8 +105,15 @@ export default function HomePage() {
           price_level: number | null;
           opening_hours: string[] | null;
         }[];
-        setAllPins(
-          pins.map((p) => ({
+        const adminPins = (adminPlacesData.pins ?? []) as {
+          id: string;
+          name: string;
+          category: string | null;
+          latitude: number;
+          longitude: number;
+        }[];
+        setAllPins([
+          ...pins.map((p) => ({
             id: p.id,
             name: p.name,
             latitude: p.latitude,
@@ -113,8 +128,24 @@ export default function HomePage() {
             photoUrl: p.photo_url,
             priceLevel: p.price_level,
             openingHours: p.opening_hours,
-          }))
-        );
+          })),
+          ...adminPins.map((p) => ({
+            id: p.id,
+            name: p.name,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            category: p.category as HomeMapPlace["category"],
+            subcategory: null,
+            rating: null,
+            googleRating: null,
+            googleRatingCount: null,
+            accessible: null,
+            address: null,
+            photoUrl: null,
+            priceLevel: null,
+            openingHours: null,
+          })),
+        ]);
       })
       .catch(() => setAllPins([]));
   }
