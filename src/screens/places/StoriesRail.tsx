@@ -26,7 +26,8 @@ function Avatar({ url }: { url: string | null }) {
   );
 }
 
-/** "חלון מטוס" - צורה אליפטית מוארכת, לכל שאר הסטוריז (לא שלי). */
+/** "חלון מטוס" - צורה אליפטית מוארכת, לכל שאר הסטוריז (לא שלי). לא
+ *  משתנה אף פעם - לא בזמן swipe, לא בזמן snap (בקשה מפורשת). */
 function WindowFrame({ gradient, glow, children }: { gradient: string; glow: boolean; children: ReactNode }) {
   return (
     <span
@@ -38,8 +39,7 @@ function WindowFrame({ gradient, glow, children }: { gradient: string; glow: boo
   );
 }
 
-/** עיגול אמיתי - רק למשתמש עצמו. בלי רקע לבן (בקשה מפורשת - "רקע
- *  שקוף") - רק ה-p-[3px] של הגרדיאנט עצמו. */
+/** עיגול אמיתי - רק למשתמש עצמו. בלי רקע. */
 function MyStoryCircle({ gradient, glow, children }: { gradient: string; glow: boolean; children: ReactNode }) {
   return (
     <span
@@ -52,20 +52,11 @@ function MyStoryCircle({ gradient, glow, children }: { gradient: string; glow: b
 }
 
 const ITEM_WIDTH = 70;
-const ITEM_GAP = 12;
-const SLOT_WIDTH = ITEM_WIDTH + ITEM_GAP;
-/** *** תיקון-שורש (בקשה מפורשת - "הרווח קטן מדי ולא אחיד, טקסט חוסם
- * את הסטורי שלי"): הגישה הקודמת ניסתה "לדחוף" את ה-offset הגולל
- * החוצה ממתחם-אסור לפי חישוב מספרי - אבל בשורה עם מרווח אחיד (כל
- * הפריטים 82px זה מזה), אין שום דרך ליצור רווח **סימטרי וגדול יותר**
- * רק על ידי הזזה של המספר - הזזה בכפולות שלמות של SLOT_WIDTH משאירה
- * תמיד את אותו יחס-מרחק (41px) לשכן הקרוב, מאיזה "תפר" (seam) שלא
- * יהיה. הפתרון הנכון: רווחן אמיתי (SPACER) בגודל קבוע, שמוכנס פיזית
- * כאיבר אחד נוסף בתוך מחזור-הבסיס שחוזר על עצמו - לא מספר שמנסה
- * "לדמות" רווח. אחרי כל גרירה, ה"נחיתה" היא תמיד בדיוק על אמצע
- * הרווחן הקרוב ביותר (נמדד בפועל עם getBoundingClientRect - לא
- * מחושב בהנחות על flexbox, כדי שזה יהיה נכון תמיד, לא רק בתיאוריה). */
-const SPACER_WIDTH = 210;
+const ITEM_GAP = 24; // *** בקשה מפורשת (סעיף 13) - "gap: 24px" קבוע, לא space-between.
+const STEP = ITEM_WIDTH + ITEM_GAP;
+/** הרווח הקבוע בין המרכז לצדדים (בקשה מפורשת, סעיף 4+13 - "מספיק
+ *  גדול כדי ליצור separation ברור"). */
+const SPACER_WIDTH = 230;
 
 const GENERIC_PLACEHOLDER_IMAGES = [
   "/images/mascot-happy.png",
@@ -74,32 +65,27 @@ const GENERIC_PLACEHOLDER_IMAGES = [
   "/images/mascot-skeptical.png",
 ];
 const MIN_CYCLE_LENGTH = 5;
+/** *** תיקון-ארכיטקטורה מלא (בקשה מפורשת - "STOP, זה לא CSS קטן, שנה
+ * את מבנה הקומפוננטה"): 3 ניסיונות קודמים התבססו על מדידת/חישוב
+ * פיקסלים ידני ב-JS (transform + getBoundingClientRect) - וכל שלושתם
+ * נכשלו במציאות, לא רק בתיאוריה. הסיבה: יותר מדי הנחות שבירות (טיימינג
+ * של אנימציה, parity של flexbox, מדידה תוך כדי תנועה). הפתרון עכשיו
+ * הוא **לא עוד קוד ידני** - גלילה אמיתית של הדפדפן (overflow-x-auto)
+ * עם CSS scroll-snap-align על הרווחנים בלבד (לא על הפריטים) - כך
+ * שהדפדפן עצמו, לא אני, אחראי על "לאן זה נוחת" אחרי כל swipe. זה
+ * פיצ'ר CSS סטנדרטי שנתמך בכל דפדפן מודרני ואי אפשר "לפספס" אותו
+ * בגלל טיימינג, כי אין שום JS שמנסה לתפוס את הרגע הנכון - זה קורה
+ * ברמת מנוע הרינדור עצמו.
+ */
 const REPEAT_COUNT = 15;
-/** מרחק גרירה מינימלי (px) כדי להיחשב "גרירה" ולא "קליק" - בקשה
- *  מפורשת: "ברגע שגוללים זה פותח סטורי שלחוץ". isDragging (state)
- *  מתאפס באותו handlePointerUp שגם קורא ל-onClick מיד אחריו (סדר
- *  אירועי הדפדפן: pointerup -> click) - אז בזמן שה-onClick רץ, ה-
- *  state כבר התאפס בחזרה ל-false ולא עוזר. ref נפרד, שלא מתאפס עד
- *  pointerdown הבא, פותר את זה נכון. */
-const DRAG_CLICK_THRESHOLD = 6;
 
 export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpenStory, onCreateStory }: StoriesRailProps) {
   const selfEntry = rail.find((entry) => entry.author.id === viewerId);
   const others = rail.filter((entry) => entry.author.id !== viewerId);
 
-  const outerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const hasDraggedRef = useRef(false);
-  const dragStateRef = useRef<{
-    active: boolean;
-    startX: number;
-    startOffset: number;
-    lastX: number;
-    lastT: number;
-    velocity: number;
-  } | null>(null);
+  const dragStateRef = useRef<{ active: boolean; startX: number; startScrollLeft: number } | null>(null);
 
   function handleMyStoryClick() {
     if (selfEntry) {
@@ -113,8 +99,6 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     | { kind: "real"; entry: StoryRailAuthorDto; renderKey: string }
     | { kind: "placeholder"; imageSrc: string; renderKey: string };
 
-  // *** מחזור-הבסיס: כל הסטוריז האמיתיים + דמויות גנריות שממלאות עד
-  // MIN_CYCLE_LENGTH (בקשה מפורשת - "אפשר שיהיו גם הפרצופים שהדבקתי").
   const baseCycle = useMemo<CycleItem[]>(() => {
     const real: CycleItem[] = others.map((entry, i) => ({ kind: "real", entry, renderKey: `real-${i}-${entry.author.id}` }));
     const missing = Math.max(0, MIN_CYCLE_LENGTH - real.length);
@@ -126,9 +110,8 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     return [...real, ...placeholders];
   }, [others]);
 
-  // *** כל חזרה של מחזור-הבסיס מסתיימת ברווחן אמיתי אחד (data-spacer) -
-  // זה מה שמבטיח רווח קבוע וסימטרי בכל מקום שהעיגול שלי בסופו של דבר
-  // "נוחת" עליו אחרי גרירה, בלי תלות בחשבון-פיקסלים משוער.
+  // כל חזרה מסתיימת ברווחן אחד - זה מה שסימני scroll-snap-align
+  // "center" יושבים עליו (לא על הפריטים עצמם).
   const repeatedItems = useMemo(() => {
     if (baseCycle.length === 0) return [];
     const out: ({ type: "item"; item: CycleItem; renderKey: string } | { type: "spacer"; renderKey: string })[] = [];
@@ -139,95 +122,61 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     return out;
   }, [baseCycle]);
 
-  /** מודד בפועל (לא מחשב לפי הנחות) את מרכז הרווחן הקרוב ביותר למרכז
-   *  הקונטיינר, ומתקן את dragOffset בהתאם - כדי שהוא יישב בדיוק שם.
-   *  זו הסיבה שזה תמיד נכון, גם אם ה-flex layout מתנהג אחרת ממה
-   *  שציפינו (בניגוד לגרסה הקודמת שהניחה הנחות על parity/justify). */
-  function snapToNearestSpacer() {
-    const outer = outerRef.current;
-    const track = trackRef.current;
-    if (!outer || !track) return;
-    const spacers = Array.from(track.querySelectorAll<HTMLElement>("[data-spacer]"));
-    if (spacers.length === 0) return;
+  const middleSpacerKey = repeatedItems.length > 0 ? `spacer-${Math.floor(REPEAT_COUNT / 2)}` : null;
 
-    const outerRect = outer.getBoundingClientRect();
-    const outerCenterX = outerRect.left + outerRect.width / 2;
-
-    let bestDelta = 0;
-    let bestAbs = Infinity;
-    for (const el of spacers as HTMLElement[]) {
-      const rect = el.getBoundingClientRect();
-      const elCenterX = rect.left + rect.width / 2;
-      const delta = outerCenterX - elCenterX;
-      if (Math.abs(delta) < bestAbs) {
-        bestAbs = Math.abs(delta);
-        bestDelta = delta;
-      }
-    }
-    setDragOffset((prev) => prev + bestDelta);
-  }
-
-  // *** תיקון (באג אמיתי, לא רק קובץ ישן): נחיתה מדויקת גם בפתיחה
-  // הראשונית - useLayoutEffect (לא useEffect) כדי שהתיקון יקרה *לפני*
-  // שהדפדפן מצייר, לא אחרי - אחרת יש הבזק קצר של מיקום שגוי ברגע
-  // הראשון.
+  // *** מיקום התחלתי - גלילה (לא transform, לא חישוב) עד שהרווחן
+  // האמצעי נמצא בדיוק במרכז הקונטיינר. scrollIntoView הוא API דפדפן
+  // סטנדרטי - עושה בדיוק את זה בעצמו, בלי שאצטרך לחשב שום פיקסל.
   useLayoutEffect(() => {
-    snapToNearestSpacer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repeatedItems.length]);
+    if (!middleSpacerKey) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    const el = container.querySelector<HTMLElement>(`[data-key="${middleSpacerKey}"]`);
+    if (el) el.scrollIntoView({ inline: "center", block: "nearest", behavior: "instant" as ScrollBehavior });
+  }, [middleSpacerKey]);
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (baseCycle.length === 0) return;
+    const container = scrollRef.current;
+    if (!container) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     hasDraggedRef.current = false;
-    dragStateRef.current = {
-      active: true,
-      startX: e.clientX,
-      startOffset: dragOffset,
-      lastX: e.clientX,
-      lastT: performance.now(),
-      velocity: 0,
-    };
-    setIsDragging(true);
+    dragStateRef.current = { active: true, startX: e.clientX, startScrollLeft: container.scrollLeft };
+    // מנטרלים scroll-snap זמנית בזמן גרירה פעילה - כדי שהתנועה תהיה
+    // חופשית וישירה אחרי האצבע/עכבר (בקשה מפורשת, סעיף 8), לא "נתפסת"
+    // מוקדם מדי על ידי snap points. חוזר לפעולה מיד בשחרור.
+    container.style.scrollSnapType = "none";
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current;
-    if (!state?.active) return;
-    const totalDelta = e.clientX - state.startX;
-    if (Math.abs(totalDelta) > DRAG_CLICK_THRESHOLD) hasDraggedRef.current = true;
-    const now = performance.now();
-    const dt = now - state.lastT;
-    if (dt > 0) state.velocity = (e.clientX - state.lastX) / dt;
-    state.lastX = e.clientX;
-    state.lastT = now;
-    setDragOffset(state.startOffset + totalDelta);
+    const container = scrollRef.current;
+    if (!state?.active || !container) return;
+    const dx = e.clientX - state.startX;
+    if (Math.abs(dx) > 6) hasDraggedRef.current = true;
+    // RTL: לפי הסטנדרט המודרני (spec-compliant, כל הדפדפנים הנוכחיים),
+    // scrollLeft שלילי יותר = עמוק יותר לתוך התוכן (שמאלה ויזואלית).
+    container.scrollLeft = state.startScrollLeft + dx;
   }
-
-  const TRANSITION_MS = 450;
 
   function handlePointerUp() {
     const state = dragStateRef.current;
-    if (!state?.active) return;
+    const container = scrollRef.current;
+    if (!state?.active || !container) return;
     state.active = false;
-    setIsDragging(false);
-    // תנופה קלה (momentum) לפי מהירות השחרור, ואז נחיתה מדויקת (בפועל
-    // נמדדת) על מרכז הרווחן הקרוב - לא "עצירה יבשה" בלי תנועה.
-    //
-    // *** תיקון באג אמיתי (לא קובץ ישן): requestAnimationFrame רץ
-    // ~16ms אחרי - הרבה לפני שה-transition של 450ms על התנופה עצמה
-    // בכלל הספיק להתקדם, לא כל שכן להסתיים. המדידה קרתה תוך כדי
-    // שהאלמנטים עדיין באמצע תנועה - זה בדיוק מה שגרם לתיקון השגוי/
-    // לחוסר-רווח שראית. עכשיו ממתינים בפועל למשך ה-transition המלא
-    // (setTimeout, לא frame בודד) לפני שמודדים ומתקנים סופית.
-    setDragOffset((prev) => prev + state.velocity * 90);
-    window.setTimeout(snapToNearestSpacer, TRANSITION_MS + 20);
+    // מחזירים scroll-snap - הדפדפן עצמו (לא קוד שלי) גולל את השארית
+    // עד לרווחן הקרוב ביותר, חלק ומדויק.
+    container.style.scrollSnapType = "x mandatory";
   }
 
   function renderCycleItem({ item, renderKey }: { item: CycleItem; renderKey: string }) {
     if (item.kind === "placeholder") {
       return (
-        <div key={renderKey} className="flex shrink-0 flex-col items-center gap-2 opacity-60" style={{ width: ITEM_WIDTH }}>
+        <div
+          key={renderKey}
+          data-key={renderKey}
+          className="flex shrink-0 flex-col items-start gap-2 opacity-60"
+          style={{ width: ITEM_WIDTH }}
+        >
           <WindowFrame gradient="#e2e2e8" glow={false}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={item.imageSrc} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -242,14 +191,13 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
     return (
       <button
         key={renderKey}
+        data-key={renderKey}
         type="button"
         onClick={() => {
-          // *** תיקון (בקשה מפורשת - "ברגע שגוללים זה פותח סטורי
-          // שלחוץ"): ref, לא state - ר' ההערה על DRAG_CLICK_THRESHOLD.
           if (hasDraggedRef.current) return;
           onOpenStory(rail.indexOf(entry));
         }}
-        className="flex shrink-0 flex-col items-center gap-2"
+        className="flex shrink-0 flex-col items-start gap-2"
         style={{ width: ITEM_WIDTH }}
       >
         <WindowFrame
@@ -270,44 +218,44 @@ export function StoriesRail({ rail, viewerId, viewerAvatarUrl, viewerName, onOpe
   }
 
   return (
-    <div ref={outerRef} className="relative pb-4 pt-10" style={{ height: 148 }}>
-      {/* המסלול - כל שאר הסטוריז + רווחנים אמיתיים, נגרר וגולש בלולאה. */}
-      <div className="absolute inset-0 overflow-hidden" style={{ zIndex: 0 }}>
-        {repeatedItems.length > 0 ? (
-          <div
-            ref={trackRef}
-            className="flex touch-pan-y select-none items-start justify-center"
-            style={{
-              gap: ITEM_GAP,
-              transform: `translateX(${dragOffset}px)`,
-              transition: isDragging ? "none" : `transform ${TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-              cursor: isDragging ? "grabbing" : "grab",
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          >
-            {repeatedItems.map((row) =>
-              row.type === "spacer" ? (
-                <div key={row.renderKey} data-spacer aria-hidden className="shrink-0" style={{ width: SPACER_WIDTH }} />
-              ) : (
-                renderCycleItem(row)
-              )
-            )}
-          </div>
-        ) : null}
+    <div className="relative pb-4 pt-12" style={{ height: 152 }}>
+      {/* מסלול-גלילה אמיתי של הדפדפן - לא transform מחושב. z-0, שכבה
+          תחתונה - "מתחת" לעיגול שלי. */}
+      <div
+        ref={scrollRef}
+        className="absolute inset-0 flex touch-pan-y select-none items-start overflow-x-auto"
+        style={{ gap: STEP - ITEM_WIDTH, scrollSnapType: "x mandatory", scrollbarWidth: "none", zIndex: 0 }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        {/* ריפוד בתחילת/סוף המסלול - כדי שגם הפריטים הראשונים/אחרונים
+            יוכלו להגיע למרכז המסך בזמן גלילה (בלי זה הגלילה הייתה
+            "נתקעת" בקצה לפני שהאלמנט הראשון מגיע למרכז). */}
+        <div className="shrink-0" style={{ width: "50vw" }} aria-hidden />
+        {repeatedItems.map((row) =>
+          row.type === "spacer" ? (
+            <div
+              key={row.renderKey}
+              data-key={row.renderKey}
+              aria-hidden
+              className="shrink-0"
+              style={{ width: SPACER_WIDTH, scrollSnapAlign: "center" }}
+            />
+          ) : (
+            renderCycleItem(row)
+          )
+        )}
+        <div className="shrink-0" style={{ width: "50vw" }} aria-hidden />
       </div>
 
-      {/* הסטורי שלי - ממורכז מוחלט, קבוע לגמרי, בלי רקע (שקוף), מעל
-          הכל - לא זז, לא נגרר, לא משתתף בלולאה בכלל. */}
+      {/* הסטורי שלי - קבוע, לא חלק מהגלילה, לא ב-transform, לא ב-
+          scroll position של המסלול בכלל - ממורכז מוחלט מעל הכל. */}
       <div className="pointer-events-none absolute inset-0 flex items-start justify-center" style={{ zIndex: 10 }}>
         <div className="pointer-events-auto flex w-[92px] shrink-0 flex-col items-center gap-2">
-          {/* *** תוספת (בקשה מפורשת - "העיגול קצת גבוה יותר משאר
-              הסטוריז, אבל הטקסט מתחתיו באותו גובה כמו כולם"): ההרמה
-              (-mt) על העיגול בלבד, לא על כל הבלוק - כך שהכיתוב
-              מתחתיו נשאר בדיוק באותה שורה כמו הכיתובים של כל
-              האליפסות האחרות (בקשה קודמת ונפרדת שעדיין בתוקף). */}
+          {/* רק התמונה מורמת - הטקסט מתחת לא זז, נשאר על אותו
+              baseline כמו כל שאר הטקסטים (בקשה מפורשת, סעיף 8). */}
           <span className="relative -mt-2">
             <button type="button" onClick={handleMyStoryClick} className="block transition-transform active:scale-95">
               <MyStoryCircle
