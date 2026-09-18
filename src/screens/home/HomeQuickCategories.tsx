@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
   HOME_QUICK_CATEGORIES,
   type HomeQuickCategoryId,
@@ -12,6 +12,10 @@ interface HomeQuickCategoriesProps {
   selected: HomeQuickCategoryId[];
   /** קליק על עיגול - טוגל: אם הקטגוריה כבר נבחרה, קליק חוזר מבטל אותה. */
   onToggle: (id: HomeQuickCategoryId) => void;
+  /** פריט אופציונלי שמוצג *ראשון* בשורה (מימין ב-RTL), לפני עיגולי
+   *  הקטגוריות - למשל כפתור הפילטרים של TripMatch המוטמע. לא מועבר =
+   *  ההתנהגות הקיימת ללא שינוי (HomeMap וכו'). */
+  leading?: ReactNode;
 }
 
 /**
@@ -30,7 +34,7 @@ interface HomeQuickCategoriesProps {
  * נבחר - אינדיקציה ויזואלית קלה של "הפילטר הזה פעיל", בלי לשנות את
  * התמונה/העיצוב הבסיסי של העיגול.
  */
-export function HomeQuickCategories({ selected, onToggle }: HomeQuickCategoriesProps) {
+export function HomeQuickCategories({ selected, onToggle, leading }: HomeQuickCategoriesProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // מוודא שהרצועה תמיד מתחילה בהתחלה (מימין, כי RTL), גם אם הדפדפן/HMR שמרו מיקום גלילה ישן
@@ -51,6 +55,7 @@ export function HomeQuickCategories({ selected, onToggle }: HomeQuickCategoriesP
       className="flex gap-2 overflow-x-auto ps-6 pb-1 pt-1"
       style={{ scrollbarWidth: "none" }}
     >
+      {leading}
       {HOME_QUICK_CATEGORIES.map((category) => {
         const isSelected = selected.includes(category.id);
         return (

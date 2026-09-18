@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { toggleFavorite } from "@/services/favorites/favoritesService";
 import { listAddresses } from "@/services/addresses/addressesService";
-import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
+import { SwipeHeader, SwipeProgressBar } from "@/screens/tripmatch/SwipeHeader";
+import { FilterCircleButton } from "@/screens/tripmatch/FilterCircleButton";
 import { TripMatchCard, TRIPMATCH_CARD_BUTTON_ZONE } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
@@ -1283,7 +1284,15 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
         )}
 
         {stage === "swiping" && (
-          <div className="h-viewport-safe flex flex-col">
+          // *** תיקון (בקשה מפורשת - "הרווח מתחת לכפתורי הלייק/אנלייק
+          // גדול מדי עד הבר התחתון"): כש-embedded=true אין יותר גובה
+          // קבוע של 100dvh לכל המכל - הוא היה יוצר "שטח מת" (25% שנשארו
+          // אחרי הקטנת הכרטיס ל-75%) *מתחת* לכפתורים, מעל ה-pb של Home.
+          // עכשיו הגובה נקבע רק ע"י תוכן המכל (header + קטגוריות + כרטיס
+          // בגובה מפורש - ר' .tripmatch-embedded-card-area ב-globals.css),
+          // והכפתורים נשארים צמודים לתחתית ההורה. עמוד /tripmatch העצמאי
+          // (embedded=false) לא השתנה.
+          <div className={embedded ? "flex flex-col" : "h-viewport-safe flex flex-col"}>
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}
@@ -1297,6 +1306,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 activeFilterCount={countActiveFilters(filters)}
                 hideTopBar={embedded}
                 hideCategoryPill={categoryValue === null}
+                hideProgressBar={embedded}
               />
             )}
 
@@ -1305,7 +1315,29 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 כבר מוצגים למעלה מ"הכל" לפני שנוגעים בעיגול אחד. בחירה
                 מרובה (OR) מסננת בצד הלקוח בלבד, בלי קריאת שרת נוספת. */}
             {candidates.length > 0 && (
-              <HomeQuickCategories selected={activeCategoryFilters} onToggle={toggleCategoryFilter} />
+              <HomeQuickCategories
+                selected={activeCategoryFilters}
+                onToggle={toggleCategoryFilter}
+                // בקשה מפורשת - "הפילטרים בשורה של הסוגים, הראשונים
+                // מימין": במצב מוטמע (בלי הבר העליון עם כפתור הפילטר) הכפתור
+                // יושב כאן, כפריט ראשון בשורת הסוגים. ב-/tripmatch העצמאי
+                // הפילטר נשאר בבר העליון כמו קודם.
+                leading={
+                  embedded ? (
+                    <FilterCircleButton onClick={() => setFiltersOpen(true)} activeFilterCount={countActiveFilters(filters)} />
+                  ) : undefined
+                }
+              />
+            )}
+
+            {/* *** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת
+                לפילטרים"): במצב מוטמע פס ההתקדמות יושב *אחרי* שורת הסוגים
+                (והפילטר), ישר מעל הכרטיס - לא מעליהם. באותם שוליים
+                אופקיים (px-6) כמו שורת החיפוש והכרטיס. */}
+            {embedded && currentCandidate && (
+              <div className="px-8 pt-1.5">
+                <SwipeProgressBar currentIndex={totalDecisions} total={totalDecisions + visibleCandidates.length} />
+              </div>
             )}
 
             {error && <p className="px-5 pt-1 text-center text-sm text-danger">{error}</p>}
@@ -1330,8 +1362,19 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
             <div
-              className="flex min-h-0 flex-1 flex-col pt-1.5"
-              style={{ paddingBottom: embedded ? 24 : 112 }}
+              className={embedded ? "flex flex-col px-8 pt-6" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
+              // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
+              // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
+              // נוספת - "בצדדים תיצור שוליים"). הכרטיסים המסובבים שמאחור
+              // מוטים פחות במצב מוטמע (3.5°/3° במקום 5°/4°) כדי שהפינות
+              // שלהם ייכנסו בתוך השוליים ולא ייחתכו בקצה המסך. pt-6 (במקום
+              // pt-3) - רווח נוסף מפס ההתקדמות, כי פינות הכרטיסים
+              // המסובבים בולטות מעל הכרטיס הקדמי (~11px). overflowX
+              // clip חותך את "הכרטיסים המסובבים" שמאחור ואת אנימציית
+              // ה-fly-out בקצה המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה
+              // אופקית (דפדפן שלא תומך ב-clip פשוט מתעלם - כמו קודם).
+              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflowX: "clip" as const } : null) }}
             >
               {!currentCandidate ? (
                 <p className="pt-16 text-center text-ink-secondary">
@@ -1342,7 +1385,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       : "נגמרו המועמדים כרגע."}
                 </p>
               ) : (
-                <div className="relative w-full" style={{ height: "75%" }}>
+                <div
+                  className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
+                  style={embedded ? undefined : { height: "75%" }}
+                >
                   {/* *** הקטנת גובה נוספת (בקשה מפורשת - "עוד 25%"): הכרטיס
                       (וה"כרטיסים" מאחוריו) לא ממלאים יותר 100% מהגובה
                       הפנוי - רק 75% ממנו, ממורכז אנכית (justify-center
@@ -1365,7 +1411,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: "rotate(-5deg)", transformOrigin: "50% 100%" }}
+                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? -3.5 : -5}deg)`, transformOrigin: "50% 100%" }}
                     >
                       {visibleCandidates[candidateIndex + 2].imageUrls[0] && (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -1381,7 +1427,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] bg-bg-secondary shadow-[0_10px_28px_rgba(16,24,40,0.12)]"
-                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: "rotate(4deg)", transformOrigin: "50% 100%" }}
+                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? 3 : 4}deg)`, transformOrigin: "50% 100%" }}
                     >
                       {visibleCandidates[candidateIndex + 1].imageUrls[0] && (
                         // eslint-disable-next-line @next/next/no-img-element

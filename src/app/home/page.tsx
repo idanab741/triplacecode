@@ -133,7 +133,15 @@ export default function HomePage() {
   const displayName = isGuest ? null : getFirstName(profile?.full_name);
 
   return (
-    <div className="min-h-screen bg-bg pb-28">
+    // *** תיקון (בקשה מפורשת - "הרווח מתחת לכפתורי הלייק/אנלייק גדול מדי
+    // עד הבר התחתון"): כשה-TripMatch המוטמע מוצג, ה-padding התחתון הוא
+    // בדיוק גובה ה-MainBottomNav (≈66px תוכן + max(safe-area, 22px)) +
+    // 12px אוויר - במקום pb-28 (112px) הקבוע. במצב הפתיחה (בלי כרטיסים)
+    // נשאר pb-28 כמו קודם.
+    <div
+      className={`min-h-screen bg-bg ${destinationQuery ? "" : "pb-28"}`}
+      style={destinationQuery ? { paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" } : undefined}
+    >
       <div className="relative mx-auto flex max-w-xl flex-col">
         <HomeHeader loading={loading || profileLoading} />
 
@@ -176,7 +184,10 @@ export default function HomePage() {
         {/* HERO - מערכת ה-TripMatch (Card Stack הניתן להחלקה). מתחבר
             ישירות לקטגוריות/חיפוש שמעליו - זה בדיוק אותו רכיב עם אותה
             לוגיקה בדיוק שקיימת ב-/tripmatch, רק מוטמע כאן. */}
-        <div className="mt-5 min-h-0 flex-1">
+        {/* תיקון (בקשה מפורשת - "להעלות קצת את הפילטרים שיתקרבו לשורת
+            החיפוש"): כשה-TripMatch המוטמע מוצג, המרווח מעל השורה קטן
+            (mt-2 במקום mt-5). במצב הפתיחה (הודעת "חפשו יעד") נשאר mt-5. */}
+        <div className={`${destinationQuery ? "mt-2" : "mt-5"} min-h-0 flex-1`}>
           {destinationQuery ? (
             <TripMatchPageContent
               key={embeddedKey}
@@ -194,20 +205,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* כפתור "+" צף - הוספת מקום חדש (AddPlaceModal הקיים, בלי שינוי
-          בלוגיקה שלו). */}
-      <button
-        type="button"
-        onClick={() => setAddPlaceOpen(true)}
-        aria-label="הוסף מקום"
-        className="fixed bottom-24 left-5 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition active:scale-95"
-        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-      >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
-
+      {/* *** הוסר (בקשה מפורשת - "הכפתור (+) אפשר להעיף מהעמוד הזה - לא
+          רלוונטי"): כפתור ה-"+" הצף להוספת מקום. ה-AddPlaceModal עצמו
+          נשאר, והוא עדיין נפתח דרך ?openAddPlace=1 (מ-CreateMenuSheet
+          בעמוד הפרופיל) - ר' ה-effect למעלה. */}
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
 
       <MainBottomNav active="home" />

@@ -26,6 +26,25 @@ interface SwipeHeaderProps {
    *  "סיימתי לסרוק") נשארים בכל מקרה - הם לא חלק מהבר הזה. ברירת המחדל
    *  false שומרת על ההתנהגות הקיימת בעמוד /tripmatch העצמאי. */
   hideTopBar?: boolean;
+  /** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת לפילטרים"):
+   *  כש-true, פס ההתקדמות לא מוצג כאן (מעל שורת הסוגים) - ההורה מציג
+   *  אותו בעצמו *אחרי* שורת הסוגים, דרך SwipeProgressBar. ברירת המחדל
+   *  false שומרת על ההתנהגות הקיימת ב-/tripmatch העצמאי. */
+  hideProgressBar?: boolean;
+}
+
+/** פס ההתקדמות (בנפרד מה-header, כדי שאפשר למקם אותו מתחת לשורת הסוגים
+ *  במצב המוטמע ב-Home). אותו עיצוב בדיוק כמו קודם. */
+export function SwipeProgressBar({ currentIndex, total, className = "" }: { currentIndex: number; total: number; className?: string }) {
+  const progressPct = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
+  return (
+    <div className={`h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary ${className}`}>
+      <div
+        className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all duration-300"
+        style={{ width: `${progressPct}%` }}
+      />
+    </div>
+  );
 }
 
 export function SwipeHeader({
@@ -40,8 +59,9 @@ export function SwipeHeader({
   activeFilterCount,
   hideTopBar = false,
   hideCategoryPill = false,
+  hideProgressBar = false,
 }: SwipeHeaderProps) {
-  const progressPct = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
+  const showPillsRow = !hideTopBar || !hideCategoryPill;
 
   return (
     <>
@@ -72,49 +92,39 @@ export function SwipeHeader({
         </header>
       )}
 
+      {(showPillsRow || !hideProgressBar) && (
       <div className="flex flex-col gap-3 px-5 pt-3">
 
+      {/* *** תיקון (בקשה מפורשת - "המיקום לא רלוונטי פה" + "הפילטרים
+          צריכים להיות בשורה של הסוגים - הראשונה מימין"): כש-hideTopBar=true
+          (מוטמע ב-Home) שורת ה-pills העליונה כבר לא כוללת לא את כפתור
+          הפילטר (עבר לשורת עיגולי הסוגים - ר' FilterCircleButton, מועבר
+          כ-`leading` ל-HomeQuickCategories) ולא את pill היעד (העיר כבר
+          מוצגת בשורת החיפוש של Home ועל הכרטיס עצמו). נשארת רק שורת
+          ה-pill של קטגוריה בודדת - ורק כשבאמת נבחרה קטגוריה כזו - כדי
+          לא להשאיר שורה ריקה (עם gap) מעל פס ההתקדמות. */}
+      {showPillsRow && (
       <div className="flex items-center gap-2">
-        {/* תיקון (בקשה מפורשת - "לא צריך פה כפתור חזור!! יש למעלה!" +
-            "שהפילטר והקטגוריות יהיו באותה שורה"): כש-hideTopBar=true
-            (מוטמע), אין יותר כפתור חזור נפרד כאן בכלל (Home כבר מציגה
-            אחד משלה מעל) - הפילטר עבר לשבת באותה שורה בדיוק עם ה-pills
-            של יעד/קטגוריה, לא בשורה נפרדת מעליהם. */}
-        {hideTopBar && (
-          <button
-            type="button"
-            onClick={onOpenFilters}
-            aria-label="פילטרים"
-            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-soft"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-start)" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M4 6h16M7 12h10M10 18h4" />
-            </svg>
-            {activeFilterCount > 0 && (
-              <span className="absolute -end-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-        )}
         {/* *** שדרוג ויזואלי (בקשה מפורשת - "זה קצת מיושן, פורמט אחר
             שיותאם לאפליקציה"): רקע לבן+shadow-soft (כמו שאר הכפתורים
             החדשים בעמוד הבית) במקום אפור שטוח, אייקון נעץ SVG אמיתי
             (אותו path בדיוק כמו ב-TripMatchCard) במקום אימוג'י "📍",
             וחץ-למטה עדין במקום "✎" כדי לרמוז "לחיצה = שינוי". */}
-        <button
-          type="button"
-          onClick={onEditDestination}
-          className="flex items-center gap-1.5 rounded-pill bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink shadow-soft"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--color-primary-start)" aria-hidden="true">
-            <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
-          </svg>
-          {city}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-ink-secondary">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
+        {!hideTopBar && (
+          <button
+            type="button"
+            onClick={onEditDestination}
+            className="flex items-center gap-1.5 rounded-pill bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink shadow-soft"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--color-primary-start)" aria-hidden="true">
+              <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
+            </svg>
+            {city}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-ink-secondary">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+        )}
         {!hideCategoryPill && (
           <button
             type="button"
@@ -128,16 +138,15 @@ export function SwipeHeader({
           </button>
         )}
       </div>
+      )}
 
-      <div className="flex flex-col gap-1">
-        <div className="h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary">
-          <div
-            className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
+      {!hideProgressBar && (
+        <div className="flex flex-col gap-1">
+          <SwipeProgressBar currentIndex={currentIndex} total={total} />
         </div>
+      )}
       </div>
-      </div>
+      )}
     </>
   );
 }
