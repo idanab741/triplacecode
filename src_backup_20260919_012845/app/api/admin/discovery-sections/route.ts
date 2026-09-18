@@ -1,0 +1,72 @@
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@/services/supabase/admin";
+import { fetchDiscoveryPlaces } from "@/services/places/discoveryService";
+import { ADMIN_DISCOVERY_SECTIONS } from "@/constants/adminDiscoverySections";
+import type { QuickCategoryId } from "@/constants/quickCategories";
+
+function checkAuth(request: Request): boolean {
+  const secret = request.headers.get("x-admin-secret");
+  return Boolean(secret) && secret === process.env.ADMIN_API_SECRET;
+}
+
+/** מחזירה את האטרקציות התואמות לסקשן אמיתי (מתוך ADMIN_DISCOVERY_SECTIONS,
+ *  שהועתק במדויק מ-DISCOVERY_SECTIONS של כל אחד מעמודי ה-Discovery
+ *  האמיתיים) - משתמשת ב-fetchDiscoveryPlaces המשותף (אותה פונקציה
+ *  בדיוק שהאפליקציה עצמה קוראת לה), כדי שהתוצאות יהיו זהות אחד לאחד
+ *  למה שהאפליקציה הייתה מציגה, בלי כפל לוגיקת סינון. בניגוד לאפליקציה
+ *  (שם "כללי" = ליד המשתמש/בישראל בלבד) - כאן *בלי* מיקום, וברירת
+ *  המחדל world/country נשלטת ע"י ?country= (worldwide אם לא סופק). */
+export async function GET(request: Request) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const quickCategory = searchParams.get("quickCategory") as QuickCategoryId | null;
+  const sectionId = searchParams.get("sectionId");
+  const country = searchParams.get("country") || undefined;
+  const limit = Number(searchParams.get("limit") ?? 200);
+  // *** תוספת ("חופשה בארץ" - Structure B, ר' ISRAEL_VACATION_DESTINATIONS):
+  // כשמסופקים lat/lng, מסננים לרדיוס סביב היעד הישראלי הספציפי - אותו
+  // מנגנון בדיוק ש-destination/[slug]/page.tsx באפליקציה כבר משתמש בו
+  // (fetchDiscoveryPlaces + location.lat/lng + radiusKm), לא מנגנון חדש.
+  // כשלא מסופקים (המקרה הקיים, שאר סוגי הטיול) - ההתנהגות בדיוק כמו קודם.
+  const lat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
+  const lng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
+  const radiusKm = searchParams.get("radiusKm") ? Number(searchParams.get("radiusKm")) : undefined;
+
+  if (!quickCategory || !sectionId) {
+    return NextResponse.json({ error: "יש לספק quickCategory ו-sectionId" }, { status: 400 });
+  }
+
+  const sections = ADMIN_DISCOVERY_SECTIONS[quickCategory];
+  const section = sections?.find((s) => s.id === sectionId);
+  if (!section) {
+    return NextResponse.json({ error: "סקשן לא מוכר" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  // *** תיקון (באג אמיתי - "תל אביב מציגה מלונות מירושלים/ים המלח"):
+  // כשיש lat/lng (עמוד יעד ספציפי - domestic/[slug]) חייב סינון הדוק:
+  // רדיוס קטן משמעותית מברירת המחדל הכללית של האפליקציה (שנועדה ל"קרוב
+  // אליי" רחב), ובלי שום הרחבת רדיוס אוטומטית - עדיף פחות תוצאות
+  // ומדויקות מאשר תוצאות מיעד אחר לגמרי שנראות כאילו הן שייכות לכאן.
+  const hasLocation = lat !== null && lng !== null;
+  const places = await fetchDiscoveryPlaces(supabase, {
+    location: { lat, lng, city: null },
+    radiusKm: radiusKm ?? (hasLocation ? 15 : undefined),
+    disableRadiusExpansion: hasLocation,
+    category: section.category,
+    categories: section.categories,
+    subcategories: section.subcategories,
+    requiredAnyTags: section.requiredAnyTags,
+    requiredAnyCuisineTags: section.requiredAnyCuisineTags,
+    categoryColumnEquals: section.categoryColumnEquals,
+    allowNightlife: section.allowNightlife ?? true, // אדמין רוצה לראות הכל, כולל nightlife, גם בסקשנים שלא ביקשו את זה במפורש
+    country,
+    worldwide: !country && lat === null,
+    limit,
+  });
+
+  return NextResponse.json({ places, section: { id: section.id, emoji: section.emoji, title: section.title } });
+}

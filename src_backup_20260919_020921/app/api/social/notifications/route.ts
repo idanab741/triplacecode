@@ -1,0 +1,14 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/services/supabase/server";
+import { getSocialNotifications } from "@/services/social/socialNotificationsService";
+
+export async function GET() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "יש להתחבר" }, { status: 401 });
+
+  const notifications = await getSocialNotifications(supabase, user.id);
+  return NextResponse.json({ notifications, unreadCount: notifications.filter((n) => !n.isRead).length });
+}

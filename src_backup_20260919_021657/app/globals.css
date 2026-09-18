@@ -1,0 +1,174 @@
+﻿@import "tailwindcss";
+@import "../theme/tokens.css";
+
+:root {
+  /* מונע מדפדפנים (בעיקר כרום באנדרואיד) לכפות מצב כהה - האתר בעיצוב בהיר בלבד */
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* *** תיקון (Bug מפורש - "החלקתי את החלק האפור ורואים מעליו את המפה,
+     הוא אמור להיות קבוע/דטרמיניסטי"): זה לא היה קשור ל-sticky (שכבר
+     מונע גלילה של הכרטיס האפור *מעבר* לראש המסך) - זה אפקט ה"רבר-בנד"
+     האלסטי הסטנדרטי של iOS/WebKit: כשמושכים/גוללים מעבר לקצה העליון
+     של הדף (מחווה נפוצה בזמן swipe מהיר), iOS מזיז את **כל תוכן הדף**
+     זמנית כלפי מטה כ"פידבק" ויזואלי - וכיוון שהמפה שלנו fixed (לא
+     חלק מהתוכן שזז), היא נחשפת ברווח שנפתח מעל. overscroll-behavior-y
+     מכבה את האפקט הזה לגמרי (לא רק ב-Home - גלובלי לכל האפליקציה,
+     שיפור לכל עמוד, לא רק תיקון נקודתי) - התוכן פשוט לא יזוז יותר
+     מעבר לקצוות שלו, בלי קשר לעוצמת המחווה. */
+  overscroll-behavior-y: none;
+}
+
+/* *** תיקון: באייפון, כשה-font-size של input/textarea/select קטן מ-16px,
+   Safari מבצע זום אוטומטי בפוקוס (זה עיצוב מכוון של iOS, לא באג) - זה
+   מה שגרם ל"זום מעצבן" בכל שדה הקלדה. פותרים בלי לבטל pinch-zoom
+   (שפוגע בנגישות) - פשוט מבטיחים שגודל הטקסט בשדות תמיד לפחות 16px
+   במסכים ניידים, כדי ש-Safari לא יחשוב שצריך להתקרב. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* *** תיקון קריטי: מסך ה-swiping ב-TripMatch (וכל שימוש עתידי דומה)
+   הסתמך על height: 100dvh דרך inline style בלבד, בלי fallback. בתוך
+   ה-WebView של האפליקציה (לא Safari/Chrome רגיל) 100dvh לא נתמך תמיד -
+   כשזה קורה, הדפדפן פשוט מתעלם מהערך (לא נופל לברירת מחדל שימושית),
+   הגובה נשאר auto/0, וכל שרשרת ה-h-full מתחתיו (כרטיס ה-TripMatch,
+   הכפתורים) קורסת - בדיוק מה שראינו: רק הכפתורים (גודל קבוע בפיקסלים,
+   לא תלויים בגובה ההורה) נשארו נראים, בזמן שגוף הכרטיס נעלם לגמרי.
+   הפתרון הקלאסי: שתי הצהרות height - הדפדפן משתמש בערך התקין האחרון
+   שהוא מבין. דפדפן בלי תמיכה ב-dvh פשוט מתעלם מהשורה השנייה ונשאר עם
+   100vh (השורה הראשונה) - fallback עובד תמיד, בלי JS. */
+.h-viewport-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* *** תוספת (בקשת המשתמש - בועת תצוגה מקדימה עם תמונה בלחיצה על פין
+   במפה): מבטלת את ה-padding/margin שברירת המחדל של Leaflet מוסיפה
+   סביב תוכן הבועה, כדי שהתמונה תיצמד לקצוות ולפינות המעוגלות. */
+.place-preview-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  border-radius: var(--radius-card, 14px);
+  overflow: hidden;
+}
+.place-preview-popup .leaflet-popup-content {
+  margin: 0;
+  width: 128px !important;
+}
+.place-preview-popup .leaflet-popup-tip {
+  background: white;
+}
+.place-preview-popup .leaflet-popup-close-button {
+  z-index: 1;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* *** תיקון (בקשת המשתמש - "למה המפה נראית אותו דבר??" - הגישה
+   הקודמת [grayscale על אריחי המפה + div נפרד מעליו עם
+   mix-blend-mode:color] לא באמת עבדה בפועל, כנראה כי Leaflet מקדם
+   כל pane משלו (tile-pane וכו') לשכבת compositing נפרדת (transform:
+   translate3d לצורך ביצועים) - ותקלה ידועה ב-WebView/Safari היא
+   ש-mix-blend-mode "לא רואה מבעד" לשכבות compositing כאלה, אז הגוון
+   פשוט לא מתערבב עם האריחים שמתחתיו בפועל, גם שהקוד "נראה" תקין.
+   הפתרון החדש לא תלוי ב-blend-mode/compositing בכלל: שרשרת filter
+   אחת שממפה את הצבעים ישירות (grayscale -> sepia -> hue-rotate ->
+   saturate) - טכניקת ה-"duotone" הסטנדרטית, נתמכת בכל דפדפן/WebView
+   בלי אפקטים צדדיים. שווה לכוון ידנית (hue-rotate/saturate) מול
+   מפה אמיתית - הערכים כאן הם נקודת התחלה סבירה לכיוון כחול-תכלת. */
+.map-branded .leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.15) sepia(0.6) hue-rotate(185deg) saturate(2.2) contrast(0.95);
+}
+
+/* *** תיקון (בקשה מפורשת - "תיישר לימין! ימין לשמאל! בגופן שלנו!"):
+   ל-Leaflet יש CSS ברירת מחדל משלו על .leaflet-popup-content (כיוון
+   LTR מובנה, font-family שלא בהכרח = הפונט של האפליקציה) - זה בדיוק
+   מה שדרס את ה-dir="rtl"/text-right שכבר היו על התוכן הפנימי שלנו,
+   וגרם לכרטיסייה להיראות דחוסה לשמאל עם המון רווח ריק מימין. מכוון
+   ספציפית ל-.tripadd-popup (לא לכל popup במערכת) כדי לא לשבור מפות
+   אחרות שמשתמשות ב-Popup רגיל. */
+.tripadd-popup .leaflet-popup-content-wrapper,
+.tripadd-popup .leaflet-popup-content {
+  direction: rtl;
+  text-align: right;
+  font-family: var(--font-sans);
+}
+.tripadd-popup .leaflet-popup-content {
+  width: 100% !important;
+  margin: 12px 14px;
+  /* *** תיקון (בקשה מפורשת - "הטקסט בורח מהחלונית"): Leaflet מודד
+     את רוחב התוכן לפי טקסט *לא-עטוף* לפני שהוא מיישם את מגבלת
+     maxWidth שהוגדרה ב-Popup - בלי word-wrap מפורש, שורה ארוכה (כמו
+     כתובת) יכולה לדחוף את כל התיבה לרוחב גדול יותר ולגלוש מעבר לקצה. */
+  white-space: normal !important;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* *** תיקון (Bug - עיגול "N"/מצפן ובקרת זום כפולה): ה-canvas שה-SDK
+   של MapTiler (MapLibre GL) מצייר עליו לא תמיד יורש את touch-action
+   שקובץ ה-CSS הרשמי של Leaflet מגדיר על .leaflet-container - אם מחוות
+   מגע (pinch) "בורחת" מה-canvas הזה, היא עלולה להתפרש כפינץ'-זום על
+   כל הדף. קיבוע מפורש שומר את המחווה כלואה בתוך המפה בלבד. */
+.home-map-fixed-gesture,
+.home-map-fixed-gesture canvas {
+  touch-action: none;
+}
+
+/* *** תיקון ודאי (Bug - עיגול "N"/מצפן ובקרת זום כפולה עדיין מופיעים
+   למרות navigationControl:false שהועבר ל-MaptilerLayer): ה-constructor
+   option לא בהכרח מיושם ע"י כל גרסה של @maptiler/leaflet-maptilersdk
+   (יכול להיות surface מצומצם יותר מ-maptilersdk.Map המלא) - אי אפשר
+   להמר שוב על ניחוש API. זו הסרה **ודאית** ברמת ה-CSS: כל הבקרות
+   שה-canvas הפנימי של MapLibre GL (לא Leaflet עצמו!) מוסיף לעצמו
+   נושאות תמיד את המחלקות הסטנדרטיות maplibregl-ctrl-* - מסתירים אותן
+   לגמרי בכל מקום בתוך מפת Leaflet, בלי תלות בשום JS option. נשארת
+   רק בקרת הזום המקורית של Leaflet עצמו (leaflet-control-zoom). */
+.leaflet-container .maplibregl-ctrl-top-right,
+.leaflet-container .maplibregl-ctrl-top-left,
+.leaflet-container .maplibregl-ctrl-bottom-right,
+.leaflet-container .maplibregl-ctrl-bottom-left {
+  display: none !important;
+}
+
+/* *** תיקון (בקשת המשתמש - "למה זה נראה ככה??" - כמעט ריק/לבן):
+   הפילטר הזה כוון במקור מול אריחי OSM הרוויים-בצבע. DATAVIZ (סגנון
+   MapTiler) כבר בהיר וחיוור בעצמו - brightness/contrast חזקים "שורפים"
+   ללבן כל מה שכבר כמעט-לבן שם (רקע, כבישים דקים). מסירים את הפילטר
+   הזה לגמרי מעל canvas של MapTiler - במקום להמשיך לנחש ערכי CSS בלי
+   אפשרות לראות תוצאה בזמן אמת, עדיף סגנון בסיס נקי כמו שהוא (הפינים
+   כבר בכחול המותג). התאמת צבע מדויקת לבסיס המפה עצמו דורשת את כלי
+   ה-Customize של MapTiler (עיצוב סגנון מותאם אישית עם משוב חזותי
+   בזמן אמת) - לא CSS filter עיוור. */
+
+.place-map-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.place-map-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+  direction: rtl;
+  font-family: var(--font-sans);
+}
+.place-map-popup .leaflet-popup-tip-container {
+  display: none;
+}
+
+/* *** תוספת (StoriesRail.tsx - הסתרת פס-גלילה): scrollbarWidth:"none"
+   ב-inline style מכסה רק Firefox - דפדפני WebKit/Chromium (Chrome,
+   Safari, Edge) צריכים את הכלל הזה בנפרד, אין לו מקבילה ב-inline
+   style בכלל (זה pseudo-element). */
+.stories-rail-track::-webkit-scrollbar {
+  display: none;
+}
