@@ -1,0 +1,185 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Skeleton } from "@/components/ui";
+import { useAuth } from "@/hooks/useAuth";
+import { NotificationCard } from "@/screens/notifications/NotificationCard";
+import type { ActivityItem } from "@/services/notifications/notificationsService";
+
+interface HomeHeaderProps {
+  loading: boolean;
+}
+
+/**
+ * Header עליון של עמוד הבית: כפתור צ'אט עגול בצד שמאל (מוביל ל-Trippy AI,
+ * /ai), הלוגו במרכז - **באותה שורה בדיוק, אותו גובה** כמו הצ'אט וההתראות
+ * (בקשה מפורשת - קודם הלוגו ישב *מתחת* ל-header עם margin שלילי, לא
+ * ממורכז אנכית איתם באמת) - וכפתור ההתראות הקיים בצד ימין, בדיוק כמו
+ * קודם, בלי שינוי בלוגיקה שלו.
+ *
+ * *** שינוי (בקשה מפורשת - שדרוג ויזואלי של מסך הבית): תמונת הפרופיל
+ * וכפתור בחירת המיקום ("המיקום שלי") הוסרו מה-header. הפרופיל עדיין
+ * נגיש מ-BottomNav, ובחירת יעד/מיקום עברה לשורת החיפוש (SearchBarLink,
+ * ר' home/page.tsx) - "קרוב אלי" שם מחליף את התפקיד שהיה לכפתור המיקום
+ * כאן. שום דבר מה-Backend/API/לוגיקת ההתראות לא השתנה.
+ */
+export function HomeHeader({ loading }: HomeHeaderProps) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifItems, setNotifItems] = useState<ActivityItem[] | null>(null);
+  const [notifError, setNotifError] = useState(false);
+  const unreadCount = notifItems ? notifItems.filter((i) => !i.isRead).length : null;
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  function fetchNotifications() {
+    setNotifError(false);
+    fetch("/api/notifications?tab=all")
+      .then((res) => {
+        if (!res.ok) throw new Error("failed");
+        return res.json();
+      })
+      .then((data) => {
+        setNotifItems(data.notifications ?? []);
+      })
+      .catch(() => {
+        setNotifError(true);
+      });
+  }
+
+  // טעינה ראשונית - כדי שה-badge יהיה מוכן מיד, בלי לחכות ללחיצה על הפעמון.
+  useEffect(() => {
+    if (!user) return;
+    fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // סגירה בלחיצה מחוץ לבועה.
+  useEffect(() => {
+    if (!notifOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifOpen]);
+
+  function handleBellClick() {
+    setNotifOpen((open) => !open);
+  }
+
+  async function handleOpenNotification(item: ActivityItem) {
+    setNotifOpen(false);
+    if (!item.isRead) {
+      setNotifItems((prev) => (prev ? prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i)) : prev));
+      try {
+        const res = await fetch(`/api/notifications/${encodeURIComponent(item.id)}/read`, { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          console.error("[HomeHeader] סימון התראה כנקראה נכשל בפועל בשרת", data);
+        }
+      } catch {
+        // כשל שקט (בעיית רשת) - ה-state המקומי כבר מציג "נקרא".
+      }
+    }
+    if (item.actionUrl) router.push(item.actionUrl);
+  }
+
+  return (
+    <header className="relative z-10 grid grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
+      {/* כפתור CHAT - עגול, לבן, אייקון מינימליסטי בכחול TRIPLACE. מוביל
+          ל-Trippy AI (/ai) - "הצ'אט" הקיים של המוצר, בלי route חדש. */}
+      <Link
+        href="/ai"
+        aria-label="צ'אט"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-soft"
+      >
+        {loading ? (
+          <Skeleton className="h-full w-full rounded-full" />
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8c-1.1 0-2.1-.2-3.1-.6L5 20l1.1-3.7C4.8 15 4 13.6 4 12Z"
+              stroke="var(--color-primary-start)"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <circle cx="9" cy="12" r="1" fill="var(--color-primary-start)" />
+            <circle cx="12" cy="12" r="1" fill="var(--color-primary-start)" />
+            <circle cx="15" cy="12" r="1" fill="var(--color-primary-start)" />
+          </svg>
+        )}
+      </Link>
+
+      {/* אמצע - לוגו TRIPLACE, באותה שורה ואותו גובה בדיוק כמו הצ'אט
+          וההתראות (items-center על ה-header כבר מיישר אנכית). */}
+      <div className="flex justify-center">
+        <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={120} height={37} className="object-contain" />
+      </div>
+
+      <div ref={popoverRef} className="relative justify-self-end">
+        <button
+          type="button"
+          onClick={handleBellClick}
+          aria-label="התראות"
+          aria-expanded={notifOpen}
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+        >
+          <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
+          {unreadCount != null && unreadCount > 0 && (
+            <span
+              className="absolute -left-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white"
+              style={{ background: "var(--color-primary-start)" }}
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {notifOpen && (
+          <div className="absolute left-0 top-full z-50 mt-2 w-[calc(100vw-2.5rem)] max-w-[360px] overflow-hidden rounded-card bg-white shadow-soft ring-1 ring-black/5">
+            <div className="max-h-[70vh] overflow-y-auto p-2">
+              {notifItems === null && !notifError && (
+                <div className="flex flex-col gap-2 p-1">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              )}
+
+              {notifError && (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <p className="text-xs text-ink-secondary">לא הצלחנו לטעון את ההתראות שלכם.</p>
+                  <button type="button" onClick={fetchNotifications} className="text-xs font-semibold text-accent">
+                    נסה שוב
+                  </button>
+                </div>
+              )}
+
+              {notifItems !== null && !notifError && notifItems.length === 0 && (
+                <div className="flex flex-col items-center gap-1.5 py-8 text-center">
+                  <span className="text-2xl">✨</span>
+                  <p className="text-xs font-semibold text-ink">הכול רגוע</p>
+                  <p className="text-[11px] text-ink-secondary">כרגע אין משהו חדש לעדכן אתכם.</p>
+                </div>
+              )}
+
+              {notifItems !== null && !notifError && notifItems.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {notifItems.map((item) => (
+                    <NotificationCard key={item.id} item={item} onOpen={handleOpenNotification} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
