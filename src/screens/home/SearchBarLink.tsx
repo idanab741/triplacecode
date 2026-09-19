@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 
 interface PlaceSuggestion {
   /** *** שינוי (בקשה מפורשת - "רק ממאגר TRIPADD, לא מגוגל"): מגיע
@@ -35,12 +36,21 @@ interface SearchBarLinkProps {
    *  מבחוץ. ברירת המחדל שומרת בדיוק על ההתנהגות הקיימת בכל השימושים
    *  הנוכחיים (home/page.tsx הרגיל, StickyHeader.tsx). */
   containerClassName?: string;
+  /** "hero" - העיצוב החדש של עמוד הבית על רקע כחול: גובה קבוע 48px, לבן
+   *  מלא, בלי מסגרת, אייקון חיפוש בכחול המותג, צל עדין וטבעת פוקוס.
+   *  ברירת המחדל "default" שומרת על העיצוב הקיים בשאר המקומות. */
+  variant?: "default" | "hero";
+  /** אלמנט שמוצג *בתוך* שורת החיפוש, בקצה הסופי שלה (פיזית שמאל ב-RTL) -
+   *  למשל כפתור "קרוב אלי" (בקשה מפורשת: המיקום נכנס לתוך שורת החיפוש). */
+  endAdornment?: ReactNode;
 }
 
 export function SearchBarLink({
   destinationMode = false,
   onSelectDestination,
   containerClassName = "relative mx-6",
+  variant = "default",
+  endAdornment,
 }: SearchBarLinkProps = {}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -129,8 +139,23 @@ export function SearchBarLink({
 
   return (
     <div className={containerClassName}>
-      <div className="flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-ink-secondary">
+      <div
+        className={
+          variant === "hero"
+            ? "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-6px_rgba(0,50,120,0.4)] transition focus-within:ring-2 focus-within:ring-white/70"
+            : "flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft"
+        }
+      >
+        <svg
+          width={variant === "hero" ? 20 : 18}
+          height={variant === "hero" ? 20 : 18}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={variant === "hero" ? "var(--color-primary-end)" : "currentColor"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          className={variant === "hero" ? "shrink-0" : "shrink-0 text-ink-secondary"}
+        >
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />
         </svg>
@@ -150,8 +175,13 @@ export function SearchBarLink({
             if (e.key === "Enter") handleEnter();
           }}
           placeholder={destinationMode ? "לאן בא לך להחליק היום?" : "חפש מסעדה, מלון, אטרקציה..."}
-          className="w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
+          className={
+            variant === "hero"
+              ? "w-full min-w-0 bg-transparent font-medium text-ink placeholder:font-normal placeholder:text-ink-secondary focus:outline-none"
+              : "w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
+          }
         />
+        {endAdornment}
       </div>
 
       {!destinationMode && focused && placeSuggestions.length > 0 && (

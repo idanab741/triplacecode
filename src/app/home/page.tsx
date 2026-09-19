@@ -138,41 +138,56 @@ export default function HomePage() {
       style={destinationQuery ? { paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" } : undefined}
     >
       <div className="relative mx-auto flex max-w-xl flex-col">
+        {/* *** בקשה מפורשת - "הרקע של החלק עד שורת החיפוש כולל בצבע כחול
+            כמו האייקון שלנו, עם קצוות מעוגלים": ההדר + שורת החיפוש יושבים
+            על רקע גרדיאנט תכלת→כחול (צבעים דגומים מאייקון האפליקציה), עם
+            פינות תחתונות מעוגלות. בלי overflow-hidden - כדי שתפריט ההצעות
+            של החיפוש והבועה של ההתראות יוכלו לצאת מתחתיו. */}
+        <div
+          className="relative z-10 rounded-b-[32px] pb-5"
+          style={{
+            background: "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)",
+            boxShadow: "0 12px 30px -14px rgba(0, 124, 254, 0.6)",
+          }}
+        >
         <HomeHeader loading={loading || profileLoading} />
 
         {/* הוסר (בקשה מפורשת - "בוא נעיף את החלק הזה"): בלוק הברכה
             ("ערב טוב, עידן! / בוא נראה מה מתאים לך היום"). הקומפוננט
             screens/home/GreetingBlock.tsx נשאר בפרויקט, פשוט לא בשימוש. */}
 
-        {/* שורת חיפוש יעד + "קרוב אלי" - אחד ליד השני, כמערכת אחת.
-            *** תיקון (בקשה מפורשת - "קרוב אלי בצד שמאל לא ימין"):
-            סדר ה-DOM הפוך בכוונה (חיפוש קודם, קרוב-אלי אחרון) - תחת
-            ה-dir="rtl" הגלובלי של האפליקציה, האלמנט האחרון ב-DOM הוא
-            זה שמסתיים פיזית בצד שמאל. */}
-        <div className="mt-4 flex items-center gap-2 px-6">
+        {/* שורת חיפוש יעד - ברוחב מלא (אותם שוליים כמו ההדר, px-5).
+            *** בקשה מפורשת - "שורת החיפוש עד הסוף, והמיקום נכנס לתוך שורת
+            החיפוש": כפתור "קרוב אלי" כבר לא עיגול נפרד לידה - הוא בתוך
+            השורה, בקצה השמאלי שלה (endAdornment, אחרון ב-DOM = פיזית שמאל
+            תחת dir="rtl"), עם קו מפריד עדין. אותו אייקון נעץ ואותה לוגיקה. */}
+        <div className="mt-4 px-5">
           <SearchBarLink
             destinationMode
+            variant="hero"
             onSelectDestination={handleSelectDestination}
-            containerClassName="relative flex-1"
+            containerClassName="relative"
+            endAdornment={
+              <>
+                <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />
+                <button
+                  type="button"
+                  onClick={handleUseNearMe}
+                  disabled={locating}
+                  aria-label={locating ? "מאתר מיקום..." : "קרוב אלי"}
+                  title="קרוב אלי"
+                  className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
+                >
+                  {locating ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink" />
+                  ) : (
+                    <Image src="/icons/location.png" alt="" width={22} height={22} />
+                  )}
+                </button>
+              </>
+            }
           />
-          {/* *** תיקון (בקשה מפורשת - "רק אייקון של נעץ סביב עיגול"):
-              לא עוד pill עם טקסט - עיגול לבן עם אייקון הנעץ הקיים בלבד
-              (/icons/location.png, אותו אייקון בדיוק שכבר משמש בכל
-              האפליקציה למיקום), תואם בגודל/סגנון לכפתורי הצ'אט/התראות. */}
-          <button
-            type="button"
-            onClick={handleUseNearMe}
-            disabled={locating}
-            aria-label={locating ? "מאתר מיקום..." : "קרוב אלי"}
-            title="קרוב אלי"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-soft transition active:scale-95 disabled:opacity-60"
-          >
-            {locating ? (
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink" />
-            ) : (
-              <Image src="/icons/location.png" alt="" width={20} height={20} />
-            )}
-          </button>
+        </div>
         </div>
         {locateError && <p className="mt-1 px-6 text-center text-xs text-danger">{locateError}</p>}
 
@@ -182,7 +197,7 @@ export default function HomePage() {
         {/* תיקון (בקשה מפורשת - "להעלות קצת את הפילטרים שיתקרבו לשורת
             החיפוש"): כשה-TripMatch המוטמע מוצג, המרווח מעל השורה קטן
             (mt-2 במקום mt-5). במצב הפתיחה (הודעת "חפשו יעד") נשאר mt-5. */}
-        <div className={`${destinationQuery ? "mt-2" : "mt-5"} min-h-0 flex-1`}>
+        <div className={`${destinationQuery ? "mt-3" : "mt-5"} min-h-0 flex-1`}>
           {destinationQuery ? (
             <TripMatchPageContent
               key={embeddedKey}

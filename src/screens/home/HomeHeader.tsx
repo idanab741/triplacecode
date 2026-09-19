@@ -11,7 +11,6 @@ import type { ActivityItem } from "@/services/notifications/notificationsService
 
 interface HomeHeaderProps {
   loading: boolean;
-  avatarUrl?: string | null;
 }
 
 /**
@@ -93,34 +92,35 @@ export function HomeHeader({ loading }: HomeHeaderProps) {
 
   return (
     <header className="relative z-10 grid grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
-      {/* כפתור CHAT - עגול, לבן, אייקון מינימליסטי בכחול TRIPLACE. מוביל
-          ל-Trippy AI (/ai) - "הצ'אט" הקיים של המוצר, בלי route חדש. */}
+      {/* כפתור CHAT - עיגול לבן עם אייקון הצ'אט של המוצר (אותו קובץ בדיוק
+          שמשמש ב-PlacesHeader: /images/places-chat-icon.png - בקשה מפורשת:
+          "הכפתור של הצ'אט יהיה כמו הצ'אט שלנו באייקונים"). מוביל ל-Trippy AI
+          (/ai) כמו קודם, בלי route חדש. */}
       <Link
         href="/ai"
         aria-label="צ'אט"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-soft"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
       >
         {loading ? (
           <Skeleton className="h-full w-full rounded-full" />
         ) : (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8c-1.1 0-2.1-.2-3.1-.6L5 20l1.1-3.7C4.8 15 4 13.6 4 12Z"
-              stroke="var(--color-primary-start)"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-            <circle cx="9" cy="12" r="1" fill="var(--color-primary-start)" />
-            <circle cx="12" cy="12" r="1" fill="var(--color-primary-start)" />
-            <circle cx="15" cy="12" r="1" fill="var(--color-primary-start)" />
-          </svg>
+          <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
         )}
       </Link>
 
       {/* אמצע - לוגו TRIPLACE, באותה שורה ואותו גובה בדיוק כמו הצ'אט
           וההתראות (items-center על ה-header כבר מיישר אנכית). */}
       <div className="flex justify-center">
-        <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={120} height={37} className="object-contain" />
+        {/* בקשה מפורשת - רקע כחול לאזור העליון: הלוגו השחור הופך ללבן
+            (brightness(0) invert(1)) - בלי קובץ לוגו חדש. */}
+        <Image
+          src="/images/triplace-logo-black.png"
+          alt="TRIPLACE"
+          width={120}
+          height={37}
+          className="object-contain"
+          style={{ filter: "brightness(0) invert(1)" }}
+        />
       </div>
 
       <div ref={popoverRef} className="relative justify-self-end">
@@ -129,7 +129,7 @@ export function HomeHeader({ loading }: HomeHeaderProps) {
           onClick={handleBellClick}
           aria-label="התראות"
           aria-expanded={notifOpen}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
         >
           <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
           {unreadCount != null && unreadCount > 0 && (
