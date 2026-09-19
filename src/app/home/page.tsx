@@ -8,6 +8,7 @@ import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
+import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
@@ -158,6 +159,7 @@ export default function HomePage() {
             boxShadow: "0 12px 30px -14px rgba(0, 124, 254, 0.6)",
           }}
         >
+        <AnimatedHeaderBackdrop />
         <HomeHeader loading={loading || profileLoading} />
 
         {/* הוסר (בקשה מפורשת - "בוא נעיף את החלק הזה"): בלוק הברכה
@@ -216,56 +218,39 @@ export default function HomePage() {
           ) : (
             // *** הוחלף (בקשה מפורשת - "שים לי את התמונה הזאת בזמן ההמתנה
             // בעמוד הבית עד שבוחרים מיקום"): במקום הודעת הטקסט "חפשו יעד
-            // למעלה..." - איור מסך-המתנה (הדמות + כרטיסי ההחלקה), מתחת לבר
-            // התכלת.
-            // *** עדכון (בקשה מפורשת - "הטקסט יגיע מאצלך, מעל הדמות, באותו
-            // פונט שלנו"): האיור כבר בלי טקסט, והכותרות הן טקסט אמיתי בקוד
-            // (פונט Rubik של האפליקציה, נורש מה-body) שמונח מעל הדמות, באזור
-            // הריק בחלק העליון של האיור. הטקסט בתוך אותו div בעל יחס-הגובה-
-            // רוחב של התמונה (941/1672) - כך שהוא נשאר תמיד באותו מקום
-            // יחסית לדמות, בכל גודל מסך, ולא חופף אליה.
+            // למעלה..." - איור מסך-המתנה (כרטיסי ההחלקה), מתחת לבר התכלת.
+            // *** עדכון (בקשה מפורשת - "תשאיר את הטקסט, ותמתח את התמונה
+            // לכל רוחב העמוד"): איור חדש (כרטיסים בלבד, בלי דמות), נמתח
+            // מקצה לקצה לכל רוחב העמוד (object-cover, בלי מסגרת/שוליים),
+            // והכותרות (טקסט אמיתי בקוד, פונט Rubik של האפליקציה) נשארות
+            // מעליו באזור הריק בחלק העליון של האיור.
             // הגובה מחושב כך שהכל נכנס במסך אחד בלי גלילה: 100dvh פחות
-            // (הבר התכלת ~130px + pb-28 של העמוד 112px + מרווח).
-            // מסכה שקופה בשני הצדדים מטשטשת את הקצה של התמונה כשנשארים
-            // רווחים בצדדים (טלפונים רחבים יחסית), כדי שלא ייראה מלבן.
-            // הרוחב נגזר מהגובה הפנוי (גובה * 941/1672), ומוגבל ל-100% מרוחב
-            // המסך; הגובה נקבע ע"י aspect-ratio - כך האיור והטקסט שמעליו
-            // תמיד באותו יחס בדיוק, גם בטלפונים צרים וגבוהים.
-            <div className="flex w-full justify-center">
-              <div
-                className="relative"
-                style={{
-                  aspectRatio: "941 / 1672",
-                  width: "min(100%, calc(max(320px, calc(100dvh - 255px)) * 0.5628))",
-                }}
-              >
-                <Image
-                  src="/images/home/home-empty-state-v2.webp"
-                  alt=""
-                  width={941}
-                  height={1672}
-                  priority
-                  sizes="(max-width: 576px) 100vw, 576px"
-                  className="h-full w-full object-contain"
-                  style={{
-                    WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-                    maskImage: "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
-                  }}
-                />
-                <div className="absolute inset-x-0 top-[4%] flex flex-col items-center gap-2 px-[6%] text-center">
-                  <h1
-                    className="font-extrabold leading-tight text-ink"
-                    style={{ fontSize: "clamp(24px, 7.8vw, 34px)" }}
-                  >
-                    מחפשים לאן לצאת?
-                  </h1>
-                  <p
-                    className="font-medium leading-snug text-ink/80"
-                    style={{ fontSize: "clamp(13px, 3.9vw, 17px)" }}
-                  >
-                    חפשו יעד או בחרו קטגוריה - והתחילו להחליק בין המקומות הכי שווים!
-                  </p>
-                </div>
+            // (הבר התכלת ~130px + pb-28 של העמוד 112px + מרווח). בטלפונים
+            // נמוכים האיור נחתך קלות מלמעלה/מלמטה (object-position נוטה
+            // כלפי מטה כדי שהכרטיסים תמיד יישארו בפריים).
+            <div className="relative w-full" style={{ height: "max(360px, calc(100dvh - 255px))" }}>
+              <Image
+                src="/images/home/home-empty-state-v3.webp"
+                alt=""
+                fill
+                priority
+                sizes="(max-width: 576px) 100vw, 576px"
+                className="object-cover"
+                style={{ objectPosition: "50% 72%" }}
+              />
+              <div className="absolute inset-x-0 top-[4%] flex flex-col items-center gap-2 px-[6%] text-center">
+                <h1
+                  className="font-extrabold leading-tight text-ink"
+                  style={{ fontSize: "clamp(24px, 7.8vw, 34px)" }}
+                >
+                  מחפשים לאן לצאת?
+                </h1>
+                <p
+                  className="font-medium leading-snug text-ink/80"
+                  style={{ fontSize: "clamp(13px, 3.9vw, 17px)" }}
+                >
+                  חפשו יעד או בחרו קטגוריה - והתחילו להחליק בין המקומות הכי שווים!
+                </p>
               </div>
             </div>
           )}
