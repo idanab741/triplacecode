@@ -5,10 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/profileService";
-import { getFirstName } from "@/utils/greeting";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHeader } from "@/screens/home/HomeHeader";
-import { GreetingBlock } from "@/screens/home/GreetingBlock";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
@@ -129,9 +127,6 @@ export default function HomePage() {
     }
   }, [loading, profileLoading, user, profile, router]);
 
-  const isGuest = Boolean(user?.is_anonymous);
-  const displayName = isGuest ? null : getFirstName(profile?.full_name);
-
   return (
     // *** תיקון (בקשה מפורשת - "הרווח מתחת לכפתורי הלייק/אנלייק גדול מדי
     // עד הבר התחתון"): כשה-TripMatch המוטמע מוצג, ה-padding התחתון הוא
@@ -145,9 +140,9 @@ export default function HomePage() {
       <div className="relative mx-auto flex max-w-xl flex-col">
         <HomeHeader loading={loading || profileLoading} />
 
-        <div className="mt-3">
-          <GreetingBlock name={displayName} loading={loading || profileLoading} />
-        </div>
+        {/* הוסר (בקשה מפורשת - "בוא נעיף את החלק הזה"): בלוק הברכה
+            ("ערב טוב, עידן! / בוא נראה מה מתאים לך היום"). הקומפוננט
+            screens/home/GreetingBlock.tsx נשאר בפרויקט, פשוט לא בשימוש. */}
 
         {/* שורת חיפוש יעד + "קרוב אלי" - אחד ליד השני, כמערכת אחת.
             *** תיקון (בקשה מפורשת - "קרוב אלי בצד שמאל לא ימין"):
