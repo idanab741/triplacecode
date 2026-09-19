@@ -1410,7 +1410,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                   {visibleCandidates[candidateIndex + 2] && (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
+                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[5px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
                       style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? -3.5 : -5}deg)`, transformOrigin: "50% 100%" }}
                     >
                       {visibleCandidates[candidateIndex + 2].imageUrls[0] && (
@@ -1426,7 +1426,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                   {visibleCandidates[candidateIndex + 1] && (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] bg-bg-secondary shadow-[0_10px_28px_rgba(16,24,40,0.12)]"
+                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[5px] border-white bg-bg-secondary shadow-[0_10px_28px_rgba(16,24,40,0.12)]"
                       style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? 3 : 4}deg)`, transformOrigin: "50% 100%" }}
                     >
                       {visibleCandidates[candidateIndex + 1].imageUrls[0] && (

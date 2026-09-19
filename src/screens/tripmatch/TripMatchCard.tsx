@@ -84,7 +84,12 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel }: 
 
   return (
     <div
-      className="absolute inset-x-0 top-0 overflow-hidden rounded-[28px] shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
+      // *** בקשה מפורשת ("המסגרת הלבנה מסביב לכל כרטיסיה - ככה זה נראה
+      // יותר טוב"): מסגרת לבנה 5px סביב הכרטיס. border-box - הגודל החיצוני
+      // של הכרטיס לא משתנה, רק התוכן נכנס 5px פנימה (ה-overflow-hidden
+      // חותך לפי הרדיוס הפנימי). אותה מסגרת בדיוק על שני הכרטיסים המציצים
+      // מאחור ב-tripmatch/page.tsx.
+      className="absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[5px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
       style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)` }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
