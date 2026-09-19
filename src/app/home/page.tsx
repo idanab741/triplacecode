@@ -201,8 +201,9 @@ export default function HomePage() {
             לוגיקה בדיוק שקיימת ב-/tripmatch, רק מוטמע כאן. */}
         {/* תיקון (בקשה מפורשת - "להעלות קצת את הפילטרים שיתקרבו לשורת
             החיפוש"): כשה-TripMatch המוטמע מוצג, המרווח מעל השורה קטן
-            (mt-2 במקום mt-5). במצב הפתיחה (הודעת "חפשו יעד") נשאר mt-5. */}
-        <div className={`${destinationQuery ? "mt-3" : "mt-5"} min-h-0 flex-1`}>
+            (mt-2 במקום mt-5). במצב הפתיחה (איור "מחפשים לאן לצאת?") mt-2 - האיור
+            נצמד לבר התכלת. */}
+        <div className={`${destinationQuery ? "mt-3" : "mt-2"} min-h-0 flex-1`}>
           {destinationQuery ? (
             <TripMatchPageContent
               key={embeddedKey}
@@ -211,10 +212,28 @@ export default function HomePage() {
               onExitEmbedded={handleExitEmbedded}
             />
           ) : (
-            <div className="flex flex-col items-center gap-3 px-10 py-16 text-center text-ink-secondary">
-              <p className="text-sm font-medium">
-                חפשו יעד למעלה, או לחצו על הנעץ כדי לבחור את המיקום שלכם ולהתחיל להחליק על מקומות מותאמים אישית.
-              </p>
+            // *** הוחלף (בקשה מפורשת - "שים לי את התמונה הזאת בזמן ההמתנה
+            // בעמוד הבית עד שבוחרים מיקום"): במקום הודעת הטקסט "חפשו יעד
+            // למעלה..." - איור מסך-המתנה (הדמות + כרטיסי ההחלקה), מתחת לבר
+            // התכלת. הטקסט שבו הוא חלק מהתמונה. הגובה מחושב כך שהכל נכנס
+            // במסך אחד בלי גלילה: 100dvh פחות (הבר התכלת ~130px + pb-28 של
+            // העמוד 112px + מרווח) - האיור נכנס ב-object-contain בלי חיתוך.
+            // מסכה שקופה בשני הצדדים מטשטשת את הקצה של התמונה כשנשארים
+            // רווחים בצדדים (טלפונים רחבים יחסית), כדי שלא ייראה מלבן.
+            <div className="flex w-full justify-center" style={{ height: "max(320px, calc(100dvh - 255px))" }}>
+              <Image
+                src="/images/home/home-empty-state.webp"
+                alt="מחפשים לאן לצאת? חפשו יעד או בחרו קטגוריה - והתחילו להחליק בין המקומות הכי שווים!"
+                width={941}
+                height={1672}
+                priority
+                sizes="(max-width: 576px) 100vw, 576px"
+                className="h-full w-full object-contain"
+                style={{
+                  WebkitMaskImage: "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+                  maskImage: "linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%)",
+                }}
+              />
             </div>
           )}
         </div>
