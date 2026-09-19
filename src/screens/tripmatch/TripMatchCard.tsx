@@ -117,6 +117,8 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
 
   return (
     <div
+      // מזהה לשכבת ההסבר של עמוד הבית (SearchIntroOverlay) - זרקור על הכרטיס הקדמי.
+      data-tripmatch-front-card=""
       // *** בקשה מפורשת ("המסגרת הלבנה מסביב לכל כרטיסיה - ככה זה נראה
       // יותר טוב"): מסגרת לבנה דקה (2px) סביב הכרטיס. border-box - הגודל החיצוני
       // של הכרטיס לא משתנה, רק התוכן נכנס 2px פנימה (ה-overflow-hidden

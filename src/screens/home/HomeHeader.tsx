@@ -4,13 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Skeleton } from "@/components/ui";
+import { BackButton, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationCard } from "@/screens/notifications/NotificationCard";
 import type { ActivityItem } from "@/services/notifications/notificationsService";
 
 interface HomeHeaderProps {
   loading: boolean;
+  /** *** חדש (בקשה מפורשת - "במקום הצ'אט, כשמתקדמים לעמוד הבא, שישתנה
+   *  לכפתור חזור"): כשמועבר, כפתור הצ'אט מוחלף ב-BackButton של האפליקציה
+   *  (בתוך אותו עיגול לבן כמו ההתראות). בלי - הצ'אט כמו תמיד. */
+  onBack?: () => void;
 }
 
 /**
@@ -26,7 +30,7 @@ interface HomeHeaderProps {
  * ר' home/page.tsx) - "קרוב אלי" שם מחליף את התפקיד שהיה לכפתור המיקום
  * כאן. שום דבר מה-Backend/API/לוגיקת ההתראות לא השתנה.
  */
-export function HomeHeader({ loading }: HomeHeaderProps) {
+export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -96,17 +100,25 @@ export function HomeHeader({ loading }: HomeHeaderProps) {
           שמשמש ב-PlacesHeader: /images/places-chat-icon.png - בקשה מפורשת:
           "הכפתור של הצ'אט יהיה כמו הצ'אט שלנו באייקונים"). מוביל ל-Trippy AI
           (/ai) כמו קודם, בלי route חדש. */}
-      <Link
-        href="/ai"
-        aria-label="צ'אט"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
-      >
-        {loading ? (
-          <Skeleton className="h-full w-full rounded-full" />
-        ) : (
-          <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
-        )}
-      </Link>
+      {onBack ? (
+        // כפתור "חזור" (BackButton של האפליקציה) במקום הצ'אט - באותו עיגול לבן
+        // ובאותו מקום בדיוק, כדי שהבר לא "יקפוץ" בין העמודים.
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]">
+          <BackButton onBack={onBack} />
+        </div>
+      ) : (
+        <Link
+          href="/ai"
+          aria-label="צ'אט"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
+        >
+          {loading ? (
+            <Skeleton className="h-full w-full rounded-full" />
+          ) : (
+            <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
+          )}
+        </Link>
+      )}
 
       {/* אמצע - לוגו TRIPLACE, באותה שורה ואותו גובה בדיוק כמו הצ'אט
           וההתראות (items-center על ה-header כבר מיישר אנכית). */}

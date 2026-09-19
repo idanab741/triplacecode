@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isMainOnboardingComplete, isProfileComplete } from "@/services/profile/profileService";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { HomeHeader } from "@/screens/home/HomeHeader";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { SearchIntroOverlay } from "@/screens/home/SearchIntroOverlay";
 import { HomeMyTripsRow } from "@/screens/home/HomeMyTripsRow";
 import { HomeHotRow } from "@/screens/home/HomeHotRow";
+import { HomeDiscoverSection } from "@/screens/home/HomeDiscoverSection";
+import { HomeNearbyRow } from "@/screens/home/HomeNearbyRow";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
@@ -80,6 +82,20 @@ export default function HomePage() {
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const autoRanRef = useRef(false);
+  // *** "צור טיול" (כרטיסיית "הטיולים שלי"): גולל למעלה ומציג הסבר על שורת
+  // החיפוש - ואז המשתמש מתחיל להחליק. ר' SearchIntroOverlay.tsx.
+  const [introOpen, setIntroOpen] = useState(false);
+
+  function handleCreateTrip() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setIntroOpen(true);
+  }
+
+  function handleCloseIntro() {
+    setIntroOpen(false);
+    // אם אין כרגע חפיסה (למשל יצאו ממנה קודם) - מתחילים ממיקום המשתמש.
+    if (!destinationQuery) handleUseNearMe().catch(() => {});
+  }
 
   /** מעדכן את היעד הפעיל (ומכריח טעינה נקייה של ה-TripMatch המוטמע), ושומר
    *  אותו לזיכרון הסשן - כך שחזרה לעמוד הבית תחזיר לאותו יעד. */
@@ -178,32 +194,21 @@ export default function HomePage() {
       style={destinationQuery ? { paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" } : undefined}
     >
       <HomeStatusBarTint />
+      <SearchIntroOverlay open={introOpen} onClose={handleCloseIntro} />
       <div className="relative mx-auto flex max-w-xl flex-col">
         {/* *** בקשה מפורשת - "הרקע של החלק עד שורת החיפוש כולל בצבע כחול
             כמו האייקון שלנו, עם קצוות מעוגלים": ההדר + שורת החיפוש יושבים
             על רקע גרדיאנט תכלת→כחול (צבעים דגומים מאייקון האפליקציה), עם
             פינות תחתונות מעוגלות. בלי overflow-hidden - כדי שתפריט ההצעות
             של החיפוש והבועה של ההתראות יוכלו לצאת מתחתיו. */}
-        <div
-          className="relative z-10 rounded-b-[32px] pb-5"
-          style={{
-            background: "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)",
-            boxShadow: "0 12px 30px -14px rgba(0, 124, 254, 0.6)",
-          }}
-        >
-        <AnimatedHeaderBackdrop />
-        <HomeHeader loading={loading || profileLoading} />
-
-        {/* הוסר (בקשה מפורשת - "בוא נעיף את החלק הזה"): בלוק הברכה
-            ("ערב טוב, עידן! / בוא נראה מה מתאים לך היום"). הקומפוננט
-            screens/home/GreetingBlock.tsx נשאר בפרויקט, פשוט לא בשימוש. */}
-
-        {/* שורת חיפוש יעד - ברוחב מלא (אותם שוליים כמו ההדר, px-5).
-            *** בקשה מפורשת - "שורת החיפוש עד הסוף, והמיקום נכנס לתוך שורת
-            החיפוש": כפתור "קרוב אלי" כבר לא עיגול נפרד לידה - הוא בתוך
-            השורה, בקצה השמאלי שלה (endAdornment, אחרון ב-DOM = פיזית שמאל
-            תחת dir="rtl"), עם קו מפריד עדין. אותו אייקון נעץ ואותה לוגיקה. */}
-        <div className="mt-4 px-5">
+        {/* *** שונה (בקשה מפורשת - "הבר העליון ישאר, רק עם שורת הלוגו/התראות/
+            צ'אט, גם בגלילה; החיפוש נעלם בגלילה באופן אנימטיבי"): הבר התכלת
+            (הרקע, הגרדיאנט, ההילות - הכל כמו שהיה) עבר ל-CollapsibleTopBar,
+            שנדבק לראש המסך ומכווץ את שורת החיפוש בהתאם לגלילה. שורת החיפוש
+            עצמה (כולל כפתור "קרוב אלי" בתוכה) נשארה בדיוק אותו דבר - היא
+            ה-children שנעלמים. */}
+        <CollapsibleTopBar loading={loading || profileLoading}>
+          <div data-home-search="">
           <SearchBarLink
             destinationMode
             variant="hero"
@@ -228,8 +233,8 @@ export default function HomePage() {
               </>
             }
           />
-        </div>
-        </div>
+          </div>
+        </CollapsibleTopBar>
         {locateError && <p className="mt-1 px-6 text-center text-xs text-danger">{locateError}</p>}
 
         {/* HERO - מערכת ה-TripMatch (Card Stack הניתן להחלקה). מתחבר
@@ -258,8 +263,10 @@ export default function HomePage() {
             מתחת לכרטיסיות ההחלקה - "הטיולים שלי" (כרטיסיית "צור טיול" +
             הטיולים האחרונים) ו"כל מה שחם" (אטרקציות אהובות). */}
         <div className="mt-6 flex flex-col gap-7 pb-4">
-          <HomeMyTripsRow />
+          <HomeMyTripsRow onCreateTrip={handleCreateTrip} />
           <HomeHotRow />
+          <HomeDiscoverSection />
+          <HomeNearbyRow />
         </div>
       </div>
 

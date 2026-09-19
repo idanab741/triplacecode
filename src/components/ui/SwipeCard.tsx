@@ -44,6 +44,13 @@ interface SwipeCardProps {
    *  גרירה הדפדפן היה יורה click לא רצוני. אופציונלי - בלעדיו (למשל
    *  trip-builder/build) ההתנהגות זהה לקודם. */
   onTap?: (info: { xFraction: number }) => void;
+  /** *** חדש (בקשה מפורשת - הבר העליון שנדבק/מתכווץ בגלילה): כשהכרטיס יושב
+   *  בעמוד שגולל (עמוד הבית), touch-action: none חסם גלילה אנכית בכל נגיעה
+   *  על הכרטיס - אי אפשר היה לגלול את העמוד מתוך אזור הכרטיסייה בכלל.
+   *  עם true: גרירה אנכית גוללת את העמוד (הדפדפן שולח pointercancel, וההחלקה
+   *  לא מתבצעת), וגרירה אופקית ממשיכה להחליק את הכרטיס כרגיל. ברירת המחדל
+   *  false - בדיוק ההתנהגות הקודמת (למשל trip-builder). */
+  allowVerticalScroll?: boolean;
 }
 
 const SWIPE_THRESHOLD_PX = 100;
@@ -62,7 +69,7 @@ const FLY_OUT_DISTANCE_PX = 500;
  * (לא דרך React state) כדי לא לגרום ל-re-render בכל תזוזת עכבר/אצבע.
  */
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { children, onSwipeLeft, onSwipeRight, disabled, onTap },
+  { children, onSwipeLeft, onSwipeRight, disabled, onTap, allowVerticalScroll = false },
   ref
 ) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -176,7 +183,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="h-full touch-none select-none"
+        className={`h-full select-none ${allowVerticalScroll ? "touch-pan-y" : "touch-none"}`}
         style={{ willChange: "transform" }}
       >
         <div className="relative h-full">

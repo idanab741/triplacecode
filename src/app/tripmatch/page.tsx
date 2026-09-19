@@ -1550,6 +1550,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                     onSwipeLeft={() => handleDecision(false)}
                     onSwipeRight={() => handleDecision(true)}
                     onTap={handleCardTap}
+                    allowVerticalScroll
                     disabled={busy}
                   >
                     {() => (

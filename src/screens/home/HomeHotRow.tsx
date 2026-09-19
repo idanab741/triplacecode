@@ -25,6 +25,7 @@ interface HotItem {
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache: { items: HotItem[]; at: number } | null = null;
 
+// מלבני (בקשה מפורשת - רק "הטיולים שלי" ריבועיים, "כל מה שחם" נשאר מלבן).
 const CARD_CLASS = "relative block h-[176px] w-[132px] shrink-0 overflow-hidden rounded-card bg-bg-secondary shadow-soft";
 
 export function HomeHotRow() {

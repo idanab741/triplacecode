@@ -56,7 +56,14 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export function DiscoverCard() {
+interface DiscoverCardProps {
+  /** "home" (בקשה מפורשת - קטע "גלה עוד ב-triplace" בעמוד הבית): בלי הכותרת
+   *  הפנימית (הכותרת באה מ-HomeSectionHeader עם האייקון והלוגו) ובאותם
+   *  שוליים (px-5) כמו שאר הקטעים שם. ברירת המחדל - כמו קודם, בלי שינוי. */
+  variant?: "default" | "home";
+}
+
+export function DiscoverCard({ variant = "default" }: DiscoverCardProps = {}) {
   const router = useRouter();
   // *** שער הסיסמה ל-place's (ר' תיעוד למעלה ליד SLIDES): נפתח בלחיצה
   // על שקופית ה-places במקום ניווט מיידי. לא נשמר בין ביקורים בכוונה -
@@ -88,10 +95,12 @@ export function DiscoverCard() {
   }
 
   return (
-    <section className="px-6">
-      <h3 className="mb-3 text-lg font-semibold text-ink">
-        עוד בשבילך ב-TRIPLACE
-      </h3>
+    <section className={variant === "home" ? "px-5" : "px-6"}>
+      {variant !== "home" && (
+        <h3 className="mb-3 text-lg font-semibold text-ink">
+          עוד בשבילך ב-TRIPLACE
+        </h3>
+      )}
 
       <Swiper
         modules={[Autoplay, Pagination]}

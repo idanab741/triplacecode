@@ -32,6 +32,10 @@ const DISCOVERY_SECTIONS: Record<
   nature_trails: { emoji: "🌿", title: "מסלולי טבע", category: "nature_trails" },
   viewpoints: { emoji: "🌄", title: "תצפיות", category: "viewpoints" },
   shopping: { emoji: "🛍️", title: "שופינג וקניות", category: "shopping" },
+  // *** חדש (עמוד הבית - "עוד מקומות בקרבת מקום", לשונית "קניון"): קניונים
+  // בלבד מתוך shopping. לא ב-DEFAULT_SECTION_ORDER - לא משפיע על עמוד
+  // ה-Discovery הראשי, רק זמין לפנייה עם category=malls.
+  malls: { emoji: "🏬", title: "קניונים", category: "shopping", subcategories: ["mall"] },
   water_amusement_parks: { emoji: "🎢", title: "פארקי שעשועים ומים", category: "water_amusement_parks" },
   parks_gardens: { emoji: "🌳", title: "פארקים וגנים", category: "parks_gardens" },
   wineries_dining: {

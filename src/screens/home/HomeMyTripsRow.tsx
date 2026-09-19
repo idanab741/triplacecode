@@ -37,9 +37,15 @@ function tripResultPath(trip: TripPreview): string {
 }
 
 const PREVIEW_LIMIT = 10;
-const CARD_CLASS = "relative block h-[176px] w-[132px] shrink-0 overflow-hidden rounded-card";
+// *** ריבועי (בקשה מפורשת - "שהתוצאות יצאו ריבועיות ולא מלבניות").
+const CARD_CLASS = "relative block h-[140px] w-[140px] shrink-0 overflow-hidden rounded-card";
 
-export function HomeMyTripsRow() {
+interface HomeMyTripsRowProps {
+  /** לחיצה על כרטיסיית "צור טיול". בלי - מוביל ל-Trippy AI כמו קודם. */
+  onCreateTrip?: () => void;
+}
+
+export function HomeMyTripsRow({ onCreateTrip }: HomeMyTripsRowProps = {}) {
   const router = useRouter();
   const [trips, setTrips] = useState<TripPreview[]>([]);
 
@@ -93,7 +99,7 @@ export function HomeMyTripsRow() {
       <div className="stories-rail-track flex gap-3 overflow-x-auto px-5 pb-2" style={{ scrollbarWidth: "none" }}>
         <button
           type="button"
-          onClick={() => router.push("/ai")}
+          onClick={() => (onCreateTrip ? onCreateTrip() : router.push("/ai"))}
           className={`${CARD_CLASS} flex flex-col items-center justify-center gap-2 border-[3px] border-dashed border-[var(--color-primary-start)]/70 bg-transparent transition active:scale-[0.97]`}
         >
           <Image src="/icons/add-trip-plus.png" alt="" width={44} height={44} className="h-11 w-11" />

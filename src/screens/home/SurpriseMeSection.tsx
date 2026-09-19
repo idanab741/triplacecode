@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import { getSessionLocation } from "@/utils/sessionLocation";
 
 interface SurpriseMeSectionProps {
   /** תיקון Product מפורש ("אפשר שהחלק הזה יופיע ב'גלה עוד'?"): כשמוטמע
@@ -48,7 +49,10 @@ export function SurpriseMeSection({ variant = "standalone" }: SurpriseMeSectionP
     if (loading) return;
     setLoading(true);
     try {
-      const coords = await getCurrentPositionSafe();
+      // המיקום כבר נשמר בעמוד הבית (utils/sessionLocation.ts) - משתמשים בו מיד,
+      // בלי GPS חדש בכל לחיצה. נופלים ל-GPS רק אם אין מיקום שמור.
+      const saved = getSessionLocation();
+      const coords = saved ? { lat: saved.lat, lng: saved.lng } : await getCurrentPositionSafe();
       const res = await fetch(`/api/discovery/day-trip?category=hot&lat=${coords.lat}&lng=${coords.lng}&limit=15`);
       const data = await res.json();
       const places: { id: string }[] = data.places ?? [];
