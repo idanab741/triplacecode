@@ -32,6 +32,59 @@ function PinIcon({ className }: { className?: string }) {
   );
 }
 
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
+/**
+ * *** בקשה מפורשת ("למה הוא לא מוסיף שורה אחרי שלחצתי על המיקום שלי?
+ * הוא יכול להוסיף עד 2 להיסטוריית המיקומים"): "מיקום נוכחי" ובחירת
+ * עיר מהרשימה מחזירים UserAddress *זמני* שלא נשמר בשום מקום (רק כתובת
+ * שנוספה דרך "הוספת כתובת" נשמרת ב-user_addresses) - לכן אחרי הבחירה
+ * לא הופיעה שום שורה. עכשיו כל בחירה כזו נזכרת בהיסטוריית "מיקומים
+ * אחרונים": עד 2, החדש ראשון, בלי כפילויות. נשמר ב-localStorage של
+ * המכשיר בלבד (לפי משתמש) - בלי שינוי סכמה/מיגרציה ב-DB.
+ */
+const RECENT_LOCATIONS_KEY = "triplace_recent_locations_v1";
+const MAX_RECENT_LOCATIONS = 2;
+
+function recentStorageKey(userId: string | undefined) {
+  return `${RECENT_LOCATIONS_KEY}:${userId ?? "guest"}`;
+}
+
+function locationKey(address: UserAddress): string {
+  return (address.city || address.label || "").trim().toLowerCase();
+}
+
+function readRecentLocations(userId: string | undefined): UserAddress[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(recentStorageKey(userId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as UserAddress[]).slice(0, MAX_RECENT_LOCATIONS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberLocation(userId: string | undefined, address: UserAddress): UserAddress[] {
+  const key = locationKey(address);
+  const existing = readRecentLocations(userId);
+  if (!key) return existing;
+  const next = [address, ...existing.filter((a) => locationKey(a) !== key)].slice(0, MAX_RECENT_LOCATIONS);
+  try {
+    window.localStorage.setItem(recentStorageKey(userId), JSON.stringify(next));
+  } catch {
+    // localStorage לא זמין (מצב פרטי וכו') - לא קריטי, פשוט לא יישמר בין טעינות.
+  }
+  return next;
+}
+
 type View = "main" | "addAddress" | "allCities";
 
 export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetProps) {
@@ -41,6 +94,18 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
   const [error, setError] = useState<string | null>(null);
 
   const [usingCurrentLocation, setUsingCurrentLocation] = useState(false);
+  const [recentLocations, setRecentLocations] = useState<UserAddress[]>([]);
+
+  useEffect(() => {
+    setRecentLocations(readRecentLocations(user?.id));
+  }, [user?.id]);
+
+  /** בחירת מיקום *זמני* (נוכחי / עיר מהרשימה): נזכר בהיסטוריה ואז מדווח
+   *  כלפי מעלה. כתובות שמורות לא נכנסות להיסטוריה - הן כבר מוצגות ברשימה. */
+  function commitTemporarySelection(address: UserAddress) {
+    setRecentLocations(rememberLocation(user?.id, address));
+    onSelect(address);
+  }
 
   const [view, setView] = useState<View>("main");
   const [allCities, setAllCities] = useState<{ name: string; country: string }[]>([]);
@@ -97,7 +162,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
           const data = await res.json();
           if (!res.ok) throw new Error(data.error);
 
-          onSelect({
+          commitTemporarySelection({
             id: "current",
             user_id: user?.id ?? "",
             label: data.address_text,
@@ -192,7 +257,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
   }
 
   function handlePickCity(city: { name: string; country: string }) {
-    onSelect({
+    commitTemporarySelection({
       id: `city-${city.name}`,
       user_id: user?.id ?? "",
       label: city.name,
@@ -312,6 +377,27 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
               {usingCurrentLocation ? "מאתר את המיקום שלך..." : "השתמש במיקום הנוכחי שלי"}
             </span>
           </button>
+
+          {recentLocations
+            .filter((loc) => !addresses.some((a) => locationKey(a) === locationKey(loc)))
+            .map((loc) => (
+              <button
+                key={`${loc.id}-${locationKey(loc)}`}
+                type="button"
+                onClick={() => commitTemporarySelection(loc)}
+                className="flex items-center gap-3 border-t border-ink-secondary/10 px-5 py-3.5 text-start"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg-secondary text-ink-secondary">
+                  <ClockIcon />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold text-ink">{loc.city || loc.label}</span>
+                  <span className="block truncate text-[13px] text-ink-secondary">
+                    {loc.id === "current" ? "המיקום הנוכחי שנבחר לאחרונה" : "נבחר לאחרונה"}
+                  </span>
+                </span>
+              </button>
+            ))}
 
           {loading ? (
             <div className="admin-skeleton mx-5 h-16 rounded-card" />

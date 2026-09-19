@@ -1,17 +1,37 @@
 "use client";
 
+import { useEffect } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
 const MAX_REASONABLE_DRIVING_KM = 400; // מעבר לזה, "X דק' נסיעה" כבר לא כנה - צריך טיסה
 
-/** *** שטח שמור בתחתית הכרטיס (בקשה מפורשת - כפתורים קבועים, גדולים
- *  ב-30%): הכרטיס עצמו נמוך מהמכל שלו בדיוק בגובה הזה, כדי שכפתורי
- *  הפעולה (שיושבים כ-siblings קבועים ב-tripmatch/page.tsx, לא בתוך
- *  הכרטיס הנגרר) יהיה להם מקום פנוי מתחתיו בלי לחפוף שום תוכן. page.tsx
- *  משתמש באותו מספר בדיוק (מיובא מכאן) גם לגובה ה"כרטיסים" המציצים
- *  מאחור - כדי שהכל יתיישר לאותו קו בדיוק. */
-export const TRIPMATCH_CARD_BUTTON_ZONE = 100;
+/** גודל הכפתור הגדול (X / לב) - px. */
+export const TRIPMATCH_MAIN_BUTTON_SIZE = 78;
+
+/** *** שטח שמור *מתחת* לכרטיס (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
+ *  הכרטיסיות לבין הבחוץ, חצי חצי"): הכפתורים כבר לא יושבים כולם מתחת
+ *  לכרטיס אלא רוכבים על הקצה התחתון שלו - חצי מהגובה שלהם על הכרטיס
+ *  וחצי מחוצה לו. לכן מתחת לכרטיס נדרש רק חצי מגובה הכפתור הגדול
+ *  (39px) + מעט אוויר, במקום 100px כמו קודם - והכרטיס גבוה בהתאם.
+ *  page.tsx משתמש באותו מספר בדיוק (מיובא מכאן) גם לגובה ה"כרטיסים"
+ *  המציצים מאחור ולמיקום שורת הכפתורים - כדי שהכל יתיישר לאותו קו. */
+export const TRIPMATCH_CARD_BUTTON_ZONE = 48;
+
+/** צד הכרטיס שלחיצה עליו מחליפה תמונה - כל צד תופס 30% מהרוחב, האמצע
+ *  (40%) פותח את עמוד המקום. */
+const SIDE_TAP_ZONE = 0.3;
+
+/** פירוש לחיצה על הכרטיס לפי מיקום אופקי:
+ *  - "next"/"prev": התמונה הבאה/הקודמת. האפליקציה RTL, לכן הצד הימני
+ *    (תחילת הקריאה בעברית) = הבאה, והשמאלי = הקודמת - כמו בסטוריז בעברית.
+ *  - "open": פתיחת עמוד המקום (האמצע, או כשיש תמונה אחת בלבד). */
+export function resolveCardTap(xFraction: number, imageCount: number): "next" | "prev" | "open" {
+  if (imageCount <= 1) return "open";
+  if (xFraction >= 1 - SIDE_TAP_ZONE) return "next";
+  if (xFraction <= SIDE_TAP_ZONE) return "prev";
+  return "open";
+}
 
 interface TripMatchCardProps {
   candidate: CandidatePlace;
@@ -20,6 +40,9 @@ interface TripMatchCardProps {
   matchTotal: number;
   /** תווית המיקום/יעד המוצג בפינה (pin + טקסט) - העיר/אזור שמחפשים בו כרגע. */
   cityLabel: string;
+  /** האינדקס (0-based) של התמונה המוצגת מתוך candidate.imageUrls. מנוהל
+   *  ב-page.tsx (ולא כאן) כי הלחיצה נקלטת ב-SwipeCard, מחוץ לכרטיס. */
+  imageIndex?: number;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -79,8 +102,18 @@ function DistanceBadge({ candidate }: { candidate: CandidatePlace }) {
  * ב-tripmatch/page.tsx, מעל ה-SwipeCard אבל לא בתוכו, כך שהם לא זזים
  * עם ה-transform שלו בזמן גרירה. ר' הערה שם.
  */
-export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel }: TripMatchCardProps) {
+export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, imageIndex = 0 }: TripMatchCardProps) {
   const tags = deriveTags(candidate);
+  const images = candidate.imageUrls;
+  const safeIndex = Math.min(Math.max(imageIndex, 0), Math.max(images.length - 1, 0));
+
+  // טעינה מוקדמת של התמונה הבאה - כדי שמעבר בלחיצה יהיה מיידי, בלי הבהוב.
+  useEffect(() => {
+    const next = images[safeIndex + 1];
+    if (!next) return;
+    const preload = new window.Image();
+    preload.src = next;
+  }, [images, safeIndex]);
 
   return (
     <div
@@ -93,10 +126,10 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel }: 
       style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)` }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
-        {candidate.imageUrls[0] ? (
+        {images[safeIndex] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={candidate.imageUrls[0]}
+            src={images[safeIndex]}
             alt={candidate.name}
             className="h-full w-full object-cover object-center"
             draggable={false}
@@ -109,22 +142,43 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel }: 
       {/* גרדיאנט תחתון */}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(10,12,20,0.88)_0%,rgba(10,12,20,0.55)_30%,rgba(10,12,20,0)_58%)]" />
 
+      {/* *** חדש (בקשה מפורשת - גלריית תמונות בתוך הכרטיס): פסי התקדמות
+          בסגנון סטוריז בראש הכרטיס - פס לכל תמונה, המוצגת כרגע מודגשת.
+          מוצגים רק כשיש יותר מתמונה אחת. לא אינטראקטיביים (pointer-events-
+          none) - הלחיצה עצמה נקלטת ב-SwipeCard ומגיעה ל-page.tsx. */}
+      {images.length > 1 && (
+        <div className="pointer-events-none absolute inset-x-4 top-3 flex gap-1" aria-hidden="true">
+          {images.map((_, i) => (
+            <div
+              key={i}
+              className={`h-[3px] flex-1 rounded-full transition-colors duration-200 ${
+                i === safeIndex ? "bg-white" : "bg-white/40"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Pill: אינדקס - קבוע פיזית בצד שמאל (לא start-/end- הלוגיים -
-          אלה מתהפכים תחת dir="rtl" הגלובלי של האפליקציה). */}
-      <div className="absolute left-4 top-4 rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
+          אלה מתהפכים תחת dir="rtl" הגלובלי של האפליקציה). top-[26px] -
+          מתחת לפסי הסטוריז. */}
+      <div className="absolute left-4 top-[26px] rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
         {matchIndex}/{matchTotal}
       </div>
 
       {/* Pill: מיקום - קבוע פיזית בצד ימין */}
-      <div className="absolute right-4 top-4 flex items-center gap-1 rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
+      <div className="absolute right-4 top-[26px] flex items-center gap-1 rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
           <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
         </svg>
         <span className="max-w-[120px] truncate">{cityLabel}</span>
       </div>
 
-      {/* תוכן תחתון - שם/תיאור/מטא-דאטה/תגיות, עברי-כתב לבן על התמונה */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-[18px] pb-[22px] text-white">
+      {/* תוכן תחתון - שם/תיאור/מטא-דאטה/תגיות, עברי-כתב לבן על התמונה.
+          *** הועלה (בקשה מפורשת - "להעלות מעט את הטקסט"): pb 22 -> 60,
+          כדי שהכפתורים שרוכבים על הקצה התחתון (חצי מ-78px = 39px נכנסים
+          לכרטיס) לא יכסו את הטקסט/התגיות. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 px-[18px] pb-[60px] text-white">
         <h2 className="text-[26px] font-extrabold leading-tight">{candidate.name}</h2>
         <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">
           {candidate.shortDescription || "מקום מומלץ שנבחר במיוחד עבורכם באזור."}

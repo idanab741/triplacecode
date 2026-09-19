@@ -36,9 +36,19 @@ interface SwipeCardProps {
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
   disabled?: boolean;
+  /** *** חדש (בקשה מפורשת - "לחיצה על הכרטיסיה פותחת את העמוד שלה / לחיצה
+   *  על הצדדים מחליפה תמונה"): נקרא כשהמשתמש *לוחץ* על הכרטיס (נגיעה קצרה
+   *  בלי גרירה). xFraction = מיקום הלחיצה לרוחב הכרטיס, 0 = קצה שמאלי פיזי,
+   *  1 = קצה ימני פיזי. מטופל כאן ולא ב-onClick של הילדים, כי ה-pointer
+   *  capture של הגרירה גורם ל-click להגיע לעטיפה ולא לילד, ובנוסף אחרי
+   *  גרירה הדפדפן היה יורה click לא רצוני. אופציונלי - בלעדיו (למשל
+   *  trip-builder/build) ההתנהגות זהה לקודם. */
+  onTap?: (info: { xFraction: number }) => void;
 }
 
 const SWIPE_THRESHOLD_PX = 100;
+/** תזוזה מקסימלית (px) שעדיין נחשבת "לחיצה" ולא גרירה. */
+const TAP_SLOP_PX = 10;
 const FLY_OUT_DISTANCE_PX = 500;
 
 /**
@@ -52,13 +62,13 @@ const FLY_OUT_DISTANCE_PX = 500;
  * (לא דרך React state) כדי לא לגרום ל-re-render בכל תזוזת עכבר/אצבע.
  */
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { children, onSwipeLeft, onSwipeRight, disabled },
+  { children, onSwipeLeft, onSwipeRight, disabled, onTap },
   ref
 ) {
   const cardRef = useRef<HTMLDivElement>(null);
   const likeStampRef = useRef<HTMLDivElement>(null);
   const nopeStampRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef({ startX: 0, currentX: 0, dragging: false, pointerId: -1 });
+  const dragState = useRef({ startX: 0, startY: 0, currentX: 0, dragging: false, moved: false, pointerId: -1 });
 
   function setStamps(x: number) {
     const progress = Math.min(1, Math.abs(x) / SWIPE_THRESHOLD_PX);
@@ -84,7 +94,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
 
   function handlePointerDown(e: React.PointerEvent) {
     if (disabled) return;
-    dragState.current = { startX: e.clientX, currentX: 0, dragging: true, pointerId: e.pointerId };
+    dragState.current = { startX: e.clientX, startY: e.clientY, currentX: 0, dragging: true, moved: false, pointerId: e.pointerId };
     cardRef.current?.setPointerCapture(e.pointerId);
   }
 
@@ -92,12 +102,28 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
     if (!dragState.current.dragging) return;
     const deltaX = e.clientX - dragState.current.startX;
     dragState.current.currentX = deltaX;
-    setTransform(deltaX, false);
+    // מרגע שהאצבע זזה מעבר ל-slop זו גרירה ולא לחיצה - גם אם חזרה לנקודת ההתחלה.
+    if (Math.abs(deltaX) > TAP_SLOP_PX || Math.abs(e.clientY - dragState.current.startY) > TAP_SLOP_PX) {
+      dragState.current.moved = true;
+    }
+    // בתוך ה-slop לא מזיזים את הכרטיס בכלל, כדי שלחיצה לא תרעיד אותו.
+    setTransform(dragState.current.moved ? deltaX : 0, false);
   }
 
-  function handlePointerUp() {
+  function handlePointerUp(e: React.PointerEvent) {
     if (!dragState.current.dragging) return;
     dragState.current.dragging = false;
+
+    // לחיצה (pointerup בלי גרירה) - לא מפעילים swipe, רק מדווחים להורה.
+    // pointercancel (למשל הדפדפן השתלט על המחווה) הוא לעולם לא לחיצה.
+    if (!dragState.current.moved && e.type === "pointerup") {
+      setTransform(0, false);
+      const rect = cardRef.current?.getBoundingClientRect();
+      if (onTap && rect && rect.width > 0) {
+        onTap({ xFraction: (e.clientX - rect.left) / rect.width });
+      }
+      return;
+    }
 
     const deltaX = dragState.current.currentX;
     if (deltaX > SWIPE_THRESHOLD_PX) {

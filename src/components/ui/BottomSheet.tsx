@@ -6,6 +6,9 @@ interface BottomSheetProps {
   onClose: () => void;
   children: ReactNode;
   zIndex?: number;
+  /** אזור קבוע בתחתית ה-Sheet (מחוץ לגלילה) - למשל כפתורי "איפוס / החל".
+   *  לא מועבר = ההתנהגות הקיימת ללא שינוי. */
+  footer?: ReactNode;
 }
 
 const DRAG_CLOSE_THRESHOLD_PX = 100;
@@ -21,7 +24,7 @@ const DRAG_CLOSE_THRESHOLD_PX = 100;
  * עצמו, לא על ה-backdrop) משאיר רווח בגובה הבר התחתון כדי שהכרטיס
  * הלבן לא "יתלבש" ויכסה את הבר שעכשיו גלוי מתחתיו.
  */
-export function BottomSheet({ onClose, children, zIndex = 40 }: BottomSheetProps) {
+export function BottomSheet({ onClose, children, zIndex = 40, footer }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
@@ -68,7 +71,12 @@ export function BottomSheet({ onClose, children, zIndex = 40 }: BottomSheetProps
         >
           <div className="h-1 w-10 rounded-pill bg-ink-secondary/30" />
         </div>
-        <div className="overflow-y-auto pb-6">{children}</div>
+        <div className={`min-h-0 overflow-y-auto ${footer ? "" : "pb-6"}`}>{children}</div>
+        {footer && (
+          <div className="shrink-0 border-t border-ink-secondary/10 bg-bg px-5 pb-4 pt-3 shadow-[0_-10px_24px_-14px_rgba(26,26,46,0.22)]">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

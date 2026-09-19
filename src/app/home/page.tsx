@@ -9,6 +9,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
+import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 
@@ -41,6 +42,11 @@ export default function HomePage() {
   const router = useRouter();
 
   const [addPlaceOpen, setAddPlaceOpen] = useState(false);
+  // *** בקשה מפורשת - "ברגע שפותחים את המיקום, שתיפתח האפשרות של עמוד
+  // 'המיקום שלי' שהיה לנו פעם": לחיצה על הנעץ בשורת החיפוש פותחת את
+  // ChooseLocationSheet (מיקום נוכחי / כתובות שמורות / כל הערים / הוספת
+  // כתובת) - אותו רכיב בדיוק שכבר משמש בעמודי ה-Discovery.
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
 
   // *** תוספת (בקשה מפורשת - "מיקום חדש שמביא ישר לעמוד הבית איפה
   // שהעלאת אטרקציה"): כשמגיעים לכאן מ-CreateMenuSheet בעמוד הפרופיל
@@ -172,10 +178,9 @@ export default function HomePage() {
                 <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />
                 <button
                   type="button"
-                  onClick={handleUseNearMe}
-                  disabled={locating}
-                  aria-label={locating ? "מאתר מיקום..." : "קרוב אלי"}
-                  title="קרוב אלי"
+                  onClick={() => setLocationSheetOpen(true)}
+                  aria-label={locating ? "מאתר מיקום..." : "המיקום שלי"}
+                  title="המיקום שלי"
                   className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
                 >
                   {locating ? (
@@ -208,7 +213,7 @@ export default function HomePage() {
           ) : (
             <div className="flex flex-col items-center gap-3 px-10 py-16 text-center text-ink-secondary">
               <p className="text-sm font-medium">
-                חפשו יעד למעלה, או לחצו על &quot;קרוב אלי&quot; כדי להתחיל להחליק על מקומות מותאמים אישית.
+                חפשו יעד למעלה, או לחצו על הנעץ כדי לבחור את המיקום שלכם ולהתחיל להחליק על מקומות מותאמים אישית.
               </p>
             </div>
           )}
@@ -220,6 +225,23 @@ export default function HomePage() {
           נשאר, והוא עדיין נפתח דרך ?openAddPlace=1 (מ-CreateMenuSheet
           בעמוד הפרופיל) - ר' ה-effect למעלה. */}
       {addPlaceOpen && <AddPlaceModal onClose={() => setAddPlaceOpen(false)} />}
+
+      {locationSheetOpen && (
+        <ChooseLocationSheet
+          onClose={() => setLocationSheetOpen(false)}
+          onSelect={(address) => {
+            // כל בחירה (מיקום נוכחי / כתובת שמורה / עיר מהרשימה) מתורגמת
+            // ליעד-עיר ל-TripMatch המוטמע - בדיוק כמו "קרוב אלי" ו-
+            // handleSelectDestination: remount נקי עם העיר החדשה.
+            setLocationSheetOpen(false);
+            const label = address.city || address.label || address.address_text;
+            if (!label) return;
+            setLocateError(null);
+            setDestinationQuery(label);
+            setEmbeddedKey((k) => k + 1);
+          }}
+        />
+      )}
 
       <MainBottomNav active="home" />
     </div>

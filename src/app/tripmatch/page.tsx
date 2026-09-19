@@ -16,7 +16,7 @@ import { toggleFavorite } from "@/services/favorites/favoritesService";
 import { listAddresses } from "@/services/addresses/addressesService";
 import { SwipeHeader, SwipeProgressBar } from "@/screens/tripmatch/SwipeHeader";
 import { FilterCircleButton } from "@/screens/tripmatch/FilterCircleButton";
-import { TripMatchCard, TRIPMATCH_CARD_BUTTON_ZONE } from "@/screens/tripmatch/TripMatchCard";
+import { TripMatchCard, TRIPMATCH_CARD_BUTTON_ZONE, TRIPMATCH_MAIN_BUTTON_SIZE, resolveCardTap } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -91,6 +91,18 @@ export default function TripMatchPage() {
     </Suspense>
   );
 }
+
+/** הכרטיסים המציצים מאחורי הכרטיס הקדמי - [0] = הקרוב (depth 1) ... [3] =
+ *  הרחוק (depth 4). rot = זווית (מעלות, סביב תחתית הכרטיס), y = הזזה אנכית
+ *  בפיקסלים (שלילי = כלפי מעלה). ערכי embedded קטנים כדי להישאר בתוך
+ *  שוליי ה-px-8 של Home; standalone (/tripmatch) - עם הזוויות הרחבות
+ *  המקוריות (4°/-5°) והזזה קטנה יותר כדי לא לחרוג מעל הכותרת. */
+const BACK_CARDS = [
+  { embedded: { rot: 3, y: 0 }, standalone: { rot: 4, y: 0 } },
+  { embedded: { rot: -3.5, y: 0 }, standalone: { rot: -5, y: 0 } },
+  { embedded: { rot: 2, y: -10 }, standalone: { rot: 2.5, y: -6 } },
+  { embedded: { rot: -2, y: -16 }, standalone: { rot: -2.5, y: -10 } },
+] as const;
 
 interface TripMatchPageContentProps {
   /** תיקון (Home - כניסה ל-TripMatch דרך שורת החיפוש): כש-true, הרכיב
@@ -190,6 +202,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   // instance עם ה-transform הישן (מחוץ למסך). מעלים tick משנה את ה-key
   // ומכריחים remount נקי, כדי שהכרטיס יחזור למרכז במקום להיעלם.
   const [swipeResetTick, setSwipeResetTick] = useState(0);
+  // *** גלריית תמונות בכרטיס (בקשה מפורשת): התמונה המוצגת כרגע בכרטיס הקדמי.
+  // נשמר יחד עם ה-id של המועמד - כשעוברים לכרטיס אחר (או חוזרים אחורה) האינדקס
+  // מתאפס אוטומטית ל-0, בלי useEffect שיגרום לרינדור כפול.
+  const [photoState, setPhotoState] = useState<{ candidateId: string; index: number }>({ candidateId: "", index: 0 });
   // *** חדש (בקשה מפורשת - כפתור "חזור" על הכרטיס): שומר את ההחלטה
   // האחרונה (מועמד + אם היה לייק/סקיפ) כדי שאפשר יהיה לבטל אותה. רק
   // רמה אחת אחורה (בדיוק כמו בסקיצה המאושרת) - לא מחסנית שלמה.
@@ -900,6 +916,24 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     );
   }, [candidates, filters, userLocation, userPreferences, nearMeActive, activeCategoryFilters]);
   const currentCandidate = visibleCandidates[candidateIndex];
+  const currentPhotoIndex =
+    currentCandidate && photoState.candidateId === currentCandidate.id ? photoState.index : 0;
+
+  /** לחיצה על הכרטיס הקדמי: צדדים = תמונה הבאה/קודמת, אמצע = עמוד המקום. */
+  function handleCardTap({ xFraction }: { xFraction: number }) {
+    if (!currentCandidate) return;
+    const imageCount = currentCandidate.imageUrls.length;
+    const action = resolveCardTap(xFraction, imageCount);
+    if (action === "open") {
+      router.push(`/place/${currentCandidate.id}`);
+      return;
+    }
+    const delta = action === "next" ? 1 : -1;
+    const nextIndex = Math.min(Math.max(currentPhotoIndex + delta, 0), imageCount - 1);
+    if (nextIndex !== currentPhotoIndex) {
+      setPhotoState({ candidateId: currentCandidate.id, index: nextIndex });
+    }
+  }
 
   /** *** תיקון מהירות: לפני זה חיכינו לתשובת השרת (decide API) לפני שהראינו
    *  את כרטיס ה"אהבתי"/עברנו לכרטיס הבא - זה גרם לזרימה להרגיש איטית
@@ -1362,7 +1396,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
             <div
-              className={embedded ? "flex flex-col px-8 pt-6" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1407,48 +1441,52 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       (visibleCandidates אחרי הנוכחי) - לא מלבן לבן ריק.
                       לא אינטראקטיביים (aria-hidden + pointer-events-none) -
                       רק תצוגה מקדימה חזותית של מה שמחכה בתור. */}
-                  {visibleCandidates[candidateIndex + 2] && (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? -3.5 : -5}deg)`, transformOrigin: "50% 100%" }}
-                    >
-                      {visibleCandidates[candidateIndex + 2].imageUrls[0] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={visibleCandidates[candidateIndex + 2].imageUrls[0]}
-                          alt=""
-                          className="h-full w-full object-cover object-center"
-                        />
-                      )}
-                    </div>
-                  )}
-                  {visibleCandidates[candidateIndex + 1] && (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_10px_28px_rgba(16,24,40,0.12)]"
-                      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`, transform: `rotate(${embedded ? 3 : 4}deg)`, transformOrigin: "50% 100%" }}
-                    >
-                      {visibleCandidates[candidateIndex + 1].imageUrls[0] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={visibleCandidates[candidateIndex + 1].imageUrls[0]}
-                          alt=""
-                          className="h-full w-full object-cover object-center"
-                        />
-                      )}
-                    </div>
-                  )}
+                  {/* *** בקשה מפורשת ("שיהיו מאחורי הכרטיסייה עוד 4, לא רק עוד
+                      3"): ערימה של עד BACK_CARD_COUNT=4 כרטיסים מאחור (במקום 2).
+                      מציירים מהרחוק לקרוב (depth 4 -> 1) כדי שהקרוב יהיה מעל.
+                      כל כרטיס מקבל זווית *שונה* (מתחלפת ימין/שמאל) וגם הזזה
+                      קלה כלפי מעלה - כך כל אחד מהם באמת נראה כפס בולט מאחורי
+                      הקודם, בלי להגדיל את הזוויות (שהיו בורחות מהשוליים) -
+                      הזוויות המקסימליות נשארות 3.5° (מוטמע) כמו קודם. */}
+                  {BACK_CARDS.map((_, i) => {
+                    const depth = BACK_CARDS.length - i; // 4,3,2,1 - הרחוק ראשון
+                    const backCandidate = visibleCandidates[candidateIndex + depth];
+                    if (!backCandidate) return null;
+                    const cfg = BACK_CARDS[depth - 1][embedded ? "embedded" : "standalone"];
+                    return (
+                      <div
+                        key={backCandidate.id}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
+                        style={{
+                          height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`,
+                          transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
+                          transformOrigin: "50% 100%",
+                        }}
+                      >
+                        {backCandidate.imageUrls[0] && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={backCandidate.imageUrls[0]}
+                            alt=""
+                            className="h-full w-full object-cover object-center"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                   <SwipeCard
                     ref={swipeCardRef}
                     key={`${currentCandidate.id}-${swipeResetTick}`}
                     onSwipeLeft={() => handleDecision(false)}
                     onSwipeRight={() => handleDecision(true)}
+                    onTap={handleCardTap}
                     disabled={busy}
                   >
                     {() => (
                       <TripMatchCard
                         candidate={currentCandidate}
+                        imageIndex={currentPhotoIndex}
                         matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
                         matchTotal={totalDecisions + visibleCandidates.length}
                         cityLabel={selectedCityLabel || selectedCity || ""}
@@ -1464,17 +1502,27 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       fly-out. גם גדולים ב-30% (בקשה מפורשת): 60→78,
                       44→57. dir="ltr" מפורש - כדי ש-X יישאר תמיד פיזית
                       משמאל והלב מימין, בלי תלות ב-dir="rtl" הגלובלי. */}
+                  {/* *** מוקם מחדש (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
+                      הכרטיסיות לבין הבחוץ, חצי חצי"): מרכז השורה בדיוק על
+                      הקצה התחתון של הכרטיס (bottom = ZONE - חצי מגובה
+                      הכפתור הגדול) - חצי מכל כפתור על הכרטיס וחצי מחוצה לו.
+                      pointer-events-none על השורה (ו-auto רק על הכפתורים)
+                      כדי שהרווחים בין הכפתורים לא יחסמו החלקה/לחיצה על
+                      הכרטיס שמתחתיהם. */}
                   <div
                     dir="ltr"
-                    className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-[16px]"
-                    style={{ height: TRIPMATCH_CARD_BUTTON_ZONE }}
+                    className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center gap-[16px]"
+                    style={{
+                      height: TRIPMATCH_MAIN_BUTTON_SIZE,
+                      bottom: TRIPMATCH_CARD_BUTTON_ZONE - TRIPMATCH_MAIN_BUTTON_SIZE / 2,
+                    }}
                   >
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.nope()}
                       aria-label="דלג"
-                      className="flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
                       <Image src="/images/tripmatch/action-nope-btn.png" alt="" width={78} height={78} className="h-full w-full object-contain" />
                     </button>
@@ -1484,7 +1532,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       disabled={busy || lastDecision == null}
                       onClick={handleRewind}
                       aria-label="חזור לכרטיס הקודם"
-                      className="flex h-[57px] w-[57px] items-center justify-center transition active:scale-90 disabled:opacity-40"
+                      className="pointer-events-auto flex h-[57px] w-[57px] items-center justify-center transition active:scale-90 disabled:opacity-40"
                     >
                       <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={57} height={57} className="h-full w-full object-contain" />
                     </button>
@@ -1494,7 +1542,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.like()}
                       aria-label="אהבתי"
-                      className="flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
                       <Image src="/images/tripmatch/action-like-btn.png" alt="" width={78} height={78} className="h-full w-full object-contain" />
                     </button>
@@ -1505,7 +1553,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       בלי שום אינדיקציה זה מרגיש "תקוע". אינדיקטור עדין
                       וממורכז, לא חוסם - רק מבהיר שמשהו קורה ברקע. */}
                   {busy && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-[112px] flex justify-center">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-[104px] flex justify-center">
                       <div className="flex items-center gap-2 rounded-pill bg-black/50 px-3.5 py-2 text-xs font-medium text-white backdrop-blur-sm">
                         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                         שומר...
@@ -1675,6 +1723,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
           onChange={setFilters}
           onClose={() => setFiltersOpen(false)}
           preferredTags={[...(userPreferences?.interests ?? []), ...(userPreferences?.culinaryStyles ?? [])]}
+          resultCount={visibleCandidates.length}
         />
       )}
 
