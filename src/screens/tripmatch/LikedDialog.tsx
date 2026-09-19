@@ -1,93 +1,237 @@
 "use client";
 
-import Image from "next/image";
+import { useEffect, useState, type CSSProperties } from "react";
 
 interface LikedDialogProps {
   placeName: string;
-  /** תמונת המקום שאהבו בפועל - מוצגת בעיגול הצף (במקום הקמע), כדי
-   *  שהרגע ירגיש אישי ורלוונטי למה שבאמת נבחר. */
+  /** תמונת המקום שנאהב - מוצגת בריבוע המעוגל. */
   placeImageUrl?: string;
+  /** כמה מקומות כבר בטיול (כולל זה). */
+  likedCount?: number;
+  /** נקרא כשההודעה נעלמת (אוטומטית או בלחיצה) - ממשיכים להחליק. */
   onContinue: () => void;
-  /** "לא, סיימתי" - מסיימים את הסבב ועוברים לתוצאות (לא ניווט לפרטי מקום -
-   *  זה בלבל, כי הכפתור השני כבר "כן, המשך [להחליק]"). */
+  /** "לטיול שלי" - פותח את עמוד הטיול. */
   onFinish: () => void;
 }
 
-/** Dialog אחרי Like - שדרוג ויזואלי: תמונת ה-Hero הקבועה של TripMatch
- *  כרקע חגיגי מלא (במקום פס גרדיאנט שטוח), עם תמונת המקום שנאהב בפועל
- *  צפה בעיגול שחופף את התמונה מלמטה (במקום הקמע - כדי שהרגע ירגיש
- *  אישי ורלוונטי), ותג לב קטן שמסמן את הרגע. אותה פלטת צבעים/רדיוסים
- *  כמו שאר האפליקציה - רק יותר "מלהיב" ופחות שטוח. */
-export function LikedDialog({ placeName, placeImageUrl, onContinue, onFinish }: LikedDialogProps) {
+/** כמה זמן ההודעה נשארת (ms) - הוארך (בקשה מפורשת - "עובר מהר מדי"). */
+const VISIBLE_MS = 6500;
+const EXIT_MS = 420;
+/** גובה ברירת המחדל (קומפקטי) כשאין שורת חיפוש גלויה - שורה אחת בלבד. */
+const DEFAULT_HEIGHT = 56;
+/** מגובה זה ומעלה - פריסה מלאה (שתי השורות של הבר: כפתורים + חיפוש). */
+const TALL_MIN_HEIGHT = 84;
+
+/** כיווני פיצוץ הלבבות (dx, dy ב-px) והשהיה. */
+const BURST = [
+  { dx: -26, dy: -22, delay: 0 },
+  { dx: 4, dy: -32, delay: 50 },
+  { dx: 30, dy: -20, delay: 100 },
+  { dx: -34, dy: -2, delay: 40 },
+  { dx: 36, dy: 2, delay: 90 },
+];
+
+interface Placement {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+/** מודד את אזור התוכן של הבר התכלת בעמוד הבית: מהקצה העליון של כפתורי
+ *  ההתראות/הצ'אט ועד **הקצה התחתון של שורת החיפוש** (בקשה מפורשת), ובין קצוות
+ *  הכפתורים לרוחב (שהם גם קצוות שורת החיפוש). אם החיפוש לא גלוי (מכווץ בגלילה)
+ *  - רק השורה הראשונה (קומפקטי). null אם אין בר כזה (עמוד /tripmatch העצמאי). */
+function measureHeaderBand(): Placement | null {
+  const bar = document.querySelector("[data-home-top-bar]");
+  const header = bar?.querySelector("header");
+  if (!bar || !header) return null;
+
+  const hr = header.getBoundingClientRect();
+  const cs = getComputedStyle(header);
+  const rowTop = hr.top + parseFloat(cs.paddingTop || "0");
+  const left = hr.left + parseFloat(cs.paddingLeft || "0");
+  const width = hr.width - parseFloat(cs.paddingLeft || "0") - parseFloat(cs.paddingRight || "0");
+
+  let height = DEFAULT_HEIGHT;
+  const search = document.querySelector("[data-home-search]");
+  if (search) {
+    const sr = search.getBoundingClientRect();
+    const candidate = sr.bottom - rowTop;
+    // רק אם החיפוש גלוי במלואו (לא מכווץ בגלילה) והמדידה סבירה.
+    if (sr.height > 30 && candidate >= TALL_MIN_HEIGHT && candidate <= 140) height = candidate;
+  }
+  return { top: rowTop, left, width, height };
+}
+
+/**
+ * *** עיצוב מחדש (בקשה מפורשת - "העמוד הזה נראה מעפן" ואז: "יותר לאט", "בדיוק
+ * מהקצה העליון של שני הכפתורים עד החלק התחתון של שורת החיפוש"): הודעת "נוסף
+ * לטיול שלך" קלילה שלא חוסמת כלום. יושבת בדיוק על אזור התוכן של הבר התכלת -
+ * מהקצה העליון של כפתורי ההתראות/הצ'אט ועד הקצה התחתון של שורת החיפוש, ובין
+ * הקצוות של שני הכפתורים - ומכסה אותו כל עוד היא מוצגת (כ-104px, פריסה
+ * מלאה). כשהחיפוש מכווץ בגלילה - פריסה קומפקטית על השורה הראשונה בלבד.
+ * נכנסת באנימציה איטית יותר, נשארת ~6.5 שניות (פס זמן דק בתחתית), ונעלמת
+ * לבד או בלחיצה. לייק נוסף מחליף אותה ומאפס את הטיימר (key בעמוד ההורה).
+ */
+export function LikedDialog({ placeName, placeImageUrl, likedCount, onContinue, onFinish }: LikedDialogProps) {
+  const [leaving, setLeaving] = useState(false);
+  const [placement, setPlacement] = useState<Placement | null>(null);
+
+  // מדידה חד-פעמית בעליית ההודעה + משוב מישוש קצר (Android).
+  useEffect(() => {
+    setPlacement(measureHeaderBand());
+    try {
+      navigator.vibrate?.(14);
+    } catch {
+      // לא קריטי
+    }
+  }, []);
+
+  useEffect(() => {
+    const hide = window.setTimeout(() => setLeaving(true), VISIBLE_MS);
+    return () => window.clearTimeout(hide);
+  }, []);
+
+  useEffect(() => {
+    if (!leaving) return;
+    const done = window.setTimeout(onContinue, EXIT_MS);
+    return () => window.clearTimeout(done);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leaving]);
+
+  const tall = (placement?.height ?? DEFAULT_HEIGHT) >= TALL_MIN_HEIGHT;
+  const burstScale = tall ? 1.45 : 1;
+
+  const style: CSSProperties = placement
+    ? { top: placement.top, left: placement.left, width: placement.width, height: placement.height }
+    : { top: "calc(env(safe-area-inset-top, 0px) + 12px)", left: 16, right: 16, height: DEFAULT_HEIGHT };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-6 backdrop-blur-sm">
-      <div className="relative w-full max-w-sm overflow-hidden rounded-card bg-white pb-6 text-center shadow-soft">
-        {/* תמונת ה-Hero הקבועה של TripMatch - רקע חגיגי אחיד (לא תמונת */}
-        {/* המקום הספציפי - זו יושבת בעיגול למטה). גרדיאנט כהה עדין לקריאות */}
-        {/* + נקודות "קונפטי" עדינות שמתלבשות על התמונה. */}
-        <div className="relative h-40 w-full overflow-hidden">
-          <Image src="/images/hero-tripmatch.png" alt="" fill priority className="object-cover" />
-          <div
-            className="absolute inset-0"
-            style={{ background: "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 55%, rgba(24,119,242,0.25) 100%)" }}
-          />
-          <div
-            className="absolute inset-0 opacity-40"
-            style={{ backgroundImage: "radial-gradient(circle, white 1.5px, transparent 1.5px)", backgroundSize: "18px 18px" }}
-          />
-          <span className="absolute right-6 top-5 text-xl animate-pulse">✨</span>
-          <span className="absolute left-8 top-9 text-base animate-pulse" style={{ animationDelay: "0.4s" }}>
-            ✨
-          </span>
-        </div>
+    <div className="pointer-events-none fixed z-[55]" style={style}>
+      <style>{CSS}</style>
 
-        {/* עיגול התמונה - תמונת המקום שנאהב בפועל (לא הקמע), כדי שהרגע */}
-        {/* ירגיש אישי ורלוונטי למה שבאמת נבחר. נופל חזרה לקמע Tripy רק */}
-        {/* אם למקום הזה במקרה אין תמונה כלל. */}
-        {/* *** תיקון: תמונות מקום מגיעות דרך /api/places/photo (פרוקסי ל-Google */}
-        {/* Places), ו-next/image קורס עליהן ב-runtime - בדיוק כמו בשאר האפליקציה */}
-        {/* (TripMatchCard, מסך התוצאות) אלה מוצגות עם <img> רגיל, לא next/image. */}
-        <div className="relative -mt-10 flex justify-center">
-          <div className="relative h-20 w-20 overflow-hidden rounded-full border-4 border-white bg-white shadow-lg">
-            {placeImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={placeImageUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <Image src="/images/tripmatch-liked-mascot.png" alt="" fill className="object-cover object-top" />
-            )}
-          </div>
-          {/* תג לב קטן - מסמן את "רגע ה-Like" בפינת הקמע */}
-          <div
-            className="absolute -bottom-1 right-[calc(50%-40px)] flex h-7 w-7 animate-bounce items-center justify-center rounded-full border-2 border-white text-sm shadow-md"
-            style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-          >
-            ❤️
-          </div>
-        </div>
-
-        <div className="px-6 pt-3">
-          <p className="text-lg font-extrabold text-ink">{placeName} נוסף למועדפים! 🎉</p>
-          <p className="mt-1.5 text-[13.5px] text-ink-secondary">האם תרצו להמשיך להחליק?</p>
-
-          <div className="mt-5 flex gap-3">
-            <button
-              type="button"
-              onClick={onFinish}
-              className="flex-1 rounded-pill bg-bg-secondary py-3 text-sm font-semibold text-ink transition active:scale-[0.97]"
+      <div
+        role="status"
+        aria-live="polite"
+        onClick={() => setLeaving(true)}
+        className={`pointer-events-auto relative h-full w-full overflow-hidden bg-white shadow-[0_18px_40px_-14px_rgba(10,40,110,0.65)] ring-1 ring-black/5 ${
+          tall ? "rounded-[26px]" : "rounded-[20px]"
+        } ${
+          leaving ? "ld-out" : "ld-in"
+        }`}
+      >
+        <div className={`flex h-full items-center pb-[3px] ${tall ? "gap-4 px-4" : "gap-3 px-2.5"}`}>
+          {/* תמונה + לב קופץ + פיצוץ לבבות */}
+          <div className={`relative shrink-0 ${tall ? "h-[68px] w-[68px]" : "h-10 w-10"}`}>
+            <div
+              className={`h-full w-full overflow-hidden bg-bg-secondary ring-2 ring-white shadow-[0_6px_14px_-6px_rgba(10,40,110,0.6)] ${
+                tall ? "rounded-[20px]" : "rounded-xl"
+              }`}
             >
-              לא, סיימתי
-            </button>
-            <button
-              type="button"
-              onClick={onContinue}
-              className="flex-1 rounded-pill py-3 text-sm font-semibold text-white shadow-soft transition active:scale-[0.97]"
+              {placeImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={placeImageUrl} alt="" draggable={false} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-base">📍</div>
+              )}
+            </div>
+
+            <div
+              className={`ld-pop absolute -bottom-1 -left-1 flex items-center justify-center rounded-full ring-2 ring-white ${
+                tall ? "h-7 w-7" : "h-[18px] w-[18px]"
+              }`}
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
-              כן, המשך
-            </button>
+              <svg width={tall ? 14 : 9} height={tall ? 14 : 9} viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#fff" d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.5 2.6c0 5.6-7.5 10.2-7.5 10.2Z" />
+              </svg>
+            </div>
+
+            {BURST.map((b, i) => (
+              <svg
+                key={i}
+                className="ld-burst pointer-events-none absolute -bottom-1 -left-1"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                style={{
+                  ["--dx" as string]: `${b.dx * burstScale}px`,
+                  ["--dy" as string]: `${b.dy * burstScale}px`,
+                  animationDelay: `${300 + b.delay}ms`,
+                }}
+              >
+                <path fill="#3B82F6" d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.7a4.3 4.3 0 0 1 7.5 2.6c0 5.6-7.5 10.2-7.5 10.2Z" />
+              </svg>
+            ))}
           </div>
+
+          {/* טקסט */}
+          <div className="min-w-0 flex-1">
+            <p className={`whitespace-nowrap font-extrabold leading-tight tracking-tight text-ink ${tall ? "text-[17px]" : "text-[14px]"}`}>
+              נוסף לטיול שלך
+            </p>
+            <p className={`truncate leading-tight text-ink-secondary ${tall ? "mt-1 text-[13.5px]" : "mt-0.5 text-[12px]"}`}>{placeName}</p>
+            {likedCount != null && likedCount > 0 && (
+              <span
+                className={`inline-block rounded-pill bg-accent/10 font-bold text-accent ${
+                  tall ? "mt-2 px-2.5 py-0.5 text-[11.5px]" : "hidden"
+                }`}
+              >
+                {likedCount === 1 ? "המקום הראשון בטיול" : `מקום ${likedCount} בטיול`}
+              </span>
+            )}
+          </div>
+
+          {/* פעולה: פתיחת עמוד הטיול */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFinish();
+            }}
+            className={`shrink-0 rounded-pill font-bold text-white shadow-[0_8px_16px_-8px_rgba(24,119,242,0.9)] transition active:scale-[0.96] ${
+              tall ? "px-4 py-3 text-[13.5px]" : "px-3.5 py-2 text-[12.5px]"
+            }`}
+            style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+          >
+            לטיול שלי
+          </button>
+        </div>
+
+        {/* פס זמן דק - כמה זמן ההודעה עוד תישאר */}
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/[0.05]" aria-hidden="true">
+          <div
+            className="ld-timer h-full origin-right"
+            style={{
+              background: "linear-gradient(90deg, var(--color-primary-start), var(--color-primary-end))",
+              animationDuration: `${VISIBLE_MS}ms`,
+            }}
+          />
         </div>
       </div>
     </div>
   );
 }
+
+const CSS = `
+.ld-in{animation:ld-in 720ms cubic-bezier(0.22,1.15,0.36,1) both}
+.ld-out{animation:ld-out ${EXIT_MS}ms ease-in both}
+.ld-pop{animation:ld-pop 700ms cubic-bezier(0.34,1.7,0.5,1) 260ms both}
+.ld-burst{opacity:0;animation:ld-burst 1000ms ease-out both}
+.ld-timer{animation-name:ld-timer;animation-timing-function:linear;animation-fill-mode:both}
+@keyframes ld-in{from{opacity:0;transform:translateY(-60%) scale(0.97)}to{opacity:1;transform:none}}
+@keyframes ld-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-30%) scale(0.98)}}
+@keyframes ld-pop{0%{transform:scale(0) rotate(-20deg)}60%{transform:scale(1.3) rotate(6deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes ld-burst{
+  0%{opacity:0;transform:translate(0,0) scale(0.4)}
+  20%{opacity:1}
+  100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.1)}
+}
+@keyframes ld-timer{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@media (prefers-reduced-motion: reduce){
+  .ld-in,.ld-out,.ld-pop{animation-duration:1ms}
+  .ld-burst{display:none}
+}
+`;

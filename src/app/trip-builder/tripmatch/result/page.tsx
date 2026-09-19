@@ -49,6 +49,8 @@ function TripMatchSavedResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
+  // מגיעים מעמוד הבית (כפתור "לטיול שלי" בהחלקות) - חזרה מחזירה לשם, לכרטיסיות.
+  const fromHome = searchParams.get("from") === "home";
 
   const [destinationLabel, setDestinationLabel] = useState<string>("");
   // *** שומרים את כל ה-itinerary הגולמי (לא רק stops) כדי שמחיקת תחנה
@@ -140,7 +142,7 @@ function TripMatchSavedResultContent() {
         <div className="relative h-16">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
             <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />
-            <BackButton onBack={() => router.push("/trips")} />
+            <BackButton onBack={() => router.push(fromHome ? "/home" : "/trips")} />
           </div>
 
           {sessionId && (

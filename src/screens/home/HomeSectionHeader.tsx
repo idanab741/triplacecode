@@ -19,7 +19,7 @@ export function HomeSectionHeader({ iconSrc, title, titleLogoSrc, actionLabel, o
         <Image src={iconSrc} alt="" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
         <h3 className="flex items-center gap-1.5 text-[19px] font-extrabold tracking-tight text-ink">
           {title}
-          {titleLogoSrc && <Image src={titleLogoSrc} alt="triplace" width={110} height={34} className="h-[22px] w-auto object-contain" />}
+          {titleLogoSrc && <Image src={titleLogoSrc} alt="triplace" width={110} height={29} className="-my-1 h-[35px] w-auto object-contain" />}
         </h3>
       </div>
       {actionLabel && onAction && (

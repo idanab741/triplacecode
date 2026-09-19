@@ -793,10 +793,47 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   }
 
 
+  // *** חדש (בקשה מפורשת - "הטיול שלי צריך להיות בעמוד נוסף, ולא בעמוד הבית
+  // בלי הכרטיסיות"): במצב מוטמע (Home) "לטיול שלי" / סיום החפיסה כבר לא מחליפים
+  // את הכרטיסיות בתוצאות בתוך עמוד הבית. יוצרים/מעדכנים את שורת הטיול ופותחים
+  // את עמוד הטיול השמור (/trip-builder/tripmatch/result) - עמוד נפרד. הכרטיסיות
+  // נשארות בעמוד הבית (החפיסה נשמרת במטמון), וחזרה מחזירה בדיוק אליהן.
+  const openingTripRef = useRef(false);
+  async function openTripPage() {
+    if (openingTripRef.current) return;
+    openingTripRef.current = true;
+    try {
+      const city = selectedCityLabel || selectedCity;
+      if (!city) throw new Error("חסר יעד");
+      const response = await fetch("/api/trip-builder/sessions/from-tripmatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          city,
+          cityValue: selectedCity,
+          places: sessionLikedPlaces,
+          sessionId: tripRecordIdRef.current ?? undefined,
+          completedCategories,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.sessionId) throw new Error(data?.error ?? "לא הצלחנו לפתוח את הטיול, נסו שוב");
+      tripRecordIdRef.current = data.sessionId;
+      setTripRecordId(data.sessionId);
+      router.push(`/trip-builder/tripmatch/result?sessionId=${data.sessionId}&from=home`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "לא הצלחנו לפתוח את הטיול, נסו שוב");
+    } finally {
+      openingTripRef.current = false;
+    }
+  }
+
   function handleFinish() {
     if (sessionLikedPlaces.length === 0) {
       if (embedded && onExitEmbedded) onExitEmbedded();
       else router.push("/home");
+    } else if (embedded) {
+      openTripPage();
     } else {
       setStage("results");
     }
@@ -1144,7 +1181,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
         </header>
       )}
 
-      {stage !== "swiping" && (
+      {/* *** תיקון (בקשה מפורשת - "מאיפה ה-HERO של ההחלקה? למה הוא פה?"): תמונת
+          ה-Hero שייכת רק לעמוד /tripmatch העצמאי - לא מוצגת בעמוד הבית
+          (embedded) בשום מצב. */}
+      {!embedded && stage !== "swiping" && (
         <div
           className="overflow-hidden transition-all duration-300 ease-out"
           style={{ maxHeight: heroVisible ? 260 : 0, opacity: heroVisible ? 1 : 0 }}
@@ -1162,8 +1202,26 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
           // (ר' embeddedStartedRef למעלה) - אין יותר מסך ביניים עם טקסט
           // "מכינים עבורכם המלצות...". רק ספינר קטן וחסר-טקסט, למקרה של
           // טעינה ראשונה (בלי חפיסה שמורה), כדי שהעמוד לא ייראה תקוע.
-          <div className="flex justify-center py-16" aria-busy="true">
-            <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-bg-secondary border-t-accent" />
+          <div className="flex flex-col items-center gap-3 py-16" aria-busy={!error}>
+            {error ? (
+              <>
+                <p className="px-6 text-center text-sm text-danger">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const query = (initialCityQuery ?? "").trim();
+                    if (!query) return;
+                    setError(null);
+                    handleSelectCity({ value: query, label: query, type: "city" }, { immediate: true });
+                  }}
+                  className="rounded-pill bg-bg-secondary px-5 py-2 text-sm font-semibold text-ink"
+                >
+                  נסו שוב
+                </button>
+              </>
+            ) : (
+              <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-bg-secondary border-t-accent" />
+            )}
           </div>
         )}
 
@@ -1801,8 +1859,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
 
       {likedPlace && (
         <LikedDialog
+          key={likedPlace.id}
           placeName={likedPlace.name}
           placeImageUrl={likedPlace.imageUrls[0]}
+          likedCount={sessionLikedPlaces.length}
           onContinue={() => setLikedPlace(null)}
           onFinish={() => {
             setLikedPlace(null);

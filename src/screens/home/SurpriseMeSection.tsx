@@ -88,12 +88,19 @@ export function SurpriseMeSection({ variant = "standalone" }: SurpriseMeSectionP
         opacity: loading ? 0.7 : 1,
       }}
     >
-      <div className="absolute inset-y-0 right-0 flex w-[48%] flex-col items-start justify-start gap-2 px-3 pt-5 sm:px-5 sm:pt-6">
-        <span className="text-base font-bold leading-tight text-ink sm:text-xl">בא לכם לצאת עכשיו?⚡</span>
-        <span className="text-sm leading-snug text-ink-secondary">
-          אין תוכניות?
+      {/* *** בקשה מפורשת ("הטקסט לא יושב טוב בכרטיסייה - שיתחיל קצת יותר משמאל, לא
+          צמוד לימין"): בלוק הטקסט מוזז פנימה מהקצה הימני (right-[8%] במקום 0) ומרוכז
+          אנכית. נוסח חדש, בשורות מפורשות. */}
+      <div className="absolute inset-y-0 right-[8%] flex w-[44%] flex-col items-start justify-center gap-2 py-3 sm:right-[7%]">
+        <span className="text-[19px] font-extrabold leading-[1.15] text-ink sm:text-2xl">
+          בא לכם לצאת
           <br />
-          יש לנו רעיון.
+          עכשיו?⚡
+        </span>
+        <span className="text-[13.5px] leading-snug text-ink-secondary sm:text-base">
+          אין לכם רעיון?
+          <br />
+          לנו יש פתרון!
         </span>
         <span
           className="mt-1 whitespace-nowrap rounded-pill px-5 py-2.5 text-sm font-semibold text-white shadow-soft"

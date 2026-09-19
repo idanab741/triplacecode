@@ -65,6 +65,14 @@ interface DiscoverCardProps {
 
 export function DiscoverCard({ variant = "default" }: DiscoverCardProps = {}) {
   const router = useRouter();
+  // *** בקשה מפורשת (קטע "גלה עוד" בעמוד הבית): רק RunTrippy ו"תפתיעו אותי".
+  // בשאר השימושים - כל השקופיות, כמו קודם.
+  const slides =
+    variant === "home"
+      ? SLIDES.filter((s) => s.kind === "surprise" || (s.kind === "link" && s.href === "/test-game")).sort(
+          (a, b) => (a.kind === "link" ? 0 : 1) - (b.kind === "link" ? 0 : 1)
+        )
+      : SLIDES;
   // *** שער הסיסמה ל-place's (ר' תיעוד למעלה ליד SLIDES): נפתח בלחיצה
   // על שקופית ה-places במקום ניווט מיידי. לא נשמר בין ביקורים בכוונה -
   // כל לחיצה פותחת מופע חדש של המודאל, בלי לזכור סיסמה קודמת שהוזנה.
@@ -80,8 +88,11 @@ export function DiscoverCard({ variant = "default" }: DiscoverCardProps = {}) {
     const target = event.target as HTMLElement | null;
     const slideEl = target?.closest("[data-swiper-slide-index]") as HTMLElement | null;
     const indexAttr = slideEl?.getAttribute("data-swiper-slide-index");
-    if (indexAttr == null) return;
-    const slide = SLIDES[Number(indexAttr)];
+    // בלי loop (שתי שקופיות בעמוד הבית) אין data-swiper-slide-index - נופלים
+    // ל-clickedIndex של ה-Swiper עצמו.
+    const slideIndex = indexAttr != null ? Number(indexAttr) : _swiper.clickedIndex;
+    if (slideIndex == null || Number.isNaN(slideIndex)) return;
+    const slide = slides[slideIndex];
     // שקופית "surprise" מטפלת בקליק שלה בעצמה (כפתור פנימי) - אין כאן
     // מה לנווט אליו ברמת ה-Swiper.
     if (!slide) return;
@@ -106,7 +117,8 @@ export function DiscoverCard({ variant = "default" }: DiscoverCardProps = {}) {
         modules={[Autoplay, Pagination]}
         slidesPerView={1}
         spaceBetween={0}
-        loop
+        loop={slides.length > 2}
+        rewind={slides.length <= 2}
         autoplay={{
           delay: 5000,
           disableOnInteraction: false,
@@ -117,7 +129,7 @@ export function DiscoverCard({ variant = "default" }: DiscoverCardProps = {}) {
         onClick={handleClick}
         className="aspect-[2112/1408] rounded-[30px] shadow-xl"
       >
-        {SLIDES.map((slide, i) => (
+        {slides.map((slide, i) => (
           <SwiperSlide
             key={slide.kind === "link" ? slide.href : slide.kind === "places" ? "places" : "surprise"}
             className="relative cursor-pointer"
