@@ -1,0 +1,26 @@
+[33mcommit 4b3e8be9a4e28107355d7586a7ca1aaa1f87a8b3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: idanab741 <idanab741@gmail.com>
+Date:   Sat Sep 19 02:19:08 2026 +0300
+
+    TripMatch: fixed action buttons, bigger icons, spacing + home/header polish
+
+ src/app/home/page.tsx | 216 [32m++++++++++++++++++++++++++++++++++++++++++++++++++[m
+ 1 file changed, 216 insertions(+)
+
+[33mcommit 8f3a55db938c1d7d38fac225e91d7c590cffd229[m
+Author: idanab741 <idanab741@gmail.com>
+Date:   Sat Sep 19 02:17:18 2026 +0300
+
+    TripMatch: fixed action buttons, bigger icons, spacing + home/header polish
+
+ src/app/home/page.tsx | 427 [31m--------------------------------------------------[m
+ 1 file changed, 427 deletions(-)
+
+[33mcommit 4d3c1f69b68c8fb7f00273d4aa5d6807a2b37ef0[m
+Author: idanab741 <idanab741@gmail.com>
+Date:   Thu Sep 17 21:34:38 2026 +0300
+
+    fix: StoriesRail - תיקון קונפליקט גרירה בטאץ' + חישוב מדויק של רווח מהבר העליון
+
+ src/app/home/page.tsx | 47 [32m+++++++++++++++++++++++++++++++++++++++[m[31m--------[m
+ 1 file changed, 39 insertions(+), 8 deletions(-)

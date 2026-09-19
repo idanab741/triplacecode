@@ -11,6 +11,7 @@ import type { ActivityItem } from "@/services/notifications/notificationsService
 
 interface HomeHeaderProps {
   loading: boolean;
+  avatarUrl?: string | null;
 }
 
 /**
