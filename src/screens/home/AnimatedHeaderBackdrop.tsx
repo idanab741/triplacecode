@@ -13,12 +13,18 @@
  * האנימציות (transform/opacity בלבד ברובן) ב-globals.css, ומכובות
  * למי שהגדיר "הפחתת תנועה" במכשיר (prefers-reduced-motion).
  */
-export function AnimatedHeaderBackdrop() {
+interface AnimatedHeaderBackdropProps {
+  /** "purple" (בר place's): ההילה השנייה בגוון סגול-ורוד במקום תכלת. */
+  tone?: "blue" | "purple";
+}
+
+export function AnimatedHeaderBackdrop({ tone = "blue" }: AnimatedHeaderBackdropProps = {}) {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-b-[32px]">
-      <div className="home-header-blob home-header-blob-light" />
-      <div className="home-header-blob home-header-blob-cyan" />
-      <div className="home-header-sheen" />
+      {/* גוון סגול: הילות מאותו סגול בעוצמה נמוכה (לא לבנות) וברק עדין, כדי שהצבע יישאר אחיד. */}
+      <div className={`home-header-blob ${tone === "purple" ? "home-header-blob-violet" : "home-header-blob-light"}`} />
+      <div className={`home-header-blob ${tone === "purple" ? "home-header-blob-pink" : "home-header-blob-cyan"}`} />
+      <div className={tone === "purple" ? "home-header-sheen-soft" : "home-header-sheen"} />
     </div>
   );
 }

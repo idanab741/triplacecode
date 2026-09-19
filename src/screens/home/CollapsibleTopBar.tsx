@@ -5,7 +5,15 @@ import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 
 interface CollapsibleTopBarProps {
-  loading: boolean;
+  loading?: boolean;
+  /** *** שורת הכותרת העליונה (ברירת מחדל: HomeHeader של triplace). place's מעביר
+   *  את PlacesHeaderRow - כך שני הבארים נבנים מאותו רכיב, באותו מיקום ובאותן מידות. */
+  headerRow?: ReactNode;
+  /** רקע הבר (ברירת מחדל: הגרדיאנט התכלת של הבית). */
+  gradient?: string;
+  shadow?: string;
+  /** גוון ההילות המונפשות. */
+  tone?: "blue" | "purple";
   /** כשמועבר - כפתור הצ'אט מוחלף בכפתור "חזור" (BackButton של האפליקציה).
    *  לעמודים "הבאים" שמשתמשים באותו בר. */
   onBack?: () => void;
@@ -17,6 +25,7 @@ interface CollapsibleTopBarProps {
 }
 
 const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)";
+const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
 
 /**
  * *** חדש (בקשה מפורשת - "הבר העליון ישאר - רק עם שורת הלוגו, ההתראות והצ'אט
@@ -35,7 +44,16 @@ const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 7
  * למה שהיה ב-home/page.tsx - עבר לכאן כמו שהוא. בלי overflow-hidden על
  * הבר עצמו, כדי שתפריט ההצעות של החיפוש והבועה של ההתראות יוכלו לצאת.
  */
-export function CollapsibleTopBar({ loading, onBack, children, raised = false }: CollapsibleTopBarProps) {
+export function CollapsibleTopBar({
+  loading = false,
+  headerRow,
+  gradient = BAR_GRADIENT,
+  shadow = BAR_SHADOW,
+  tone = "blue",
+  onBack,
+  children,
+  raised = false,
+}: CollapsibleTopBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -61,19 +79,22 @@ export function CollapsibleTopBar({ loading, onBack, children, raised = false }:
         bar.style.marginBottom = "";
         clip.style.height = "";
         clip.style.overflow = "";
-        clip.style.opacity = "";
-        clip.style.transform = "";
         clip.style.pointerEvents = "";
+        if (content) content.style.transform = "";
         return;
       }
       const collapsed = naturalHeight * progress;
       bar.style.marginBottom = `${collapsed}px`;
       clip.style.height = `${naturalHeight - collapsed}px`;
       clip.style.overflow = "hidden";
-      // נעלם מהר יותר מהכיווץ עצמו - מרגיש "נשאב" למעלה ולא נחתך.
-      clip.style.opacity = String(Math.max(0, 1 - progress * 1.7));
-      clip.style.transform = `translateY(${-10 * progress}px)`;
       clip.style.pointerEvents = progress > 0.5 ? "none" : "";
+      // *** תיקון (בקשה מפורשת - "בעיה בהחלקה כשגוללים חזרה למעלה, פער צבע, צל
+      // מיותר"): קודם השורה התעמעמה (opacity) ועלתה קצת - ובזמן הגלילה חזרה היא
+      // הייתה שקופה למחצה מעל הסגול (גוון עכור), והצל שלה נחתך בקצה התחתון.
+      // עכשיו היא תמיד אטומה לגמרי ופשוט "גולשת" למעלה, מתחת לשורת הכותרת (התוכן
+      // עולה בדיוק במרחק שהבר התכווץ, והקצה התחתון שלה צמוד לקצה התחתון של הבר) -
+      // כמו תוכן שגולל מתחת לבר נדבק. transform בלבד - חלק וללא עכירות.
+      if (content) content.style.transform = `translate3d(0, ${-collapsed}px, 0)`;
     }
 
     function onScroll() {
@@ -102,16 +123,16 @@ export function CollapsibleTopBar({ loading, onBack, children, raised = false }:
       data-home-top-bar=""
       className={`sticky top-0 rounded-b-[32px] pb-5 ${raised ? "z-[65]" : "z-30"}`}
       style={{
-        background: BAR_GRADIENT,
-        boxShadow: "0 12px 30px -14px rgba(0, 124, 254, 0.6)",
+        background: gradient,
+        boxShadow: shadow,
       }}
     >
-      <AnimatedHeaderBackdrop />
-      <HomeHeader loading={loading} onBack={onBack} />
+      <AnimatedHeaderBackdrop tone={tone} />
+      {headerRow ?? <HomeHeader loading={loading} onBack={onBack} />}
 
       {collapsible && (
-        <div ref={clipRef} style={{ willChange: "height, opacity, transform" }}>
-          <div ref={contentRef} className="px-5 pt-4">
+        <div ref={clipRef}>
+          <div ref={contentRef} className="px-5 pt-4" style={{ willChange: "transform" }}>
             {children}
           </div>
         </div>

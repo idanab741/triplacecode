@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
-import { StoriesRail } from "@/screens/places/StoriesRail";
-import { StoryViewerModal } from "@/screens/places/StoryViewerModal";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
+import dynamic from "next/dynamic";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
 import { SuggestedPeopleCircles } from "@/screens/places/SuggestedPeopleCircles";
 import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
@@ -16,17 +15,24 @@ import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
-import { CreatePostBar } from "@/screens/places/CreatePostBar";
+import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
+import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
 import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import type { FeedItemDto, FeedTab } from "@/services/social/feedService";
-import type { StoryRailAuthorDto } from "@/services/social/storyService";
+import type { PlacesFeedView } from "@/screens/places/FeedTabs";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
 import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
 import type { PostVisibility } from "@/services/social/types";
+
+// המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח, ורק כשנכנסים ללשונית "מפה".
+const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
+  ssr: false,
+});
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -38,20 +44,34 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export default function PlacesHomePage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [storyRail, setStoryRail] = useState<StoryRailAuthorDto[] | null>(null);
   const [creators, setCreators] = useState<CreatorCardDto[] | null>(null);
   const [suggestedTravelers, setSuggestedTravelers] = useState<SuggestedTravelerDto[] | null>(null);
   const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[] | null>(null);
   const [feedItems, setFeedItems] = useState<FeedItemDto[] | null>(null);
-  const [feedTab, setFeedTab] = useState<FeedTab>("for_you");
+  // *** "עבורך / מפה" (בקשה מפורשת) - פיד "חברים" הוחלף בלשונית המפה (בהמשך: כל ההמלצות
+  // של החברים על מפה). הפיד עצמו הוא תמיד "עבורך".
+  const feedTab: FeedTab = "for_you";
+  const [view, setView] = useState<PlacesFeedView>("for_you");
+  // *** במפה (בקשה מפורשת - "עבורך/מפה צריך להיעלם במפה, כשהאצבע על המפה מתחת לחיפוש"):
+  // הטאבים מרחפים מעל המפה ונעלמים בזמן שנוגעים בה (כדי שהמפה תהיה נקייה ומלאה),
+  // וחוזרים ~1 שנייה אחרי שמרימים את האצבע.
+  const [mapTouching, setMapTouching] = useState(false);
+  const mapTouchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function handleMapInteracting(active: boolean) {
+    if (mapTouchTimerRef.current) clearTimeout(mapTouchTimerRef.current);
+    if (active) setMapTouching(true);
+    else mapTouchTimerRef.current = setTimeout(() => setMapTouching(false), 1100);
+  }
+  useEffect(() => {
+    if (view !== "map") setMapTouching(false);
+  }, [view]);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const [storyViewerIndex, setStoryViewerIndex] = useState<number | null>(null);
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
@@ -79,7 +99,6 @@ export default function PlacesHomePage() {
 
   useEffect(() => {
     if (!user) return;
-    fetchJson<{ rail: StoryRailAuthorDto[] }>("/api/social/stories").then((r) => setStoryRail(r.rail)).catch(() => setStoryRail([]));
     fetchJson<{ creators: CreatorCardDto[] }>("/api/social/creators").then((r) => setCreators(r.creators)).catch(() => setCreators([]));
     fetchJson<{ travelers: SuggestedTravelerDto[] }>("/api/social/suggested-travelers")
       .then((r) => setSuggestedTravelers(r.travelers))
@@ -150,33 +169,6 @@ export default function PlacesHomePage() {
     setFeedItems((prev) => prev?.filter((i) => i.id !== postId) ?? null);
   }
 
-  function handleOpenStory(authorIndex: number) {
-    setStoryViewerIndex(authorIndex);
-  }
-
-  async function handleStoryViewed(storyId: string) {
-    fetchJson(`/api/social/stories/${storyId}/view`, { method: "POST" }).catch(() => {});
-    // עדכון מקומי מיידי - כדי שהטבעת הסגולה תיעלם ברגע שנצפו כל
-    // הסטוריז של אותו מחבר, בלי לחכות לרענון מלא של הדף (בקשה מפורשת).
-    setStoryRail((prev) =>
-      prev?.map((entry) => {
-        const stories = entry.stories.map((s) => (s.id === storyId ? { ...s, viewed: true } : s));
-        return { ...entry, stories, hasUnviewed: stories.some((s) => !s.viewed) };
-      }) ?? null
-    );
-  }
-
-  async function handleStoryDeleted(storyId: string) {
-    await fetchJson(`/api/social/stories/${storyId}`, { method: "DELETE" });
-    // מסירים את הסטורי מה-state המקומי, וגם את המחבר כולו מהשורה אם
-    // זה היה הסטורי האחרון שלו - בלי לחכות לרענון מלא.
-    setStoryRail((prev) =>
-      prev
-        ?.map((entry) => ({ ...entry, stories: entry.stories.filter((s) => s.id !== storyId) }))
-        .filter((entry) => entry.stories.length > 0) ?? null
-    );
-  }
-
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-white px-4 pt-6">
@@ -188,33 +180,60 @@ export default function PlacesHomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-places-bg pb-24">
-      <PlacesHeader />
+    <div className={`min-h-screen bg-places-bg ${view === "map" ? "pb-0" : "pb-24"}`}>
+      <HomeStatusBarTint color="#7C3AED" />
+      {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
+          ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
+          נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
+      <CollapsibleTopBar
+        headerRow={<PlacesHeaderRow />}
+        gradient={PLACES_BAR_GRADIENT}
+        shadow={PLACES_BAR_SHADOW}
+        tone="purple"
+      >
+        <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
+      </CollapsibleTopBar>
 
-      {/* *** תיקון (בקשה מפורשת - "השורה של 'כתבו את הטיול שלכם' צריכה
-          לרדת מתחת לסטוריז"): הוזזה לגמרי - שורת הסטוריז עכשיו ראשונה,
-          מיד אחרי ה-header, ושורת הכתיבה באה אחריה. */}
-      <div className="bg-white">
-        {storyRail === null ? (
-          <div className="flex gap-4 px-4 py-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-[60px] w-[60px] shrink-0 rounded-full" />
-            ))}
-          </div>
-        ) : (
-          <StoriesRail
-            rail={storyRail}
-            viewerId={user.id}
-            viewerAvatarUrl={profile?.avatar_url}
-            viewerName={profile?.full_name}
-            onOpenStory={handleOpenStory}
-            onCreateStory={() => router.push("/places/story/create")}
+
+      {/* הטאבים "עבורך / מפה" - צמודים מתחת לבר הסגול (בקשה מפורשת: "עבורך / מפה"). */}
+      {view !== "map" && (
+        <div className="mt-3 bg-white">
+          <FeedTabs active={view} onChange={setView} />
+        </div>
+      )}
+
+      {view === "map" ? (
+        /* *** חדש (בקשה מפורשת - "בוא נכניס את המפה לעמוד המפה, מפה מלאה בעיצוב
+           מיוחד כמו שלנו"): מפת ההמלצות של החברים, בגובה המסך שנשאר מתחת לבר
+           ולטאבים ומעל הבר התחתון. ר' PlacesFriendsMap.tsx. */
+        /* המפה ממשיכה מתחת לפינות המעוגלות של הבר (marginTop שלילי של 32px) - בלי "כתמים"
+           לבנדריים בפינות; הטאבים מרחפים מעליה. */
+        <div
+          className="relative isolate z-0"
+          style={{
+            marginTop: -32,
+            height: "max(472px, calc(100dvh - 136px + 32px - 66px - max(env(safe-area-inset-bottom), 22px)))",
+          }}
+        >
+          <PlacesFriendsMap
+            onCreate={() => setCreateMenuOpen(true)}
+            onInteractingChange={handleMapInteracting}
+            topOffsetPx={mapTouching ? 44 : 104}
           />
-        )}
-      </div>
-
-      <CreatePostBar onClick={() => setCreateMenuOpen(true)} />
-
+          <div
+            className="absolute inset-x-3 top-11 z-[1001] overflow-hidden rounded-2xl shadow-[0_12px_30px_-12px_rgba(40,10,110,0.55)] ring-1 ring-black/5"
+            style={{
+              transform: mapTouching ? "translateY(-140%)" : "none",
+              opacity: mapTouching ? 0 : 1,
+              pointerEvents: mapTouching ? "none" : "auto",
+              transition: "transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease",
+            }}
+          >
+            <FeedTabs active={view} onChange={setView} />
+          </div>
+        </div>
+      ) : (
+        <>
       {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}
 
       {creators === null ? (
@@ -243,8 +262,9 @@ export default function PlacesHomePage() {
         <OnlineFriendsSection friends={onlineFriends} />
       )}
 
-      <div className="mt-2 bg-white">
-        <FeedTabs active={feedTab} onChange={setFeedTab} />
+
+      {/* הפיד: שטוח ולבן ברוחב מלא, כמו פידים מוכרים (בקשה מפורשת - "נראה מצועצע"). */}
+      <div className="bg-white">
 
         {feedItems === null && (
           <div className="p-4">
@@ -260,11 +280,7 @@ export default function PlacesHomePage() {
 
         {feedItems?.length === 0 && !feedError && (
           <PlacesEmptyState
-            title={
-              feedTab === "friends"
-                ? "אין עדיין תוכן מחברים - עדיין אין לך חברים ב-place's"
-                : "שתף את הרגע הראשון שלך"
-            }
+            title="שתף את הרגע הראשון שלך"
             actionLabel="צור פוסט"
             onAction={() => setCreatePostOpen(true)}
           />
@@ -298,19 +314,10 @@ export default function PlacesHomePage() {
       </div>
 
       <MyDestinationsSection />
+        </>
+      )}
 
       <MainBottomNav active="places" />
-
-      {storyViewerIndex !== null && storyRail && (
-        <StoryViewerModal
-          rail={storyRail}
-          startAuthorIndex={storyViewerIndex}
-          viewerId={user.id}
-          onClose={() => setStoryViewerIndex(null)}
-          onView={handleStoryViewed}
-          onDelete={handleStoryDeleted}
-        />
-      )}
 
       {createPostOpen && (
         <CreatePostSheet

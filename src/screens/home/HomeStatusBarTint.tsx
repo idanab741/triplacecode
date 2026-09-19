@@ -22,7 +22,12 @@ const TINT_STRIP_PX = 140;
  * לא מושפעים.
  * לא משנה כלום ב-DOM הנראה של העמוד עצמו.
  */
-export function HomeStatusBarTint() {
+interface HomeStatusBarTintProps {
+  /** צבע הצביעה (ברירת מחדל: תכלת של הבית). place's מעביר את הסגול שלו. */
+  color?: string;
+}
+
+export function HomeStatusBarTint({ color = HOME_TINT }: HomeStatusBarTintProps = {}) {
   useEffect(() => {
     // 1) theme-color
     let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
@@ -33,7 +38,7 @@ export function HomeStatusBarTint() {
       meta.name = "theme-color";
       document.head.appendChild(meta);
     }
-    meta.setAttribute("content", HOME_TINT);
+    meta.setAttribute("content", color);
 
     // 2) פס תכלת ברקע ה-html
     const root = document.documentElement;
@@ -43,7 +48,7 @@ export function HomeStatusBarTint() {
       backgroundRepeat: root.style.backgroundRepeat,
     };
     root.style.backgroundColor = "var(--color-bg-secondary)";
-    root.style.backgroundImage = `linear-gradient(to bottom, ${HOME_TINT} 0px, ${HOME_TINT} ${TINT_STRIP_PX}px, transparent ${TINT_STRIP_PX}px)`;
+    root.style.backgroundImage = `linear-gradient(to bottom, ${color} 0px, ${color} ${TINT_STRIP_PX}px, transparent ${TINT_STRIP_PX}px)`;
     root.style.backgroundRepeat = "no-repeat";
 
     return () => {
@@ -55,7 +60,7 @@ export function HomeStatusBarTint() {
       root.style.backgroundImage = prev.backgroundImage;
       root.style.backgroundRepeat = prev.backgroundRepeat;
     };
-  }, []);
+  }, [color]);
 
   return null;
 }

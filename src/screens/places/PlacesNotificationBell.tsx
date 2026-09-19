@@ -54,7 +54,12 @@ function toActivityItem(item: SocialNotificationItem): ActivityItem {
  *  (תזכורות טיול, הודעות Admin) וגם את ההתראות ה-social (עוקבים/
  *  לייקים/תגובות). זו אותה תשתית read/unread הקיימת (notification_reads)
  *  לשני הסוגים - לא כפילות. */
-export function PlacesNotificationBell() {
+interface PlacesNotificationBellProps {
+  /** true (בר place's הסגול): עיגול לבן מלא עם צל - בדיוק כמו הפעמון בבר של עמוד הבית. */
+  solid?: boolean;
+}
+
+export function PlacesNotificationBell({ solid = false }: PlacesNotificationBellProps = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ActivityItem[] | null>(null);
@@ -117,7 +122,11 @@ export function PlacesNotificationBell() {
         onClick={() => setOpen((o) => !o)}
         aria-label="התראות"
         aria-expanded={open}
-        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+        className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
+          solid
+            ? "bg-white shadow-[0_4px_12px_-4px_rgba(50,10,120,0.45)]"
+            : "border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
+        }`}
       >
         <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
         {unreadCount != null && unreadCount > 0 && (

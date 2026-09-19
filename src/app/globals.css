@@ -241,3 +241,83 @@ body {
     animation: none;
   }
 }
+
+/* *** חדש (בר place's הסגול - AnimatedHeaderBackdrop tone="purple"): ההילה השנייה
+   בגוון סגול-ורוד במקום תכלת, באותה תנועה בדיוק כמו .home-header-blob-cyan. */
+.home-header-blob-pink {
+  width: 340px;
+  height: 340px;
+  right: -110px;
+  bottom: -190px;
+  background: radial-gradient(circle at 50% 50%, rgba(190, 130, 255, 0.28) 0%, rgba(190, 130, 255, 0) 68%);
+  animation: home-header-drift-b 15s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-header-blob-pink {
+    animation: none;
+  }
+}
+
+/* *** חדש (עיצוב פוסטים מקצועי ב-place's - PostCard.tsx): כניסה עדינה של כרטיס/תפריט
+   ו"קפיצה" קצרה של אייקון הלייק/שמירה בעת הפעלה. מכובה ב"הפחתת תנועה". */
+.pc-in {
+  animation: pc-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pc-pop {
+  display: inline-flex;
+  animation: pc-pop 460ms cubic-bezier(0.34, 1.7, 0.5, 1) both;
+}
+@keyframes pc-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pc-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-in, .pc-pop { animation: none; }
+}
+
+/* *** תיקון (בקשה מפורשת - "החלק התחתון של הבר הסגול לא באותו צבע"): ההילה הלבנה הנעה
+   יצרה כתם בהיר בתחתית הבר הסגול (שנמוך יותר מהתכלת). לגוון הסגול - הילות מאותו
+   גוון סגול בעוצמה נמוכה (לא לבנות), וברק אלכסוני עדין מאוד - כך שהצבע אחיד. */
+.home-header-blob-violet {
+  width: 300px;
+  height: 300px;
+  left: -90px;
+  top: -130px;
+  background: radial-gradient(circle at 50% 50%, rgba(160, 110, 255, 0.4) 0%, rgba(160, 110, 255, 0) 68%);
+  animation: home-header-drift-a 12s ease-in-out infinite alternate;
+}
+.home-header-sheen-soft {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.06) 50%, transparent 68%);
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  animation: home-header-sheen 10s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-header-blob-violet,
+  .home-header-sheen-soft {
+    animation: none;
+  }
+}
+
+/* *** חדש (מפת place's - PlacesFriendsMap): וריאנט סגול של .map-branded - אותה טכניקה
+   (duotone) עם hue-rotate לכיוון הסגול של place's, במקום התכלת של המפות האחרות. */
+.map-branded-purple .leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.12) sepia(0.6) hue-rotate(238deg) saturate(1.7) contrast(0.95);
+}
+
+/* *** תיקון (מפת place's): שורת הזכויות (MapTiler / OpenStreetMap) נחתכה בקצה - מקטינים
+   ומאפשרים ירידת שורה, בלי להסתיר אותה (נדרשת ע"י הספקים). */
+.places-friends-map .leaflet-control-attribution {
+  max-width: 78%;
+  font-size: 9px;
+  line-height: 1.3;
+  white-space: normal;
+  background: rgba(255, 255, 255, 0.75);
+}

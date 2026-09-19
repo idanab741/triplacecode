@@ -4,6 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { BackButton } from "@/components/ui";
 import { PlacesNotificationBell } from "./PlacesNotificationBell";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "./PlacesHeaderRow";
 
 interface PlacesHeaderProps {
   /** אם לא מועבר - זהו עמוד הבית: מוצג רק כפתור חזרה בצד שמאל בעמודי
@@ -26,6 +28,12 @@ interface PlacesHeaderProps {
    *  מחליף את כפתור הצ'אט בפינה הנגדית לתפריט שמוביל לשם (בעמוד
    *  הפרופיל: /profile, עמוד החשבון הכללי - לא /places). */
   menuHref?: string;
+  /** *** חדש (בקשה מפורשת - "החלק העליון כמו בעמוד הבית, עם place's בלבן ורקע סגול
+   *  דינמי אנימטיבי"): "purple" = הבר החדש (סגול מונפש, פינות תחתונות מעוגלות,
+   *  place's בלבן, פעמון וצ'אט בעיגולים לבנים כמו בבית). ברירת מחדל "default" -
+   *  כל שאר עמודי place's נשארים בדיוק כמו קודם. עם onBack: כפתור החזרה של
+   *  האפליקציה מחליף את הצ'אט. */
+  variant?: "default" | "purple";
 }
 
 /** Header אחיד לכל עמודי place's.
@@ -48,7 +56,18 @@ interface PlacesHeaderProps {
  *  ההורה שמעביר transparent=true חייב לפצות עם ריווח עליון מקביל
  *  לגובה הבר (h-16) על שאר התוכן - חוץ מהקאבר עצמו, שאמור להתחיל
  *  מ-y=0 כדי שהבר יצוף מעליו ולא מעל רווח לבן. */
-export function PlacesHeader({ onBack, transparent = false, overlay = false, menuHref }: PlacesHeaderProps) {
+export function PlacesHeader({ onBack, transparent = false, overlay = false, menuHref, variant = "default" }: PlacesHeaderProps) {
+  if (variant === "purple") {
+    return (
+      <CollapsibleTopBar
+        headerRow={<PlacesHeaderRow onBack={onBack} />}
+        gradient={PLACES_BAR_GRADIENT}
+        shadow={PLACES_BAR_SHADOW}
+        tone="purple"
+      />
+    );
+  }
+
   return (
     <header
       className={`left-0 right-0 top-0 z-30 w-full transition-colors ${overlay ? "fixed" : "sticky"} ${

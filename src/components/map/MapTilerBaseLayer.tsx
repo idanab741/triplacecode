@@ -36,14 +36,21 @@ import { MAPTILER_KEY } from "@/constants/mapTiles";
  * חובה: לרנדר את הרכיב הזה רק כשיש מפתח (בדוק IS_USING_FALLBACK_TILES
  * בקומפוננטה הקוראת) - אחרת MaptilerLayer יזרוק שגיאה על מפתח חסר.
  */
-export function MapTilerBaseLayer() {
+interface MapTilerBaseLayerProps {
+  /** *** חדש (מפת place's - "המפה צריכה להיות יותר ברורה"): "streets" = סגנון רחובות
+   *  מלא וקריא (כבישים/שמות בולטים). ברירת המחדל "dataviz" - בדיוק כמו קודם, כדי לא
+   *  לשנות את שאר המפות באפליקציה. */
+  variant?: "dataviz" | "streets";
+}
+
+export function MapTilerBaseLayer({ variant = "dataviz" }: MapTilerBaseLayerProps = {}) {
   const map = useMap();
 
   useEffect(() => {
     if (!MAPTILER_KEY) return;
     const layer = new MaptilerLayer({
       apiKey: MAPTILER_KEY,
-      style: MapStyle.DATAVIZ,
+      style: variant === "streets" ? MapStyle.STREETS : MapStyle.DATAVIZ,
       language: Language.HEBREW,
     }).addTo(map);
 
@@ -88,7 +95,7 @@ export function MapTilerBaseLayer() {
       map.removeLayer(layer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map]);
+  }, [map, variant]);
 
   return null;
 }

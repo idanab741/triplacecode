@@ -94,8 +94,10 @@ export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
     if (item.actionUrl) router.push(item.actionUrl);
   }
 
+  // *** גובה קבוע (52px = pt-3 + כפתורים 40px) - זהה בדיוק לשורה של הבר הסגול של place's
+  // (PlacesHeaderRow), כך ששני הבארים תמיד באותו גובה, בלי תלות בתוכן.
   return (
-    <header className="relative z-10 grid grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
+    <header className="relative z-10 grid h-[52px] grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
       {/* כפתור CHAT - עיגול לבן עם אייקון הצ'אט של המוצר (אותו קובץ בדיוק
           שמשמש ב-PlacesHeader: /images/places-chat-icon.png - בקשה מפורשת:
           "הכפתור של הצ'אט יהיה כמו הצ'אט שלנו באייקונים"). מוביל ל-Trippy AI
@@ -122,7 +124,12 @@ export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
 
       {/* אמצע - לוגו TRIPLACE, באותה שורה ואותו גובה בדיוק כמו הצ'אט
           וההתראות (items-center על ה-header כבר מיישר אנכית). */}
-      <div className="flex justify-center">
+      {/* *** תיקון (בקשה מפורשת - "העיגולים לא באותו גובה בשני העמודים"): עוטף הלוגו
+          בגובה קבוע של 40px (h-10) - זהה לעיגולים. קודם גובה הלוגו (שנקבע לפי היחס
+          הטבעי של התמונה) קבע את גובה שורת ה-grid ודחף את העיגולים כ-3px למטה; עכשיו
+          הלוגו פשוט "גולש" (overflow) מעל/מתחת לרצועה, ולא משפיע על השורה. זהה
+          בדיוק ל-PlacesHeaderRow. */}
+      <div className="flex h-10 items-center justify-center">
         {/* בקשה מפורשת - רקע כחול לאזור העליון: הלוגו השחור הופך ללבן
             (brightness(0) invert(1)) - בלי קובץ לוגו חדש.
             *** הוגדל ב-25% (בקשה מפורשת - "להגדיל מעט את הלוגו"): 120x37 ->
@@ -132,7 +139,7 @@ export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
           alt="TRIPLACE"
           width={150}
           height={46}
-          className="-my-1 object-contain"
+          className="object-contain"
           style={{ filter: "brightness(0) invert(1)" }}
         />
       </div>
