@@ -12,7 +12,7 @@ interface ReviewPlacePickerSheetProps {
   onBack?: () => void;
 }
 
-/** שלב ראשון של "ביקורת": בחירת מקום קיים מהמאגר. אם לא נמצא - פותח
+/** שלב ראשון של "מקום" (שתפו מקום -> חפשו מקום -> בחרו מקום -> ספרו איך היה): בחירת מקום קיים. אם לא נמצא - פותח
  *  את SuggestPlaceSheet (Bottom Sheet, לא ניווט לעמוד - בקשה מפורשת). */
 export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPlace, onBack }: ReviewPlacePickerSheetProps) {
   const [query, setQuery] = useState("");
@@ -46,13 +46,13 @@ export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPla
             <BackButton onBack={onBack} />
           </div>
         )}
-        <h2 className="mb-4 text-[17px] font-bold text-ink">על איזה מקום תרצה לכתוב ביקורת?</h2>
+        <h2 className="mb-4 text-[17px] font-bold text-ink">על איזה מקום בא לכם לספר?</h2>
 
         <input
           autoFocus
           value={query}
           onChange={(e) => runSearch(e.target.value)}
-          placeholder="חפש מקום..."
+          placeholder="חפשו מקום..."
           className="mb-3 w-full rounded-pill border border-ink-secondary/20 px-4 py-2.5 text-[14px] focus:outline-none"
         />
 
@@ -77,7 +77,7 @@ export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPla
         ))}
 
         {results !== null && !searching && results.length === 0 && (
-          <p className="py-4 text-center text-[12.5px] text-ink-secondary">לא נמצאו מקומות תואמים</p>
+          <p className="py-4 text-center text-[12.5px] text-ink-secondary">לא מצאנו מקום כזה</p>
         )}
 
         <button
@@ -89,7 +89,7 @@ export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPla
           className="mt-3 w-full rounded-pill border py-2.5 text-[13px] font-bold"
           style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
         >
-          לא מוצא את המקום? הצע מקום חדש
+          לא מוצאים את המקום? הוסיפו אותו
         </button>
       </div>
     </BottomSheet>

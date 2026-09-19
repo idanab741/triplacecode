@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createOrUpdateReview } from "@/services/social/reviewService";
+import { enrichPlaceFromGoogle } from "@/services/places/placeEnrichmentService";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
       comment: body?.comment,
       mediaIds: body?.mediaIds,
     });
+    // כל ביקורת מרעננת את המקום מ-Google (דירוג) ומשלימה מה שחסר (תמונה, נגישות, שעות). לא זורק.
+    await enrichPlaceFromGoogle(placeId);
     return NextResponse.json({ id: reviewId }, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה" }, { status: 400 });

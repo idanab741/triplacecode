@@ -11,8 +11,6 @@ import { PostCard } from "@/screens/places/PostCard";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
-import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
-import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
 import { getAvatarUrl } from "@/constants/avatar";
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { createClient } from "@/services/supabase/client";
@@ -42,8 +40,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [postsLoadingMore, setPostsLoadingMore] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createPostOpen, setCreatePostOpen] = useState(false);
-  const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
-  const [suggestPlaceOpen, setSuggestPlaceOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -140,10 +136,10 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
     setPosts((prev) => prev?.filter((i) => i.id !== postId) ?? null);
   }
 
-  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[]) {
+  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[], placeId?: string | null) {
     await fetchJson("/api/social/posts", {
       method: "POST",
-      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds }),
+      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds, placeId: placeId ?? undefined }),
     });
     const { items, nextCursor } = await fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(
       `/api/social/profile/${username}/posts`
@@ -445,12 +441,13 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
         <CreateMenuSheet
           onClose={() => setCreateMenuOpen(false)}
           onSelectPost={() => setCreatePostOpen(true)}
-          onSelectReview={() => setReviewPickerOpen(true)}
-          // *** תיקון (בקשה מפורשת - "מיקום חדש שמביא ישר לעמוד הבית
-          // איפה שהעלאת אטרקציה"): לא עוד SuggestPlaceSheet (המאגר
-          // הישן) - מנווט ישירות לעמוד הבית עם פרמטר ש-home/page.tsx
-          // קורא כדי לפתוח את AddPlaceModal אוטומטית עם הטעינה.
-          onSelectPlace={() => router.push("/home?openAddPlace=1")}
+          // "מקום": עמודים מלאים עם הבר העליון של Places - /places/create (בחירה/הוספת מקום) ואז /places/create/review.
+          onSelectPlace={() => router.push("/places/create")}
+          onSelectCollection={() => {
+            setCreateMenuOpen(false);
+            setComingSoonMessage("אוספים יגיעו בקרוב!");
+            setTimeout(() => setComingSoonMessage(null), 2500);
+          }}
           // *** תיקון (בקשה מפורשת - "טיול חדש (בקרוב)"): לא עוד ניווט
           // ל-tripmatch - הודעה קצרה שנעלמת לבד.
           onSelectTrip={() => {
@@ -471,47 +468,16 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
         <CreatePostSheet
           onClose={() => setCreatePostOpen(false)}
           onSubmit={handleCreatePost}
-          onBack={() => {
-            setCreatePostOpen(false);
-            setCreateMenuOpen(true);
-          }}
         />
       )}
 
-      {reviewPickerOpen && (
-        <ReviewPlacePickerSheet
-          onClose={() => setReviewPickerOpen(false)}
-          onSelectPlace={(place) => {
-            setReviewPickerOpen(false);
-            setReviewTarget({ placeId: place.id, placeName: place.name });
-          }}
-          onSuggestNewPlace={() => setSuggestPlaceOpen(true)}
-          onBack={() => {
-            setReviewPickerOpen(false);
-            setCreateMenuOpen(true);
-          }}
-        />
-      )}
 
-      {suggestPlaceOpen && (
-        <SuggestPlaceSheet
-          onClose={() => setSuggestPlaceOpen(false)}
-          onBack={() => {
-            setSuggestPlaceOpen(false);
-            setCreateMenuOpen(true);
-          }}
-        />
-      )}
 
       {reviewTarget && (
         <CreateReviewSheet
           placeId={reviewTarget.placeId}
           placeName={reviewTarget.placeName}
-          onClose={() => setReviewTarget(null)}
-          onBack={() => {
-            setReviewTarget(null);
-            setReviewPickerOpen(true);
-          }}
+          onClose={() => setReviewTarget(null)}
           onSubmitted={() => {
             setReviewTarget(null);
             fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(`/api/social/profile/${username}/posts`).then(

@@ -29,7 +29,7 @@ function NavIcon({
 }
 
 interface MainBottomNavProps {
-  active: "home" | "favorites" | "ai" | "community" | "profile" | "places" | "tripworld" | "tripmatch";
+  active: "home" | "favorites" | "ai" | "community" | "profile" | "places" | "tripworld" | "tripmatch" | "content";
   /** רק לעמודי place's: מחליף את העיגול המסתובב של Trippy AI בכפתור "+"
    *  ליצירת תוכן (סעיף 6 - בקשה מפורשת: "רק בעמוד של places, חשוב מאוד
    *  שלא תהרוס אותו"). כשלא מועבר (כל שאר האפליקציה) - האייקון, ה-glow
@@ -66,27 +66,25 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
         />
       ),
       href: "/places",
+      // צבע הטקסט כשהטאב פעיל - הסגול של אייקון הגלובוס (icon-globe-active.png).
+      activeColor: "#6c02a5",
     },
     { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
     {
-      // *** שינוי (בקשה מפורשת - "שנחזיר את tripmatch, במקום tripworld"):
-      // הטאב תופס בדיוק את המקום של TripWorld בבר התחתון - לא נוסף טאב
-      // שישי. TripWorld עצמו לא נמחק (העמוד /tripworld עדיין קיים), הוא
-      // רק לא נגיש יותר מהבר התחתון.
-      // *** דורש שני קבצי אייקון חדשים תחת public/images (עדיין לא
-      // קיימים בריפו הזה): icon-tripmatch-active.png / -inactive.png,
-      // באותו סגנון/מידה כמו שאר אייקוני הבר (home/globe/profile).
-      id: "tripmatch",
-      label: "tripmatch",
+      // *** שינוי (בקשה מפורשת - "תוסיף את הפלוס לבר התחתון במקום tripmatch, ייקרא תוכן"):
+      // הטאב תופס את המקום של tripmatch. לחיצה פותחת את תפריט "מה בא לכם ליצור?"
+      // בעמוד places (?create=1). /tripmatch עצמו לא נמחק - רק לא נגיש מהבר.
+      id: "content",
+      label: "תוכן",
       icon: (
         <NavIcon
-          active={active === "tripmatch"}
-          activeSrc="/images/icon-tripmatch-active.png"
-          inactiveSrc="/images/icon-tripmatch-inactive.png"
-          alt="tripmatch"
+          active={active === "content"}
+          activeSrc="/images/icon-content-active.png"
+          inactiveSrc="/images/icon-content-inactive.png"
+          alt="תוכן"
         />
       ),
-      href: "/tripmatch",
+      href: "/places?create=1",
     },
     {
       id: "profile",

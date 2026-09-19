@@ -19,8 +19,6 @@ import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/scree
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
-import { ReviewPlacePickerSheet } from "@/screens/places/ReviewPlacePickerSheet";
-import { SuggestPlaceSheet } from "@/screens/places/SuggestPlaceSheet";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import type { FeedItemDto, FeedTab } from "@/services/social/feedService";
 import type { PlacesFeedView } from "@/screens/places/FeedTabs";
@@ -74,13 +72,31 @@ export default function PlacesHomePage() {
 
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [reviewPickerOpen, setReviewPickerOpen] = useState(false);
-  const [suggestPlaceOpen, setSuggestPlaceOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
+  const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
+  function showComingSoon(message: string) {
+    setComingSoonMessage(message);
+    setTimeout(() => setComingSoonMessage(null), 2500);
+  }
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
   }, [authLoading, user, router]);
+
+  // אחרי פרסום ביקורת (/places/create/review) חוזרים לכאן עם ?published=1 - הודעת הצלחה קצרה.
+  // הפיד נטען מחדש ממילא בכניסה לעמוד, והביקורת החדשה מופיעה בראשו.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("published") === "1") {
+      showComingSoon("הביקורת פורסמה 🎉");
+      router.replace("/places");
+    } else if (params.get("create") === "1") {
+      // הטאב "תוכן" בבר התחתון (MainBottomNav) - פותח את תפריט היצירה.
+      setCreateMenuOpen(true);
+      router.replace("/places");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadFeed = useCallback(async (tab: FeedTab) => {
     setFeedItems(null);
@@ -152,12 +168,15 @@ export default function PlacesHomePage() {
   // פותח עכשיו מודל מסך-מלא פנימי בעצמו (PostMediaViewerModal), בלי
   // מעורבות של העמוד הזה בכלל.
 
-  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[]) {
+  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[], placeId?: string | null) {
     await fetchJson("/api/social/posts", {
       method: "POST",
-      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds }),
+      // placeId = תיוג מקום אופציונלי - לא הופך את הפוסט לביקורת (postType נשאר "post"/"photo").
+      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds, placeId: placeId ?? undefined }),
     });
     await loadFeed(feedTab);
+    // חזרה ל-Feed - הפוסט החדש מופיע בראש (הפיד ממוין לפי created_at).
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleEditPost(postId: string, newText: string) {
@@ -323,10 +342,6 @@ export default function PlacesHomePage() {
         <CreatePostSheet
           onClose={() => setCreatePostOpen(false)}
           onSubmit={handleCreatePost}
-          onBack={() => {
-            setCreatePostOpen(false);
-            setCreateMenuOpen(true);
-          }}
         />
       )}
 
@@ -334,50 +349,27 @@ export default function PlacesHomePage() {
         <CreateMenuSheet
           onClose={() => setCreateMenuOpen(false)}
           onSelectPost={() => setCreatePostOpen(true)}
-          onSelectReview={() => setReviewPickerOpen(true)}
-          onSelectPlace={() => setSuggestPlaceOpen(true)}
+          // "מקום": עמודים מלאים עם הבר העליון של Places - /places/create (בחירה/הוספת מקום) ואז /places/create/review.
+          onSelectPlace={() => router.push("/places/create")}
+          onSelectCollection={() => showComingSoon("אוספים יגיעו בקרוב!")}
           onSelectTrip={() => router.push("/tripmatch")}
         />
       )}
 
-      {reviewPickerOpen && (
-        <ReviewPlacePickerSheet
-          onClose={() => setReviewPickerOpen(false)}
-          onSelectPlace={(place) => {
-            setReviewPickerOpen(false);
-            setReviewTarget({ placeId: place.id, placeName: place.name });
-          }}
-          onSuggestNewPlace={() => setSuggestPlaceOpen(true)}
-          onBack={() => {
-            setReviewPickerOpen(false);
-            setCreateMenuOpen(true);
-          }}
-        />
+      {comingSoonMessage && (
+        <div className="fixed inset-x-4 bottom-24 z-50 rounded-pill bg-ink px-4 py-3 text-center text-[13px] font-semibold text-white shadow-soft">
+          {comingSoonMessage}
+        </div>
       )}
 
-      {suggestPlaceOpen && (
-        <SuggestPlaceSheet
-          onClose={() => setSuggestPlaceOpen(false)}
-          onBack={() => {
-            setSuggestPlaceOpen(false);
-            // מגיעים לכאן גם מ-CreateMenuSheet וגם מ"לא מצאתי" בתוך
-            // ReviewPlacePickerSheet - ברירת המחדל היא לחזור לתפריט
-            // הראשי, שזה נכון ברוב המקרים.
-            setCreateMenuOpen(true);
-          }}
-        />
-      )}
+
 
       {reviewTarget && (
         <CreateReviewSheet
           placeId={reviewTarget.placeId}
           placeName={reviewTarget.placeName}
           onClose={() => setReviewTarget(null)}
-          onSubmitted={() => loadFeed(feedTab)}
-          onBack={() => {
-            setReviewTarget(null);
-            setReviewPickerOpen(true);
-          }}
+          onSubmitted={() => loadFeed(feedTab)}
         />
       )}
     </div>

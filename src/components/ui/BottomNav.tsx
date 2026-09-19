@@ -14,6 +14,9 @@ export interface BottomNavItem {
    *  כשלא מועבר (undefined בכל מקום קיים באפליקציה), ההתנהגות המקורית
    *  של Trippy AI נשארת בדיוק כפי שהייתה - זה שדה תוסף בלבד. */
   elevatedIcon?: ReactNode;
+  /** צבע הטקסט של הפריט כשהוא פעיל. כשלא מועבר - ברירת המחדל
+   *  (--color-primary-start) נשארת בדיוק כמו שהייתה. */
+  activeColor?: string;
 }
 
 interface BottomNavProps {
@@ -53,7 +56,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           const elevatedLabel = item.label ? (
               <span
                 className="w-full truncate whitespace-nowrap text-center text-[10.5px] font-medium"
-                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
               >
                 {item.label}
               </span>
@@ -92,7 +95,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               </span>
               <span
                 className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
               >
                 {item.label}
               </span>
@@ -104,7 +107,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               </span>
               <span
                 className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
               >
                 {item.label}
               </span>

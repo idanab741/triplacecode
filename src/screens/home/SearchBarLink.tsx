@@ -174,7 +174,7 @@ export function SearchBarLink({
           onKeyDown={(e) => {
             if (e.key === "Enter") handleEnter();
           }}
-          placeholder={destinationMode ? "לאן בא לך להחליק היום?" : "חפש מסעדה, מלון, אטרקציה..."}
+          placeholder={destinationMode ? "חפשו יעד או מקום שמעניין אתכם" : "חפש מסעדה, מלון, אטרקציה..."}
           className={
             variant === "hero"
               ? "w-full min-w-0 bg-transparent font-medium text-ink placeholder:font-normal placeholder:text-ink-secondary focus:outline-none"
