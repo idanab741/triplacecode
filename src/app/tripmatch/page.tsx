@@ -1522,9 +1522,9 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.nope()}
                       aria-label="דלג"
-                      className="pointer-events-auto flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
-                      <Image src="/images/tripmatch/action-nope-btn.png" alt="" width={78} height={78} className="h-full w-full object-contain" />
+                      <Image src="/images/tripmatch/action-nope-btn.png" alt="" width={98} height={98} className="h-full w-full object-contain" />
                     </button>
 
                     <button
@@ -1532,9 +1532,9 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       disabled={busy || lastDecision == null}
                       onClick={handleRewind}
                       aria-label="חזור לכרטיס הקודם"
-                      className="pointer-events-auto flex h-[57px] w-[57px] items-center justify-center transition active:scale-90 disabled:opacity-40"
+                      className="pointer-events-auto flex h-[71px] w-[71px] items-center justify-center transition active:scale-90 disabled:opacity-40"
                     >
-                      <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={57} height={57} className="h-full w-full object-contain" />
+                      <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={71} height={71} className="h-full w-full object-contain" />
                     </button>
 
                     <button
@@ -1542,9 +1542,9 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.like()}
                       aria-label="אהבתי"
-                      className="pointer-events-auto flex h-[78px] w-[78px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
-                      <Image src="/images/tripmatch/action-like-btn.png" alt="" width={78} height={78} className="h-full w-full object-contain" />
+                      <Image src="/images/tripmatch/action-like-btn.png" alt="" width={98} height={98} className="h-full w-full object-contain" />
                     </button>
                   </div>
 
@@ -1553,7 +1553,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       בלי שום אינדיקציה זה מרגיש "תקוע". אינדיקטור עדין
                       וממורכז, לא חוסם - רק מבהיר שמשהו קורה ברקע. */}
                   {busy && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-[104px] flex justify-center">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-[114px] flex justify-center">
                       <div className="flex items-center gap-2 rounded-pill bg-black/50 px-3.5 py-2 text-xs font-medium text-white backdrop-blur-sm">
                         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                         שומר...

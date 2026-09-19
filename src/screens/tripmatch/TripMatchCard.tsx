@@ -7,16 +7,16 @@ import type { CandidatePlace } from "@/services/tripBuilder/types";
 const MAX_REASONABLE_DRIVING_KM = 400; // מעבר לזה, "X דק' נסיעה" כבר לא כנה - צריך טיסה
 
 /** גודל הכפתור הגדול (X / לב) - px. */
-export const TRIPMATCH_MAIN_BUTTON_SIZE = 78;
+export const TRIPMATCH_MAIN_BUTTON_SIZE = 98; // הוגדל ב-25% (בקשה מפורשת): 78 -> 98
 
 /** *** שטח שמור *מתחת* לכרטיס (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
  *  הכרטיסיות לבין הבחוץ, חצי חצי"): הכפתורים כבר לא יושבים כולם מתחת
  *  לכרטיס אלא רוכבים על הקצה התחתון שלו - חצי מהגובה שלהם על הכרטיס
  *  וחצי מחוצה לו. לכן מתחת לכרטיס נדרש רק חצי מגובה הכפתור הגדול
- *  (39px) + מעט אוויר, במקום 100px כמו קודם - והכרטיס גבוה בהתאם.
+ *  (49px) + מעט אוויר, במקום 100px כמו קודם - והכרטיס גבוה בהתאם.
  *  page.tsx משתמש באותו מספר בדיוק (מיובא מכאן) גם לגובה ה"כרטיסים"
  *  המציצים מאחור ולמיקום שורת הכפתורים - כדי שהכל יתיישר לאותו קו. */
-export const TRIPMATCH_CARD_BUTTON_ZONE = 48;
+export const TRIPMATCH_CARD_BUTTON_ZONE = 56;
 
 /** צד הכרטיס שלחיצה עליו מחליפה תמונה - כל צד תופס 30% מהרוחב, האמצע
  *  (40%) פותח את עמוד המקום. */
@@ -175,10 +175,10 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       </div>
 
       {/* תוכן תחתון - שם/תיאור/מטא-דאטה/תגיות, עברי-כתב לבן על התמונה.
-          *** הועלה (בקשה מפורשת - "להעלות מעט את הטקסט"): pb 22 -> 60,
-          כדי שהכפתורים שרוכבים על הקצה התחתון (חצי מ-78px = 39px נכנסים
+          *** הועלה (בקשה מפורשת - "להעלות מעט את הטקסט"): pb 22 -> 72,
+          כדי שהכפתורים שרוכבים על הקצה התחתון (חצי מ-98px = 49px נכנסים
           לכרטיס) לא יכסו את הטקסט/התגיות. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 px-[18px] pb-[60px] text-white">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 px-[18px] pb-[72px] text-white">
         <h2 className="text-[26px] font-extrabold leading-tight">{candidate.name}</h2>
         <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">
           {candidate.shortDescription || "מקום מומלץ שנבחר במיוחד עבורכם באזור."}
