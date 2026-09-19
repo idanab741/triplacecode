@@ -9,6 +9,8 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
+import { HomeMyTripsRow } from "@/screens/home/HomeMyTripsRow";
+import { HomeHotRow } from "@/screens/home/HomeHotRow";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
@@ -250,6 +252,14 @@ export default function HomePage() {
           // איתור המיקום מתחיל מיד בטעינת העמוד (ה-useEffect של
           // handleUseNearMe למעלה), והכרטיסים מופיעים ברגע שיש יעד.
           null}
+        </div>
+
+        {/* *** חדש (בקשה מפורשת - "מתחת לכפתורים של ההחלקות"): שני קטעים
+            מתחת לכרטיסיות ההחלקה - "הטיולים שלי" (כרטיסיית "צור טיול" +
+            הטיולים האחרונים) ו"כל מה שחם" (אטרקציות אהובות). */}
+        <div className="mt-6 flex flex-col gap-7 pb-4">
+          <HomeMyTripsRow />
+          <HomeHotRow />
         </div>
       </div>
 
