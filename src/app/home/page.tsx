@@ -14,6 +14,13 @@ import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
 import { TripMatchPageContent } from "@/app/tripmatch/page";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import {
+  getSessionLocation,
+  setSessionLocation,
+  getSessionDestination,
+  setSessionDestination,
+  clearSessionDestination,
+} from "@/utils/sessionLocation";
 
 /**
  * *** שדרוג ויזואלי מלא של מסך הבית (בקשה מפורשת):
@@ -72,7 +79,24 @@ export default function HomePage() {
   const [locateError, setLocateError] = useState<string | null>(null);
   const autoRanRef = useRef(false);
 
+  /** מעדכן את היעד הפעיל (ומכריח טעינה נקייה של ה-TripMatch המוטמע), ושומר
+   *  אותו לזיכרון הסשן - כך שחזרה לעמוד הבית תחזיר לאותו יעד. */
+  function applyDestination(label: string) {
+    setLocateError(null);
+    setSessionDestination(label);
+    setDestinationQuery(label);
+    setEmbeddedKey((k) => k + 1);
+  }
+
   async function handleUseNearMe() {
+    // *** חדש (בקשה מפורשת - "המיקום אמור להישמר כל עוד אתה באפליקציה"):
+    // אם כבר איתרנו את המיקום בסשן הזה - משתמשים בו מיד, בלי GPS ובלי
+    // reverse-geocode (שניות של המתנה). ר' utils/sessionLocation.ts.
+    const saved = getSessionLocation();
+    if (saved) {
+      applyDestination(saved.city);
+      return;
+    }
     if (locating) return;
     setLocating(true);
     setLocateError(null);
@@ -86,8 +110,9 @@ export default function HomePage() {
       } catch {
         // reverse-geocode נכשל - ממשיכים עם שם גנרי, לא חוסם.
       }
-      setDestinationQuery(city);
-      setEmbeddedKey((k) => k + 1);
+      // נשמר *לפני* שה-TripMatch המוטמע נטען - הוא קורא את המיקום משם.
+      setSessionLocation({ lat: pos.lat, lng: pos.lng, city });
+      applyDestination(city);
     } catch {
       setLocateError("לא הצלחנו לזהות את המיקום שלך, נסו לחפש יעד במקום.");
     } finally {
@@ -101,19 +126,24 @@ export default function HomePage() {
   useEffect(() => {
     if (autoRanRef.current) return;
     autoRanRef.current = true;
+    // חזרה לעמוד (למשל מעמוד מקום) - קודם כל לאותו יעד שהיינו בו; אחרת המיקום.
+    const savedDestination = getSessionDestination();
+    if (savedDestination) {
+      applyDestination(savedDestination);
+      return;
+    }
     handleUseNearMe().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSelectDestination(label: string) {
-    setLocateError(null);
-    setDestinationQuery(label);
-    setEmbeddedKey((k) => k + 1);
+    applyDestination(label);
   }
 
   // "Reverse Scroll" - חזרה למסך החיפוש הנקי של הבית (למשל אחרי לחיצה
   // על "חזרה"/"ערוך יעד" בתוך ה-TripMatch המוטמע, או סיום סריקה בלי לייקים).
   function handleExitEmbedded() {
+    clearSessionDestination();
     setDestinationQuery(null);
     setEmbeddedKey((k) => k + 1);
   }
@@ -215,45 +245,11 @@ export default function HomePage() {
               initialCityQuery={destinationQuery}
               onExitEmbedded={handleExitEmbedded}
             />
-          ) : (
-            // *** הוחלף (בקשה מפורשת - "שים לי את התמונה הזאת בזמן ההמתנה
-            // בעמוד הבית עד שבוחרים מיקום"): במקום הודעת הטקסט "חפשו יעד
-            // למעלה..." - איור מסך-המתנה (כרטיסי ההחלקה), מתחת לבר התכלת.
-            // *** עדכון (בקשה מפורשת - "תשאיר את הטקסט, ותמתח את התמונה
-            // לכל רוחב העמוד"): איור חדש (כרטיסים בלבד, בלי דמות), נמתח
-            // מקצה לקצה לכל רוחב העמוד (object-cover, בלי מסגרת/שוליים),
-            // והכותרות (טקסט אמיתי בקוד, פונט Rubik של האפליקציה) נשארות
-            // מעליו באזור הריק בחלק העליון של האיור.
-            // הגובה מחושב כך שהכל נכנס במסך אחד בלי גלילה: 100dvh פחות
-            // (הבר התכלת ~130px + pb-28 של העמוד 112px + מרווח). בטלפונים
-            // נמוכים האיור נחתך קלות מלמעלה/מלמטה (object-position נוטה
-            // כלפי מטה כדי שהכרטיסים תמיד יישארו בפריים).
-            <div className="relative w-full" style={{ height: "max(360px, calc(100dvh - 255px))" }}>
-              <Image
-                src="/images/home/home-empty-state-v3.webp"
-                alt=""
-                fill
-                priority
-                sizes="(max-width: 576px) 100vw, 576px"
-                className="object-cover"
-                style={{ objectPosition: "50% 72%" }}
-              />
-              <div className="absolute inset-x-0 top-[4%] flex flex-col items-center gap-2 px-[6%] text-center">
-                <h1
-                  className="font-extrabold leading-tight text-ink"
-                  style={{ fontSize: "clamp(24px, 7.8vw, 34px)" }}
-                >
-                  מחפשים לאן לצאת?
-                </h1>
-                <p
-                  className="font-medium leading-snug text-ink/80"
-                  style={{ fontSize: "clamp(13px, 3.9vw, 17px)" }}
-                >
-                  חפשו יעד או בחרו קטגוריה - והתחילו להחליק בין המקומות הכי שווים!
-                </p>
-              </div>
-            </div>
-          )}
+          ) : // *** הוסר (בקשה מפורשת - "להעיף את כל עיצובי הטעינה, שזה ישר יקבל את
+          // המיקום של המשתמש"): אין יותר מסך המתנה (איור/טקסט) בעמוד הבית.
+          // איתור המיקום מתחיל מיד בטעינת העמוד (ה-useEffect של
+          // handleUseNearMe למעלה), והכרטיסים מופיעים ברגע שיש יעד.
+          null}
         </div>
       </div>
 
@@ -273,9 +269,7 @@ export default function HomePage() {
             setLocationSheetOpen(false);
             const label = address.city || address.label || address.address_text;
             if (!label) return;
-            setLocateError(null);
-            setDestinationQuery(label);
-            setEmbeddedKey((k) => k + 1);
+            applyDestination(label);
           }}
         />
       )}

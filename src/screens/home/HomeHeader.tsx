@@ -112,13 +112,15 @@ export function HomeHeader({ loading }: HomeHeaderProps) {
           וההתראות (items-center על ה-header כבר מיישר אנכית). */}
       <div className="flex justify-center">
         {/* בקשה מפורשת - רקע כחול לאזור העליון: הלוגו השחור הופך ללבן
-            (brightness(0) invert(1)) - בלי קובץ לוגו חדש. */}
+            (brightness(0) invert(1)) - בלי קובץ לוגו חדש.
+            *** הוגדל ב-25% (בקשה מפורשת - "להגדיל מעט את הלוגו"): 120x37 ->
+            150x46. -my-1 מקזז את הגובה הנוסף כדי שגובה ההדר לא יקפוץ. */}
         <Image
           src="/images/triplace-logo-black.png"
           alt="TRIPLACE"
-          width={120}
-          height={37}
-          className="object-contain"
+          width={150}
+          height={46}
+          className="-my-1 object-contain"
           style={{ filter: "brightness(0) invert(1)" }}
         />
       </div>

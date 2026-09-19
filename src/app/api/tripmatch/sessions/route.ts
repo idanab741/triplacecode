@@ -43,7 +43,12 @@ export async function POST(request: Request) {
       ...(isGeoSearch ? { latitude: lat!, longitude: lng!, radiusKm } : {}),
       includeAllCategories,
     });
-    const candidates = await fetchTripMatchCandidates(supabase, session);
+    // *** שיפור מהירות (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית"): העדפות
+    // המשתמש והמועמדים לא תלויים זה בזה - רצים במקביל במקום אחד אחרי השני.
+    const [candidates, userPreferences] = await Promise.all([
+      fetchTripMatchCandidates(supabase, session),
+      fetchUserPreferences(supabase, user.id),
+    ]);
 
     // אין עדיין מועמדים ליעד הזה ב-DB (בעיקר יעדים בינלאומיים) - Claude יוצר
     // רשימת אטרקציות אמיתית, שומר אותה, ואז שולפים שוב.
@@ -56,14 +61,14 @@ export async function POST(request: Request) {
       return NextResponse.json({
         session,
         candidates: regenerated,
-        userPreferences: await fetchUserPreferences(supabase, user.id),
+        userPreferences,
       });
     }
 
     return NextResponse.json({
       session,
       candidates,
-      userPreferences: await fetchUserPreferences(supabase, user.id),
+      userPreferences,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "שגיאה לא ידועה";

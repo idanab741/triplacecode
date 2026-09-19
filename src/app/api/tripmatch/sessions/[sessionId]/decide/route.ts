@@ -77,6 +77,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     await recordTripMatchDecision(supabase, sessionId, placeId, liked);
   }
 
+  // *** חדש (בקשה מפורשת - "מדויק ומיידי"): הלקוח מחזיק חפיסה קבועה ולא
+  // משתמש יותר ברשימה שהיינו מחזירים כאן - אז כשהוא מבקש (skipCandidates)
+  // מדלגים על שליפת המועמדים מחדש (שאילתה כבדה: favorites + places), וזה
+  // מקצר משמעותית כל החלקה. בלי הדגל - ההתנהגות הקודמת, ללא שינוי.
+  if (body?.skipCandidates === true) {
+    return NextResponse.json({ candidates: [], tokenBalance });
+  }
+
   const updatedSession = await getTripMatchSession(supabase, sessionId);
   const candidates = updatedSession ? await fetchTripMatchCandidates(supabase, updatedSession) : [];
 

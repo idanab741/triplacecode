@@ -68,6 +68,12 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   const cardRef = useRef<HTMLDivElement>(null);
   const likeStampRef = useRef<HTMLDivElement>(null);
   const nopeStampRef = useRef<HTMLDivElement>(null);
+  // *** חדש (בקשה מפורשת - "מדויק ומיידי, בלי משחקים במעברים"): ברגע שהכרטיס
+  // התחיל לעוף החוצה הוא "סגור" - אי אפשר להפעיל אותו שוב (לחיצה כפולה על
+  // X/לב, או נגיעה בכרטיס שעדיין עף). בלי זה, שתי הפעלות בתוך 180ms הפעילו
+  // את onSwipe פעמיים על אותו כרטיס. הכרטיס נבנה מחדש (key) לכל מועמד, ולכן
+  // הדגל מתאפס מעצמו בכרטיס הבא.
+  const flyingRef = useRef(false);
   const dragState = useRef({ startX: 0, startY: 0, currentX: 0, dragging: false, moved: false, pointerId: -1 });
 
   function setStamps(x: number) {
@@ -93,7 +99,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   }
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (disabled) return;
+    if (disabled || flyingRef.current) return;
     dragState.current = { startX: e.clientX, startY: e.clientY, currentX: 0, dragging: true, moved: false, pointerId: e.pointerId };
     cardRef.current?.setPointerCapture(e.pointerId);
   }
@@ -136,6 +142,8 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
   }
 
   function flyOut(direction: "left" | "right") {
+    if (flyingRef.current) return;
+    flyingRef.current = true;
     const distance = direction === "right" ? FLY_OUT_DISTANCE_PX : -FLY_OUT_DISTANCE_PX;
     if (likeStampRef.current) likeStampRef.current.style.opacity = direction === "right" ? "1" : "0";
     if (nopeStampRef.current) nopeStampRef.current.style.opacity = direction === "left" ? "1" : "0";

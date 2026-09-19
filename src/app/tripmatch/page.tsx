@@ -27,6 +27,8 @@ import type { CandidatePlace } from "@/services/tripBuilder/types";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
+import { getSessionLocation } from "@/utils/sessionLocation";
+import { readDeck, writeDeck, clearDeck } from "@/utils/tripMatchDeckCache";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -125,21 +127,38 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const { ready } = useFeatureOnboardingGuard("tripmatch", "/onboarding/tripmatch");
-  const [stage, setStage] = useState<Stage>("city");
+  // *** חדש (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית"): במצב מוטמע,
+  // אם כבר נטענה חפיסה ליעד הזה (למשל חוזרים מעמוד מקום) - משחזרים אותה
+  // מיד, עם אותו session, אותו סדר ואותו מקום בחפיסה, בלי בקשה לשרת.
+  // ר' utils/tripMatchDeckCache.ts. נקרא פעם אחת בלבד (lazy init).
+  const deckCacheKey = embedded ? (initialCityQuery ?? "").trim() : "";
+  const [restoredDeck] = useState(() => {
+    if (!deckCacheKey) return null;
+    const deck = readDeck(deckCacheKey);
+    if (!deck) return null;
+    const decided = new Set(deck.decidedIds);
+    // חפיסה שכבר הסתיימה לגמרי - לא משחזרים (תיווצר חדשה).
+    if (deck.candidates.every((c) => decided.has(c.id))) {
+      clearDeck(deckCacheKey);
+      return null;
+    }
+    return deck;
+  });
+  const [stage, setStage] = useState<Stage>(restoredDeck ? "swiping" : "city");
   // תיקון (Home - כניסה מוטמעת): כש-embedded=true אין להציג בכלל את
   // תמונת ה-Hero הדקורטיבית ("אין Hero של TripMatch" - Home כבר הציג
   // הירו/חיפוש משלו שהתחלף בכניסה הזו) - מתחילים עם false במקום עם
   // true+איפוס מאוחר יותר, כדי שלא תבהב לרגע לפני שההיעד מתאשר.
   const [heroVisible, setHeroVisible] = useState(() => !embedded);
 
-  const [cityInput, setCityInput] = useState("");
+  const [cityInput, setCityInput] = useState(restoredDeck?.cityLabel ?? "");
   const [cityOptions, setCityOptions] = useState<{ value: string; label: string; type: "city" | "country" }[]>([]);
-  const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const [selectedCityLabel, setSelectedCityLabel] = useState<string>("");
+  const [selectedCity, setSelectedCity] = useState<string | null>(restoredDeck?.cityValue ?? null);
+  const [selectedCityLabel, setSelectedCityLabel] = useState<string>(restoredDeck?.cityLabel ?? "");
 
   const [categoryValue, setCategoryValue] = useState<string | null>(null);
-  const [categoryLabel, setCategoryLabel] = useState<string>("");
-  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
+  const [categoryLabel, setCategoryLabel] = useState<string>(restoredDeck ? "הכל" : "");
+  const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(restoredDeck?.userPreferences ?? null);
 
   // *** שינוי (בקשה מפורשת - "בחירת קטגוריה אופציונלית, לא חובה"):
   // בניגוד ל-categoryValue (שנשלח לשרת וקובע איזה סט מועמדים נשלף -
@@ -186,14 +205,24 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   const [nearMeOtherQuery, setNearMeOtherQuery] = useState("");
   const [nearMeOtherTags, setNearMeOtherTags] = useState<string[]>([]);
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [candidates, setCandidates] = useState<CandidatePlace[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(restoredDeck?.sessionId ?? null);
+  // *** שינוי (בקשה מפורשת - "החלוקה אמורה להיות קבועה, ולא להשתנות"):
+  // candidates הוא עכשיו החפיסה *הקבועה* - נטענת פעם אחת בתחילת ה-session
+  // ולא משתנה יותר. לפני זה כל החלטה (החלקה) קיבלה מהשרת רשימה חדשה
+  // שהחליפה את כולה (חפיסה של עד 60 מתוך מה שנשאר) - ולכן הסך ב-"1/60"
+  // קפץ ל-70, 90..., הסדר השתנה, ותשובות שהגיעו באיחור החזירו כרטיסים שכבר
+  // הוחלקו ("החלקתי - והיא חזרה ומתחלפת"). מי שהוחלט עליו נשמר ב-decidedIds.
+  const [candidates, setCandidates] = useState<CandidatePlace[]>(restoredDeck?.candidates ?? []);
   const [candidateIndex, setCandidateIndex] = useState(0);
-  // *** תיקון: הספירה "X מתוך Y" הייתה מתאפסת בכל swipe (כי ה-Y נגזר
-  // מ-visibleCandidates.length, שמתכווץ אחרי כל החלטה) - "1 מתוך 5" ואז
-  // "1 מתוך 4" במקום "2 מתוך 5". totalDecisions סופר כמה החלטות כבר
-  // התקבלו בסשן הזה, כדי שהמונה יעלה בעקביות במקום להתאפס.
-  const [totalDecisions, setTotalDecisions] = useState(0);
+  // *** מזהי המקומות שכבר הוחלט עליהם (לייק/דילוג) בחפיסה הנוכחית - במקום
+  // להסיר אותם מ-candidates. המונה "X/Y" נגזר מזה: Y = גודל החפיסה (קבוע),
+  // X = כמה כבר הוחלט + 1 (ר' deck/visibleCandidates למטה).
+  const [decidedIds, setDecidedIds] = useState<string[]>(restoredDeck?.decidedIds ?? []);
+  // תור הקריאות לשרת (החלטות) - מסודרות בזו אחר זו, כדי שהשרת יקבל אותן
+  // בדיוק בסדר שבו המשתמש עשה אותן. ו-decidingRef מונע הפעלה כפולה של
+  // אותה החלטה (למשל שתי לחיצות מהירות על X).
+  const decisionQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const decidingRef = useRef<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // *** מערכת "טריפים": כשלייק נדחה בגלל יתרה לא מספיקה, הכרטיס כבר
@@ -223,8 +252,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
-  const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>([]);
-  const [hasSwipedAny, setHasSwipedAny] = useState(false);
+  const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>(restoredDeck?.likedPlaces ?? []);
+  const [hasSwipedAny, setHasSwipedAny] = useState(Boolean(restoredDeck && restoredDeck.decidedIds.length > 0));
   // *** עוקב אחרי אילו מתוך 3 הקטגוריות של "המשך לקטגוריה הבאה" כבר
   // הושלמו ליעד הנוכחי (מתאפס בכל בחירת יעד חדש) - כדי לדעת מתי להציג
   // את הכפתור ולאיזו קטגוריה לקפוץ בלחיצה עליו.
@@ -445,7 +474,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     }, 300);
   }, [cityInput, selectedCity]);
 
-  function handleSelectCity(option: { value: string; label: string; type: "city" | "country" }) {
+  function handleSelectCity(option: { value: string; label: string; type: "city" | "country" }, opts?: { immediate?: boolean }) {
     setSelectedCity(option.value);
     setSelectedCityLabel(option.label);
     setCityInput(option.label);
@@ -459,7 +488,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     // קטגוריה קודם"): לפני זה עברנו לשלב "category" (מסך בחירה חוסם).
     // עכשיו קופצים ישר להחלקות עם כל הקטגוריות יחד - העיגולים בעמוד
     // ההחלקות הם סינון אופציונלי על מה שכבר מוצג, לא שלב נפרד.
-    window.setTimeout(() => handleBrowseAll(option.value), 280);
+    // *** immediate: במצב מוטמע (Home) היעד כבר סופי ונקי - אין סיבה להמתין
+    // 280ms (שהיו רק כדי שאנימציית הבחירה תסתיים) לפני בקשת הכרטיסים.
+    if (opts?.immediate) handleBrowseAll(option.value);
+    else window.setTimeout(() => handleBrowseAll(option.value), 280);
   }
 
   /** טוען את כל הקטגוריות יחד ליעד שנבחר (ללא בחירת קטגוריה קודמת) -
@@ -485,7 +517,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
       setCandidates(data.candidates ?? []);
       setUserPreferences(data.userPreferences ?? null);
       setCandidateIndex(0);
-      setTotalDecisions(0);
+      setDecidedIds([]);
+      decidingRef.current.clear();
       setStage("swiping");
     } catch (err) {
       setError(err instanceof Error ? err.message : "לא הצלחנו להתחיל, נסו שוב");
@@ -503,23 +536,23 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     setCityInput(initialCityQuery ?? "");
   }, [embedded, initialCityQuery, selectedCity]);
 
-  // *** לאחר שה-query התייצב (משתמש הפסיק להקליד), מתקדמים אוטומטית
-  // לשלב הקטגוריה - בדיוק כמו בחירת עיר רגילה (handleSelectCity הקיים,
-  // בלי מנגנון חדש), עם עדיפות לתוצאת ההשלמה האוטומטית הקיימת
-  // (cityOptions, שכבר נטענת ע"י ה-effect למעלה) ונפילה חזרה לטקסט
-  // הגולמי שהוקלד אם אין התאמה - כדי ש-TripMatch תמיד "ייפתח" עם היעד
-  // שהמשתמש הקליד, גם בלי בחירה ידנית מהרשימה.
+  // *** שינוי (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית"): במצב מוטמע
+  // היעד מגיע מ-Home כבר נקי וסופי - option.value מהשלמת היעד בשורת החיפוש,
+  // או שם העיר מזיהוי המיקום (השרת מטפל בהבדלי ניסוח כמו "תל אביב-יפו").
+  // לכן מתחילים לטעון את הכרטיסים *מיד* בטעינת הרכיב. לפני זה: המתנה
+  // ל-debounce של 550ms + בקשת השלמה אוטומטית (שלפעמים עוד לא חזרה ב-550ms,
+  // ואז נפלנו לטקסט הגולמי בכל מקרה) + עוד 280ms - כל אלה לפני שבכלל
+  // נשלחה הבקשה לשרת. אם שוחזרה חפיסה מהמטמון (restoredDeck) - אין מה לטעון.
+  const embeddedStartedRef = useRef(false);
   useEffect(() => {
-    if (!embedded || selectedCity) return;
-    if (!cityInput.trim()) return;
-    const timer = setTimeout(() => {
-      const match = cityOptions[0];
-      if (match) handleSelectCity(match);
-      else handleSelectCity({ value: cityInput.trim(), label: cityInput.trim(), type: "city" });
-    }, 550);
-    return () => clearTimeout(timer);
+    if (!embedded || selectedCity || restoredDeck) return;
+    if (embeddedStartedRef.current) return;
+    const query = (initialCityQuery ?? "").trim();
+    if (!query) return;
+    embeddedStartedRef.current = true;
+    handleSelectCity({ value: query, label: query, type: "city" }, { immediate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embedded, cityInput, cityOptions, selectedCity]);
+  }, [embedded, initialCityQuery, selectedCity, restoredDeck]);
 
   function handleEditDestination() {
     // *** תיקון (Home - מוטמע): כש-embedded=true, שורת החיפוש של Home
@@ -592,7 +625,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
       setCandidates(data.candidates ?? []);
       setUserPreferences(data.userPreferences ?? null);
       setCandidateIndex(0);
-      setTotalDecisions(0);
+      setDecidedIds([]);
+      decidingRef.current.clear();
       // "אחר" - מסננים גם בצד לקוח לפי התגיות הספציפיות שנבחרו (לא רק
       // לפי הקטגוריה הראשית שנגזרה מהן), כדי שהתוצאות יהיו ממוקדות.
       if (opts?.interests && opts.interests.length > 0) {
@@ -643,7 +677,14 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     handleSelectCategory(bestBucket.value, "אחר - התאמה אישית", { interests: otherTags });
   }
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // *** במצב מוטמע: המיקום כבר נשמר ב-Home (utils/sessionLocation.ts) - משתמשים
+  // בו מיד, בלי לבקש GPS שוב באמצע ההחלקות (שגרם גם לחישוב מחדש של המרחקים
+  // ולרינדור נוסף של הכרטיס הנוכחי).
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    if (!embedded) return null;
+    const saved = getSessionLocation();
+    return saved ? { lat: saved.lat, lng: saved.lng } : null;
+  });
   const [locating, setLocating] = useState(false);
   const NEAR_ME_RADIUS_KM = 10;
 
@@ -883,11 +924,31 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
   }
 
+  // החפיסה הסתיימה = כל מי שנטען כבר הוחלט עליו (לייק/דילוג). לפני זה: "אין
+  // יותר מועמדים" נגזר מהרשימה שהשרת החזיר אחרי כל החלטה.
+  const allDecided =
+    candidates.length > 0 && decidedIds.length >= candidates.length && candidates.every((c) => decidedIds.includes(c.id));
   useEffect(() => {
-    if (stage === "swiping" && hasSwipedAny && candidates.length === 0 && !busy) {
+    if (stage === "swiping" && hasSwipedAny && allDecided && !busy) {
+      if (deckCacheKey) clearDeck(deckCacheKey);
       handleFinish();
     }
-  }, [stage, hasSwipedAny, candidates, busy, sessionLikedPlaces, router]);
+  }, [stage, hasSwipedAny, allDecided, busy, sessionLikedPlaces, router]);
+
+  // שומר את החפיסה במטמון בכל שינוי (החלטה חדשה, לייק וכו') - כדי שחזרה
+  // לעמוד הבית תשחזר בדיוק את המצב הנוכחי. ר' utils/tripMatchDeckCache.ts.
+  useEffect(() => {
+    if (!deckCacheKey || stage !== "swiping" || !sessionId || candidates.length === 0) return;
+    writeDeck(deckCacheKey, {
+      sessionId,
+      cityValue: selectedCity ?? deckCacheKey,
+      cityLabel: selectedCityLabel || deckCacheKey,
+      candidates,
+      userPreferences,
+      decidedIds,
+      likedPlaces: sessionLikedPlaces,
+    });
+  }, [deckCacheKey, stage, sessionId, candidates, userPreferences, decidedIds, sessionLikedPlaces, selectedCity, selectedCityLabel]);
 
   useEffect(() => {
     if (stage !== "swiping" || userLocation || !navigator.geolocation) return;
@@ -897,7 +958,11 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     );
   }, [stage, userLocation]);
 
-  const visibleCandidates = useMemo(() => {
+  // *** חפיסה קבועה (בקשה מפורשת): deck = כל החפיסה אחרי הסינון והמיון (כולל מי
+  // שכבר הוחלט עליו) - גודלה הוא ה-Y הקבוע ב-"X/Y". visibleCandidates = מי
+  // שנשאר להחליק. הסדר יציב: candidates לא מוחלף יותר אחרי כל החלטה, והמיון
+  // (אחוז התאמה) הוא פונקציה דטרמיניסטית של נתונים קבועים.
+  const { deck, visibleCandidates } = useMemo(() => {
     const withDistance = !userLocation
       ? candidates
       : candidates.map((c) => {
@@ -911,10 +976,15 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
         ? distanceLimited
         : distanceLimited.filter((c) => activeCategoryFilters.some((id) => matchesQuickCategoryFilter(c, id)));
     const filtered = applyFilters(categoryFiltered, filters);
-    return [...filtered].sort(
+    const sorted = [...filtered].sort(
       (a, b) => computeMatchPercent(b, filters, userPreferences) - computeMatchPercent(a, filters, userPreferences)
     );
-  }, [candidates, filters, userLocation, userPreferences, nearMeActive, activeCategoryFilters]);
+    const decided = new Set(decidedIds);
+    return { deck: sorted, visibleCandidates: sorted.filter((c) => !decided.has(c.id)) };
+  }, [candidates, filters, userLocation, userPreferences, nearMeActive, activeCategoryFilters, decidedIds]);
+  const deckSize = deck.length;
+  /** כמה כבר הוחלט בתוך החפיסה הנוכחית (אחרי סינון) - "X-1" ב-"X/Y". */
+  const totalDecisions = deckSize - visibleCandidates.length;
   const currentCandidate = visibleCandidates[candidateIndex];
   const currentPhotoIndex =
     currentCandidate && photoState.candidateId === currentCandidate.id ? photoState.index : 0;
@@ -935,74 +1005,74 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     }
   }
 
-  /** *** תיקון מהירות: לפני זה חיכינו לתשובת השרת (decide API) לפני שהראינו
-   *  את כרטיס ה"אהבתי"/עברנו לכרטיס הבא - זה גרם לזרימה להרגיש איטית
-   *  ולא אחידה (תלוי ברשת). עכשיו העדכון קורה אופטימית ומיידית: מסירים
-   *  את המועמד מהרשימה המקומית ומציגים את הפופאפ/כרטיס הבא מייד עם
-   *  סיום אנימציית ה-swipe, ושליחת ההחלטה לשרת קורית ברקע. */
-  /** *** תיקון (מערכת "טריפים" - דרישה מפורשת): Skip (liked=false) לא
-   *  עולה כלום - ממשיך בדיוק כמו קודם, אופטימי ומיידי. Like (liked=true)
-   *  עולה TOKEN_COST_LIKE טריפים, אז חייבים לחכות לתשובת השרת *לפני* שמזיזים את
-   *  הכרטיס/מציגים את דיאלוג "אהבתי" - אחרת משתמש בלי מספיק טריפים
-   *  היה רואה לייק "מצליח" ויזואלית שבפועל לא נשמר ולא חויב. */
-  async function handleDecision(liked: boolean) {
-    if (!sessionId || !currentCandidate) return;
-    const decidedPlace = currentCandidate;
-    setLastDecision({ candidate: decidedPlace, liked });
-
-    if (!liked) {
-      setHasSwipedAny(true);
-      setTotalDecisions((n) => n + 1);
-      setCandidates((prev) => prev.filter((c) => c.id !== decidedPlace.id));
-      setCandidateIndex(0);
+  /** שולח החלטה לשרת - בתור, כדי שההחלטות יגיעו בדיוק בסדר שבו נעשו.
+   *  skipCandidates: הלקוח כבר לא משתמש ברשימה שהשרת היה מחזיר (החפיסה
+   *  קבועה) - השרת מדלג על שליפת המועמדים מחדש, וזה מקצר משמעותית כל קריאה. */
+  function sendDecision(
+    sid: string,
+    placeId: string,
+    liked: boolean
+  ): Promise<{ ok: boolean; data: { error?: string; cost?: number; remainingTokens?: number } | null }> {
+    const run = async () => {
       try {
-        const response = await fetch(`/api/tripmatch/sessions/${sessionId}/decide`, {
+        const response = await fetch(`/api/tripmatch/sessions/${sid}/decide`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ placeId: decidedPlace.id, liked: false }),
+          body: JSON.stringify({ placeId, liked, skipCandidates: true }),
         });
-        const data = await response.json();
-        if (response.ok) setCandidates(data.candidates ?? []);
+        const data = await response.json().catch(() => null);
+        return { ok: response.ok, data };
       } catch {
-        // העדכון האופטימי כבר בוצע - שגיאת רשת לא חוסמת את הזרימה.
+        return { ok: false, data: null };
       }
-      return;
-    }
+    };
+    const next = decisionQueueRef.current.then(run, run);
+    decisionQueueRef.current = next;
+    return next;
+  }
 
-    setBusy(true);
+  /** *** שינוי (בקשה מפורשת - "מדויק ומיידי, בלי משחקים במעברים"): גם לייק
+   *  וגם דילוג הם עכשיו *אופטימיים ומיידיים* - הכרטיס הבא מופיע באותו רגע,
+   *  בלי להמתין לשרת, והחפיסה עצמה לא משתנה (רק מסמנים את המקום כ"הוחלט").
+   *  קריאת השרת רצה ברקע, בתור.
+   *  - דילוג: כשל ברשת לא חוסם כלום (כמו קודם).
+   *  - לייק עולה טריפים: אם השרת דחה (אין מספיק טריפים / שגיאה) - מבטלים את
+   *    הלייק, הכרטיס חוזר לראש החפיסה ומוצגת הודעה. זה המקרה היחיד שבו
+   *    כרטיס חוזר, והוא נובע מכך שהלייק באמת לא נשמר. */
+  function handleDecision(liked: boolean) {
+    if (!sessionId || !currentCandidate) return;
+    const decidedPlace = currentCandidate;
+    // הגנה מפני הפעלה כפולה של אותה החלטה (לחיצה כפולה מהירה).
+    if (decidingRef.current.has(decidedPlace.id)) return;
+    decidingRef.current.add(decidedPlace.id);
+
+    setLastDecision({ candidate: decidedPlace, liked });
+    setHasSwipedAny(true);
     setError(null);
-    try {
-      const response = await fetch(`/api/tripmatch/sessions/${sessionId}/decide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ placeId: decidedPlace.id, liked: true }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        // הכרטיס כבר "עף" ויזואלית (אנימציית SwipeCard) - מכריחים remount
-        // כדי שיחזור למרכז, כי בפועל שום Like לא בוצע.
-        setSwipeResetTick((t) => t + 1);
-        if (data?.error === "INSUFFICIENT_TOKENS") {
-          setError(`אין לכם מספיק טריפים לביצוע לייק · לייק ב-TripMatch עולה ${data.cost ?? 10} טריפים · נשארו לכם ${data.remainingTokens ?? 0} טריפים`);
-        } else {
-          setError(data?.error ?? "שמירת הלייק נכשלה - נסו שוב.");
-        }
-        return;
-      }
-
-      setHasSwipedAny(true);
-      setTotalDecisions((n) => n + 1);
-      setCandidates(data.candidates ?? []);
-      setCandidateIndex(0);
+    setDecidedIds((prev) => (prev.includes(decidedPlace.id) ? prev : [...prev, decidedPlace.id]));
+    setCandidateIndex(0);
+    if (liked) {
       setSessionLikedPlaces((prev) => (prev.some((p) => p.id === decidedPlace.id) ? prev : [...prev, decidedPlace]));
       setLikedPlace(decidedPlace);
-    } catch {
-      setSwipeResetTick((t) => t + 1);
-      setError("שמירת הלייק נכשלה - נסו שוב.");
-    } finally {
-      setBusy(false);
     }
+
+    sendDecision(sessionId, decidedPlace.id, liked).then(({ ok, data }) => {
+      if (ok || !liked) return;
+      // הלייק לא נשמר בשרת - מבטלים אותו והכרטיס חוזר.
+      decidingRef.current.delete(decidedPlace.id);
+      setDecidedIds((prev) => prev.filter((id) => id !== decidedPlace.id));
+      setSessionLikedPlaces((prev) => prev.filter((p) => p.id !== decidedPlace.id));
+      setLikedPlace((current) => (current?.id === decidedPlace.id ? null : current));
+      setLastDecision((current) => (current?.candidate.id === decidedPlace.id ? null : current));
+      setSwipeResetTick((t) => t + 1);
+      if (data?.error === "INSUFFICIENT_TOKENS") {
+        setError(
+          `אין לכם מספיק טריפים לביצוע לייק · לייק ב-TripMatch עולה ${data.cost ?? 10} טריפים · נשארו לכם ${data.remainingTokens ?? 0} טריפים`
+        );
+      } else {
+        setError(data?.error ?? "שמירת הלייק נכשלה - נסו שוב.");
+      }
+    });
   }
 
   if (!ready) return null;
@@ -1013,9 +1083,11 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   function handleRewind() {
     if (!lastDecision) return;
     const { candidate, liked } = lastDecision;
-    setCandidates((prev) => (prev.some((c) => c.id === candidate.id) ? prev : [candidate, ...prev]));
+    // החפיסה קבועה - "חזור" פשוט מחזיר את המקום למצב "לא הוחלט", והוא חוזר
+    // לראש התור (הוא היה האחרון שהוחלט, וסדר החפיסה יציב).
+    decidingRef.current.delete(candidate.id);
+    setDecidedIds((prev) => prev.filter((id) => id !== candidate.id));
     setCandidateIndex(0);
-    setTotalDecisions((n) => Math.max(0, n - 1));
     if (liked) {
       setSessionLikedPlaces((prev) => prev.filter((p) => p.id !== candidate.id));
     }
@@ -1085,16 +1157,13 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
 
       <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
         {stage === "city" && embedded && (
-          // *** תיקון (Home - כניסה מוטמעת): היעד כבר הגיע משורת החיפוש
-          // של Home ("אין לאפס את הערך, אין לבקש מהמשתמש להקליד שוב") -
-          // לא מציגים כאן שוב את מסך "איפה תרצו לטייל?" המלא, רק מסך
-          // ביניים קצר עד שה-effect למעלה מסיים לאשר את היעד ולהתקדם
-          // לשלב הקטגוריה (בדרך כלל כמה מאות מ"ש).
-          <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
-            <p className="text-sm font-medium text-ink-secondary">
-              {cityInput ? `מכינים עבורכם המלצות ל${cityInput}...` : "מכינים עבורכם המלצות..."}
-            </p>
+          // *** שונה (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית", ובלי
+          // עיצובי טעינה): במצב מוטמע (Home) הטעינה מתחילה מיד בהתחברות הרכיב
+          // (ר' embeddedStartedRef למעלה) - אין יותר מסך ביניים עם טקסט
+          // "מכינים עבורכם המלצות...". רק ספינר קטן וחסר-טקסט, למקרה של
+          // טעינה ראשונה (בלי חפיסה שמורה), כדי שהעמוד לא ייראה תקוע.
+          <div className="flex justify-center py-16" aria-busy="true">
+            <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-bg-secondary border-t-accent" />
           </div>
         )}
 
@@ -1664,7 +1733,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       setSessionLikedPlaces([]);
                       setHasSwipedAny(false);
                       setCandidates([]);
-                      setTotalDecisions(0);
+                      setDecidedIds([]);
+                      decidingRef.current.clear();
                       setNearMeActive(false);
                       setOtherQuery("");
                       setOtherTags([]);
@@ -1696,7 +1766,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                   setSessionLikedPlaces([]);
                   setHasSwipedAny(false);
                   setCandidates([]);
-                  setTotalDecisions(0);
+                  setDecidedIds([]);
+                  decidingRef.current.clear();
                   setNearMeActive(false);
                   setOtherQuery("");
                   setOtherTags([]);

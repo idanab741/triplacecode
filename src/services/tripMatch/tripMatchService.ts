@@ -181,7 +181,14 @@ export async function fetchTripMatchCandidates(
     query = query.not("id", "in", `(${Array.from(excluded).join(",")})`);
   }
 
-  const { data, error } = await query.limit(isGeoSearch ? limit * 3 : limit);
+  // *** חדש (בקשה מפורשת - "החלוקה אמורה להיות קבועה"): בלי ORDER BY, Postgres
+  // מחזיר "60 שורות כלשהן" - ובכל קריאה (למשל אחרי כל החלטה, כשההחרגות
+  // משתנות) חלון אחר של שורות. עכשיו הבחירה דטרמיניסטית: הכי מדורגים
+  // קודם (ואז לפי id כשוברי-שוויון), כך שאותו יעד מחזיר תמיד את אותה חפיסה.
+  const { data, error } = await query
+    .order("rating", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: true })
+    .limit(isGeoSearch ? limit * 3 : limit);
   if (error || !data) return [];
 
   const geoOrigin: LatLng | null = isGeoSearch ? { lat: session.latitude!, lng: session.longitude! } : null;
