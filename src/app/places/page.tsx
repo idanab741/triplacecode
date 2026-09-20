@@ -14,6 +14,7 @@ import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
 import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
+import { TripFeedCard } from "@/screens/trips/TripFeedCard";
 import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
@@ -315,6 +316,8 @@ export default function PlacesHomePage() {
             {feedItems.map((entry) =>
               entry.kind === "collection" ? (
                 <CollectionFeedCard key={`collection-${entry.item.id}`} item={entry.item} />
+              ) : entry.kind === "trip" ? (
+                <TripFeedCard key={`trip-${entry.item.id}`} item={entry.item} />
               ) : (
                 <PostCard
                   key={entry.item.id}
@@ -361,7 +364,7 @@ export default function PlacesHomePage() {
           // "מקום": עמודים מלאים עם הבר העליון של Places - /places/create (בחירה/הוספת מקום) ואז /places/create/review.
           onSelectPlace={() => router.push("/places/create")}
           onSelectCollection={() => setCollectionTypeOpen(true)}
-          onSelectTrip={() => router.push("/tripmatch")}
+          onSelectTrip={() => router.push("/places/trip/create")}
         />
       )}
 

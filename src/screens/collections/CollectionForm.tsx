@@ -1,28 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BottomSheet } from "@/components/ui";
-import { useAuth } from "@/hooks/useAuth";
-import { createClient } from "@/services/supabase/client";
-import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { COLLECTION_LIMITS, COLLECTION_TYPE_LABELS, type CollectionType, type CollectionVisibility } from "@/services/social/collectionTypes";
 import { CollectionCover } from "./CollectionCover";
 import { CollectionItemPickerSheet } from "./CollectionItemPickerSheet";
+import { CoverPickerSheet } from "./CoverPickerSheet";
+import { VisibilityChips } from "./VisibilityChips";
 import { toItemInputs, type CollectionFormItem } from "./collectionFormTypes";
 
 const PURPLE_GRADIENT = "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))";
 const DRAFT_KEY = "collection_draft_v1";
-
-/** אותה מערכת Visibility של פוסטים (CreatePostSheet): כולם / חברים / פרטי. */
-const VISIBILITY_OPTIONS: { id: CollectionVisibility; label: string }[] = [
-  { id: "public", label: "כולם" },
-  { id: "friends", label: "חברים" },
-  { id: "private", label: "פרטי" },
-];
 
 const TITLE_EXAMPLES: Record<CollectionType, string[]> = {
   places: ["עגלות הקפה שאסור לפספס", "המסעדות האהובות עליי", "מקומות לדייט"],
@@ -105,7 +96,6 @@ function SortableItemRow({
 /** טופס יצירה/עריכה של אוסף (משותף). כותרת (חובה) · תיאור · Cover · פריטים (לפחות 2, גרירה לסדר) · פרטיות. */
 export function CollectionForm({ mode, type, collectionId, initial }: CollectionFormProps) {
   const router = useRouter();
-  const { user } = useAuth();
   const labels = COLLECTION_TYPE_LABELS[type];
 
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -115,10 +105,8 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
   const [items, setItems] = useState<CollectionFormItem[]>(initial?.items ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [coverSheetOpen, setCoverSheetOpen] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -170,23 +158,7 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
     });
   }
 
-  async function handleCoverFile(file: File | undefined) {
-    if (!file || !user) return;
-    setUploadingCover(true);
-    setError(null);
-    try {
-      const uploaded = await uploadSocialMedia(createClient(), user.id, file);
-      setCoverUrl(uploaded.url);
-      setCoverSheetOpen(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בהעלאת התמונה");
-    } finally {
-      setUploadingCover(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  const canPublish = title.trim().length > 0 && items.length >= COLLECTION_LIMITS.minItems && !submitting && !uploadingCover;
+  const canPublish = title.trim().length > 0 && items.length >= COLLECTION_LIMITS.minItems && !submitting;
   const itemImages = items.map((i) => i.imageUrl).filter((u): u is string => !!u);
 
   async function handleSubmit() {
@@ -315,18 +287,8 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
       )}
 
       <label className="mb-2 mt-6 block text-[13px] font-semibold text-ink-secondary">מי יכול לראות?</label>
-      <div className="mb-6 flex gap-2">
-        {VISIBILITY_OPTIONS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => setVisibility(option.id)}
-            className={`rounded-pill px-4 py-1.5 text-[13px] font-semibold ${visibility === option.id ? "text-white" : "bg-bg-secondary text-ink-secondary"}`}
-            style={visibility === option.id ? { background: "var(--color-places-purple)" } : undefined}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className="mb-6">
+        <VisibilityChips value={visibility} onChange={setVisibility} />
       </div>
 
       {error && <p className="mb-3 text-[12.5px] text-red-500">{error}</p>}
@@ -358,55 +320,15 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
       )}
 
       {coverSheetOpen && (
-        <BottomSheet onClose={() => setCoverSheetOpen(false)}>
-          <div className="max-h-[75vh] overflow-y-auto px-5 pb-4">
-            <h2 className="mb-3 text-[17px] font-bold text-ink">בחירת קאבר</h2>
-            <button
-              type="button"
-              onClick={() => {
-                setCoverUrl(null);
-                setCoverSheetOpen(false);
-              }}
-              className="mb-2 flex w-full items-center justify-between rounded-card px-3 py-3 text-start text-[14px] font-semibold text-ink hover:bg-bg-secondary"
-            >
-              קאבר אוטומטי
-              {coverUrl === null && <span style={{ color: "var(--color-places-purple)" }}>✓</span>}
-            </button>
-
-            {itemImages.length > 0 && (
-              <>
-                <p className="mb-2 mt-3 text-[12.5px] font-semibold text-ink-secondary">מתוך התמונות באוסף</p>
-                <div className="mb-3 grid grid-cols-3 gap-2">
-                  {[...new Set(itemImages)].map((url) => (
-                    <button
-                      key={url}
-                      type="button"
-                      onClick={() => {
-                        setCoverUrl(url);
-                        setCoverSheetOpen(false);
-                      }}
-                      className={`relative aspect-square overflow-hidden rounded-card ring-2 ${coverUrl === url ? "ring-[var(--color-places-purple)]" : "ring-transparent"}`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleCoverFile(e.target.files?.[0])} />
-            <button
-              type="button"
-              disabled={uploadingCover}
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full rounded-pill border py-2.5 text-[13.5px] font-bold disabled:opacity-50"
-              style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
-            >
-              {uploadingCover ? "מעלה..." : "העלאת תמונה מהמכשיר"}
-            </button>
-          </div>
-        </BottomSheet>
+        <CoverPickerSheet
+          coverUrl={coverUrl}
+          imageUrls={itemImages}
+          onSelect={(url) => {
+            setCoverUrl(url);
+            setCoverSheetOpen(false);
+          }}
+          onClose={() => setCoverSheetOpen(false)}
+        />
       )}
     </div>
   );

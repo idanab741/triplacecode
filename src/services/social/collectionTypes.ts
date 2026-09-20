@@ -1,6 +1,7 @@
 /** טיפוסים משותפים (server + client) לאוספים - ר' collectionService.ts ו-migration 0089. */
 
 import type { FeedItemDto } from "./feedService";
+import type { TripCardDto } from "./tripTypes";
 import type { PostVisibility } from "./types";
 
 /** רק 2 סוגי אוספים, ואין ערבוב ביניהם (נאכף גם ב-DB - ר' trigger collection_items_enforce_type). */
@@ -66,7 +67,9 @@ export interface CollectionPlaceItemDto {
 }
 
 /** מקור הטיול - אותם שני מקורות של "הטיולים שלי" (trip_builder_sessions / trippy_ai_results). */
-export type CollectionTripSource = "session" | "trippy_ai";
+/** session / trippy_ai = תוצרי בניית-טיול פרטיים של המשתמש ("הטיולים שלי");
+ *  trip = טיול חברתי (Trip, migration 0090) - שלו או של מישהו אחר שהוא רשאי לראות. */
+export type CollectionTripSource = "session" | "trippy_ai" | "trip";
 
 export interface CollectionTripItemDto {
   id: string;
@@ -106,7 +109,8 @@ export interface SaveCollectionInput {
   items: CollectionItemInput[];
 }
 
-/** פריט בפיד: פוסט או אוסף. ממוין לפי createdAt של ה-item. */
+/** פריט בפיד: פוסט, אוסף או טיול. ממוין לפי createdAt של ה-item. */
 export type FeedEntryDto =
   | { kind: "post"; item: FeedItemDto }
-  | { kind: "collection"; item: CollectionCardDto };
+  | { kind: "collection"; item: CollectionCardDto }
+  | { kind: "trip"; item: TripCardDto };

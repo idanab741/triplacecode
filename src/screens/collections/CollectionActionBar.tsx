@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { CollectionCardDto } from "@/services/social/collectionTypes";
 
 const LIKE_COLOR = "#F43F5E";
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -73,11 +72,19 @@ export function collectionPath(id: string): string {
   return `/places/collection/${id}`;
 }
 
-async function shareCollection(item: Pick<CollectionCardDto, "id" | "title">): Promise<"shared" | "copied" | "failed"> {
-  const url = `${window.location.origin}${collectionPath(item.id)}`;
+/** הפעולות החברתיות של תוכן שאינו Post: אוסף או טיול. */
+export interface SocialActionItem {
+  id: string;
+  title: string;
+  stats: { likes: number; comments: number };
+  viewerState: { liked: boolean; saved: boolean };
+}
+
+async function shareItem(item: Pick<SocialActionItem, "title">, sharePath: string, shareText: string): Promise<"shared" | "copied" | "failed"> {
+  const url = `${window.location.origin}${sharePath}`;
   if (navigator.share) {
     try {
-      await navigator.share({ title: item.title, text: `${item.title} - אוסף ב-TRIPLACE`, url });
+      await navigator.share({ title: item.title, text: shareText, url });
       return "shared";
     } catch {
       return "failed"; // המשתמש סגר את חלון השיתוף
@@ -92,14 +99,20 @@ async function shareCollection(item: Pick<CollectionCardDto, "id" | "title">): P
 }
 
 interface CollectionActionBarProps {
-  item: CollectionCardDto;
+  item: SocialActionItem;
   commentsActive: boolean;
   onToggleComments: () => void;
+  /** ברירת מחדל: אוסף. טיול מעביר basePath="/api/social/trips/{id}" (+ sharePath/shareText משלו). */
+  basePath?: string;
+  sharePath?: string;
+  shareText?: string;
 }
 
-/** Like / Comment / Save / Share של אוסף. Like ו-Save אופטימיים (חוזרים אחורה אם השרת נכשל),
- *  בדיוק כמו ב-PostCard. Save לא הופך את האוסף לשלך - רק שומר אותו. */
-export function CollectionActionBar({ item, commentsActive, onToggleComments }: CollectionActionBarProps) {
+/** Like / Comment / Save / Share של אוסף או טיול (אותו רכיב, אותן טבלאות: post_likes / social_saves / comments).
+ *  Like ו-Save אופטימיים (חוזרים אחורה אם השרת נכשל), בדיוק כמו ב-PostCard.
+ *  Save לא הופך את התוכן לשלך ולא משכפל אותו - רק שומר אותו. */
+export function CollectionActionBar({ item, commentsActive, onToggleComments, basePath, sharePath, shareText }: CollectionActionBarProps) {
+  const base = basePath ?? `/api/social/collections/${item.id}`;
   const [liked, setLiked] = useState(item.viewerState.liked);
   const [likeCount, setLikeCount] = useState(item.stats.likes);
   const [saved, setSaved] = useState(item.viewerState.saved);
@@ -110,7 +123,7 @@ export function CollectionActionBar({ item, commentsActive, onToggleComments }: 
     setLiked(next);
     setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
     try {
-      const { liked: confirmed } = await postToggle<{ liked: boolean }>(`/api/social/collections/${item.id}/like`);
+      const { liked: confirmed } = await postToggle<{ liked: boolean }>(`${base}/like`);
       if (confirmed !== next) {
         setLiked(confirmed);
         setLikeCount((c) => Math.max(0, c + (confirmed ? 1 : -1) - (next ? 1 : -1)));
@@ -125,7 +138,7 @@ export function CollectionActionBar({ item, commentsActive, onToggleComments }: 
     const next = !saved;
     setSaved(next);
     try {
-      const { saved: confirmed } = await postToggle<{ saved: boolean }>(`/api/social/collections/${item.id}/save`);
+      const { saved: confirmed } = await postToggle<{ saved: boolean }>(`${base}/save`);
       setSaved(confirmed);
     } catch {
       setSaved(!next);
@@ -133,7 +146,7 @@ export function CollectionActionBar({ item, commentsActive, onToggleComments }: 
   }
 
   async function handleShare() {
-    const result = await shareCollection(item);
+    const result = await shareItem(item, sharePath ?? collectionPath(item.id), shareText ?? `${item.title} - אוסף ב-TRIPLACE`);
     if (result === "copied") {
       setToast("הקישור הועתק");
       setTimeout(() => setToast(null), 2000);

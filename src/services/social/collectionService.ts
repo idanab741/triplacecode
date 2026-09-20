@@ -4,6 +4,8 @@ import { summarizeTripSessionRow, tripResultPath, type TripSessionRow } from "@/
 import type { TrippyQuickStop } from "@/services/tripBuilder/trippyQuickShared";
 import type { FeedTab } from "./feedService";
 import type { PostVisibility } from "./types";
+import { getTripSummaries } from "./tripService";
+import { addTargetComment, deleteTargetComment, getTargetComments, resolveFeedAuthorIds, toggleTargetLike } from "./socialTargetService";
 import {
   COLLECTION_LIMITS,
   type CollectionAuthorDto,
@@ -75,7 +77,9 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
 
     let tripSource: CollectionTripSource | undefined;
     if (type === "trips") {
-      if (item.tripSource !== "session" && item.tripSource !== "trippy_ai") throw new CollectionInputError("אחד הטיולים לא תקין");
+      if (item.tripSource !== "session" && item.tripSource !== "trippy_ai" && item.tripSource !== "trip") {
+        throw new CollectionInputError("אחד הטיולים לא תקין");
+      }
       tripSource = item.tripSource;
     }
 
@@ -118,20 +122,29 @@ async function assertItemsUsable(
 
   const sessionIds = items.filter((i) => i.tripSource === "session").map((i) => i.refId);
   const trippyIds = items.filter((i) => i.tripSource === "trippy_ai").map((i) => i.refId);
+  const socialTripIds = items.filter((i) => i.tripSource === "trip").map((i) => i.refId);
   // ה-RLS של שתי הטבלאות ממילא "בעלים בלבד"; ה-eq(user_id) מפורש כדי שההודעה תהיה נכונה.
   // *** רק טיולים שמורים (is_saved) - טיול זמני נמחק אוטומטית אחרי תקופת ההסרה, ואז האוסף "היה מאבד" פריט.
-  const [sessionsRes, trippyRes] = await Promise.all([
+  const [sessionsRes, trippyRes, socialTripsRes] = await Promise.all([
     sessionIds.length
       ? supabase.from("trip_builder_sessions").select("id").in("id", sessionIds).eq("user_id", userId).eq("is_saved", true)
       : Promise.resolve({ data: [] as { id: string }[], error: null }),
     trippyIds.length
       ? supabase.from("trippy_ai_results").select("id").in("id", trippyIds).eq("user_id", userId).eq("is_saved", true)
       : Promise.resolve({ data: [] as { id: string }[], error: null }),
+    // טיול חברתי (Trip): כל טיול שהיוצר רשאי *לראות* (ה-RLS של trips) - שלו, או ציבורי/חברים של מישהו אחר.
+    socialTripIds.length
+      ? supabase.from("trips").select("id").in("id", socialTripIds)
+      : Promise.resolve({ data: [] as { id: string }[], error: null }),
   ]);
   if (sessionsRes.error) throw sessionsRes.error;
   if (trippyRes.error) throw trippyRes.error;
+  if (socialTripsRes.error) throw socialTripsRes.error;
   if ((sessionsRes.data ?? []).length !== sessionIds.length || (trippyRes.data ?? []).length !== trippyIds.length) {
     throw new CollectionInputError("אפשר להוסיף לאוסף רק טיולים שמורים שלכם");
+  }
+  if ((socialTripsRes.data ?? []).length !== socialTripIds.length) {
+    throw new CollectionInputError("אחד הטיולים לא נמצא - ייתכן שהוסר או שהפך לפרטי");
   }
 }
 
@@ -142,6 +155,7 @@ function toItemRow(collectionId: string, item: CollectionItemInput, position: nu
     place_id: item.kind === "place" ? item.refId : null,
     trip_session_id: item.kind === "trip" && item.tripSource === "session" ? item.refId : null,
     trippy_ai_result_id: item.kind === "trip" && item.tripSource === "trippy_ai" ? item.refId : null,
+    trip_id: item.kind === "trip" && item.tripSource === "trip" ? item.refId : null,
     position,
     note: item.note ?? null,
   };
@@ -191,10 +205,12 @@ interface ExistingItemRow {
   place_id: string | null;
   trip_session_id: string | null;
   trippy_ai_result_id: string | null;
+  trip_id: string | null;
 }
 
 function existingItemKey(row: ExistingItemRow): string {
   if (row.item_type === "place") return `place:${row.place_id}`;
+  if (row.trip_id) return `trip:${row.trip_id}`;
   return row.trip_session_id ? `session:${row.trip_session_id}` : `trippy_ai:${row.trippy_ai_result_id}`;
 }
 
@@ -225,7 +241,7 @@ export async function updateCollection(
 
   const { data: currentRows, error: currentError } = await supabase
     .from("collection_items")
-    .select("id, item_type, place_id, trip_session_id, trippy_ai_result_id")
+    .select("id, item_type, place_id, trip_session_id, trippy_ai_result_id, trip_id")
     .eq("collection_id", collectionId);
   if (currentError) throw currentError;
 
@@ -308,6 +324,7 @@ interface ItemRow {
   place_id: string | null;
   trip_session_id: string | null;
   trippy_ai_result_id: string | null;
+  trip_id: string | null;
   position: number;
   note: string | null;
 }
@@ -327,9 +344,11 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
   const placeIds = [...new Set(rows.map((r) => r.place_id).filter(Boolean))] as string[];
   const sessionIds = [...new Set(rows.map((r) => r.trip_session_id).filter(Boolean))] as string[];
   const trippyIds = [...new Set(rows.map((r) => r.trippy_ai_result_id).filter(Boolean))] as string[];
+  const socialTripIds = [...new Set(rows.map((r) => r.trip_id).filter(Boolean))] as string[];
   const admin = sessionIds.length || trippyIds.length ? createAdminClient() : null;
 
-  const [placesRes, sessionsRes, trippyRes] = await Promise.all([
+  // טיולים חברתיים (Trips): ה-client הרגיל - ה-RLS של trips מכבד visibility, כך שטיול שהפך פרטי פשוט נעלם מהאוסף.
+  const [placesRes, sessionsRes, trippyRes, socialTrips] = await Promise.all([
     placeIds.length
       ? supabase.from("places").select("id, name, category, city, rating, image_urls, latitude, longitude").in("id", placeIds)
       : Promise.resolve({ data: [] as never[] }),
@@ -342,6 +361,7 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
     admin && trippyIds.length
       ? admin.from("trippy_ai_results").select("id, user_id, title, stops, share_token").in("id", trippyIds)
       : Promise.resolve({ data: [] as never[] }),
+    getTripSummaries(supabase, viewerId, socialTripIds),
   ]);
 
   const placesById = new Map(
@@ -385,6 +405,26 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
           imageUrls: place.image_urls ?? [],
           latitude: place.latitude,
           longitude: place.longitude,
+        },
+      });
+      continue;
+    }
+
+    if (row.trip_id) {
+      const socialTrip = socialTrips.get(row.trip_id);
+      if (!socialTrip) continue;
+      result.set(row.id, {
+        id: row.id,
+        kind: "trip",
+        position: row.position,
+        note: row.note,
+        trip: {
+          source: "trip",
+          id: row.trip_id,
+          title: socialTrip.title,
+          imageUrl: socialTrip.imageUrl,
+          stopCount: socialTrip.stopCount,
+          href: `/places/trip/${row.trip_id}`,
         },
       });
       continue;
@@ -462,7 +502,7 @@ async function buildCollections(
     supabase.from("profiles").select("id, username, full_name, avatar_url, is_creator").in("id", authorIds),
     supabase
       .from("collection_items")
-      .select("id, collection_id, item_type, place_id, trip_session_id, trippy_ai_result_id, position, note")
+      .select("id, collection_id, item_type, place_id, trip_session_id, trippy_ai_result_id, trip_id, position, note")
       .in("collection_id", ids)
       .order("position", { ascending: true }),
     supabase.from("post_likes").select("collection_id").in("collection_id", ids),
@@ -560,6 +600,8 @@ export interface CollectionCardsOptions {
   limit?: number;
   /** created_at של הפריט האחרון בעמוד הקודם. */
   cursor?: string;
+  /** true ב-Feed: תוכן פרטי לא מופיע ב-Feed (גם לא ליוצר עצמו) - הוא נגיש רק מהפרופיל / ישירות. */
+  excludePrivate?: boolean;
 }
 
 /** אוספים כ-Cards, מהחדש לישן. ה-RLS כבר מגביל למה שהצופה רשאי לראות. */
@@ -568,26 +610,16 @@ export async function getCollectionCards(
   viewerId: string,
   options: CollectionCardsOptions = {}
 ): Promise<CollectionCardDto[]> {
-  const { tab = "for_you", authorId, limit = 15, cursor } = options;
+  const { tab = "for_you", authorId, limit = 15, cursor, excludePrivate = false } = options;
 
-  let authorFilterIds: string[] | null = null;
-  if (tab === "friends") {
-    const { data } = await supabase
-      .from("friendships")
-      .select("requester_id, addressee_id")
-      .or(`requester_id.eq.${viewerId},addressee_id.eq.${viewerId}`)
-      .eq("status", "accepted");
-    authorFilterIds = (data ?? []).map((row) => (row.requester_id === viewerId ? row.addressee_id : row.requester_id));
-  } else if (tab === "following") {
-    const { data } = await supabase.from("follows").select("following_id").eq("follower_id", viewerId);
-    authorFilterIds = (data ?? []).map((row) => row.following_id);
-  }
+  const authorFilterIds = await resolveFeedAuthorIds(supabase, viewerId, tab);
   if (authorFilterIds && authorFilterIds.length === 0) return [];
 
   let query = supabase.from("collections").select(COLLECTION_COLUMNS).order("created_at", { ascending: false }).limit(limit);
   if (authorId) query = query.eq("author_id", authorId);
   if (authorFilterIds) query = query.in("author_id", authorFilterIds);
   if (cursor) query = query.lt("created_at", cursor);
+  if (excludePrivate) query = query.neq("visibility", "private");
 
   const { data, error } = await query;
   if (error) throw error;
@@ -600,57 +632,14 @@ export async function getCollectionCards(
 // אינטראקציות: Like / Comment (Save עובר דרך toggleSocialSave הקיים)
 // ────────────────────────────────────────────────────────────────────────────
 
-export async function toggleCollectionLike(supabase: SupabaseClient, collectionId: string, userId: string): Promise<boolean> {
-  const { data: existing } = await supabase
-    .from("post_likes")
-    .select("id")
-    .eq("collection_id", collectionId)
-    .eq("user_id", userId)
-    .maybeSingle();
+export const toggleCollectionLike = (supabase: SupabaseClient, collectionId: string, userId: string) =>
+  toggleTargetLike(supabase, "collection_id", collectionId, userId);
 
-  if (existing) {
-    const { error } = await supabase.from("post_likes").delete().eq("id", existing.id);
-    if (error) throw error;
-    return false;
-  }
-  const { error } = await supabase.from("post_likes").insert({ collection_id: collectionId, user_id: userId });
-  if (error) throw error;
-  return true;
-}
+export const getCollectionComments = (supabase: SupabaseClient, collectionId: string, limit = 30, before?: string) =>
+  getTargetComments(supabase, "collection_id", collectionId, limit, before);
 
-export async function getCollectionComments(supabase: SupabaseClient, collectionId: string, limit = 30, before?: string) {
-  let query = supabase
-    .from("comments")
-    .select("id, text, created_at, parent_comment_id, author:profiles!comments_author_id_fkey(id, username, full_name, avatar_url)")
-    .eq("collection_id", collectionId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (before) query = query.lt("created_at", before);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data ?? [];
-}
+export const addCollectionComment = (supabase: SupabaseClient, collectionId: string, authorId: string, text: string, parentCommentId?: string) =>
+  addTargetComment(supabase, "collection_id", collectionId, authorId, text, parentCommentId);
 
-export async function addCollectionComment(
-  supabase: SupabaseClient,
-  collectionId: string,
-  authorId: string,
-  text: string,
-  parentCommentId?: string
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("comments")
-    .insert({ collection_id: collectionId, author_id: authorId, text, parent_comment_id: parentCommentId ?? null })
-    .select("id")
-    .single();
-  if (error) throw error;
-  return data.id as string;
-}
-
-/** מחיקה אמיתית של התגובה של המשתמש עצמו (policy "Users can delete their own comments").
- *  לא soft-delete כמו ב-deleteComment של פוסטים - UPDATE של deleted_at נחסם ע"י ה-RLS (ר' migration 0089). */
-export async function deleteCollectionComment(supabase: SupabaseClient, commentId: string, authorId: string): Promise<void> {
-  const { error } = await supabase.from("comments").delete().eq("id", commentId).eq("author_id", authorId).not("collection_id", "is", null);
-  if (error) throw error;
-}
+export const deleteCollectionComment = (supabase: SupabaseClient, commentId: string, authorId: string) =>
+  deleteTargetComment(supabase, "collection_id", commentId, authorId);

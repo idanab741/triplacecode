@@ -9,6 +9,7 @@ import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { PostCard } from "@/screens/places/PostCard";
 import { CollectionAlbumCard } from "@/screens/collections/CollectionAlbumCard";
+import { TripAlbumCard } from "@/screens/trips/TripAlbumCard";
 import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
@@ -20,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { FeedItemDto } from "@/services/social/feedService";
 import type { CollectionCardDto } from "@/services/social/collectionTypes";
+import type { TripCardDto } from "@/services/social/tripTypes";
 import type { PostVisibility } from "@/services/social/types";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -55,9 +57,10 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [collectionsNextCursor, setCollectionsNextCursor] = useState<string | null>(null);
   const [collectionsLoadingMore, setCollectionsLoadingMore] = useState(false);
   const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
-  // *** תוספת (בקשה מפורשת - "טיול חדש בקרוב"): הודעה קצרה שנעלמת
-  // לבד, במקום alert() דפדפן גס.
-  const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
+  // טאב "טיולים" (Trips) - הטיולים שהמשתמש יצר ופרסם; נטען בפעם הראשונה שנכנסים אליו.
+  const [trips, setTrips] = useState<TripCardDto[] | null>(null);
+  const [tripsNextCursor, setTripsNextCursor] = useState<string | null>(null);
+  const [tripsLoadingMore, setTripsLoadingMore] = useState(false);
 
   useEffect(() => {
     function handleScroll() {
@@ -109,7 +112,33 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   useEffect(() => {
     setCollections(null);
     setCollectionsNextCursor(null);
+    setTrips(null);
+    setTripsNextCursor(null);
   }, [username]);
+
+  useEffect(() => {
+    if (activeProfileTab !== "trips" || trips !== null) return;
+    fetchJson<{ trips: TripCardDto[]; nextCursor: string | null }>(`/api/social/profile/${username}/trips`)
+      .then((r) => {
+        setTrips(r.trips);
+        setTripsNextCursor(r.nextCursor);
+      })
+      .catch(() => setTrips([]));
+  }, [activeProfileTab, trips, username]);
+
+  async function handleLoadMoreTrips() {
+    if (!tripsNextCursor) return;
+    setTripsLoadingMore(true);
+    try {
+      const r = await fetchJson<{ trips: TripCardDto[]; nextCursor: string | null }>(
+        `/api/social/profile/${username}/trips?cursor=${encodeURIComponent(tripsNextCursor)}`
+      );
+      setTrips((prev) => [...(prev ?? []), ...r.trips]);
+      setTripsNextCursor(r.nextCursor);
+    } finally {
+      setTripsLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     if (activeProfileTab !== "collections" || collections !== null) return;
@@ -429,7 +458,41 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
         ))}
       </div>
 
-      {activeProfileTab === "collections" ? (
+      {activeProfileTab === "trips" ? (
+        <div className="px-4 pt-4">
+          {trips === null && (
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} className="aspect-square w-full rounded-card" />
+              ))}
+            </div>
+          )}
+          {trips !== null && trips.length === 0 && (
+            <p className="py-10 text-center text-[13px] text-ink-secondary">
+              {profile.viewerState.isSelf ? "עוד לא יצרתם טיול - לחצו על ה־+ כדי ליצור את הראשון." : "אין עדיין טיולים להצגה כאן."}
+            </p>
+          )}
+          {trips !== null && trips.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                {trips.map((t) => (
+                  <TripAlbumCard key={t.id} item={t} />
+                ))}
+              </div>
+              {tripsNextCursor && (
+                <button
+                  type="button"
+                  onClick={handleLoadMoreTrips}
+                  disabled={tripsLoadingMore}
+                  className="w-full py-4 text-[13px] font-semibold text-ink-secondary disabled:opacity-50"
+                >
+                  {tripsLoadingMore ? "טוען..." : "טען עוד"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ) : activeProfileTab === "collections" ? (
         <div className="px-4 pt-4">
           {collections === null && (
             <div className="grid grid-cols-2 gap-3">
@@ -465,7 +528,7 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
         </div>
       ) : activeProfileTab !== "media" ? (
         <p className="py-10 text-center text-[13px] text-ink-secondary">
-          {activeProfileTab === "trips" ? "תוכן הטיולים יופיע כאן בקרוב" : "הביקורות יופיעו כאן בקרוב"}
+          הביקורות יופיעו כאן בקרוב
         </p>
       ) : (
       <div className="mt-2 px-3 pt-3">
@@ -519,13 +582,8 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             setCreateMenuOpen(false);
             setCollectionTypeOpen(true);
           }}
-          // *** תיקון (בקשה מפורשת - "טיול חדש (בקרוב)"): לא עוד ניווט
-          // ל-tripmatch - הודעה קצרה שנעלמת לבד.
-          onSelectTrip={() => {
-            setCreateMenuOpen(false);
-            setComingSoonMessage("בניית טיולים תגיע בקרוב!");
-            setTimeout(() => setComingSoonMessage(null), 2500);
-          }}
+          // "טיול": עמוד יצירת טיול (place's Trips) - מסלול של תחנות בסדר, עם ימים.
+          onSelectTrip={() => router.push("/places/trip/create")}
         />
       )}
 
@@ -534,12 +592,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           onClose={() => setCollectionTypeOpen(false)}
           onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
         />
-      )}
-
-      {comingSoonMessage && (
-        <div className="fixed inset-x-4 bottom-24 z-50 rounded-pill bg-ink px-4 py-3 text-center text-[13px] font-semibold text-white shadow-soft">
-          {comingSoonMessage}
-        </div>
       )}
 
       {createPostOpen && (

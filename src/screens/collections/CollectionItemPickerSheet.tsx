@@ -15,16 +15,21 @@ interface CollectionItemPickerSheetProps {
   onClose: () => void;
   /** אוסף מקומות: אם המקום לא קיים - יוצאים לזרימת "הוספת מקום" הקיימת (לא יוצרים Place מתוך האוסף). */
   onGoAddPlace?: () => void;
+  /** כותרת/Placeholder מותאמים (למשל בעמוד יצירת טיול: "חפשו מקום להוסיף לטיול"). */
+  heading?: string;
+  placeholder?: string;
 }
 
 interface TripOption {
   key: string;
-  source: "session" | "trippy_ai";
+  source: "session" | "trippy_ai" | "trip";
   id: string;
   title: string;
   imageUrl: string | null;
   stopCount: number;
   createdAt: string;
+  /** תווית קטנה לזיהוי המקור. */
+  tag: string | null;
 }
 
 function rowClass(added: boolean) {
@@ -54,7 +59,7 @@ function AddedMark({ added }: { added: boolean }) {
 
 /** "מה תרצו להוסיף?" - בוחר פריט *קיים* בלבד: מקום מתוך TRIPLACE (אותו חיפוש כמו בשאר הזרימות),
  *  או טיול שמור מ"הטיולים שלי" (אותם שני endpoints). ה-Sheet נשאר פתוח כדי להוסיף כמה פריטים ברצף. */
-export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onGoAddPlace }: CollectionItemPickerSheetProps) {
+export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onGoAddPlace, heading, placeholder }: CollectionItemPickerSheetProps) {
   const [query, setQuery] = useState("");
   const [placeResults, setPlaceResults] = useState<PlaceSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -85,11 +90,27 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
 
   useEffect(() => {
     if (type !== "trips") return;
-    // ברירת המחדל של שני ה-endpoints היא "שמורים בלבד" - וזה בדיוק מה שמותר להוסיף לאוסף.
+    // מקורות: (1) טיולים (Trips) שיצרתי, (2) טיולים של אחרים ששמרתי, (3) תוצרי בניית-טיול שמורים שלי
+    // ("הטיולים שלי" - שני ה-endpoints הקיימים; ברירת המחדל שלהם היא "שמורים בלבד" - בדיוק מה שמותר).
     Promise.all([
+      fetch("/api/social/trips/mine").then((r) => r.json()).catch(() => ({ trips: [] })),
+      fetch("/api/social/trips/saved").then((r) => r.json()).catch(() => ({ trips: [] })),
       fetch("/api/trip-builder/sessions/saved").then((r) => r.json()).catch(() => ({ trips: [] })),
       fetch("/api/trippy-ai").then((r) => r.json()).catch(() => ({ results: [] })),
-    ]).then(([sessionsData, trippyData]) => {
+    ]).then(([mineData, savedData, sessionsData, trippyData]) => {
+      type SocialTrip = { id: string; title: string; coverUrl: string | null; autoCoverUrl: string | null; stopCount: number; createdAt: string };
+      const toSocial = (t: SocialTrip, tag: string): TripOption => ({
+        key: formItemKey("trip", t.id, "trip"),
+        source: "trip",
+        id: t.id,
+        title: t.title,
+        imageUrl: t.coverUrl ?? t.autoCoverUrl,
+        stopCount: t.stopCount,
+        createdAt: t.createdAt,
+        tag,
+      });
+      const mine: TripOption[] = (mineData.trips ?? []).map((t: SocialTrip) => toSocial(t, "הטיול שלי"));
+      const saved: TripOption[] = (savedData.trips ?? []).map((t: SocialTrip) => toSocial(t, "שמרתי"));
       const fromSessions: TripOption[] = (sessionsData.trips ?? []).map(
         (t: { sessionId: string; destinationLabel: string; imageUrl: string | null; stopCount: number; createdAt: string }) => ({
           key: formItemKey("trip", t.sessionId, "session"),
@@ -99,6 +120,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
           imageUrl: t.imageUrl,
           stopCount: t.stopCount,
           createdAt: t.createdAt,
+          tag: "מהבחירות שלי",
         })
       );
       const fromTrippy: TripOption[] = (trippyData.results ?? []).map(
@@ -110,9 +132,12 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
           imageUrl: r.imageUrl,
           stopCount: r.stopCount,
           createdAt: r.createdAt,
+          tag: "מהבחירות שלי",
         })
       );
-      setTrips([...fromSessions, ...fromTrippy].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const byDate = (a: TripOption, b: TripOption) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      // טיולים חברתיים קודם (מיון פנימי לפי תאריך), אחריהם הבחירות השמורות
+      setTrips([...mine.sort(byDate), ...saved, ...[...fromSessions, ...fromTrippy].sort(byDate)]);
     });
   }, [type]);
 
@@ -124,12 +149,12 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[80vh] overflow-y-auto px-5 pb-4">
-        <h2 className="mb-3 text-[17px] font-bold text-ink">מה תרצו להוסיף?</h2>
+        <h2 className="mb-3 text-[17px] font-bold text-ink">{heading ?? "מה תרצו להוסיף?"}</h2>
         <input
           autoFocus
           value={query}
           onChange={(e) => (type === "places" ? handlePlaceQuery(e.target.value) : setQuery(e.target.value))}
-          placeholder={type === "places" ? "חפשו מקום..." : "חפשו טיול..."}
+          placeholder={placeholder ?? (type === "places" ? "חפשו מקום..." : "חפשו טיול...")}
           className="mb-3 w-full rounded-pill border border-ink-secondary/20 px-4 py-2.5 text-[14px] focus:outline-none"
         />
 
@@ -190,7 +215,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
             {trips === null && <p className="py-4 text-center text-[12.5px] text-ink-secondary">טוען את הטיולים שלכם...</p>}
             {trips !== null && trips.length === 0 && (
               <p className="py-4 text-center text-[12.5px] text-ink-secondary">
-                אין לכם עדיין טיולים שמורים. שמרו טיול ב&quot;הבחירות שלי&quot; ואז תוכלו להוסיף אותו לאוסף.
+                אין עדיין טיולים להוסיף. צרו טיול, או שמרו טיול של מישהו אחר, ואז תוכלו לאסוף אותו כאן.
               </p>
             )}
             {trips !== null && trips.length > 0 && filteredTrips.length === 0 && (
@@ -220,7 +245,9 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                   <Thumb url={trip.imageUrl} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-semibold text-ink">{trip.title}</span>
-                    <span className="block text-[12px] text-ink-secondary">{trip.stopCount} תחנות</span>
+                    <span className="block text-[12px] text-ink-secondary">
+                      {trip.stopCount} תחנות{trip.tag ? ` · ${trip.tag}` : ""}
+                    </span>
                   </span>
                   <AddedMark added={added} />
                 </button>

@@ -17,6 +17,11 @@ interface MapStop {
 
 interface ResultMapProps {
   stops: MapStop[];
+  /** גובה המפה (Tailwind). ברירת מחדל h-64 - כמו עד עכשיו. */
+  heightClassName?: string;
+  /** "global" (ברירת מחדל, כמו עד עכשיו): מספור רציף לכל התחנות. "perDay": המספור מתחיל מ-1 מחדש בכל יום
+   *  (כמו ברשימת התחנות בעמוד טיול - place's Trips). */
+  numbering?: "global" | "perDay";
 }
 
 /** פלטת צבעים קבועה לימים - עד 8 ימים מובחנים, אחר כך חוזר על עצמה.
@@ -76,7 +81,7 @@ function FitBounds({ stops }: { stops: MapStop[] }) {
   return null;
 }
 
-export function ResultMap({ stops }: ResultMapProps) {
+export function ResultMap({ stops, heightClassName = "h-64", numbering = "global" }: ResultMapProps) {
   const validStops = stops.filter((s) => s.latitude != null && s.longitude != null);
   if (validStops.length === 0) return null;
 
@@ -91,9 +96,19 @@ export function ResultMap({ stops }: ResultMapProps) {
     dayGroups.get(day)!.push(stop);
   }
 
+  // מספר התחנה שמוצג בנעץ: global = אינדקס רציף; perDay = המיקום בתוך היום של התחנה.
+  const seenPerDay = new Map<number, number>();
+  const displayNumbers = validStops.map((stop, index) => {
+    if (numbering !== "perDay") return index + 1;
+    const day = stop.dayIndex ?? 1;
+    const next = (seenPerDay.get(day) ?? 0) + 1;
+    seenPerDay.set(day, next);
+    return next;
+  });
+
   return (
     <div
-      className={`tm-result-map relative isolate z-0 h-64 w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
+      className={`tm-result-map relative isolate z-0 ${heightClassName} w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
     >
       <MapContainer
         center={positions[0]}
@@ -132,7 +147,7 @@ export function ResultMap({ stops }: ResultMapProps) {
           <Marker
             key={stop.stopId}
             position={[stop.latitude, stop.longitude]}
-            icon={createNumberedIcon(index, colorForDay(stop.dayIndex))}
+            icon={createNumberedIcon(displayNumbers[index] - 1, colorForDay(stop.dayIndex))}
           >
             <Popup>{stop.name}</Popup>
           </Marker>
