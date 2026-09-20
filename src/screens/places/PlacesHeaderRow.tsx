@@ -22,7 +22,7 @@ const WHITE_CIRCLE =
  * הפעמון והצ'אט - אלה הקיימים של place's (התראות חברתיות + צ'אט place's).
  * עם onBack: כפתור החזרה של האפליקציה מחליף את הצ'אט.
  */
-export function PlacesHeaderRow({ onBack }: { onBack?: () => void }) {
+export function PlacesHeaderRow({ onBack, menuHref }: { onBack?: () => void; menuHref?: string }) {
   return (
     <header className="relative z-10 grid h-[52px] grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
       {onBack ? (
@@ -52,7 +52,16 @@ export function PlacesHeaderRow({ onBack }: { onBack?: () => void }) {
       </div>
 
       <div className="justify-self-end">
-        <PlacesNotificationBell solid />
+        {/* menuHref (עמוד הפרופיל שלי): תפריט שלוש-הפסים מחליף את הפעמון, באותו עיגול לבן ובאותו מיקום. */}
+        {menuHref ? (
+          <Link href={menuHref} aria-label="תפריט" className={WHITE_CIRCLE}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b21b6" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </Link>
+        ) : (
+          <PlacesNotificationBell solid />
+        )}
       </div>
     </header>
   );

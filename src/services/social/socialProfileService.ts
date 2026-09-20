@@ -83,7 +83,7 @@ export async function setUsername(supabase: SupabaseClient, userId: string, user
 export async function updateSocialProfile(
   supabase: SupabaseClient,
   userId: string,
-  updates: { bio?: string; coverUrl?: string; website?: string; profileVisibility?: "public" | "private" }
+  updates: { bio?: string; coverUrl?: string | null; website?: string; profileVisibility?: "public" | "private" }
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
   if (updates.bio !== undefined) payload.bio = updates.bio;

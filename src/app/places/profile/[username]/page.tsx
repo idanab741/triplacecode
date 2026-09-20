@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { PostCard } from "@/screens/places/PostCard";
@@ -15,8 +16,7 @@ import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { getAvatarUrl } from "@/constants/avatar";
-import { uploadSocialMedia } from "@/services/social/mediaUploadService";
-import { createClient } from "@/services/supabase/client";
+import { DEFAULT_PROFILE_HERO_URL } from "@/constants/profileCover";
 import { useAuth } from "@/hooks/useAuth";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { FeedItemDto } from "@/services/social/feedService";
@@ -47,10 +47,6 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
-  const [uploadingCover, setUploadingCover] = useState(false);
-  // *** תוספת (בקשה מפורשת - עיצוב מחדש בסגנון אינסטגרם):
-  // scrolled שולט על מתי הבר העליון עובר משקוף (מעל הקאבר) ללבן אטום.
-  const [scrolled, setScrolled] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState<"media" | "trips" | "collections" | "reviews">("media");
   // טאב "אוספים" (Collections) - נטען בפעם הראשונה שנכנסים אליו.
   const [collections, setCollections] = useState<CollectionCardDto[] | null>(null);
@@ -63,35 +59,12 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   const [tripsLoadingMore, setTripsLoadingMore] = useState(false);
 
   useEffect(() => {
-    function handleScroll() {
-      setScrolled(window.scrollY > 24);
-    }
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  useEffect(() => {
     if (profile) {
       setCoverUrl(profile.coverUrl);
     }
   }, [profile]);
 
-  async function handleCoverFileChange(file: File | undefined) {
-    if (!file || !user) return;
-    setUploadingCover(true);
-    try {
-      const supabase = createClient();
-      const uploaded = await uploadSocialMedia(supabase, user.id, file);
-      setCoverUrl(uploaded.url);
-      await fetchJson("/api/social/profile/me", {
-        method: "PATCH",
-        body: JSON.stringify({ coverUrl: uploaded.url }),
-      });
-    } finally {
-      setUploadingCover(false);
-    }
-  }
+  // עריכה/הסרה של הקאבר עברו לעמוד "עריכת פרופיל" (/places/profile/edit) - בעמוד הזה הקאבר להצגה בלבד.
 
   useEffect(() => {
     fetchJson<{ profile: SocialProfileDto }>(`/api/social/profile/${username}`)
@@ -257,34 +230,97 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           : "אשר בקשה"
         : "הוסף חבר";
 
+  /** תמונת הפרופיל בתוך הטבעת: קוטר 44.2% מרוחב הקאבר (החור הפנימי של הטבעת ~42% - "נדחפת" מעט מתחת לטבעת
+   *  כדי שלא יישארו רווחים). משותפת לשני מצבי הקאבר. */
+  const avatarLayer = (
+    <span className="absolute left-1/2 top-[68.9%] aspect-square w-[44.2%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-bg-secondary">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
+    </span>
+  );
+
   return (
     <div className="min-h-screen bg-white pb-24">
+      {/* *** תיקון (בקשה מפורשת - "הבר העליון צריך להיות כמו ב-places"): אותו בר סגול של places
+          (variant="purple"): חזרה מימין, לוגו place's במרכז, ובצד השני פעמון - ובפרופיל שלי תפריט
+          שלוש-הפסים (/profile) במקום הפעמון. הבר תופס מקום בזרימה, והקאבר מתחיל מתחתיו (לא שקוף/צף כמו קודם). */}
+      <HomeStatusBarTint color="#7C3AED" />
       <PlacesHeader
+        variant="purple"
         onBack={() => router.back()}
-        transparent={!scrolled}
-        overlay
         menuHref={profile.viewerState.isSelf ? "/profile" : undefined}
       />
 
-      {/* *** תיקון (בקשה מפורשת - "הקאבר צריך לכסות גם את הבר העליון
-          כשהוא שקוף, עד שגוללים ואז הוא לבן"): הקאבר מתחיל מ-y=0 (אין
-          עוד ריווח-פיצוי מעל, כי הבר עצמו fixed/מחוץ לזרימה) - כך
-          שהוא נמצא *מתחת* לבר, לא אחריו. גובה גדל קצת (h-40 במקום
-          h-28) כדי שיהיה מקום נשימה אמיתי מתחת לבר השקוף. */}
-      <div className="relative h-40 w-full bg-bg-secondary">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {coverUrl && <img src={coverUrl} alt="" className="h-full w-full object-cover" />}
-        {profile.viewerState.isSelf && (
-          <label className="absolute bottom-2 end-2 flex cursor-pointer items-center gap-1.5 rounded-pill bg-black/50 px-3 py-1.5 text-[11.5px] font-semibold text-white">
-            {uploadingCover ? "מעלה..." : "החלף קאבר"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={uploadingCover}
-              onChange={(e) => handleCoverFileChange(e.target.files?.[0])}
+      {/* *** עיצוב-מחדש (בקשה מפורשת - "להחליף את הקאבר... התמונה ששלחתי תופיע עם הקאבר החדש"):
+          הקאבר הוא עכשיו *מסגרת* (public/images/profile-cover-frame.webp) שמונחת מעל תמונת הקאבר של
+          המשתמש. במסגרת יש שני חורים שקופים (העיגול הגדול והטבעת הכחולה) - תמונת הקאבר (או הגרדיאנט
+          של ברירת המחדל, כשאין קאבר) נראית דרכם. לכן החלפת קאבר משנה רק את השכבה שמאחור, והמסגרת
+          תמיד נשארת. *** תיקון (בקשה מפורשת - "כמו בתמונה ששלחתי! למה זה שונה?"): המסגרת מוצגת עכשיו
+          במלואה, ריבוע מלא בדיוק כמו הקובץ (aspect-square, בלי חיתוך), ורקע ברירת המחדל מאחוריה
+          לבן - כמו בתמונה המקורית - ולא גרדיאנט. קובץ המסגרת הוא WebP *ללא אובדן* (lossless), כי
+          דחיסה עם אובדן יצרה שוליים כהים סביב החורים השקופים. */}
+      {/* *** תיקון (בקשה מפורשת - "שהבר העליון יהיה קצת על התמונה, בלי רווח לבן ביניהם"): -mt-8 (32px, בדיוק
+          רדיוס הפינות התחתונות של הבר - rounded-b-[32px]) מושך את הקאבר *מתחת* לבר. הבר sticky ב-z-30 ולכן
+          נצבע מעליו, והפינות המעוגלות שלו חושפות את הקאבר ולא את הרקע הלבן של העמוד. */}
+      <div className="relative -mt-8 aspect-square w-full overflow-hidden bg-white">
+        {/* *** תיקון (בקשה מפורשת - "זאת התמונה! אם אני מסיר קאבר זה אמור להיות התמונה עם ה-HERO"):
+            שני מצבים, שניהם עם אותה גיאומטריה (הכל באחוזים מרוחב הקאבר, ריבוע; מרכז הטבעת ב-(50%, 68.9%)):
+            א. בלי קאבר משלו: *התמונה המלאה* (profile-default-hero.webp): הנוף בעיגול הגדול + ה-HERO שמחזיק
+               את הטבעת הכחולה. חור הטבעת שקוף, ולכן תמונת הפרופיל (44.2%) יושבת *מתחת* לתמונה ונראית דרכו.
+            ב. עם קאבר משלו: המסגרת הריקה (profile-cover-frame) -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> תמונת
+               הפרופיל -> הטבעת (profile-cover-ring, חתך הטבעת מאותה תמונה - מעל הכל, ולכן הקאבר "נגוס" מתחת). */}
+        {coverUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/profile-cover-frame.webp"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
             />
-          </label>
+            <span className="absolute left-1/2 top-[39.2%] aspect-square w-[70%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+            </span>
+            {avatarLayer}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/profile-cover-ring.webp"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
+            />
+          </>
+        ) : (
+          <>
+            {avatarLayer}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={DEFAULT_PROFILE_HERO_URL}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
+            />
+          </>
+        )}
+        {/* "+" יצירת תוכן (רק בפרופיל שלי) - צמוד לטבעת, באותו מיקום/גודל שלה (49%) */}
+        {profile.viewerState.isSelf && (
+          <div className="pointer-events-none absolute left-1/2 top-[68.9%] aspect-square w-[49%] -translate-x-1/2 -translate-y-1/2">
+            <button
+              type="button"
+              onClick={() => setCreateMenuOpen(true)}
+              aria-label="צור תוכן חדש"
+              className="pointer-events-auto absolute bottom-[4%] end-[4%] flex h-11 w-11 items-center justify-center rounded-full text-white shadow-soft"
+              style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
 
@@ -310,29 +346,16 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             עצמו (כמו שהיה קודם, לפני האיחוד) - השורה עצמה במקומה
             הרגיל, עם items-end כך שהשם מיושר לתחתית העיגול (האזור
             הגלוי, לא-חתוך שלו). */}
-        <div className="flex items-end gap-3">
-          <div className="relative -mt-14 h-32 w-32 shrink-0">
-            <span className="block h-32 w-32 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
-            </span>
-            {profile.viewerState.isSelf && (
-              <button
-                type="button"
-                onClick={() => setCreateMenuOpen(true)}
-                aria-label="צור תוכן חדש"
-                className="absolute -bottom-1 -end-1 flex h-11 w-11 items-center justify-center rounded-full text-white shadow-soft"
-                style={{ background: "var(--color-places-purple)" }}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-2">
-            <h2 className="flex items-baseline gap-1 truncate text-[17px] font-bold text-ink">
+        {/* *** תיקון (בקשה מפורשת - "לא צריך את השלישי למטה!"): העיגול הנפרד של תמונת הפרופיל מתחת לקאבר
+            הוסר. תמונת הפרופיל (והפלוס) יושבות עכשיו בתוך הטבעת הכחולה של המסגרת (ר' הקאבר למעלה) -
+            ולכן השם ושם המשתמש ממורכזים מתחת לקאבר. */}
+        {/* *** תיקון (בקשה מפורשת - "פחות רווח בין השם ושם המשתמש לתמונת הפרופיל"): מתחת לטבעת יש רצפה
+            לבנה של המסגרת (~7% מגובה הקאבר), ולכן ה-mt- השלילי מושך את השם לתוכה - הטקסט כבר לא
+            "צף" רחוק מהטבעת. relative נדרש כדי שהטקסט ייצבע *מעל* תיבת הקאבר (שגם היא relative).
+            את הרווח משנים כאן: -mt-5 = 20px למעלה. */}
+        <div className="relative -mt-5 flex justify-center">
+          <div className="flex min-w-0 flex-col items-center gap-0.5 pb-1 text-center">
+            <h2 className="flex items-baseline justify-center gap-1 truncate text-[17px] font-bold text-ink">
               {profile.fullName}
               {profile.isCreator && (
                 <span className="ms-1" style={{ color: "var(--color-places-purple)" }}>

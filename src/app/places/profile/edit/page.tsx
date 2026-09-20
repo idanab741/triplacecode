@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { updateProfile, uploadAvatar, removeAvatar } from "@/services/profile/profileService";
+import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { getAvatarUrl } from "@/constants/avatar";
+import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -19,6 +22,7 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 interface MeProfile {
   username: string | null;
   bio: string | null;
+  cover_url?: string | null;
 }
 
 /**
@@ -49,6 +53,8 @@ export default function EditProfilePage() {
   const [birthDate, setBirthDate] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const [newEmail, setNewEmail] = useState("");
   const [currentPasswordForEmail, setCurrentPasswordForEmail] = useState("");
@@ -80,6 +86,7 @@ export default function EditProfilePage() {
         setMeProfile(data.profile);
         setUsername(data.profile?.username ?? "");
         setBio(data.profile?.bio ?? "");
+        setCoverUrl(data.profile?.cover_url ?? null);
       })
       .catch(() => {});
   }, []);
@@ -118,11 +125,39 @@ export default function EditProfilePage() {
     setUploadingPhoto(true);
     try {
       const url = await uploadAvatar(user.id, file);
+      // *** תיקון (בקשה מפורשת - "למה זה לא משנה לי את תמונת הפרופיל?"): uploadAvatar רק מעלה את הקובץ
+      // ל-storage ומחזיר כתובת - הוא *לא* שומר אותה ב-profiles.avatar_url. בלי השורה הזאת הפרופיל
+      // (והפיד, והתגובות...) המשיכו להציג את התמונה הישנה. (AvatarUploader.tsx עושה בדיוק את שתי הפעולות.)
+      const { error } = await updateProfile(user.id, { avatar_url: url });
+      if (error) throw error;
       setAvatarUrl(url);
       await refreshProfile();
+    } catch (err) {
+      setBasicsMessage({ type: "error", text: err instanceof Error ? `שגיאה בהחלפת התמונה: ${err.message}` : "שגיאה בהחלפת התמונה" });
     } finally {
       setUploadingPhoto(false);
     }
+  }
+
+  /** קאבר: העלאה + שמירה ב-profiles.cover_url (אותו מנגנון קיים). */
+  async function handleCoverChange(file: File | undefined) {
+    if (!file || !user) return;
+    setUploadingCover(true);
+    try {
+      const uploaded = await uploadSocialMedia(createClient(), user.id, file);
+      await fetchJson("/api/social/profile/me", { method: "PATCH", body: JSON.stringify({ coverUrl: uploaded.url }) });
+      setCoverUrl(uploaded.url);
+    } catch (err) {
+      setBasicsMessage({ type: "error", text: err instanceof Error ? `שגיאה בהחלפת הקאבר: ${err.message}` : "שגיאה בהחלפת הקאבר" });
+    } finally {
+      setUploadingCover(false);
+    }
+  }
+
+  /** הסרת הקאבר: cover_url = null. בפרופיל נשאר רק המסגרת הריקה (העיגול הגדול לבן). */
+  async function handleRemoveCover() {
+    await fetchJson("/api/social/profile/me", { method: "PATCH", body: JSON.stringify({ coverUrl: null }) });
+    setCoverUrl(null);
   }
 
   async function handleRemovePhoto() {
@@ -196,29 +231,67 @@ export default function EditProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      <header className="sticky top-0 z-30 flex items-center justify-center border-b border-ink-secondary/10 bg-white px-4 py-3.5">
-        <button type="button" onClick={() => router.back()} aria-label="חזור" className="absolute end-4">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-        <h1 className="text-[15px] font-bold text-ink">עריכת פרופיל</h1>
-      </header>
+      {/* *** בקשה מפורשת - "להוסיף את הבר העליון של places": אותו בר סגול של places (וחזרה). */}
+      <HomeStatusBarTint color="#7C3AED" />
+      <PlacesHeader variant="purple" onBack={() => router.back()} />
 
-      {/* תמונת פרופיל - עריכה/הסרה עברו לכאן לגמרי (בקשה מפורשת -
-          "אפשר למחוק את התמונה בתוך עמוד עריכת פרופיל") */}
-      <div className="flex flex-col items-center gap-2 py-6">
-        <div className="relative h-24 w-24">
-          <span className="block h-24 w-24 overflow-hidden rounded-full bg-bg-secondary">
+      {/* *** בקשה מפורשת - "קאבר בצורת קאבר (מלבן), ופרופיל בצורת עיגול באמצע שלו למטה (כמו בכל מקום), ופלוס לשינוי/עריכה":
+          מלבן הקאבר בראש העמוד (-mt-8 = נכנס מתחת לפינות המעוגלות של הבר, בלי רווח לבן ביניהם - כמו בעמוד הפרופיל),
+          ועיגול תמונת הפרופיל ממורכז ויושב על קצהו התחתון. כל אחד עם "+" כחול להחלפה (בחירת תמונה מהמכשיר).
+          קאבר ברירת המחדל (בלי קאבר משלכם) = הנוף עם ה-HERO, חתוך למלבן. הסרה - קישורים אדומים מתחת. */}
+      <div className="relative -mt-8 h-52 w-full overflow-hidden bg-bg-secondary">
+        {/* *** תיקון (בקשה מפורשת - "זה לא אמור להיות הקאבר כשאין תמונה! זה אמור להיות ריק וגנרי"): בעמוד העריכה,
+            בלי קאבר משלכם, מוצג מלבן ריק וגנרי (רקע אפור-בהיר + אייקון תמונה) - לא ה-HERO. ה-HERO הוא רק ברירת
+            המחדל שמוצגת בעמוד הפרופיל עצמו. */}
+        {coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-[#f1f3f8] to-[#e4e8f0] pb-16 text-ink-secondary/45">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="3" />
+              <circle cx="9" cy="10" r="1.6" />
+              <path d="m21 16-5-5-8 8" />
+            </svg>
+          </div>
+        )}
+        {uploadingCover && (
+          <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-[12.5px] font-semibold text-white">מעלה...</span>
+        )}
+        <label
+          aria-label="החלפת קאבר"
+          className="absolute bottom-3 end-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
+          style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploadingCover}
+            onChange={(e) => handleCoverChange(e.target.files?.[0])}
+          />
+        </label>
+      </div>
+
+      <div className="relative z-10 -mt-14 flex flex-col items-center">
+        <div className="relative h-28 w-28">
+          <span className="block h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={getAvatarUrl(avatarUrl)} alt="" className="h-full w-full object-cover" />
           </span>
+          {uploadingPhoto && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 text-[11.5px] font-semibold text-white">מעלה...</span>
+          )}
           <label
-            className="absolute -bottom-0.5 -end-0.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
-            style={{ background: "var(--color-places-purple)" }}
+            aria-label="החלפת תמונת פרופיל"
+            className="absolute -bottom-0.5 -end-0.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
+            style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
             </svg>
             <input
               type="file"
@@ -229,13 +302,26 @@ export default function EditProfilePage() {
             />
           </label>
         </div>
-        {uploadingPhoto && <p className="text-[11.5px] text-ink-secondary">מעלה...</p>}
-        {avatarUrl && !uploadingPhoto && (
-          <button type="button" onClick={handleRemovePhoto} className="text-[12.5px] font-semibold text-red-500">
-            הסר תמונה
-          </button>
+
+        <h1 className="mt-3 text-[17px] font-bold text-ink">עריכת פרופיל</h1>
+
+        {((avatarUrl && !uploadingPhoto) || (coverUrl && !uploadingCover)) && (
+          <div className="mt-1.5 flex items-center gap-4">
+            {avatarUrl && !uploadingPhoto && (
+              <button type="button" onClick={handleRemovePhoto} className="text-[12.5px] font-semibold text-red-500">
+                הסר תמונה
+              </button>
+            )}
+            {coverUrl && !uploadingCover && (
+              <button type="button" onClick={handleRemoveCover} className="text-[12.5px] font-semibold text-red-500">
+                הסר קאבר
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      <div className="h-6" />
 
       {/* פרטים בסיסיים */}
       <div className="flex flex-col gap-3.5 px-4">

@@ -60,7 +60,7 @@ export function PlacesHeader({ onBack, transparent = false, overlay = false, men
   if (variant === "purple") {
     return (
       <CollapsibleTopBar
-        headerRow={<PlacesHeaderRow onBack={onBack} />}
+        headerRow={<PlacesHeaderRow onBack={onBack} menuHref={menuHref} />}
         gradient={PLACES_BAR_GRADIENT}
         shadow={PLACES_BAR_SHADOW}
         tone="purple"
