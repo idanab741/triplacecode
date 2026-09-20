@@ -23,12 +23,21 @@ interface BottomNavProps {
   items: BottomNavItem[];
   activeId: string;
   onChange?: (id: string) => void;
+  /** "dark" = בר שחור עם תוויות לבנות (עמוד "תוכן"). ברירת מחדל "light" - כל שאר האפליקציה
+   *  נשארת בדיוק כמו שהייתה. את צבע האייקונים הלא-פעילים קובע המרכיב (MainBottomNav). */
+  tone?: "light" | "dark";
 }
 
-export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
+export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomNavProps) {
+  const dark = tone === "dark";
+  const inactiveLabelColor = dark ? "#fff" : "var(--color-ink-secondary, #8a94a6)";
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50">
-<div className="relative flex items-end justify-around bg-white px-2 pb-[max(env(safe-area-inset-bottom),22px)] pt-1.5 shadow-[0_-2px_16px_rgba(16,24,40,0.08)]">        {items.map((item) => {
+<div
+        className={`relative flex items-end justify-around px-2 pb-[max(env(safe-area-inset-bottom),22px)] pt-1.5 ${
+          dark ? "border-t border-white/10 bg-black" : "bg-white shadow-[0_-2px_16px_rgba(16,24,40,0.08)]"
+        }`}
+      >        {items.map((item) => {
           const isActive = item.id === activeId;
 
           if (item.elevated) {
@@ -56,7 +65,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
           const elevatedLabel = item.label ? (
               <span
                 className="w-full truncate whitespace-nowrap text-center text-[10.5px] font-medium"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
               >
                 {item.label}
               </span>
@@ -95,7 +104,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               </span>
               <span
                 className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
               >
                 {item.label}
               </span>
@@ -107,7 +116,7 @@ export function BottomNav({ items, activeId, onChange }: BottomNavProps) {
               </span>
               <span
                 className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: "var(--color-ink-secondary, #8a94a6)" }}
+                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
               >
                 {item.label}
               </span>

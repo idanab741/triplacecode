@@ -12,17 +12,27 @@ function NavIcon({
   inactiveSrc,
   alt,
   scale = 1,
+  whiteWhenInactive = false,
 }: {
   active: boolean;
   activeSrc: string;
   inactiveSrc: string;
   alt: string;
   scale?: number;
+  /** בר כהה: האייקון הלא-פעיל מוצג בלבן מלא. האייקון הפעיל נשאר בצבעיו. */
+  whiteWhenInactive?: boolean;
 }) {
   return (
     <span className="relative flex h-6 w-6 items-center justify-center">
       <span className="relative h-full w-full" style={{ transform: `scale(${scale})` }}>
-        <Image src={active ? activeSrc : inactiveSrc} alt={alt} fill sizes="24px" className="object-contain" />
+        <Image
+          src={active ? activeSrc : inactiveSrc}
+          alt={alt}
+          fill
+          sizes="24px"
+          className="object-contain"
+          style={whiteWhenInactive && !active ? { filter: "brightness(0) invert(1)" } : undefined}
+        />
       </span>
     </span>
   );
@@ -35,11 +45,15 @@ interface MainBottomNavProps {
    *  שלא תהרוס אותו"). כשלא מועבר (כל שאר האפליקציה) - האייקון, ה-glow
    *  וההתנהגות של Trippy AI נשארים בדיוק זהים ל-100% למה שהיו. */
   elevatedOverride?: { icon: ReactNode; onClick: () => void };
+  /** "dark" = בר שחור: כל האייקונים והתוויות הלא-פעילים בלבן, הטאב הפעיל נשאר בצבעיו
+   *  (עמוד "תוכן"). ברירת מחדל "light" - כל שאר האפליקציה זהה למה שהייתה. */
+  tone?: "light" | "dark";
 }
 
 /** בר הניווט התחתון האמיתי של האפליקציה, לשימוש בכל מסכי הטאבים הראשיים
  *  - כולל place's (עם elevatedOverride) - זהו אותו בר בדיוק, לא עותק. */
-export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) {
+export function MainBottomNav({ active, elevatedOverride, tone = "light" }: MainBottomNavProps) {
+  const whiteWhenInactive = tone === "dark";
   const items: BottomNavItem[] = [
     {
       id: "home",
@@ -50,6 +64,7 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
           activeSrc="/images/icon-home-active.png"
           inactiveSrc="/images/icon-home-inactive.png"
           alt="בית"
+          whiteWhenInactive={whiteWhenInactive}
         />
       ),
       href: "/home",
@@ -63,6 +78,7 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
           activeSrc="/images/icon-globe-active.png"
           inactiveSrc="/images/icon-globe-inactive.png"
           alt="places"
+          whiteWhenInactive={whiteWhenInactive}
         />
       ),
       href: "/places",
@@ -72,8 +88,8 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
     { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
     {
       // *** שינוי (בקשה מפורשת - "תוסיף את הפלוס לבר התחתון במקום tripmatch, ייקרא תוכן"):
-      // הטאב תופס את המקום של tripmatch. לחיצה פותחת את תפריט "מה בא לכם ליצור?"
-      // בעמוד places (?create=1). /tripmatch עצמו לא נמחק - רק לא נגיש מהבר.
+      // הטאב תופס את המקום של tripmatch. עודכן: לחיצה פותחת את עמוד "תוכן" (/content) -
+      // עמוד יצירה שחור עם 4 ריבועים: פוסט / מקום / אוסף / טיול. /tripmatch עצמו לא נמחק - רק לא נגיש מהבר.
       id: "content",
       label: "תוכן",
       icon: (
@@ -82,9 +98,10 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
           activeSrc="/images/icon-content-active.png"
           inactiveSrc="/images/icon-content-inactive.png"
           alt="תוכן"
+          whiteWhenInactive={whiteWhenInactive}
         />
       ),
-      href: "/places?create=1",
+      href: "/content",
     },
     {
       id: "profile",
@@ -95,6 +112,7 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
           activeSrc="/images/icon-profile-active.png"
           inactiveSrc="/images/icon-profile-inactive.png"
           alt="פרופיל"
+          whiteWhenInactive={whiteWhenInactive}
         />
       ),
       href: "/places/profile/me",
@@ -105,6 +123,7 @@ export function MainBottomNav({ active, elevatedOverride }: MainBottomNavProps) 
     <BottomNav
       items={items}
       activeId={active}
+      tone={tone}
       onChange={(id) => {
         if (id === "ai" && elevatedOverride) elevatedOverride.onClick();
       }}

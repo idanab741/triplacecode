@@ -97,8 +97,12 @@ export default function PlacesHomePage() {
       showComingSoon("הביקורת פורסמה 🎉");
       router.replace("/places");
     } else if (params.get("create") === "1") {
-      // הטאב "תוכן" בבר התחתון (MainBottomNav) - פותח את תפריט היצירה.
+      // תפריט היצירה ("מה בא לכם ליצור?") - נשאר נתמך לקישורים ישנים.
       setCreateMenuOpen(true);
+      router.replace("/places");
+    } else if (params.get("create") === "post") {
+      // עמוד "תוכן" (/content): ריבוע "פוסט" פותח ישר את ה-Post Composer הקיים.
+      setCreatePostOpen(true);
       router.replace("/places");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
