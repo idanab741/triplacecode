@@ -230,12 +230,19 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           : "אשר בקשה"
         : "הוסף חבר";
 
-  /** תמונת הפרופיל בתוך הטבעת: קוטר 44.2% מרוחב הקאבר (החור הפנימי של הטבעת ~42% - "נדחפת" מעט מתחת לטבעת
-   *  כדי שלא יישארו רווחים). משותפת לשני מצבי הקאבר. */
+  /** תמונת הפרופיל בתוך הטבעת. *** תיקון (בקשה מפורשת - "הפרופיל נקי, בלי שום לבן מסביב - רק התמונה עצמה על המסגרת
+   *  הכחולה"): נראה פס לבן בין התמונה לטבעת, כי תמונה שלא ממלאת את כל הריבוע שלה (למשל סטיקר עגול עם שוליים
+   *  שקופים, או אווטאר ברירת המחדל עם קו לבן פנימי) השאירה את הרקע הבהיר של הקאבר נראה דרך חור הטבעת.
+   *  עכשיו: (1) הרקע שמאחורי התמונה בכחול הטבעת - שוליים שקופים נראים ככחול ולא כלבן; (2) העיגול גדול יותר (46% מרוחב
+   *  הקאבר; החור הפנימי ~42%, ועובי הטבעת עד ~49%) - הקצה שלו מוסתר מתחת לטבעת; (3) הגדלה של 6% בתוך העיגול - חותכת
+   *  שוליים קטנים / קו לבן פנימי של התמונה. משותפת לשני מצבי הקאבר. */
   const avatarLayer = (
-    <span className="absolute left-1/2 top-[68.9%] aspect-square w-[44.2%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-bg-secondary">
+    <span
+      className="absolute left-1/2 top-[68.9%] aspect-square w-[46%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full"
+      style={{ background: "#0A6DFE" }}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
+      <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full scale-[1.06] object-cover" />
     </span>
   );
 
