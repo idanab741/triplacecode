@@ -8,6 +8,8 @@ import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { PostCard } from "@/screens/places/PostCard";
+import { CollectionAlbumCard } from "@/screens/collections/CollectionAlbumCard";
+import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
@@ -17,6 +19,7 @@ import { createClient } from "@/services/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { FeedItemDto } from "@/services/social/feedService";
+import type { CollectionCardDto } from "@/services/social/collectionTypes";
 import type { PostVisibility } from "@/services/social/types";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -46,7 +49,12 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
   // *** תוספת (בקשה מפורשת - עיצוב מחדש בסגנון אינסטגרם):
   // scrolled שולט על מתי הבר העליון עובר משקוף (מעל הקאבר) ללבן אטום.
   const [scrolled, setScrolled] = useState(false);
-  const [activeProfileTab, setActiveProfileTab] = useState<"media" | "trips" | "reviews">("media");
+  const [activeProfileTab, setActiveProfileTab] = useState<"media" | "trips" | "collections" | "reviews">("media");
+  // טאב "אוספים" (Collections) - נטען בפעם הראשונה שנכנסים אליו.
+  const [collections, setCollections] = useState<CollectionCardDto[] | null>(null);
+  const [collectionsNextCursor, setCollectionsNextCursor] = useState<string | null>(null);
+  const [collectionsLoadingMore, setCollectionsLoadingMore] = useState(false);
+  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
   // *** תוספת (בקשה מפורשת - "טיול חדש בקרוב"): הודעה קצרה שנעלמת
   // לבד, במקום alert() דפדפן גס.
   const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
@@ -97,6 +105,35 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
       })
       .catch(() => setPosts([]));
   }, [username]);
+
+  useEffect(() => {
+    setCollections(null);
+    setCollectionsNextCursor(null);
+  }, [username]);
+
+  useEffect(() => {
+    if (activeProfileTab !== "collections" || collections !== null) return;
+    fetchJson<{ collections: CollectionCardDto[]; nextCursor: string | null }>(`/api/social/profile/${username}/collections`)
+      .then((r) => {
+        setCollections(r.collections);
+        setCollectionsNextCursor(r.nextCursor);
+      })
+      .catch(() => setCollections([]));
+  }, [activeProfileTab, collections, username]);
+
+  async function handleLoadMoreCollections() {
+    if (!collectionsNextCursor) return;
+    setCollectionsLoadingMore(true);
+    try {
+      const r = await fetchJson<{ collections: CollectionCardDto[]; nextCursor: string | null }>(
+        `/api/social/profile/${username}/collections?cursor=${encodeURIComponent(collectionsNextCursor)}`
+      );
+      setCollections((prev) => [...(prev ?? []), ...r.collections]);
+      setCollectionsNextCursor(r.nextCursor);
+    } finally {
+      setCollectionsLoadingMore(false);
+    }
+  }
 
   async function handleLoadMorePosts() {
     if (!postsNextCursor) return;
@@ -373,6 +410,7 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           [
             { id: "media", label: "מדיה" },
             { id: "trips", label: "טיולים" },
+            { id: "collections", label: "אוספים" },
             { id: "reviews", label: "ביקורות" },
           ] as const
         ).map((tab) => (
@@ -391,7 +429,41 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
         ))}
       </div>
 
-      {activeProfileTab !== "media" ? (
+      {activeProfileTab === "collections" ? (
+        <div className="px-4 pt-4">
+          {collections === null && (
+            <div className="grid grid-cols-2 gap-3">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} className="aspect-square w-full rounded-card" />
+              ))}
+            </div>
+          )}
+          {collections !== null && collections.length === 0 && (
+            <p className="py-10 text-center text-[13px] text-ink-secondary">
+              {profile.viewerState.isSelf ? "עוד לא יצרתם אוסף - לחצו על ה־+ כדי ליצור את הראשון." : "אין עדיין אוספים להצגה כאן."}
+            </p>
+          )}
+          {collections !== null && collections.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                {collections.map((c) => (
+                  <CollectionAlbumCard key={c.id} item={c} />
+                ))}
+              </div>
+              {collectionsNextCursor && (
+                <button
+                  type="button"
+                  onClick={handleLoadMoreCollections}
+                  disabled={collectionsLoadingMore}
+                  className="w-full py-4 text-[13px] font-semibold text-ink-secondary disabled:opacity-50"
+                >
+                  {collectionsLoadingMore ? "טוען..." : "טען עוד"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ) : activeProfileTab !== "media" ? (
         <p className="py-10 text-center text-[13px] text-ink-secondary">
           {activeProfileTab === "trips" ? "תוכן הטיולים יופיע כאן בקרוב" : "הביקורות יופיעו כאן בקרוב"}
         </p>
@@ -445,8 +517,7 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
           onSelectPlace={() => router.push("/places/create")}
           onSelectCollection={() => {
             setCreateMenuOpen(false);
-            setComingSoonMessage("אוספים יגיעו בקרוב!");
-            setTimeout(() => setComingSoonMessage(null), 2500);
+            setCollectionTypeOpen(true);
           }}
           // *** תיקון (בקשה מפורשת - "טיול חדש (בקרוב)"): לא עוד ניווט
           // ל-tripmatch - הודעה קצרה שנעלמת לבד.
@@ -455,6 +526,13 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
             setComingSoonMessage("בניית טיולים תגיע בקרוב!");
             setTimeout(() => setComingSoonMessage(null), 2500);
           }}
+        />
+      )}
+
+      {collectionTypeOpen && (
+        <CollectionTypeSheet
+          onClose={() => setCollectionTypeOpen(false)}
+          onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
         />
       )}
 

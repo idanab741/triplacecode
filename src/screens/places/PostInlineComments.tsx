@@ -15,6 +15,9 @@ interface CommentRow {
 
 interface PostInlineCommentsProps {
   postId: string;
+  /** ברירת מחדל: /api/social/posts/{postId}. אוספים (Collections) משתמשים באותו רכיב בדיוק
+   *  עם basePath="/api/social/collections/{id}" - אותה טבלת comments, אותו UI. */
+  basePath?: string;
 }
 
 /**
@@ -25,14 +28,15 @@ interface PostInlineCommentsProps {
  * תמונה ספציפית). כאן - בלי `mediaId` - מביא תמיד רק את התגובות
  * הכלליות על הפוסט (media_id IS NULL בשרת, ר' postService.ts).
  */
-export function PostInlineComments({ postId }: PostInlineCommentsProps) {
+export function PostInlineComments({ postId, basePath }: PostInlineCommentsProps) {
   const { user } = useAuth();
+  const base = basePath ?? `/api/social/posts/${postId}`;
   const [comments, setComments] = useState<CommentRow[] | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
   function load() {
-    fetch(`/api/social/posts/${postId}/comments`)
+    fetch(`${base}/comments`)
       .then((r) => r.json())
       .then((data) => setComments(data.comments ?? []))
       .catch(() => setComments([]));
@@ -44,7 +48,7 @@ export function PostInlineComments({ postId }: PostInlineCommentsProps) {
     if (!text.trim()) return;
     setSending(true);
     try {
-      await fetch(`/api/social/posts/${postId}/comments`, {
+      await fetch(`${base}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: text.trim() }),
@@ -61,7 +65,7 @@ export function PostInlineComments({ postId }: PostInlineCommentsProps) {
   async function handleDelete(commentId: string) {
     setComments((prev) => prev?.filter((c) => c.id !== commentId) ?? prev);
     try {
-      await fetch(`/api/social/posts/${postId}/comments/${commentId}`, { method: "DELETE" });
+      await fetch(`${base}/comments/${commentId}`, { method: "DELETE" });
     } catch {
       load();
     }

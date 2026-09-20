@@ -42,6 +42,8 @@ interface DiscoveryPlacesMapProps {
    *  שימושים קיימים ברכיב הזה (עמודי result וכו') שאין להם מיקום GPS
    *  זמין - שם ממשיכים עם חישוב האשכול הישן כברירת מחדל. */
   userLocation?: { lat: number; lng: number } | null;
+  /** גובה המפה (Tailwind). ברירת מחדל h-56 - כמו עד עכשיו. */
+  heightClassName?: string;
 }
 
 /**
@@ -199,7 +201,7 @@ function PlacePreview({ place }: { place: ValidMapPlace }) {
   );
 }
 
-export function DiscoveryPlacesMap({ places, userLocation }: DiscoveryPlacesMapProps) {
+export function DiscoveryPlacesMap({ places, userLocation, heightClassName = "h-56" }: DiscoveryPlacesMapProps) {
   const validPlaces = places.filter(
     (p): p is ValidMapPlace => p.latitude != null && p.longitude != null
   );
@@ -209,7 +211,7 @@ export function DiscoveryPlacesMap({ places, userLocation }: DiscoveryPlacesMapP
 
   return (
     <div
-      className={`relative isolate z-0 h-56 w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
+      className={`relative isolate z-0 ${heightClassName} w-full overflow-hidden rounded-card shadow-soft ${IS_USING_FALLBACK_TILES ? "map-branded" : ""}`}
     >
       <MapContainer
         center={initialView.center}

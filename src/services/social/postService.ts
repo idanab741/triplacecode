@@ -136,11 +136,12 @@ export async function getComments(
   return data ?? [];
 }
 
-/** Toggle social save (Post/Trip) - נפרד מ-Favorites (סעיף 110) */
+/** Toggle social save (Post/Trip/Collection) - נפרד מ-Favorites (סעיף 110).
+ *  Save של אוסף לא הופך אותו לאוסף של השומר - האוסף נשאר שייך ליוצר (collections.author_id). */
 export async function toggleSocialSave(
   supabase: SupabaseClient,
   userId: string,
-  targetType: "post" | "trip",
+  targetType: "post" | "trip" | "collection",
   targetId: string
 ): Promise<boolean> {
   const { data: existing } = await supabase

@@ -13,6 +13,8 @@ import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
+import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
+import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
 import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
@@ -20,7 +22,8 @@ import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
-import type { FeedItemDto, FeedTab } from "@/services/social/feedService";
+import type { FeedTab } from "@/services/social/feedService";
+import type { FeedEntryDto } from "@/services/social/collectionTypes";
 import type { PlacesFeedView } from "@/screens/places/FeedTabs";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
@@ -48,7 +51,8 @@ export default function PlacesHomePage() {
   const [creators, setCreators] = useState<CreatorCardDto[] | null>(null);
   const [suggestedTravelers, setSuggestedTravelers] = useState<SuggestedTravelerDto[] | null>(null);
   const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[] | null>(null);
-  const [feedItems, setFeedItems] = useState<FeedItemDto[] | null>(null);
+  // *** הפיד מכיל פוסטים *ו*אוספים (Collections) ממוזגים לפי זמן - ר' /api/social/feed.
+  const [feedItems, setFeedItems] = useState<FeedEntryDto[] | null>(null);
   // *** "עבורך / מפה" (בקשה מפורשת) - פיד "חברים" הוחלף בלשונית המפה (בהמשך: כל ההמלצות
   // של החברים על מפה). הפיד עצמו הוא תמיד "עבורך".
   const feedTab: FeedTab = "for_you";
@@ -72,6 +76,7 @@ export default function PlacesHomePage() {
 
   const [createPostOpen, setCreatePostOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
   const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
   function showComingSoon(message: string) {
@@ -102,10 +107,10 @@ export default function PlacesHomePage() {
     setFeedItems(null);
     setFeedError(null);
     try {
-      const { items, nextCursor } = await fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(
+      const { entries, nextCursor } = await fetchJson<{ entries: FeedEntryDto[]; nextCursor: string | null }>(
         `/api/social/feed?tab=${tab}`
       );
-      setFeedItems(items);
+      setFeedItems(entries);
       setNextCursor(nextCursor);
     } catch (err) {
       setFeedError(err instanceof Error ? err.message : "שגיאה בטעינת ה-Feed");
@@ -133,10 +138,10 @@ export default function PlacesHomePage() {
     if (!nextCursor || feedLoadingMore) return;
     setFeedLoadingMore(true);
     try {
-      const { items, nextCursor: newCursor } = await fetchJson<{ items: FeedItemDto[]; nextCursor: string | null }>(
+      const { entries, nextCursor: newCursor } = await fetchJson<{ entries: FeedEntryDto[]; nextCursor: string | null }>(
         `/api/social/feed?tab=${feedTab}&cursor=${encodeURIComponent(nextCursor)}`
       );
-      setFeedItems((prev) => [...(prev ?? []), ...items]);
+      setFeedItems((prev) => [...(prev ?? []), ...entries]);
       setNextCursor(newCursor);
     } finally {
       setFeedLoadingMore(false);
@@ -185,7 +190,7 @@ export default function PlacesHomePage() {
 
   async function handleDeletePost(postId: string) {
     await fetchJson(`/api/social/posts/${postId}`, { method: "DELETE" });
-    setFeedItems((prev) => prev?.filter((i) => i.id !== postId) ?? null);
+    setFeedItems((prev) => prev?.filter((e) => !(e.kind === "post" && e.item.id === postId)) ?? null);
   }
 
   if (authLoading || !user) {
@@ -307,17 +312,21 @@ export default function PlacesHomePage() {
 
         {feedItems && feedItems.length > 0 && (
           <div>
-            {feedItems.map((item) => (
-              <PostCard
-                key={item.id}
-                item={item}
-                onLikeToggle={handleLikeToggle}
-                onSaveToggle={handleSaveToggle}
-                onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
-                onEditPost={handleEditPost}
-                onDeletePost={handleDeletePost}
-              />
-            ))}
+            {feedItems.map((entry) =>
+              entry.kind === "collection" ? (
+                <CollectionFeedCard key={`collection-${entry.item.id}`} item={entry.item} />
+              ) : (
+                <PostCard
+                  key={entry.item.id}
+                  item={entry.item}
+                  onLikeToggle={handleLikeToggle}
+                  onSaveToggle={handleSaveToggle}
+                  onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
+                  onEditPost={handleEditPost}
+                  onDeletePost={handleDeletePost}
+                />
+              )
+            )}
             {nextCursor && (
               <button
                 type="button"
@@ -351,8 +360,16 @@ export default function PlacesHomePage() {
           onSelectPost={() => setCreatePostOpen(true)}
           // "מקום": עמודים מלאים עם הבר העליון של Places - /places/create (בחירה/הוספת מקום) ואז /places/create/review.
           onSelectPlace={() => router.push("/places/create")}
-          onSelectCollection={() => showComingSoon("אוספים יגיעו בקרוב!")}
+          onSelectCollection={() => setCollectionTypeOpen(true)}
           onSelectTrip={() => router.push("/tripmatch")}
+        />
+      )}
+
+      {/* "מה תרצו לאסוף?" - בחירה אחת (מקומות / טיולים); הסוג נקבע ולא ניתן לערבב. */}
+      {collectionTypeOpen && (
+        <CollectionTypeSheet
+          onClose={() => setCollectionTypeOpen(false)}
+          onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
         />
       )}
 

@@ -18,6 +18,34 @@ export interface SavedTripSummary {
   isSaved: boolean;
 }
 
+/** שורת trip_builder_sessions (העמודות הנדרשות ל-SavedTripSummary). */
+export interface TripSessionRow {
+  id: string;
+  trip_type: string;
+  answers: unknown;
+  final_itinerary: unknown;
+  created_at: string;
+  is_saved: boolean | null;
+}
+
+/** ממפה שורת session ל-SavedTripSummary. משותף ל-getSavedTrips ולתצוגת פריטי-טיול באוספים
+ *  (collectionService) - כדי שכרטיס הטיול יציג בדיוק אותם label/תמונה/מספר תחנות בכל מקום. */
+export function summarizeTripSessionRow(session: TripSessionRow): SavedTripSummary {
+  const answers = session.answers as { destination?: string; requestedArea?: string } | null;
+  const itinerary = session.final_itinerary as { stops?: { name?: string; imageUrls?: string[] }[] } | null;
+  const firstStop = itinerary?.stops?.[0];
+
+  return {
+    sessionId: session.id,
+    tripType: session.trip_type,
+    destinationLabel: answers?.destination ?? answers?.requestedArea ?? firstStop?.name ?? "הטיול שלי",
+    imageUrl: firstStop?.imageUrls?.[0] ?? null,
+    stopCount: itinerary?.stops?.length ?? 0,
+    createdAt: session.created_at,
+    isSaved: session.is_saved === true,
+  };
+}
+
 const TRIP_TYPE_ROUTE: Record<string, string> = {
   abroad_vacation: "abroad-vacation",
   day_trip: "day-trip",
@@ -68,25 +96,5 @@ export async function getSavedTrips(
   // עכשיו פשוט משתמשים בתמונה הקיימת הזו - בלי שום קריאת רשת נוספת
   // ל-Google. אם אין תמונה שמורה, פשוט אין תמונה (לא נופלים בחזרה
   // לחיפוש Google).
-  const summaries = sessions.map((session) => {
-    const answers = session.answers as { destination?: string; requestedArea?: string } | null;
-    const itinerary = session.final_itinerary as { stops?: { name?: string; imageUrls?: string[] }[] } | null;
-    const firstStop = itinerary?.stops?.[0];
-
-    const destinationLabel = answers?.destination ?? answers?.requestedArea ?? firstStop?.name ?? "הטיול שלי";
-    const imageUrl = firstStop?.imageUrls?.[0] ?? null;
-    const stopCount = itinerary?.stops?.length ?? 0;
-
-    return {
-      sessionId: session.id as string,
-      tripType: session.trip_type as string,
-      destinationLabel,
-      imageUrl,
-      stopCount,
-      createdAt: session.created_at as string,
-      isSaved: session.is_saved === true,
-    } satisfies SavedTripSummary;
-  });
-
-  return summaries;
+  return sessions.map((session) => summarizeTripSessionRow(session as TripSessionRow));
 }

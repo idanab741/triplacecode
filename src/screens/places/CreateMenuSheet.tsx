@@ -31,7 +31,7 @@ function CollectionIcon() {
 const OPTIONS = [
   { id: "post", label: "פוסט", sub: "שתפו רגע, סיפור או תוכן", icon: "/images/places-menu-post.png" },
   { id: "place", label: "מקום", sub: "ספרו על מקום שביקרתם בו", icon: "/images/places-menu-location.png" },
-  { id: "collection", label: "אוסף", sub: "אספו מקומות סביב רעיון אחד", icon: null },
+  { id: "collection", label: "אוסף", sub: "אספו מקומות או טיולים סביב רעיון אחד", icon: null },
   { id: "trip", label: "טיול", sub: "בנו מסלול עם כמה תחנות", icon: "/images/places-menu-trip.png" },
 ] as const;
 
