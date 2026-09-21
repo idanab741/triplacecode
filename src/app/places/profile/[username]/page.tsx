@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -248,12 +248,11 @@ export default function SocialProfilePage({ params }: { params: Promise<{ userna
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      {/* *** תיקון (בקשה מפורשת - "הבר העליון צריך להיות כמו ב-places"): אותו בר סגול של places
-          (variant="purple"): חזרה מימין, לוגו place's במרכז, ובצד השני פעמון - ובפרופיל שלי תפריט
-          שלוש-הפסים (/profile) במקום הפעמון. הבר תופס מקום בזרימה, והקאבר מתחיל מתחתיו (לא שקוף/צף כמו קודם). */}
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader
-        variant="purple"
+      {/* *** תיקון (בקשה מפורשת - "גם בעמוד פרופיל! הבר העליון של triplace ולא places"): הבר התכלת של triplace (אותו בר
+          כמו בעמוד הבית): חזרה מימין, לוגו triplace במרכז, ובצד השני - בפרופיל שלי תפריט שלוש-הפסים (/profile) במקום
+          הפעמון. הבר תופס מקום בזרימה, והקאבר מתחיל מתחתיו (מתחת לפינות המעוגלות שלו). */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar
         onBack={() => router.back()}
         menuHref={profile.viewerState.isSelf ? "/profile" : undefined}
       />

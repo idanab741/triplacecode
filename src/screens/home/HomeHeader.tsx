@@ -15,6 +15,8 @@ interface HomeHeaderProps {
    *  לכפתור חזור"): כשמועבר, כפתור הצ'אט מוחלף ב-BackButton של האפליקציה
    *  (בתוך אותו עיגול לבן כמו ההתראות). בלי - הצ'אט כמו תמיד. */
   onBack?: () => void;
+  /** כשמועבר (עמוד הפרופיל שלי): תפריט שלוש-הפסים מחליף את הפעמון, באותו עיגול לבן ובאותו מקום. */
+  menuHref?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ interface HomeHeaderProps {
  * ר' home/page.tsx) - "קרוב אלי" שם מחליף את התפקיד שהיה לכפתור המיקום
  * כאן. שום דבר מה-Backend/API/לוגיקת ההתראות לא השתנה.
  */
-export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
+export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -144,6 +146,17 @@ export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
         />
       </div>
 
+      {menuHref ? (
+        <Link
+          href={menuHref}
+          aria-label="תפריט"
+          className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A6DFE" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </Link>
+      ) : (
       <div ref={popoverRef} className="relative justify-self-end">
         <button
           type="button"
@@ -202,6 +215,7 @@ export function HomeHeader({ loading, onBack }: HomeHeaderProps) {
           </div>
         )}
       </div>
+      )}
     </header>
   );
 }

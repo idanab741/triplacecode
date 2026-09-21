@@ -7,7 +7,7 @@ import { createClient } from "@/services/supabase/client";
 import { updateProfile, uploadAvatar, removeAvatar } from "@/services/profile/profileService";
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { getAvatarUrl } from "@/constants/avatar";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -231,9 +231,10 @@ export default function EditProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      {/* *** בקשה מפורשת - "להוסיף את הבר העליון של places": אותו בר סגול של places (וחזרה). */}
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={() => router.back()} />
+      {/* *** תיקון (בקשה מפורשת - "שהבר העליון יהיה triplace ולא places"): הבר התכלת של triplace (אותו בר כמו
+          בעמוד הבית) עם כפתור חזור במקום הצ'אט. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.back()} />
 
       {/* *** בקשה מפורשת - "קאבר בצורת קאבר (מלבן), ופרופיל בצורת עיגול באמצע שלו למטה (כמו בכל מקום), ופלוס לשינוי/עריכה":
           מלבן הקאבר בראש העמוד (-mt-8 = נכנס מתחת לפינות המעוגלות של הבר, בלי רווח לבן ביניהם - כמו בעמוד הפרופיל),
@@ -258,36 +259,24 @@ export default function EditProfilePage() {
         {uploadingCover && (
           <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-[12.5px] font-semibold text-white">מעלה...</span>
         )}
-        <label
-          aria-label="החלפת קאבר"
-          className="absolute bottom-3 end-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
-          style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={uploadingCover}
-            onChange={(e) => handleCoverChange(e.target.files?.[0])}
-          />
-        </label>
-      </div>
-
-      <div className="relative z-10 -mt-14 flex flex-col items-center">
-        <div className="relative h-28 w-28">
-          <span className="block h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={getAvatarUrl(avatarUrl)} alt="" className="h-full w-full object-cover" />
-          </span>
-          {uploadingPhoto && (
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 text-[11.5px] font-semibold text-white">מעלה...</span>
-          )}
+        {/* *** בקשה מפורשת - "ברגע שמעלים תמונה הפלוס הופך למינוס בשביל למחוק": בלי קאבר - "+" (בחירת תמונה);
+            עם קאבר - "−" שמוחק אותו. */}
+        {coverUrl ? (
+          <button
+            type="button"
+            onClick={handleRemoveCover}
+            aria-label="הסרת קאבר"
+            className="absolute bottom-3 end-3 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-soft"
+            style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        ) : (
           <label
-            aria-label="החלפת תמונת פרופיל"
-            className="absolute -bottom-0.5 -end-0.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
+            aria-label="הוספת קאבר"
+            className="absolute bottom-3 end-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
             style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
@@ -297,28 +286,59 @@ export default function EditProfilePage() {
               type="file"
               accept="image/*"
               className="hidden"
-              disabled={uploadingPhoto}
-              onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+              disabled={uploadingCover}
+              onChange={(e) => handleCoverChange(e.target.files?.[0])}
             />
           </label>
+        )}
+      </div>
+
+      {/* *** תיקון (בקשה מפורשת - "בעריכת פרופיל אי אפשר לערוך את הקאבר!"): העוטף הזה (-mt-14, z-10) חופף את 56px
+          התחתונים של הקאבר לכל רוחב המסך, ולכן חסם את הלחיצה על כפתור ה-"+" של הקאבר (שיושב שם, 12px מהקצה התחתון).
+          pointer-events-none על העוטף, ו-pointer-events-auto רק על העיגול עצמו - הלחיצות עוברות לקאבר. */}
+      <div className="pointer-events-none relative z-10 -mt-14 flex flex-col items-center">
+        <div className="pointer-events-auto relative h-28 w-28">
+          <span className="block h-28 w-28 overflow-hidden rounded-full border-4 border-white bg-bg-secondary shadow-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getAvatarUrl(avatarUrl)} alt="" className="h-full w-full object-cover" />
+          </span>
+          {uploadingPhoto && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 text-[11.5px] font-semibold text-white">מעלה...</span>
+          )}
+          {avatarUrl ? (
+            <button
+              type="button"
+              onClick={handleRemovePhoto}
+              aria-label="הסרת תמונת פרופיל"
+              className="absolute -bottom-0.5 -end-0.5 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-soft"
+              style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+          ) : (
+            <label
+              aria-label="הוספת תמונת פרופיל"
+              className="absolute -bottom-0.5 -end-0.5 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white shadow-soft"
+              style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingPhoto}
+                onChange={(e) => handlePhotoChange(e.target.files?.[0])}
+              />
+            </label>
+          )}
         </div>
 
         <h1 className="mt-3 text-[17px] font-bold text-ink">עריכת פרופיל</h1>
 
-        {((avatarUrl && !uploadingPhoto) || (coverUrl && !uploadingCover)) && (
-          <div className="mt-1.5 flex items-center gap-4">
-            {avatarUrl && !uploadingPhoto && (
-              <button type="button" onClick={handleRemovePhoto} className="text-[12.5px] font-semibold text-red-500">
-                הסר תמונה
-              </button>
-            )}
-            {coverUrl && !uploadingCover && (
-              <button type="button" onClick={handleRemoveCover} className="text-[12.5px] font-semibold text-red-500">
-                הסר קאבר
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="h-6" />

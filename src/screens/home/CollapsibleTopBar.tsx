@@ -17,6 +17,8 @@ interface CollapsibleTopBarProps {
   /** כשמועבר - כפתור הצ'אט מוחלף בכפתור "חזור" (BackButton של האפליקציה).
    *  לעמודים "הבאים" שמשתמשים באותו בר. */
   onBack?: () => void;
+  /** עמוד הפרופיל שלי: תפריט שלוש-הפסים (קישור) במקום הפעמון. */
+  menuHref?: string;
   /** התוכן שנעלם בגלילה (שורת החיפוש). בלי children - בר קבוע פשוט. */
   children?: ReactNode;
   /** מרים את הבר מעל שכבת ההסבר (SearchIntroOverlay), כדי שיישאר מוגדר
@@ -51,6 +53,7 @@ export function CollapsibleTopBar({
   shadow = BAR_SHADOW,
   tone = "blue",
   onBack,
+  menuHref,
   children,
   raised = false,
 }: CollapsibleTopBarProps) {
@@ -128,7 +131,7 @@ export function CollapsibleTopBar({
       }}
     >
       <AnimatedHeaderBackdrop tone={tone} />
-      {headerRow ?? <HomeHeader loading={loading} onBack={onBack} />}
+      {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} />}
 
       {collapsible && (
         <div ref={clipRef}>
