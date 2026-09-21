@@ -33,6 +33,10 @@ interface CollectionFormProps {
   type: CollectionType;
   collectionId?: string;
   initial?: CollectionFormInitial;
+  /** *** תוספת (בקשה מפורשת): כשהאוסף נוצר מתוך עמוד "תוכן" השחור - פופאפ "מה תרצו
+   *  להוסיף?" בלבד נפתח כהה, כדי להתאים לזרימה שממנה הגיעו. שום דבר אחר בטופס/בעמוד
+   *  לא משתנה (לא הרקע, לא הבר העליון, אין בר תחתון) - בדיוק כמו תמיד. ברירת מחדל false. */
+  dark?: boolean;
 }
 
 function SortableItemRow({
@@ -94,7 +98,7 @@ function SortableItemRow({
 }
 
 /** טופס יצירה/עריכה של אוסף (משותף). כותרת (חובה) · תיאור · Cover · פריטים (לפחות 2, גרירה לסדר) · פרטיות. */
-export function CollectionForm({ mode, type, collectionId, initial }: CollectionFormProps) {
+export function CollectionForm({ mode, type, collectionId, initial, dark = false }: CollectionFormProps) {
   const router = useRouter();
   const labels = COLLECTION_TYPE_LABELS[type];
 
@@ -231,7 +235,7 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
         className="mb-5 w-full resize-none rounded-card border border-ink-secondary/20 px-4 py-3 text-[15px] focus:outline-none"
       />
 
-      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">קאבר</label>
+      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">תמונת האוסף</label>
       <div className="mb-5 overflow-hidden rounded-2xl shadow-soft">
         <div className="relative">
           <CollectionCover coverUrl={coverUrl} collageUrls={itemImages} type={type} className="aspect-[16/9]" />
@@ -240,11 +244,11 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
             onClick={() => setCoverSheetOpen(true)}
             className="absolute bottom-2 end-2 rounded-pill bg-black/55 px-3 py-1.5 text-[12px] font-semibold text-white"
           >
-            החלפת קאבר
+            החלפת תמונת האוסף
           </button>
         </div>
         <p className="bg-white px-3 py-2 text-[12px] text-ink-secondary">
-          {coverUrl ? "קאבר שבחרתם" : "קאבר אוטומטי - נוצר מהתמונות של הפריטים הראשונים"}
+          {coverUrl ? "תמונת האוסף שבחרתם" : "תמונת אוסף אוטומטית - נוצרת מהתמונות של הפריטים הראשונים"}
         </p>
       </div>
 
@@ -316,6 +320,7 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
           onAdd={handleAddItem}
           onClose={() => setPickerOpen(false)}
           onGoAddPlace={type === "places" ? handleGoAddPlace : undefined}
+          dark={dark}
         />
       )}
 
@@ -323,6 +328,8 @@ export function CollectionForm({ mode, type, collectionId, initial }: Collection
         <CoverPickerSheet
           coverUrl={coverUrl}
           imageUrls={itemImages}
+          heading="בחירת תמונת האוסף"
+          autoLabel="תמונת אוסף אוטומטית"
           onSelect={(url) => {
             setCoverUrl(url);
             setCoverSheetOpen(false);

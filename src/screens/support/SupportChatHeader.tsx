@@ -46,7 +46,7 @@ export function SupportChatHeader({ onBack }: SupportChatHeaderProps) {
             </div>
             <span className="absolute bottom-0 left-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
           </div>
-          <p className="text-lg font-bold leading-tight text-ink">TRIPLACE שירות לקוחות</p>
+          <p className="text-lg font-bold leading-tight text-ink">שירות לקוחות</p>
         </div>
       </div>
     </header>

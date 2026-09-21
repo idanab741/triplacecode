@@ -6,6 +6,13 @@
  */
 export const MONTHLY_TOKEN_ALLOWANCE = 100;
 
+/**
+ * *** מבצע הרצה (בקשה מפורשת - "במיוחד להרצה: ללא הגבלת טריפים", "לבטל לגמרי את הטריפים... שיהיה כמו המבצע"):
+ * כש-true, מערכת הטריפים "כבויה" - אף פעולה לא נחסמת ולא מחויבת (Trippy AI, TripMatch), והיתרה תמיד המלאה.
+ * הכול עובר דרך tokenService, ולכן זה הדגל היחיד: כדי לחזור למערכת טריפים אמיתית - להחליף ל-false.
+ */
+export const UNLIMITED_TRIPS_PROMO = true;
+
 export const TOKEN_COSTS = {
   trippy_ai_generation: 10,
   tripmatch_like: 5,

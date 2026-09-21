@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getAvatarUrl } from "@/constants/avatar";
@@ -8,14 +10,13 @@ import { createClient } from "@/services/supabase/client";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
 import { searchPlaces, type PlaceSearchResult } from "@/services/places/searchService";
 import type { PostVisibility } from "@/services/social/types";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
+import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { PlacesLocationIcon } from "@/screens/places/PlacesIcons";
 
-interface CreatePostSheetProps {
-  onClose: () => void;
-  /** placeId = מקום מתויג (אופציונלי). תיוג מקום לא הופך את הפוסט לביקורת. */
-  onSubmit: (text: string, visibility: PostVisibility, mediaIds: string[], placeId?: string | null) => Promise<void>;
-}
-
-/** *** עדכון (בקשה מפורשת - "Post Composer"): מסך ייעודי ליצירת פוסט, לא Bottom Sheet.
+/** "יצירת פוסט" - + -> פוסט. עמוד מלא (לא Sheet) עם הבר העליון של Places והבר התחתון הראשי
+ *  (טאב "תוכן" פעיל), בדיוק כמו שאר עמודי היצירה (/places/create, טיול, אוסף).
  *  פשוט, מהיר וחברתי - בלי כותרת, בלי סוג פוסט, בלי קטגוריה, בלי דירוג. המשתמש
  *  כותב / מוסיף מדיה / מתייג מקום (אם רוצה) ומפרסם.
  *  פרטיות: אותה מערכת קיימת (posts.visibility: public / friends / private) -
@@ -32,8 +33,10 @@ const PLACES_PURPLE_GRADIENT = "linear-gradient(135deg, var(--color-places-purpl
 
 type LocalMedia = UploadedMedia & { previewUrl: string };
 
-export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
-  const { user, profile } = useAuth();
+export default function CreatePostPage() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [text, setText] = useState("");
   const [visibility, setVisibility] = useState<PostVisibility>("public");
   const [visibilityMenuOpen, setVisibilityMenuOpen] = useState(false);
@@ -46,6 +49,10 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/auth/login");
+  }, [authLoading, user, router]);
 
   useEffect(() => {
     const urls = previewUrlsRef.current;
@@ -104,9 +111,10 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
     });
   }
 
-  function handleCancel() {
+  /** כפתור החזרה של הבר העליון (החליף את "ביטול"). */
+  function handleBack() {
     if (hasContent && !window.confirm("לבטל את הפוסט? מה שכתבתם לא יישמר.")) return;
-    onClose();
+    router.back();
   }
 
   async function handleSubmit() {
@@ -114,32 +122,55 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit(text.trim(), visibility, media.map((m) => m.id), place?.id ?? null);
-      onClose();
+      const res = await fetch("/api/social/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          visibility,
+          postType: media.length ? "photo" : "post",
+          mediaIds: media.map((m) => m.id),
+          // placeId = תיוג מקום אופציונלי - לא הופך את הפוסט לביקורת.
+          placeId: place?.id ?? undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "שגיאה בפרסום הפוסט");
+      router.replace("/places?published=post");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בפרסום הפוסט");
-    } finally {
       setSubmitting(false);
     }
   }
 
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-white">
+        <HomeStatusBarTint color="#7C3AED" />
+        <PlacesHeader variant="purple" onBack={() => router.back()} />
+        <div className="px-5 pt-6">
+          <Skeleton className="mb-4 h-10 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+        <MainBottomNav active="content" />
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-white">
-      {/* 1. HEADER - יצירת פוסט (ימין) | ביטול + פרסום (שמאל) */}
-      <div
-        className="flex shrink-0 items-center justify-between border-b border-ink-secondary/10 px-4 pb-2.5"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
-      >
-        <h1 className="text-[17px] font-bold text-ink">יצירת פוסט</h1>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={handleCancel} className="text-[14px] font-semibold text-ink-secondary">
-            ביטול
-          </button>
+    <div className="min-h-screen bg-white pb-32">
+      <HomeStatusBarTint color="#7C3AED" />
+      <PlacesHeader variant="purple" onBack={handleBack} />
+
+      <div className="px-4 pt-5">
+        {/* כותרת העמוד (ימין) + פרסום (שמאל) */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-[22px] font-extrabold leading-tight text-ink">יצירת פוסט</h1>
           <button
             type="button"
             disabled={!canPublish}
             onClick={handleSubmit}
-            className="rounded-pill px-4 py-1.5 text-[13.5px] font-bold transition-colors"
+            className="rounded-pill px-5 py-2 text-[14px] font-bold transition-colors"
             style={
               canPublish
                 ? { background: PLACES_PURPLE_GRADIENT, color: "white" }
@@ -149,11 +180,9 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
             {submitting ? "מפרסם..." : "פרסום"}
           </button>
         </div>
-      </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-4">
-        {/* 2. USER INFORMATION */}
-        <div className="flex items-center gap-3">
+        {/* USER INFORMATION */}
+        <div className="mt-5 flex items-center gap-3">
           <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={getAvatarUrl(profile?.avatar_url)} alt="" className="h-full w-full object-cover" />
@@ -198,7 +227,7 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
           </div>
         </div>
 
-        {/* 3. TEXT AREA - בלי כותרת, בלי מסגרת כבדה */}
+        {/* TEXT AREA - בלי כותרת, בלי מסגרת כבדה */}
         <textarea
           ref={textareaRef}
           autoFocus
@@ -212,7 +241,7 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
           className="mt-4 block min-h-[120px] w-full resize-none bg-transparent text-[16px] leading-relaxed text-ink placeholder:text-ink-secondary focus:outline-none"
         />
 
-        {/* 4. MEDIA */}
+        {/* MEDIA */}
         {media.length > 0 && (
           <div className={`mt-2 grid gap-2 ${media.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
             {media.map((m, index) => (
@@ -285,11 +314,11 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
           )}
         </button>
 
-        {/* 5-6. ACTIONS - מוכן להרחבה עתידית (תגיות, רגש) בלי ליצור אותם עכשיו */}
+        {/* ACTIONS - מוכן להרחבה עתידית (תגיות, רגש) בלי ליצור אותם עכשיו */}
         <div className="mt-2 border-t border-ink-secondary/10 pt-1">
           {place ? (
-            <div className="flex items-center gap-3 py-3 text-[14.5px] font-semibold text-ink">
-              <span aria-hidden="true">📍</span>
+            <div className="flex items-center gap-3 py-2.5 text-[14.5px] font-semibold text-ink">
+              <PlacesLocationIcon />
               <span className="min-w-0 flex-1 truncate">{place.name}</span>
               <button
                 type="button"
@@ -304,9 +333,9 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
             <button
               type="button"
               onClick={() => setPlacePickerOpen(true)}
-              className="flex w-full items-center gap-3 py-3 text-start text-[14.5px] font-semibold text-ink"
+              className="flex w-full items-center gap-3 py-2.5 text-start text-[14.5px] font-semibold text-ink"
             >
-              <span aria-hidden="true">📍</span>
+              <PlacesLocationIcon />
               הוספת מקום
             </button>
           )}
@@ -314,6 +343,8 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
 
         {error && <p className="mt-3 text-[12.5px] text-red-500">{error}</p>}
       </div>
+
+      <MainBottomNav active="content" />
 
       {placePickerOpen && (
         <PlacePickerView
@@ -364,7 +395,10 @@ function PlacePickerView({ onClose, onPick }: { onClose: () => void; onPick: (pl
         className="flex shrink-0 items-center justify-between border-b border-ink-secondary/10 px-4 pb-2.5"
         style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
       >
-        <h1 className="text-[17px] font-bold text-ink">הוספת מקום</h1>
+        <h1 className="flex items-center gap-2 text-[17px] font-bold text-ink">
+          <PlacesLocationIcon size={30} />
+          הוספת מקום
+        </h1>
         <button type="button" onClick={onClose} className="text-[14px] font-semibold text-ink-secondary">
           ביטול
         </button>

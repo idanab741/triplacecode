@@ -1,5 +1,5 @@
 /**
- * 5 הקטגוריות הראשיות היחידות שמותר לשדה `places.category` לקבל.
+ * 6 הקטגוריות הראשיות היחידות שמותר לשדה `places.category` לקבל.
  * זה השדה שמוצג בעמודת "קטגוריה" ברשימת המקומות (admin/places) ובפילטר
  * הקטגוריה שם - הוא *לא* אמור להכיל תתי-סוג עדין (כמו "cocktail_bar" או
  * "nature_trails") - זה תפקידו של `subcategory` / `tags`.
@@ -14,6 +14,7 @@ export const PLACE_CATEGORIES = [
   { key: "attractions", label: "אטרקציות" },
   { key: "nature", label: "טבע" },
   { key: "hotels", label: "מלונות" },
+  { key: "shopping", label: "קניות ושופינג" },
 ] as const;
 
 export type PlaceCategoryKey = (typeof PLACE_CATEGORIES)[number]["key"];
@@ -50,6 +51,7 @@ export const CATEGORY_TO_SUGGESTED_TRIP_TYPE_TAGS: Record<PlaceCategoryKey, stri
   attractions: ["attractions_activities"],
   nature: ["nature_trails"],
   hotels: [],
+  shopping: ["shopping"],
 };
 
 /**

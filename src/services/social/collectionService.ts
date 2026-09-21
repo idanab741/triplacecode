@@ -55,7 +55,7 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
   let coverUrl: string | null = null;
   if (typeof body.coverUrl === "string" && body.coverUrl.trim()) {
     coverUrl = body.coverUrl.trim();
-    if (!/^https:\/\//i.test(coverUrl) || coverUrl.length > 1000) throw new CollectionInputError("תמונת הקאבר לא תקינה");
+    if (!/^https:\/\//i.test(coverUrl) || coverUrl.length > 1000) throw new CollectionInputError("תמונת האוסף לא תקינה");
   }
 
   const visibility = (body.visibility ?? "public") as PostVisibility;

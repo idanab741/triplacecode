@@ -1,38 +1,21 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "@/services/supabase/server";
+import { ensureUsername } from "@/services/social/socialProfileService";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth";
-import { Skeleton } from "@/components/ui";
+/**
+ * "הפרופיל שלי" (הטאב בבר התחתון) -> /places/profile/{username שלי}.
+ * *** מהירות (בקשה מפורשת - "הפרופיל נטען המון זמן"): הפניה בצד השרת (HTTP redirect) - במקום useAuth + fetch +
+ * router.replace בצד הלקוח, שהיו שלושה מעברים לפני שבכלל התחילה טעינת הפרופיל. אם עוד אין username - נוצר אוטומטית
+ * (ensureUsername), כמו קודם.
+ */
+export default async function MyProfileRedirectPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
 
-export default function MyProfileRedirectPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!user) return;
-    fetch("/api/social/profile/me")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.profile?.username) {
-          router.replace(`/places/profile/${data.profile.username}`);
-          return;
-        }
-        // *** תיקון (בקשה מפורשת - "למה זה קפץ עם מסך לא מעוצב?"): במקום
-        // לחסום עם טופס "בחר שם משתמש" בלי הקשר/עיצוב, יוצרים אחד
-        // אוטומטית בשקט (ensureUsername) - אפשר לשנות מאוחר יותר
-        // ב-/places/settings אם ירצו.
-        fetch("/api/social/username/auto", { method: "POST" })
-          .then((r) => r.json())
-          .then((data2) => {
-            if (data2.username) router.replace(`/places/profile/${data2.username}`);
-          });
-      });
-  }, [user, router]);
-
-  return (
-    <div className="p-6">
-      <Skeleton className="h-8 w-full" />
-    </div>
-  );
+  const { data } = await supabase.from("profiles").select("username").eq("id", user.id).maybeSingle();
+  const username = data?.username ?? (await ensureUsername(supabase, user.id));
+  redirect(`/places/profile/${username}`);
 }

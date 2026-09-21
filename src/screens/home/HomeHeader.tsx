@@ -152,7 +152,7 @@ export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
           aria-label="תפריט"
           className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0A6DFE" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </Link>

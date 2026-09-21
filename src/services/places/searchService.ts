@@ -22,6 +22,23 @@ export interface SearchFilters {
 
 export const SEARCH_PAGE_SIZE = 20;
 
+function normalizeForDedupe(value: string | null | undefined): string {
+  return (value ?? "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+/** תוצאה אחת לכל מקום: כשיש כמה שורות לאותו מקום (אותו שם ואותה עיר) נשארת אחת בלבד -
+ *  זו עם תמונה, ובין שתיים כאלה זו עם הדירוג הגבוה יותר. הסדר המקורי נשמר. */
+export function dedupePlaceResults(results: PlaceSearchResult[]): PlaceSearchResult[] {
+  const rank = (r: PlaceSearchResult) => (r.image_urls?.length ? 10 : 0) + (r.rating ?? 0);
+  const byKey = new Map<string, PlaceSearchResult>();
+  for (const r of results) {
+    const key = `${normalizeForDedupe(r.name)}|${normalizeForDedupe(r.city)}`;
+    const existing = byKey.get(key);
+    if (!existing || rank(r) > rank(existing)) byKey.set(key, r);
+  }
+  return [...byKey.values()];
+}
+
 export async function searchPlaces(
   filters: SearchFilters,
   offset: number,

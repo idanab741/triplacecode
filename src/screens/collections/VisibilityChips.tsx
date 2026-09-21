@@ -2,7 +2,7 @@
 
 import type { PostVisibility } from "@/services/social/types";
 
-/** אותה מערכת Visibility של פוסטים (CreatePostSheet): כולם / חברים / פרטי. */
+/** אותה מערכת Visibility של פוסטים (app/places/post/create): כולם / חברים / פרטי. */
 const OPTIONS: { id: PostVisibility; label: string }[] = [
   { id: "public", label: "כולם" },
   { id: "friends", label: "חברים" },

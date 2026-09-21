@@ -11,7 +11,7 @@ import { downloadAndStorePhoto } from "@/services/places/photoStorageService";
  *  ולא ייראה כתוכן שנאסף ע"י הצוות (google_places). */
 export const USER_PLACE_SOURCE = "user_review";
 
-export type UserPlaceCategory = "restaurant" | "attraction" | "nature" | "nightlife" | "hotel";
+export type UserPlaceCategory = "restaurant" | "attraction" | "nature" | "nightlife" | "hotel" | "shopping";
 
 /** הקטגוריות בטופס "הוסיפו מקום" -> 5 הקטגוריות הראשיות המותרות ב-places.category. */
 const CATEGORY_TO_PLACE_CATEGORY: Record<UserPlaceCategory, string> = {
@@ -20,6 +20,7 @@ const CATEGORY_TO_PLACE_CATEGORY: Record<UserPlaceCategory, string> = {
   nature: "nature",
   nightlife: "nightlife",
   hotel: "hotels",
+  shopping: "shopping",
 };
 
 export function isUserPlaceCategory(value: unknown): value is UserPlaceCategory {

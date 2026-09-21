@@ -8,7 +8,10 @@ import { updateProfile, uploadAvatar, removeAvatar } from "@/services/profile/pr
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
 import { getAvatarUrl } from "@/constants/avatar";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { rememberUsernameChange } from "@/services/social/usernameAlias";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
+import { MainBottomNav } from "@/components/MainBottomNav";
+import { usernameLockedMessage, usernameLockedUntil } from "@/services/social/usernameLimit";
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -23,7 +26,15 @@ interface MeProfile {
   username: string | null;
   bio: string | null;
   cover_url?: string | null;
+  /** מתי שונה שם המשתמש לאחרונה (migration 0092) - שינוי אפשרי פעם ב-30 יום. */
+  username_changed_at?: string | null;
 }
+
+/** שדה טקסט אחיד. *** תיקון (בקשה מפורשת - "העמוד נשבר, חורג שמאלה ובורח מהגודל של העמוד"): min-w-0 + max-w-full
+ *  + appearance-none - בלי זה שדות (בעיקר type="date" בנייד) מקבלים רוחב מינימלי משלהם וחורגים מהעמוד.
+ *  צבע הפוקוס תכלת (triplace) ולא סגול. */
+const INPUT_CLASS =
+  "block w-full min-w-0 max-w-full appearance-none rounded-card border border-ink-secondary/20 bg-white px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/40 disabled:opacity-60";
 
 /**
  * *** תוספת (בקשה מפורשת - "עריכת פרופיל צריכה להביא אותי לעמוד נוסף
@@ -104,13 +115,22 @@ export default function EditProfilePage() {
 
       if (username.trim() && username.trim() !== (meProfile?.username ?? "")) {
         await fetchJson("/api/social/username", { method: "POST", body: JSON.stringify({ username: username.trim() }) });
+        // *** תיקון (בקשה מפורשת - "למה הפרופיל לא נמצא? הוא צריך להסתנכרן ברגע שמשנים את השם!"): כתובת הפרופיל
+        // כוללת את ה-username, ולכן "חזור" (וההיסטוריה) הובילו לכתובת הישנה = "פרופיל לא נמצא". זוכרים את השינוי
+        // (ישן -> חדש) כדי שכתובות ישנות יופנו לחדשה, ו"חזור" למטה הולך ישר לפרופיל הנוכחי.
+        rememberUsernameChange(meProfile?.username, username.trim());
       }
 
       if (bio !== (meProfile?.bio ?? "")) {
         await fetchJson("/api/social/profile/me", { method: "PATCH", body: JSON.stringify({ bio }) });
       }
 
-      setMeProfile({ username: username.trim(), bio });
+      const usernameChanged = username.trim() !== (meProfile?.username ?? "");
+      setMeProfile({
+        username: username.trim(),
+        bio,
+        username_changed_at: usernameChanged ? new Date().toISOString() : (meProfile?.username_changed_at ?? null),
+      });
       await refreshProfile();
       setBasicsMessage({ type: "success", text: "הפרופיל נשמר בהצלחה" });
     } catch (err) {
@@ -229,12 +249,21 @@ export default function EditProfilePage() {
     }
   }
 
+  const usernameLocked = usernameLockedUntil(meProfile?.username_changed_at);
+
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen max-w-full overflow-x-clip bg-white pb-28">
       {/* *** תיקון (בקשה מפורשת - "שהבר העליון יהיה triplace ולא places"): הבר התכלת של triplace (אותו בר כמו
           בעמוד הבית) עם כפתור חזור במקום הצ'אט. */}
       <HomeStatusBarTint />
-      <CollapsibleTopBar onBack={() => router.back()} />
+      <CollapsibleTopBar
+        onBack={() => {
+          // ישר לפרופיל שלי בשם הנוכחי (לא router.back() - הוא היה חוזר לכתובת עם ה-username הישן אחרי שינוי שם).
+          const current = (meProfile?.username ?? "").trim();
+          if (current) router.replace(`/places/profile/${current}`);
+          else router.replace("/places/profile/me");
+        }}
+      />
 
       {/* *** בקשה מפורשת - "קאבר בצורת קאבר (מלבן), ופרופיל בצורת עיגול באמצע שלו למטה (כמו בכל מקום), ופלוס לשינוי/עריכה":
           מלבן הקאבר בראש העמוד (-mt-8 = נכנס מתחת לפינות המעוגלות של הבר, בלי רווח לבן ביניהם - כמו בעמוד הפרופיל),
@@ -350,16 +379,21 @@ export default function EditProfilePage() {
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            disabled={usernameLocked !== null}
             dir="ltr"
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
+          {/* *** בקשה מפורשת - "שם משתמש אפשר לשנות רק פעם בחודש": נעול (עם התאריך) עד שעוברים 30 יום מהשינוי האחרון */}
+          <p className="mt-1 text-[11.5px] text-ink-secondary">
+            {usernameLocked ? usernameLockedMessage(usernameLocked) : "אפשר לשנות שם משתמש פעם בחודש."}
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-[12px] font-semibold text-ink-secondary">שם מלא</label>
           <input
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         <div>
@@ -367,7 +401,7 @@ export default function EditProfilePage() {
           <input
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         <div>
@@ -376,7 +410,7 @@ export default function EditProfilePage() {
             type="date"
             value={birthDate}
             onChange={(e) => setBirthDate(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         <div>
@@ -386,7 +420,7 @@ export default function EditProfilePage() {
             onChange={(e) => setBio(e.target.value)}
             rows={3}
             placeholder="קצת עליי..."
-            className="w-full resize-none rounded-card border border-ink-secondary/20 p-3 text-[14px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className="block w-full min-w-0 max-w-full resize-none rounded-card border border-ink-secondary/20 p-3 text-[14px] text-ink placeholder:text-ink-secondary/60 focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/40"
           />
         </div>
 
@@ -401,7 +435,7 @@ export default function EditProfilePage() {
           onClick={handleSaveBasics}
           disabled={savingBasics}
           className="rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
-          style={{ background: "var(--color-places-purple)" }}
+          style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
         >
           {savingBasics ? "שומר..." : "שמירה"}
         </button>
@@ -410,7 +444,7 @@ export default function EditProfilePage() {
       {/* אימייל */}
       <div className="mt-6 flex flex-col gap-3 border-t border-ink-secondary/10 px-4 pt-5">
         <h2 className="text-[14.5px] font-bold text-ink">אימייל</h2>
-        <p className="text-[12.5px] text-ink-secondary" dir="ltr">
+        <p className="break-all text-[12.5px] text-ink-secondary" dir="ltr">
           {user?.email}
         </p>
         <div>
@@ -420,7 +454,7 @@ export default function EditProfilePage() {
             dir="ltr"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         <div>
@@ -429,7 +463,7 @@ export default function EditProfilePage() {
             type="password"
             value={currentPasswordForEmail}
             onChange={(e) => setCurrentPasswordForEmail(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         {emailMessage && (
@@ -457,7 +491,7 @@ export default function EditProfilePage() {
             type="password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         <div>
@@ -466,7 +500,7 @@ export default function EditProfilePage() {
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full rounded-card border border-ink-secondary/20 px-3.5 py-2.5 text-[14px] text-ink focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+            className={INPUT_CLASS}
           />
         </div>
         {passwordMessage && (
@@ -483,6 +517,8 @@ export default function EditProfilePage() {
           {savingPassword ? "מעדכן..." : "עדכון סיסמה"}
         </button>
       </div>
+
+      <MainBottomNav active="profile" />
     </div>
   );
 }

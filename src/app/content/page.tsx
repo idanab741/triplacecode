@@ -104,7 +104,7 @@ const CSS = `
  * הכרטיסיות ומצביעה עליהן), ו-4 ריבועים (פוסט / מקום / אוסף / טיול - אותן 4 פעולות של תפריט ה-+ ב-places).
  * הבר התחתון שחור (tone="dark") - אייקונים ותוויות בלבן, הטאב הפעיל נשאר בצבעיו.
  * לחיצה על ריבוע מובילה לזרימת היצירה הקיימת - לא נוצרת כאן לוגיקה חדשה:
- *  פוסט -> /places?create=post · מקום -> /places/create
+ *  פוסט -> /places/post/create · מקום -> /places/create
  *  אוסף -> "מה תרצו לאסוף?" -> /places/collection/create · טיול -> /places/trip/create
  */
 export default function ContentPage() {
@@ -117,7 +117,7 @@ export default function ContentPage() {
   }, [authLoading, user, router]);
 
   function handleSelect(id: TileId) {
-    if (id === "post") router.push("/places?create=post");
+    if (id === "post") router.push("/places/post/create");
     else if (id === "place") router.push("/places/create");
     else if (id === "collection") setCollectionTypeOpen(true);
     else router.push("/places/trip/create");
@@ -183,8 +183,9 @@ export default function ContentPage() {
 
       {collectionTypeOpen && (
         <CollectionTypeSheet
+          dark
           onClose={() => setCollectionTypeOpen(false)}
-          onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
+          onSelect={(type) => router.push(`/places/collection/create?type=${type}&origin=content`)}
         />
       )}
     </>

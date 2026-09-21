@@ -13,13 +13,16 @@ interface CoverPickerSheetProps {
   imageUrls: string[];
   /** טקסט האפשרות "אוטומטי" (למשל "קאבר אוטומטי"). */
   autoLabel?: string;
+  /** כותרת ה-Sheet (ברירת מחדל "בחירת קאבר" - לשימוש בטיולים). CollectionForm מעביר
+   *  "בחירת תמונת האוסף", כי "קאבר" אינה המילה הנכונה עבור אוספים. */
+  heading?: string;
   onSelect: (url: string | null) => void;
   onClose: () => void;
 }
 
 /** בחירת Cover - משותף לאוספים ולטיולים: אוטומטי / אחת מהתמונות הקיימות / העלאה מהמכשיר
  *  (אותה מערכת מדיה קיימת: uploadSocialMedia). לא נוצרת שום תמונה חדשה. */
-export function CoverPickerSheet({ coverUrl, imageUrls, autoLabel = "קאבר אוטומטי", onSelect, onClose }: CoverPickerSheetProps) {
+export function CoverPickerSheet({ coverUrl, imageUrls, autoLabel = "קאבר אוטומטי", heading = "בחירת קאבר", onSelect, onClose }: CoverPickerSheetProps) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function CoverPickerSheet({ coverUrl, imageUrls, autoLabel = "קאבר א
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[75vh] overflow-y-auto px-5 pb-4">
-        <h2 className="mb-3 text-[17px] font-bold text-ink">בחירת קאבר</h2>
+        <h2 className="mb-3 text-[17px] font-bold text-ink">{heading}</h2>
         <button
           type="button"
           onClick={() => onSelect(null)}

@@ -18,6 +18,9 @@ interface CollectionItemPickerSheetProps {
   /** כותרת/Placeholder מותאמים (למשל בעמוד יצירת טיול: "חפשו מקום להוסיף לטיול"). */
   heading?: string;
   placeholder?: string;
+  /** *** תוספת (בקשה מפורשת): כשהאוסף נוצר מתוך עמוד "תוכן" השחור - הפופאפ הזה כהה
+   *  גם הוא, כדי להתאים לזרימה. ברירת מחדל false - שימושים אחרים (TripForm וכו') זהים לקודם. */
+  dark?: boolean;
 }
 
 interface TripOption {
@@ -32,13 +35,14 @@ interface TripOption {
   tag: string | null;
 }
 
-function rowClass(added: boolean) {
-  return `flex w-full items-center gap-3 rounded-card px-2 py-2.5 text-start ${added ? "opacity-60" : "hover:bg-bg-secondary"}`;
+function rowClass(added: boolean, dark: boolean) {
+  const hover = dark ? "hover:bg-white/10" : "hover:bg-bg-secondary";
+  return `flex w-full items-center gap-3 rounded-card px-2 py-2.5 text-start ${added ? "opacity-60" : hover}`;
 }
 
-function Thumb({ url }: { url: string | null }) {
+function Thumb({ url, dark }: { url: string | null; dark: boolean }) {
   return (
-    <span className="h-12 w-12 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
+    <span className={`h-12 w-12 shrink-0 overflow-hidden rounded-card ${dark ? "bg-white/10" : "bg-bg-secondary"}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {url && <img src={url} alt="" className="h-full w-full object-cover" />}
     </span>
@@ -59,7 +63,7 @@ function AddedMark({ added }: { added: boolean }) {
 
 /** "מה תרצו להוסיף?" - בוחר פריט *קיים* בלבד: מקום מתוך TRIPLACE (אותו חיפוש כמו בשאר הזרימות),
  *  או טיול שמור מ"הטיולים שלי" (אותם שני endpoints). ה-Sheet נשאר פתוח כדי להוסיף כמה פריטים ברצף. */
-export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onGoAddPlace, heading, placeholder }: CollectionItemPickerSheetProps) {
+export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onGoAddPlace, heading, placeholder, dark = false }: CollectionItemPickerSheetProps) {
   const [query, setQuery] = useState("");
   const [placeResults, setPlaceResults] = useState<PlaceSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -90,13 +94,15 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
 
   useEffect(() => {
     if (type !== "trips") return;
-    // מקורות: (1) טיולים (Trips) שיצרתי, (2) טיולים של אחרים ששמרתי, (3) תוצרי בניית-טיול שמורים שלי
-    // ("הטיולים שלי" - שני ה-endpoints הקיימים; ברירת המחדל שלהם היא "שמורים בלבד" - בדיוק מה שמותר).
+    // מקורות: (1) טיולים (Trips) שיצרתי, (2) טיולים של אחרים ששמרתי, (3) תוצרי בניית-טיול שלי
+    // (כולל טיולים שיצאו מ-TripMatch/"החלקות" ועדיין לא סומנו "שמור" במפורש - is_saved=false -
+    // בדיוק כמו MyTripsSection בעמוד הבית ("הבחירות שלי"): all=true מחזיר גם אותם, לא רק
+    // is_saved=true, כדי שכל הטיולים שלי יופיעו כאן, לא רק אלה ששמרתי בפירוש).
     Promise.all([
       fetch("/api/social/trips/mine").then((r) => r.json()).catch(() => ({ trips: [] })),
       fetch("/api/social/trips/saved").then((r) => r.json()).catch(() => ({ trips: [] })),
-      fetch("/api/trip-builder/sessions/saved").then((r) => r.json()).catch(() => ({ trips: [] })),
-      fetch("/api/trippy-ai").then((r) => r.json()).catch(() => ({ results: [] })),
+      fetch("/api/trip-builder/sessions/saved?all=true").then((r) => r.json()).catch(() => ({ trips: [] })),
+      fetch("/api/trippy-ai?all=true").then((r) => r.json()).catch(() => ({ results: [] })),
     ]).then(([mineData, savedData, sessionsData, trippyData]) => {
       type SocialTrip = { id: string; title: string; coverUrl: string | null; autoCoverUrl: string | null; stopCount: number; createdAt: string };
       const toSocial = (t: SocialTrip, tag: string): TripOption => ({
@@ -146,21 +152,26 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
     return (trips ?? []).filter((t) => !q || t.title.toLowerCase().includes(q));
   }, [trips, query]);
 
+  const textMain = dark ? "text-white" : "text-ink";
+  const textSecondary = dark ? "text-white/55" : "text-ink-secondary";
+
   return (
-    <BottomSheet onClose={onClose}>
+    <BottomSheet onClose={onClose} dark={dark}>
       <div className="max-h-[80vh] overflow-y-auto px-5 pb-4">
-        <h2 className="mb-3 text-[17px] font-bold text-ink">{heading ?? "מה תרצו להוסיף?"}</h2>
+        <h2 className={`mb-3 text-[17px] font-bold ${textMain}`}>{heading ?? "מה תרצו להוסיף?"}</h2>
         <input
           autoFocus
           value={query}
           onChange={(e) => (type === "places" ? handlePlaceQuery(e.target.value) : setQuery(e.target.value))}
           placeholder={placeholder ?? (type === "places" ? "חפשו מקום..." : "חפשו טיול...")}
-          className="mb-3 w-full rounded-pill border border-ink-secondary/20 px-4 py-2.5 text-[14px] focus:outline-none"
+          className={`mb-3 w-full rounded-pill border px-4 py-2.5 text-[14px] focus:outline-none ${
+            dark ? "border-white/15 bg-white/10 text-white placeholder:text-white/40" : "border-ink-secondary/20"
+          }`}
         />
 
         {type === "places" && (
           <>
-            {searching && <p className="py-4 text-center text-[12.5px] text-ink-secondary">מחפש...</p>}
+            {searching && <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>מחפש...</p>}
             {!searching &&
               placeResults?.map((place) => {
                 const key = formItemKey("place", place.id);
@@ -181,12 +192,12 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                         note: "",
                       })
                     }
-                    className={rowClass(added)}
+                    className={rowClass(added, dark)}
                   >
-                    <Thumb url={place.image_urls?.[0] ?? null} />
+                    <Thumb url={place.image_urls?.[0] ?? null} dark={dark} />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold text-ink">{place.name}</span>
-                      <span className="block truncate text-[12px] text-ink-secondary">
+                      <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{place.name}</span>
+                      <span className={`block truncate text-[12px] ${textSecondary}`}>
                         {[getPlaceCategoryLabel(place.category), place.city].filter(Boolean).join(" · ")}
                       </span>
                     </span>
@@ -195,7 +206,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                 );
               })}
             {placeResults !== null && !searching && placeResults.length === 0 && (
-              <p className="py-4 text-center text-[12.5px] text-ink-secondary">לא מצאנו מקום כזה</p>
+              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>לא מצאנו מקום כזה</p>
             )}
             {onGoAddPlace && (
               <button
@@ -212,14 +223,14 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
 
         {type === "trips" && (
           <>
-            {trips === null && <p className="py-4 text-center text-[12.5px] text-ink-secondary">טוען את הטיולים שלכם...</p>}
+            {trips === null && <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>טוען את הטיולים שלכם...</p>}
             {trips !== null && trips.length === 0 && (
-              <p className="py-4 text-center text-[12.5px] text-ink-secondary">
+              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>
                 אין עדיין טיולים להוסיף. צרו טיול, או שמרו טיול של מישהו אחר, ואז תוכלו לאסוף אותו כאן.
               </p>
             )}
             {trips !== null && trips.length > 0 && filteredTrips.length === 0 && (
-              <p className="py-4 text-center text-[12.5px] text-ink-secondary">לא נמצא טיול כזה</p>
+              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>לא נמצא טיול כזה</p>
             )}
             {filteredTrips.map((trip) => {
               const added = addedKeys.has(trip.key);
@@ -240,12 +251,12 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                       note: "",
                     })
                   }
-                  className={rowClass(added)}
+                  className={rowClass(added, dark)}
                 >
-                  <Thumb url={trip.imageUrl} />
+                  <Thumb url={trip.imageUrl} dark={dark} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold text-ink">{trip.title}</span>
-                    <span className="block text-[12px] text-ink-secondary">
+                    <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{trip.title}</span>
+                    <span className={`block text-[12px] ${textSecondary}`}>
                       {trip.stopCount} תחנות{trip.tag ? ` · ${trip.tag}` : ""}
                     </span>
                   </span>

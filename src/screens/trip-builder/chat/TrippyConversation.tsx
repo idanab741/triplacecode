@@ -14,7 +14,8 @@ import { ChatHeader } from "./ChatHeader";
 import { RuntrippyPromptBubble } from "./RuntrippyPromptBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { UserBubble } from "./UserBubble";
-import { TOKEN_COSTS } from "@/constants/tokenCosts";
+import { TOKEN_COSTS, UNLIMITED_TRIPS_PROMO } from "@/constants/tokenCosts";
+import { TripsIntroCard } from "@/components/trips/TripsIntroCard";
 
 const TRIPPY_AI_COST = TOKEN_COSTS.trippy_ai_generation;
 
@@ -349,6 +350,15 @@ export function TrippyConversation() {
           pb-56 ברשימת ההודעות מפנה מקום גם ל-footer וגם לבר יחד. */}
       <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-56">
         {messages.map((message) => {
+          if (message.role === "assistant" && message.id === "intro") {
+            // "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך הצ'אט, מיד אחרי הודעת הפתיחה (לא פופאפ)
+            return (
+              <div key={message.id} className="flex flex-col gap-3">
+                <ChatBubble>{message.text}</ChatBubble>
+                <TripsIntroCard />
+              </div>
+            );
+          }
           if (message.role === "assistant") return <ChatBubble key={message.id}>{message.text}</ChatBubble>;
           if (message.role === "runtrippy")
             return (
@@ -379,7 +389,7 @@ export function TrippyConversation() {
       {stage === "compose" && !typing && (
         <div className="fixed inset-x-0 bottom-24 z-40 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3">
           <div className="mx-auto flex max-w-md flex-col gap-2">
-            <p className="text-center text-[11px] font-medium text-ink-secondary">בניית טיול — {TRIPPY_AI_COST} טריפים</p>
+            <p className="text-center text-[11px] font-medium text-ink-secondary">{UNLIMITED_TRIPS_PROMO ? "בניית טיול — ללא הגבלה (מבצע הרצה)" : `בניית טיול — ${TRIPPY_AI_COST} טריפים`}</p>
             {/* *** תיקון (בקשה מפורשת - "שורת המלל - שהכפתור המשך יהיה
                 עיגול בצד שמאל כמו בהודעות למערכת"): לפני זה כפתור
                 "המשך" מלא-רוחב **מעל** התיבה - עכשיו אותו דפוס בדיוק

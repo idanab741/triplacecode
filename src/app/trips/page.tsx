@@ -7,7 +7,8 @@ import { createClient } from "@/services/supabase/client";
 import { getFavoritePlaces, toggleFavorite } from "@/services/favorites/favoritesService";
 import type { UnifiedPlace } from "@/services/places/unifiedPlaceService";
 import { Screen, Skeleton, Button, SwipeToDeleteRow } from "@/components/ui";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { RetentionInfoModal } from "@/screens/trips/RetentionInfoModal";
 import { getDaysRemainingBeforeRemoval } from "@/constants/contentRetention";
@@ -236,7 +237,10 @@ function TripsPageContent() {
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      <SimpleAppHeader onBack={() => router.push("/home")} title="הבחירות שלי" />
+      {/* *** בקשה מפורשת - "הבחירות שלי צריך להיות עם הבר העליון החדש של triplace": הבר התכלת (כמו בעמוד הבית) עם כפתור חזור; הכותרת עברה מתחתיו. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.push("/home")} />
+      <h1 className="px-5 pb-1 pt-5 text-xl font-bold text-ink">הבחירות שלי</h1>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
         <div className="flex rounded-pill bg-bg-secondary p-1">

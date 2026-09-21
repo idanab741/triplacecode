@@ -9,6 +9,11 @@ interface BottomSheetProps {
   /** אזור קבוע בתחתית ה-Sheet (מחוץ לגלילה) - למשל כפתורי "איפוס / החל".
    *  לא מועבר = ההתנהגות הקיימת ללא שינוי. */
   footer?: ReactNode;
+  /** *** תוספת (בקשה מפורשת - הפופאפים שנפתחים מעמוד "תוכן" השחור צריכים
+   *  להיות שחורים גם הם, ולא לבנים כמו בכל שאר האפליקציה): כשמועבר true -
+   *  כרטיס ה-Sheet עצמו כהה (במקום bg-bg הלבן) וידית הגרירה בגוון בהיר עליו.
+   *  ברירת מחדל false - כל שאר השימושים הקיימים ב-BottomSheet לא מושפעים. */
+  dark?: boolean;
 }
 
 const DRAG_CLOSE_THRESHOLD_PX = 100;
@@ -24,7 +29,7 @@ const DRAG_CLOSE_THRESHOLD_PX = 100;
  * עצמו, לא על ה-backdrop) משאיר רווח בגובה הבר התחתון כדי שהכרטיס
  * הלבן לא "יתלבש" ויכסה את הבר שעכשיו גלוי מתחתיו.
  */
-export function BottomSheet({ onClose, children, zIndex = 40, footer }: BottomSheetProps) {
+export function BottomSheet({ onClose, children, zIndex = 40, footer, dark = false }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
@@ -59,7 +64,7 @@ export function BottomSheet({ onClose, children, zIndex = 40, footer }: BottomSh
   return (
     <div className="fixed inset-0 flex items-end justify-center bg-black/50" style={{ zIndex }} onClick={handleBackdropClick}>
       <div
-        className="mb-[88px] flex max-h-[calc(90dvh-88px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card bg-bg"
+        className={`mb-[88px] flex max-h-[calc(90dvh-88px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card ${dark ? "bg-[#141416]" : "bg-bg"}`}
         style={{ transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.2s ease-out" }}
       >
         <div
@@ -69,11 +74,15 @@ export function BottomSheet({ onClose, children, zIndex = 40, footer }: BottomSh
           onPointerCancel={handleHandlePointerUp}
           className="flex shrink-0 cursor-grab touch-none items-center justify-center py-3 active:cursor-grabbing"
         >
-          <div className="h-1 w-10 rounded-pill bg-ink-secondary/30" />
+          <div className={`h-1 w-10 rounded-pill ${dark ? "bg-white/25" : "bg-ink-secondary/30"}`} />
         </div>
         <div className={`min-h-0 overflow-y-auto ${footer ? "" : "pb-6"}`}>{children}</div>
         {footer && (
-          <div className="shrink-0 border-t border-ink-secondary/10 bg-bg px-5 pb-4 pt-3 shadow-[0_-10px_24px_-14px_rgba(26,26,46,0.22)]">
+          <div
+            className={`shrink-0 border-t px-5 pb-4 pt-3 shadow-[0_-10px_24px_-14px_rgba(26,26,46,0.22)] ${
+              dark ? "border-white/10 bg-[#141416]" : "border-ink-secondary/10 bg-bg"
+            }`}
+          >
             {footer}
           </div>
         )}

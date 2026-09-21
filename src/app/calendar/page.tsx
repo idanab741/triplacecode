@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Screen } from "@/components/ui";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { MonthCalendar } from "@/screens/calendar/MonthCalendar";
 
@@ -57,18 +57,10 @@ export default function CalendarPage() {
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      <SimpleAppHeader onBack={() => router.push("/profile")} title="היומן שלי" />
-
-      <div className="overflow-hidden rounded-b-[40px] bg-white">
-        <Image
-          src="/images/hero-calendar.png"
-          alt="היומן שלי"
-          width={800}
-          height={360}
-          priority
-          className="h-auto w-full"
-        />
-      </div>
+      {/* *** בקשה מפורשת - "היומן שלי צריך להיות עם הבר העליון החדש של triplace": הבר התכלת (כמו בעמוד הבית) עם כפתור חזור; הכותרת עברה מתחתיו. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.push("/profile")} />
+      <h1 className="px-5 pb-1 pt-5 text-xl font-bold text-ink">היומן שלי</h1>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
         <MonthCalendar

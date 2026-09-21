@@ -16,7 +16,6 @@ import { PostCard } from "@/screens/places/PostCard";
 import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
 import { TripFeedCard } from "@/screens/trips/TripFeedCard";
 import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
-import { CreatePostSheet } from "@/screens/places/CreatePostSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
@@ -29,7 +28,6 @@ import type { PlacesFeedView } from "@/screens/places/FeedTabs";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
 import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
 import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
-import type { PostVisibility } from "@/services/social/types";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח, ורק כשנכנסים ללשונית "מפה".
 const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
@@ -75,7 +73,6 @@ export default function PlacesHomePage() {
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const [createPostOpen, setCreatePostOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
@@ -89,21 +86,24 @@ export default function PlacesHomePage() {
     if (!authLoading && !user) router.replace("/auth/login");
   }, [authLoading, user, router]);
 
-  // אחרי פרסום ביקורת (/places/create/review) חוזרים לכאן עם ?published=1 - הודעת הצלחה קצרה.
+  // אחרי פרסום ביקורת (/places/create) חוזרים לכאן עם ?published=1 - הודעת הצלחה קצרה.
   // הפיד נטען מחדש ממילא בכניסה לעמוד, והביקורת החדשה מופיעה בראשו.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("published") === "1") {
       showComingSoon("הביקורת פורסמה 🎉");
       router.replace("/places");
+    } else if (params.get("published") === "post") {
+      // אחרי פרסום פוסט (/places/post/create) - הפיד נטען מחדש ממילא והפוסט מופיע בראשו.
+      showComingSoon("הפוסט פורסם 🎉");
+      router.replace("/places");
     } else if (params.get("create") === "1") {
       // תפריט היצירה ("מה בא לכם ליצור?") - נשאר נתמך לקישורים ישנים.
       setCreateMenuOpen(true);
       router.replace("/places");
     } else if (params.get("create") === "post") {
-      // עמוד "תוכן" (/content): ריבוע "פוסט" פותח ישר את ה-Post Composer הקיים.
-      setCreatePostOpen(true);
-      router.replace("/places");
+      // קישורים ישנים (/places?create=post) - ממשיכים לעמוד יצירת הפוסט.
+      router.replace("/places/post/create");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -177,17 +177,6 @@ export default function PlacesHomePage() {
   // handleOpenComments (שניווט ל-/places/post/[id]) הוסר - PostCard
   // פותח עכשיו מודל מסך-מלא פנימי בעצמו (PostMediaViewerModal), בלי
   // מעורבות של העמוד הזה בכלל.
-
-  async function handleCreatePost(text: string, visibility: PostVisibility, mediaIds: string[], placeId?: string | null) {
-    await fetchJson("/api/social/posts", {
-      method: "POST",
-      // placeId = תיוג מקום אופציונלי - לא הופך את הפוסט לביקורת (postType נשאר "post"/"photo").
-      body: JSON.stringify({ text, visibility, postType: mediaIds.length ? "photo" : "post", mediaIds, placeId: placeId ?? undefined }),
-    });
-    await loadFeed(feedTab);
-    // חזרה ל-Feed - הפוסט החדש מופיע בראש (הפיד ממוין לפי created_at).
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
 
   async function handleEditPost(postId: string, newText: string) {
     await fetchJson(`/api/social/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ text: newText }) });
@@ -311,7 +300,7 @@ export default function PlacesHomePage() {
           <PlacesEmptyState
             title="שתף את הרגע הראשון שלך"
             actionLabel="צור פוסט"
-            onAction={() => setCreatePostOpen(true)}
+            onAction={() => router.push("/places/post/create")}
           />
         )}
 
@@ -354,18 +343,11 @@ export default function PlacesHomePage() {
 
       <MainBottomNav active="places" />
 
-      {createPostOpen && (
-        <CreatePostSheet
-          onClose={() => setCreatePostOpen(false)}
-          onSubmit={handleCreatePost}
-        />
-      )}
-
       {createMenuOpen && (
         <CreateMenuSheet
           onClose={() => setCreateMenuOpen(false)}
-          onSelectPost={() => setCreatePostOpen(true)}
-          // "מקום": עמודים מלאים עם הבר העליון של Places - /places/create (בחירה/הוספת מקום) ואז /places/create/review.
+          onSelectPost={() => router.push("/places/post/create")}
+          // "מקום": עמוד מלא אחד (/places/create) - חיפוש, הוספת מקום וביקורת נחשפים שלב אחרי שלב.
           onSelectPlace={() => router.push("/places/create")}
           onSelectCollection={() => setCollectionTypeOpen(true)}
           onSelectTrip={() => router.push("/places/trip/create")}

@@ -1,5 +1,5 @@
 ﻿import { createAdminClient } from "@/services/supabase/admin";
-import { MONTHLY_TOKEN_ALLOWANCE, TOKEN_COSTS, type TokenActionType } from "@/constants/tokenCosts";
+import { MONTHLY_TOKEN_ALLOWANCE, TOKEN_COSTS, UNLIMITED_TRIPS_PROMO, type TokenActionType } from "@/constants/tokenCosts";
 
 export { MONTHLY_TOKEN_ALLOWANCE, TOKEN_COSTS, type TokenActionType };
 
@@ -39,6 +39,8 @@ interface TokenBalanceRow {
 /** שולף (ומוודא מחזור עדכני, כולל reset אוטומטי אם צריך) את היתרה
  *  הנוכחית של המשתמש. משתמש חדש מקבל אוטומטית 100/100. */
 export async function getTokenBalance(userId: string): Promise<TokenBalance> {
+  // מבצע הרצה: תמיד היתרה המלאה, בלי לגעת ב-DB (ר' UNLIMITED_TRIPS_PROMO).
+  if (UNLIMITED_TRIPS_PROMO) return { balance: MONTHLY_TOKEN_ALLOWANCE, cycleStart: new Date().toISOString() };
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("ensure_token_cycle", { p_user_id: userId });
   if (error) throw new Error(`getTokenBalance: ${error.message}`);
@@ -52,6 +54,7 @@ export async function getTokenBalance(userId: string): Promise<TokenBalance> {
  *  הבדיקה הזו לחיוב בפועל, ולכן consumeTokens *תמיד* בודק שוב באופן
  *  אטומי בעצמו, בלי להסתמך על התוצאה של הפונקציה הזו. */
 export async function canConsumeTokens(userId: string, amount: number): Promise<{ canAfford: boolean; balance: number }> {
+  if (UNLIMITED_TRIPS_PROMO) return { canAfford: true, balance: MONTHLY_TOKEN_ALLOWANCE };
   const { balance } = await getTokenBalance(userId);
   return { canAfford: balance >= amount, balance };
 }
@@ -69,6 +72,8 @@ export async function consumeTokens(
   type: TokenActionType | (string & {}),
   referenceId?: string | null
 ): Promise<ConsumeTokensResult> {
+  // מבצע הרצה: לא מחייבים ולא חוסמים - הפעולה תמיד מצליחה והיתרה נשארת מלאה.
+  if (UNLIMITED_TRIPS_PROMO) return { success: true, alreadyCharged: false, balance: MONTHLY_TOKEN_ALLOWANCE };
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("consume_tokens", {
     p_user_id: userId,
@@ -92,6 +97,8 @@ export async function refundTokens(
   type: string,
   referenceId?: string | null
 ): Promise<{ success: boolean; balance: number }> {
+  // מבצע הרצה: לא חויב - אין מה להחזיר.
+  if (UNLIMITED_TRIPS_PROMO) return { success: true, balance: MONTHLY_TOKEN_ALLOWANCE };
   const supabase = createAdminClient();
   const { data, error } = await supabase.rpc("refund_tokens", {
     p_user_id: userId,

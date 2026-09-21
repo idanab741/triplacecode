@@ -29,6 +29,7 @@ import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import { getSessionLocation } from "@/utils/sessionLocation";
 import { readDeck, writeDeck, clearDeck } from "@/utils/tripMatchDeckCache";
+import { TripsIntroCard } from "@/components/trips/TripsIntroCard";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -1196,6 +1197,9 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
       )}
 
       <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
+        {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
+        {stage === "city" && !embedded && <TripsIntroCard />}
+
         {stage === "city" && embedded && (
           // *** שונה (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית", ובלי
           // עיצובי טעינה): במצב מוטמע (Home) הטעינה מתחילה מיד בהתחברות הרכיב

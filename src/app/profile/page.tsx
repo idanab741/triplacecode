@@ -2,24 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth/authService";
-import { AvatarUploader } from "@/components/AvatarUploader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { InviteFriendsModal } from "@/components/invite/InviteFriendsModal";
-import { TokenBalancePill } from "@/screens/profile/TokenBalancePill";
-import { Button, Field, Input, Skeleton } from "@/components/ui";
-import { updateProfile, uploadAvatar } from "@/services/profile/profileService";
+import { TripsBalanceBadge } from "@/screens/profile/TripsBalanceBadge";
+import { getAvatarUrl } from "@/constants/avatar";
+import { Button, Skeleton } from "@/components/ui";
 
 export default function ProfilePage() {
-  const { user, loading, profile, profileLoading, refreshProfile } = useAuth();
+  const { loading, profile, profileLoading } = useAuth();
   const router = useRouter();
 
-  const [fullName, setFullName] = useState(profile?.full_name ?? "");
-  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
-  const [savingName, setSavingName] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -51,27 +47,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSaveName() {
-    if (!user) return;
-    setSavingName(true);
-    setSaveError(null);
-    try {
-      if (pendingAvatarFile) {
-        const url = await uploadAvatar(user.id, pendingAvatarFile);
-        await updateProfile(user.id, { avatar_url: url });
-        setPendingAvatarFile(null);
-      }
-      if (fullName.trim()) {
-        await updateProfile(user.id, { full_name: fullName.trim() });
-      }
-      await refreshProfile();
-    } catch {
-      setSaveError("שמירת השינויים נכשלה, נסו שוב");
-    } finally {
-      setSavingName(false);
-    }
-  }
-
   function ChevronLeft() {
     return (
       <svg
@@ -94,7 +69,6 @@ export default function ProfilePage() {
     return (
       <div className="min-h-screen bg-bg pb-28">
         <div className="mx-auto flex max-w-xl flex-col items-center gap-4 pt-10">
-          <Skeleton className="h-28 w-28 rounded-full" />
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-4 w-56" />
         </div>
@@ -104,94 +78,63 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-bg pb-28">
+      {/* *** בקשה מפורשת - "בלי תמונה ובלי קאבר בעמוד הזה ספציפית": עמוד התפריט (שלוש הפסים בפרופיל) - בלי תמונת
+          הפרופיל ובלי הקאבר. במקומם - בר triplace עם חזרה, ומיד אחריו השם והרשימה. כרטיס "פרטים אישיים" (שם/אימייל/סיסמה)
+          הוסר: אותם שדות בדיוק נמצאים ב"עריכת פרופיל". */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.back()} />
       <div className="mx-auto max-w-xl">
         <div className="overflow-hidden rounded-b-[50px] bg-white">
-          <div className="relative w-full">
-            <Image
-              src="/images/hero-profile-setup.png"
-              alt="קמע triplace"
-              width={800}
-              height={500}
-              priority
-              className="h-auto w-full"
-            />
-            <div
-              className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
-              style={{ left: "49.73%", top: "71.7%", width: "42%" }}
-            >
-              {user && (
-                <AvatarUploader
-                  userId={user.id}
-                  initialUrl={profile?.avatar_url}
-                  fluid
-                  bordered={false}
-                  deferSave
-                  onFileSelected={setPendingAvatarFile}
-                  onFileCleared={() => setPendingAvatarFile(null)}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-3 px-5 pb-6 pt-0 text-center">
-            <div>
-              <h1 className="text-xl font-bold text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
-              <p className="text-sm text-ink-secondary">{profile?.city || "—"}</p>
-              <div className="mt-2 flex justify-center">
-                <TokenBalancePill />
+          <div className="flex flex-col gap-4 px-5 pb-5 pt-5">
+            {/* *** בקשה מפורשת - "עיגול של תמונת הפרופיל עם השם ליד משמאל": העיגול מימין (התחלה ב-RTL), השם והעיר משמאלו. */}
+            <div className="flex items-center gap-3.5">
+              <span className="block h-[76px] w-[76px] shrink-0 overflow-hidden rounded-full border-[3px] border-white bg-bg-secondary shadow-soft ring-1 ring-black/5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={getAvatarUrl(profile?.avatar_url)} alt="" className="h-full w-full object-cover" />
+              </span>
+              <div className="min-w-0 flex-1 text-start">
+                {/* *** בקשה מפורשת - "שהטריפים שלי יהיו ליד השם" (ושורת "במיוחד להרצה" הוסרה) */}
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <h1 className="min-w-0 truncate text-xl font-bold text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
+                  <TripsBalanceBadge />
+                </div>
+                <p className="truncate text-sm text-ink-secondary">{profile?.city || "—"}</p>
               </div>
-            </div>
-
-            <div className="flex w-full flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => router.push("/onboarding")}
-                className="flex w-full items-center justify-between rounded-card border-2 border-accent bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-              >
-                <span className="font-bold text-ink">הכירו את triplace</span>
-                <ChevronLeft />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/preferences?returnTo=/profile")}
-                className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-              >
-                <span className="font-bold text-ink">התאמות אישיות</span>
-                <ChevronLeft />
-              </button>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 px-5 pb-4 pt-6">
-          <div className="rounded-card bg-white p-4 shadow-soft">
-            <p className="mb-3 font-bold text-ink">פרטים אישיים</p>
-            <div className="flex flex-col gap-3">
-              <Field label="שם מלא">
-                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-              </Field>
-              <Field label="אימייל">
-                <Input value={user?.email ?? ""} disabled />
-              </Field>
-              {saveError && <p className="text-center text-xs text-danger">{saveError}</p>}
-              <Button
-                variant="primary"
-                fullWidth
-                onClick={handleSaveName}
-                disabled={savingName || (fullName.trim() === profile?.full_name && !pendingAvatarFile)}
-              >
-                {savingName ? "שומר..." : "שמור שינויים"}
-              </Button>
-              <button
-                type="button"
-                onClick={() => router.push("/auth/change-password")}
-                className="text-center text-sm font-medium text-accent"
-              >
-                שינוי סיסמה
-              </button>
-            </div>
-          </div>
+        {/* *** בקשה מפורשת - "רווח אחיד לכולם!!!!": כל השורות (הכירו, התאמות, עריכת פרופיל, הבחירות, היומן, ...) ברשימה אחת
+            עם gap-3 (12px) קבוע. קודם: gap-2 בתוך בלוק לבן + 32px בין הבלוק לרשימה + gap-4 בשאר. הבלוק הלבן מכיל רק את השם. */}
+        <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
+          <button
+            type="button"
+            onClick={() => router.push("/onboarding")}
+            className="flex w-full items-center justify-between rounded-card border-2 border-accent bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+          >
+            <span className="font-bold text-ink">הכירו את triplace</span>
+            <ChevronLeft />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/preferences?returnTo=/profile")}
+            className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+          >
+            <span className="font-bold text-ink">התאמות אישיות</span>
+            <ChevronLeft />
+          </button>
+
+          {/* *** בקשה מפורשת - "עריכת פרופיל בין התאמות אישיות לבין הבחירות שלי" + "למה רווח כזה גדול?": השורה בתוך אותו בלוק לבן,
+              צמודה ל"התאמות אישיות" באותו מרווח קטן כמו בין שתי השורות שמעליה (לא בתחילת הרשימה התחתונה, שם נוצר רווח). */}
+          <button
+            type="button"
+            onClick={() => router.push("/places/profile/edit")}
+            className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+          >
+            <span className="font-bold text-ink">עריכת פרופיל</span>
+            <ChevronLeft />
+          </button>
 
           <button
             type="button"

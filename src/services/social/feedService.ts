@@ -25,7 +25,9 @@ export async function getFeed(
   tab: FeedTab,
   limit = 15,
   cursor?: string,
-  authorId?: string
+  authorId?: string,
+  /** סינון לפי post_type (טאבים בפרופיל): include = רק הסוגים האלה, exclude = הכל חוץ מהסוגים האלה. */
+  postTypes?: { include?: string[]; exclude?: string[] }
 ): Promise<{ items: FeedItemDto[]; nextCursor: string | null }> {
   let authorFilterIds: string[] | null = null;
 
@@ -57,6 +59,8 @@ export async function getFeed(
   // הפוסטים של אותו משתמש שה-RLS מרשה לצופה לראות, לא רק אם הוא בין
   // החברים/הנעקבים של הצופה עצמו.
   if (authorId) query = query.eq("author_id", authorId);
+  if (postTypes?.include?.length) query = query.in("post_type", postTypes.include);
+  if (postTypes?.exclude?.length) query = query.not("post_type", "in", `(${postTypes.exclude.join(",")})`);
   if (authorFilterIds) query = query.in("author_id", authorFilterIds);
   if (cursor) query = query.lt("created_at", cursor);
 
