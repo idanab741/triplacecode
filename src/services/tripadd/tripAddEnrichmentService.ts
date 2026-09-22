@@ -37,10 +37,11 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       return;
     }
 
-    // *** בקשה מפורשת (מינימלי): מגוגל נשלפים ונשמרים אך ורק דירוג,
-    // נגישות וטווח מחירים - לא תמונות, לא טלפון, לא תיאור, לא שעות
-    // פתיחה. המיקום (address/lat/lng) כבר מגיע מגוגל בשלב ההגשה עצמה
-    // (autocomplete), לא כאן.
+    // *** תיקון (בקשה מפורשת - "תיאור - תוציא מגוגל, איפה הדירוג, המרחק, הקטגוריות?"): ההחלטה הישנה כאן
+    // הייתה למשוך רק דירוג/נגישות/מחיר, בלי תיאור - זה התהפך: תיאור (editorialSummary) נשלף ונשמר עכשיו
+    // גם הוא, ר' patch.shortDescription למטה. עדיין לא תמונות/טלפון מגוגל - TripMatch (ר' tripMatchService.ts)
+    // מציג רק תמונות שמשתמשים העלו, עם נפילה חזרה לתמונת ה-Google היחידה שכבר נשמרה מרגע ההגשה (google_photo_url)
+    // רק כשאין אף תמונת משתמש - לא שולף/שומר עוד תמונות Google כאן.
     const patch: {
       subcategory?: string | null;
       accessible?: boolean | null;
@@ -51,6 +52,7 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       googleRating?: number | null;
       googleRatingCount?: number | null;
       openingHours?: string[] | null;
+      shortDescription?: string | null;
     } = {};
 
     // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות"): אם המשתמש כבר
@@ -110,6 +112,12 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
         // isPlaceOpenNow (utils/openingHours.ts) כבר יודע לפרש.
         if (googlePlace.regularOpeningHours?.weekdayDescriptions) {
           patch.openingHours = googlePlace.regularOpeningHours.weekdayDescriptions;
+        }
+        // *** תוספת (בקשה מפורשת - "תיאור - תוציא מגוגל מבחינתי"): אותה קריאה בדיוק ל-Google (ה-FIELD_MASK
+        // כבר כלל "places.editorialSummary" - ר' googlePlacesService.ts) - רק לא נקרא עד עכשיו. תקציר
+        // עריכתי אמיתי של גוגל, לא טקסט שממציא ה-AI.
+        if (googlePlace.editorialSummary?.text) {
+          patch.shortDescription = googlePlace.editorialSummary.text;
         }
       }
     } catch {

@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
-import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 import { ProfileContentGrid } from "@/screens/places/ProfileContentGrid";
 import { ProfileSocialLinks } from "@/screens/places/ProfileSocialLinks";
 import { SocialLinkSheet } from "@/screens/places/SocialLinkSheet";
@@ -48,9 +46,9 @@ export default function ProfileView({
   const router = useRouter();
   const [profile, setProfile] = useState<SocialProfileDto>(initialProfile);
   const [busy, setBusy] = useState(false);
-  const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
   const [socialSheet, setSocialSheet] = useState<SocialPlatform | null>(null);
+  /** מפתח לרענון ה-Grid (קבוע כרגע - אין יותר יצירת תוכן מהעמוד הזה). */
+  const [gridVersion] = useState(0);
 
   /** עקוב / עוקב - אותה מערכת follows הקיימת (POST/DELETE /api/social/follows). */
   async function handleFollowToggle() {
@@ -151,22 +149,6 @@ export default function ProfileView({
           </>
         )}
 
-        {/* "+" יצירת תוכן (רק בפרופיל שלי) - צמוד לטבעת (קוטר חיצוני 49%) */}
-        {isSelf && (
-          <div className="pointer-events-none absolute left-1/2 top-[68.9%] aspect-square w-[49%] -translate-x-1/2 -translate-y-1/2">
-            <button
-              type="button"
-              onClick={() => setCreateMenuOpen(true)}
-              aria-label="צור תוכן חדש"
-              className="pointer-events-auto absolute bottom-[4%] end-[4%] flex h-11 w-11 items-center justify-center rounded-full text-white shadow-soft"
-              style={{ background: BLUE_GRADIENT }}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.75" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="px-4">
@@ -243,29 +225,9 @@ export default function ProfileView({
       </div>
 
       {/* התוכן: טאבים עם אייקון + Grid ללא שוליים (פוסטים, ביקורות, אוספים, טיולים - לכל סוג אייקון משלו) */}
-      <ProfileContentGrid username={username} isSelf={isSelf} initialAll={initialContent} />
+      <ProfileContentGrid username={username} isSelf={isSelf} refreshKey={gridVersion} initialAll={initialContent} />
 
       <MainBottomNav active="profile" />
-
-      {createMenuOpen && (
-        <CreateMenuSheet
-          onClose={() => setCreateMenuOpen(false)}
-          onSelectPost={() => router.push("/places/post/create")}
-          onSelectPlace={() => router.push("/places/create")}
-          onSelectCollection={() => {
-            setCreateMenuOpen(false);
-            setCollectionTypeOpen(true);
-          }}
-          onSelectTrip={() => router.push("/places/trip/create")}
-        />
-      )}
-
-      {collectionTypeOpen && (
-        <CollectionTypeSheet
-          onClose={() => setCollectionTypeOpen(false)}
-          onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
-        />
-      )}
 
       {socialSheet && (
         <SocialLinkSheet

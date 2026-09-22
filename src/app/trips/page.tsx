@@ -44,17 +44,13 @@ interface TrippyAiTrip {
 
 type ChoiceItem = SessionTrip | TrippyAiTrip;
 
-type Tab = "all" | "saved" | "attractions";
+type Tab = "all" | "saved";
 
 const TAB_LABELS: Record<Tab, string> = {
-  all: "כל הבחירות",
+  // *** בקשה מפורשת - "רוצה שיהיה רק 'הטיולים שלי' ו'שמורים'": שתי לשוניות בלבד. לשונית "אטרקציות" (לייקים מ-TripMatch)
+  // הוסרה - הלייקים עברו לתוך "שמורים" (מתחת לאטרקציות השמורות), כדי שלא ייעלמו למשתמש.
+  all: "הטיולים שלי",
   saved: "שמורים",
-  // *** תיקון (בקשה מפורשת - "במקום לשונית לייקים - לשנות לאטרקציות"):
-  // רק שינוי תווית - הלוגיקה מתחתיה (getFavoritePlaces עם source
-  // "tripmatch") לא השתנתה, זו עדיין אותה רשימת "לייקים" ב-TripMatch,
-  // רק עם שם מדויק יותר למה שבאמת מוצג שם (אטרקציות, לא מקומות/מסעדות
-  // מכל סוג).
-  attractions: "אטרקציות",
 };
 
 const TRIP_TYPE_ROUTE: Record<string, string> = {
@@ -115,7 +111,7 @@ function TripsPageContent() {
   const [showRetentionInfo, setShowRetentionInfo] = useState(false);
 
   useEffect(() => {
-    if (!user || tab === "attractions") return;
+    if (!user) return;
     setTrips(null);
     const savedOnly = tab === "saved";
 
@@ -158,7 +154,7 @@ function TripsPageContent() {
   }, [user, tab]);
 
   useEffect(() => {
-    if (!user || tab !== "attractions") return;
+    if (!user || tab !== "saved") return;
     setPlaces(null);
     // *** תיקון: getFavoritePlaces בלי סינון מקור החזירה כל לייק בכל
     // האפליקציה (גם מבניית מסלולים, לא רק TripMatch) - הלשונית הזו
@@ -232,8 +228,8 @@ function TripsPageContent() {
   // *** בלשונית "שמורים" יש שני מקורות שונים (טיולים שמורים + אטרקציות
   // שמורות) - "ריק" אמיתי הוא רק כששניהם ריקים, לא רק trips. ר' הערה
   // ליד savedPlaces state למעלה.
-  const isSavedTabLoading = tab === "saved" && (loading || trips === null || savedPlaces === null);
-  const isSavedTabEmpty = tab === "saved" && (trips?.length ?? 0) === 0 && (savedPlaces?.length ?? 0) === 0;
+  const isSavedTabLoading = tab === "saved" && (loading || trips === null || savedPlaces === null || places === null);
+  const isSavedTabEmpty = tab === "saved" && (trips?.length ?? 0) === 0 && (savedPlaces?.length ?? 0) === 0 && (places?.length ?? 0) === 0;
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
@@ -260,8 +256,7 @@ function TripsPageContent() {
           ))}
         </div>
 
-        {tab !== "attractions" ? (
-          (tab === "saved" ? isSavedTabLoading : loading || trips === null) ? (
+        {(tab === "saved" ? isSavedTabLoading : loading || trips === null) ? (
             <div className="flex flex-col gap-3">
               {[0, 1, 2].map((i) => (
                 <Skeleton key={i} className="h-28 w-full rounded-card" />
@@ -350,46 +345,38 @@ function TripsPageContent() {
                   ))}
                 </>
               )}
+              {/* לייקים מ-TripMatch (החלקה ימינה) - עברו לכאן מלשונית "אטרקציות" שהוסרה (בקשה מפורשת: רק "הטיולים שלי" ו"שמורים") */}
+              {tab === "saved" && places && places.length > 0 && (
+                <>
+                  <p className="mt-2 text-sm font-bold text-ink">אטרקציות שאהבתם ב־TripMatch</p>
+                  {places.map((place) => (
+                    <SwipeToDeleteRow key={`liked-${place.id}`} resetKey={tab} onDelete={() => handleUnlikePlace(place.id)}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`)}
+                        className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
+                      >
+                        {place.imageUrls[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={place.imageUrls[0]} alt={place.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
+                        ) : (
+                          <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-ink-secondary">
+                            {[place.subcategory, place.category, place.city].filter(Boolean)[0]}
+                            {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
+                          </p>
+                        </div>
+                      </button>
+                    </SwipeToDeleteRow>
+                  ))}
+                </>
+              )}
             </div>
           )
-        ) : loading || places === null ? (
-          <div className="flex flex-col gap-3">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-28 w-full rounded-card" />
-            ))}
-          </div>
-        ) : places.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-center">
-            <p className="text-sm text-ink-secondary">עוד לא סימנת לייק לאף אטרקציה ב-TripMatch - צאו לגלות!</p>
-            <Button href="/tripmatch">ל-TripMatch</Button>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {places.map((place) => (
-              <SwipeToDeleteRow key={place.id} resetKey={tab} onDelete={() => handleUnlikePlace(place.id)}>
-                <button
-                  type="button"
-                  onClick={() => router.push(place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`)}
-                  className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
-                >
-                  {place.imageUrls[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={place.imageUrls[0]} alt={place.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
-                  ) : (
-                    <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
-                    <p className="mt-0.5 truncate text-xs text-ink-secondary">
-                      {[place.subcategory, place.category, place.city].filter(Boolean)[0]}
-                      {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
-                    </p>
-                  </div>
-                </button>
-              </SwipeToDeleteRow>
-            ))}
-          </div>
-        )}
+        }
       </div>
 
       {showRetentionInfo && (

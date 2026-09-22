@@ -507,10 +507,19 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     setCategoryValue(null);
     setCategoryLabel("הכל");
     try {
+      // *** תוספת (בקשה מפורשת - "מרחק מהמיקום הנוכחי"): המיקום האמיתי של המשתמש (אם כבר ידוע, ר'
+      // utils/sessionLocation.ts) - להצגת מרחק אמיתי בכרטיס, בנפרד ממוקד החיפוש עצמו.
+      const savedLocation = getSessionLocation();
       const response = await fetch("/api/tripmatch/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ city, category: "attractions", interests: [], includeAllCategories: true }),
+        body: JSON.stringify({
+          city,
+          category: "attractions",
+          interests: [],
+          includeAllCategories: true,
+          ...(savedLocation ? { userLat: savedLocation.lat, userLng: savedLocation.lng } : {}),
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "לא הצלחנו להתחיל");
@@ -607,6 +616,8 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     setError(null);
     setFilters(EMPTY_FILTERS);
     try {
+      // *** תוספת (בקשה מפורשת - "מרחק מהמיקום הנוכחי"): ר' ההערה המקבילה למעלה.
+      const savedLocation = getSessionLocation();
       const response = await fetch("/api/tripmatch/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -618,6 +629,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
           ...(opts?.geo
             ? { lat: opts.geo.lat, lng: opts.geo.lng, radiusKm: opts.geo.radiusKm, includeAllCategories: opts.geo.includeAll ?? false }
             : {}),
+          ...(savedLocation ? { userLat: savedLocation.lat, userLng: savedLocation.lng } : {}),
         }),
       });
       const data = await response.json();
@@ -959,7 +971,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     setSessionLikedPlaces((prev) => prev.filter((p) => p.id !== placeId));
     if (!user) return;
     const supabase = createClient();
-    await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
+    await toggleFavorite(supabase, user.id, placeId, "tripadd", "liked").catch(() => {});
   }
 
   // החפיסה הסתיימה = כל מי שנטען כבר הוחלט עליו (לייק/דילוג). לפני זה: "אין

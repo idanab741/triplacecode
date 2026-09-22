@@ -42,7 +42,7 @@ function CreateCollectionContent() {
           <Skeleton className="mb-4 h-10 w-full" />
           <Skeleton className="h-40 w-full" />
         </div>
-        <MainBottomNav active="places" />
+        <MainBottomNav active="content" />
       </div>
     );
   }
@@ -54,7 +54,7 @@ function CreateCollectionContent() {
       <div className="pb-24">
         <CollectionForm mode="create" type={type} dark={dark} />
       </div>
-      <MainBottomNav active="places" />
+      <MainBottomNav active="content" />
     </div>
   );
 }

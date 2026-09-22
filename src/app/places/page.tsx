@@ -15,7 +15,6 @@ import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
 import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
 import { TripFeedCard } from "@/screens/trips/TripFeedCard";
-import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
 import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
@@ -74,7 +73,6 @@ export default function PlacesHomePage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
   const [comingSoonMessage, setComingSoonMessage] = useState<string | null>(null);
   function showComingSoon(message: string) {
@@ -349,16 +347,7 @@ export default function PlacesHomePage() {
           onSelectPost={() => router.push("/places/post/create")}
           // "מקום": עמוד מלא אחד (/places/create) - חיפוש, הוספת מקום וביקורת נחשפים שלב אחרי שלב.
           onSelectPlace={() => router.push("/places/create")}
-          onSelectCollection={() => setCollectionTypeOpen(true)}
           onSelectTrip={() => router.push("/places/trip/create")}
-        />
-      )}
-
-      {/* "מה תרצו לאסוף?" - בחירה אחת (מקומות / טיולים); הסוג נקבע ולא ניתן לערבב. */}
-      {collectionTypeOpen && (
-        <CollectionTypeSheet
-          onClose={() => setCollectionTypeOpen(false)}
-          onSelect={(type) => router.push(`/places/collection/create?type=${type}`)}
         />
       )}
 

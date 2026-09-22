@@ -25,9 +25,17 @@ const DESTINATION_KEY = "triplace:session-destination";
 let memoryLocation: SessionLocation | null = null;
 let memoryDestination: string | null = null;
 
+/** *** תיקון (בקשה מפורשת - "המיקום שלי צריך להיות זכור תמיד, ולא כל פעם מחדש לשאול ולהתאפס"):
+ *  המיקום (LOCATION_KEY) עבר מ-sessionStorage ל-localStorage - נשמר גם אחרי סגירת האפליקציה/הטאב, לא רק
+ *  "כל עוד אתה באפליקציה". היעד הפעיל בעמוד הבית (DESTINATION_KEY) נשאר ב-sessionStorage בכוונה - הוא
+ *  אמור להתאפס בכניסה חדשה לחלוטין לעמוד הבית, רק לשרוד ניווט פנימי (חזרה מעמוד מקום וכו'). */
+function storageFor(key: string): Storage | null {
+  return key === LOCATION_KEY ? window.localStorage : window.sessionStorage;
+}
+
 function readStorage(key: string): string | null {
   try {
-    return window.sessionStorage.getItem(key);
+    return storageFor(key)?.getItem(key) ?? null;
   } catch {
     return null;
   }
@@ -35,8 +43,10 @@ function readStorage(key: string): string | null {
 
 function writeStorage(key: string, value: string | null) {
   try {
-    if (value == null) window.sessionStorage.removeItem(key);
-    else window.sessionStorage.setItem(key, value);
+    const storage = storageFor(key);
+    if (!storage) return;
+    if (value == null) storage.removeItem(key);
+    else storage.setItem(key, value);
   } catch {
     // אחסון לא זמין - נשארים עם הזיכרון בלבד.
   }

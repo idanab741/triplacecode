@@ -117,13 +117,14 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // שחזור חד-פעמי של טיוטה: אם יצאנו לזרימת "הוספת מקום" הקיימת (אי אפשר ליצור Place מתוך האוסף) וחזרנו.
+  // *** תיקון (בקשה מפורשת - "וכמובן שמירה קבועה"): מ-sessionStorage (נמחק כשסוגרים את הטאב) ל-
+  // localStorage (שורד סגירת דפדפן/טאב) - כדי שהוספת פריטים לאוסף לא תלך לאיבוד אם יוצאים מהעמוד
+  // לפני "פרסום האוסף" בפועל.
   useEffect(() => {
     if (mode !== "create") return;
     try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
+      const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
-      sessionStorage.removeItem(DRAFT_KEY);
       const draft = JSON.parse(raw) as CollectionFormInitial & { type: CollectionType };
       if (draft.type !== type) return;
       setTitle(draft.title);
@@ -134,14 +135,22 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
     } catch {
       // טיוטה פגומה - מתעלמים
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, type]);
 
-  function handleGoAddPlace() {
+  // *** תוספת (אותה בקשה - "שמירה קבועה"): שמירה שוטפת של הטיוטה בכל שינוי, לא רק ברגע היציאה
+  // הזמנית ל"הוספת מקום" (handleGoAddPlace למטה) - כך שכל פריט שנוסף לאוסף נשמר מיד, גם אם המשתמש
+  // סוגר את האפליקציה/הדפדפן ולא לוחץ בפועל על "פרסום האוסף".
+  useEffect(() => {
+    if (mode !== "create") return;
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ type, title, description, coverUrl, visibility, items }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ type, title, description, coverUrl, visibility, items }));
     } catch {
-      // sessionStorage חסום - ממשיכים בלי טיוטה
+      // localStorage חסום - ממשיכים בלי טיוטה
     }
+  }, [mode, type, title, description, coverUrl, visibility, items]);
+
+  function handleGoAddPlace() {
     router.push("/places/create");
   }
 
@@ -185,6 +194,15 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
             });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "שגיאה בשמירת האוסף");
+      // *** תיקון (אותה בקשה - "שמירה קבועה"): פורסם בהצלחה - מוחקים את הטיוטה הקבועה, כדי שאוסף
+      // הבא (create) לא "יירש" בטעות את הפריטים של האוסף הזה.
+      if (mode === "create") {
+        try {
+          localStorage.removeItem(DRAFT_KEY);
+        } catch {
+          // localStorage חסום - לא קריטי
+        }
+      }
       router.replace(`/places/collection/${mode === "create" ? data.id : collectionId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בשמירת האוסף");
@@ -320,7 +338,10 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
           onAdd={handleAddItem}
           onClose={() => setPickerOpen(false)}
           onGoAddPlace={type === "places" ? handleGoAddPlace : undefined}
-          dark={dark}
+          // *** תיקון (בקשה מפורשת - "עכשיו רק באוסף - במקומות ובטיולים - צריך להחזיר את 'מה תרצו
+          // להוסיף' לצבע לבן"): "מה תרצו להוסיף?" נשאר תמיד לבן בזרימת האוסף - גם ב-type="places"
+          // וגם ב-type="trips" - בלי קשר ל-dark שהתקבל מ-collection/create/page.tsx (origin=content).
+          // ה-dark ההוא עדיין משפיע על CollectionTypeSheet הקודם ("מה תרצו לאסוף?") - לא נגעתי בו.
         />
       )}
 

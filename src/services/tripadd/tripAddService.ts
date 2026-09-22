@@ -214,6 +214,10 @@ export interface TripAddEnrichmentPatch {
    *  languageCode:"he") - בדיוק הפורמט ש-isPlaceOpenNow (utils/
    *  openingHours.ts) כבר יודע לפרש, לא בונים parser חדש. */
   openingHours?: string[] | null;
+  /** *** תוספת (בקשה מפורשת - "תיאור - תוציא מגוגל מבחינתי"): תקציר עריכתי של Google (editorialSummary),
+   *  נשמר לתוך short_description - העמודה הזו כבר הוגדרה מלכתחילה למטרה הזו (ר' migration 0078: "הושלם
+   *  ע\"י AI/Google *אחרי* השמירה"), פשוט אף תהליך לא מילא אותה עד עכשיו. */
+  shortDescription?: string | null;
 }
 
 /** מיושם רק אחרי השמירה, ע"י tripAddEnrichmentService.ts בלבד - לא
@@ -235,6 +239,7 @@ export async function applyTripAddEnrichment(
   if (patch.openingHours !== undefined) update.opening_hours = patch.openingHours;
   if (patch.googleRating !== undefined) update.google_rating = patch.googleRating;
   if (patch.googleRatingCount !== undefined) update.google_rating_count = patch.googleRatingCount;
+  if (patch.shortDescription !== undefined) update.short_description = patch.shortDescription;
 
   const { error } = await supabase.from("tripadd_submissions").update(update).eq("id", submissionId);
   if (error) throw error;

@@ -154,16 +154,16 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_8px_18px_-8px_rgba(27,111,232,0.7)]"
           style={{ background: BRAND_GRADIENT }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
-            <circle cx="15" cy="7" r="2" />
-            <circle cx="9" cy="17" r="2" />
+          {/* *** תיקון (בקשה מפורשת - "לשנות את האייקון לזה שמופיע בעמוד הבית"): אותו אייקון בדיוק כמו כפתור
+              הפילטרים בעמוד הבית (FilterCircleButton) - שלוש קווים אופקיים בגדלים יורדים. */}
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[19px] font-extrabold leading-tight text-ink">פילטרים</h2>
+          <h2 className="text-[19px] font-extrabold leading-tight text-ink">סינון</h2>
           <p className="mt-0.5 text-[12px] text-ink-secondary">
-            {activeCount > 0 ? `${activeCount} פילטרים פעילים` : "התאימו את המקומות שמוצגים לכם"}
+            {activeCount > 0 ? `${activeCount} סינונים פעילים` : "התאימו את המקומות שמוצגים לכם"}
           </p>
         </div>
         {activeCount > 0 && (

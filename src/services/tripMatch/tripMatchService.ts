@@ -1,8 +1,11 @@
 ﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/services/supabase/admin";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import type { CandidatePlace, LatLng } from "@/services/tripBuilder/types";
+import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 export interface TripMatchSession {
   id: string;
@@ -77,53 +80,87 @@ function kmToLngDegrees(km: number, atLat: number): number {
  *  הראשי - כך ש-ILIKE של השם המלא לא מוצא את השורות (המחרוזת הקצרה יותר
  *  לא *מכילה* את הארוכה). לוקחים את החלק שלפני המקף כדי שההתאמה תעבוד
  *  משני הכיוונים. */
+/** session.category משתמש בטקסונומיית PLACE_CATEGORIES (constants/placeCategories.ts) - tripadd_submissions
+ *  משתמשת בטקסונומיה אחרת (HomeQuickCategoryId, constants/homeQuickCategories.ts). ממפים בין השתיים כדי
+ *  לסנן נכון. "hotels" -> "sleep" (הכי קרוב מבחינת משמעות; TripMatch עצמו לא מציע "hotels" כאפשרות בחירה
+ *  רגילה, אבל session.category יכול לקבל אותו טכנית). אין מקבילה ל-"shopping" בצד PLACE_CATEGORIES - זה
+ *  בסדר, כי session רגיל אף פעם לא ישלח אותו; includeAllCategories ממילא מדלג על הסינון הזה. */
+const CATEGORY_TO_TRIPADD: Record<string, string> = {
+  restaurants: "food",
+  nightlife: "nightlife",
+  attractions: "attraction",
+  nature: "nature",
+  hotels: "sleep",
+};
+
 function coreCityTerm(city: string): string {
   return city.split(/[-–—]/)[0].trim();
 }
 
-/** שולף מועמדים (אטרקציות) - בשני מצבים אפשריים:
- *  1. חיפוש רגיל לפי עיר/מדינה שנבחרה בשלב 2.
- *  2. "קרוב אליי" (session.latitude/longitude מוגדרים) - חיפוש רדיוס
- *     אמיתי מהקואורדינטות, בלי קשר לשם העיר בכלל (כי מקום קרוב יכול
- *     להיות רשום תחת עיר שכנה - "רמת גן" למשל, שנמצאת ממש ליד תל אביב
- *     אבל לא תואמת ILIKE של השם "תל אביב"). */
-export async function fetchTripMatchCandidates(
+/**
+ * *** שינוי-מקור (בקשה מפורשת - "שיופיעו רק האטרקציות שהמשתמשים הכניסו לאפליקציה, ולא מה שיש בעמוד admin
+ *  places! כולל התגיות, כולל הדירוג של גוגל, כולל המרחק, והתיאור"): TripMatch שולף עכשיו אך ורק מ-
+ *  tripadd_submissions (המאגר הקהילתי, ר' migration 0078+) - לא מטבלת places (המאגר שמנוהל ע"י admin/places).
+ *  בהתאם, שדות שהיו תלויים בעושר הנתונים של places לא מוצגים: rating/ratingCount = null (לא דירוג גוגל, לא
+ *  שום דירוג), tags/tripTypeTags/cuisineTags = [] (בלי תגיות), shortDescription = null (בלי תיאור).
+ *  distanceKm עדיין מחושב במצב "קרוב אליי" (המרחק עצמו לא הוסתר בבקשה - רק תגיות/דירוג/תיאור; TripMatchCard
+ *  הוא זה שהפסיק להציג את ה-badge של המרחק, ר' שם). תמונות - רק מה שהמשתמשים העלו בפועל
+ *  (tripadd_submission_media), לא google_photo_url - אותו עיקרון שכבר קיים ב-tripadd/pins ו-tripAddPlaceService.
+ *  בלי סינון לפי status (pending/approved) - אותו עיקרון בדיוק כמו כל שאר המאגר הקהילתי הזה באפליקציה.
+ */
+async function fetchTripAddCandidates(
   supabase: SupabaseClient,
   session: TripMatchSession,
-  limit = 60
+  limit: number,
+  /** *** תוספת (בקשה מפורשת - "מרחק מהמיקום הנוכחי"): המיקום *האמיתי* של המשתמש כרגע - נפרד מ"מוקד
+   *  החיפוש" (geoOrigin למטה, שיכול להיות עיר שגואוקדה, לא איפה שהמשתמש נמצא בפועל). כשמועבר, המרחק
+   *  המוצג בכרטיס תמיד מחושב ממנו; בלעדיו (המשתמש עוד לא שיתף מיקום) - נופלים חזרה למוקד החיפוש. */
+  userLocation?: LatLng | null
 ): Promise<CandidatePlace[]> {
   const isGeoSearch = session.latitude != null && session.longitude != null;
 
-  let query = supabase
-    .from("places")
-    .select(
-      "id,name,category,subcategory,short_description,image_urls,rating,rating_count,price_level,estimated_visit_minutes,latitude,longitude,trip_type_tags,cuisine_tags,tags,tripmatch_scores,dna_scores,kosher,accessible,suitable_child_ages,budget_tier,is_area_experience,city"
-    )
-    // *** תיקון: TripMatch היה שולף מכל 2717 השורות בטבלה, כולל כל
-    // מה שמסומן is_legacy=true (מקומות "בארכיון" שהאדמין בכוונה לא
-    // רוצה שיוצגו יותר). וגם היה מחזיר מקומות מכל קטגוריה (מסעדות,
-    // מלונות, חיי לילה וכו') ולא רק אטרקציות. שני הפילטרים האלה חסרים
-    // מקוריים - זה לא שינוי בהתנהגות אלא סגירת פער אמיתי.
-    .eq("is_legacy", false);
+  // *** תיקון-שורש (בקשה מפורשת - "שמתי רק בתל אביב ואין שום כרטיסייה?! איך זה הגיוני?"): חיפוש-עיר לפי
+  // טקסט (tripadd_submissions.city ILIKE) פספס שורות עם city=null (נפוץ כשמוסיפים מקום ע"י נעיצת "+" על
+  // המפה - רק lat/lng תמיד נשמרים, ר' tripAddService.ts: `city: input.city ?? null`). עכשיו מגאוקדים את
+  // שם העיר שחיפשנו לקואורדינטות, ומסננים לפי מרחק אמיתי - בלי תלות בעמודת city של השורה בכלל.
+  let searchOrigin: LatLng | null = isGeoSearch ? { lat: session.latitude!, lng: session.longitude! } : null;
+  let radiusKm = session.radius_km ?? 10;
+  if (!isGeoSearch) {
+    const cityCoords = await geocodePlaceName(session.city);
+    if (cityCoords) {
+      searchOrigin = cityCoords;
+      radiusKm = 20; // רדיוס עיר סביר (כולל פרברים קרובים) - לא 10 (מכוון ל"קרוב אליי" ברמת שכונה)
+    }
+    // גיאוקוד נכשל (API key חסר/שגיאת רשת) - fail open: ממשיכים בלי סינון גיאוגרפי כלל, במקום 0 תוצאות.
+  }
+  // מוקד ה*הצגה* של המרחק בכרטיס: המיקום האמיתי של המשתמש כשידוע, אחרת מוקד החיפוש עצמו.
+  const distanceOrigin: LatLng | null = userLocation ?? searchOrigin;
 
-  // *** תיקון: לפני זה היה .eq("category", "attractions") קבוע - עכשיו
-  // תלוי בקטגוריה שהמשתמש בחר בשלב 2 (מסעדות/חיי לילה/טבע/אטרקציות),
-  // כדי שבחירת "מסעדות וקולינריה" באמת תחזיר מסעדות ולא אטרקציות.
-  // *** ב"הכל" (include_all_categories - גם בחיפוש עיר רגיל וגם ב"קרוב
-  // אליי") לא מסננים לפי קטגוריה בכלל, כולל "מלונות"/לינה - בקשה מפורשת
-  // שגם לינה תהיה חלק מהתוצאות (עיגול הסינון "לינה" בעמוד TripMatch
-  // מסנן על זה בצד הלקוח, לא כאן). אם המשתמש בחר קטגוריה ספציפית -
-  // עדיין מסננים רגיל לפי אותה עמודה.
+  // *** תיקון-שורש (בקשה מפורשת - "למה אין לי תמונה לכל המקומות כאן? לכולן יש תמונה באפליקציה בדקתי"):
+  // media_assets נשמרת RLS מוגבל-לבעלים ברמת הטבלה בכוונה ("Owners can view their own media", migration
+  // 0067) - חשיפה ציבורית אמורה לעבור תמיד דרך DTO של שרת עם admin client, לא RLS ישיר (בדיוק כמו
+  // ב-getTripAddPlaceById ו-pins/route.ts). tripadd_submissions/tripadd_submission_media עצמן כבר
+  // ציבוריות לכל משתמש מחובר (migrations 0080/0086) - אבל ה-join המקונן media_assets(url) עדיין רץ עם
+  // ה-client הרגיל (מוגבל ל-session/cookies של המבקר), אז השורה חוזרת עם media_assets: null בשקט לכל
+  // תמונה שהועלתה ע"י משתמש *אחר* - בדיוק ה"חצי מהמקומות בלי תמונה" שתואר. עמוד המקום הבודד (/place/[id])
+  // תמיד הציג נכון כי הוא כבר משתמש ב-admin client. עכשיו גם כאן.
+  const adminForMedia = createAdminClient();
+  let query = adminForMedia
+    .from("tripadd_submissions")
+    .select(
+      "id, name, category, subcategory, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, tripadd_submission_media(sort_order, media_assets(url))"
+    )
+    .not("latitude", "is", null)
+    .not("longitude", "is", null);
+
   if (!session.include_all_categories) {
-    query = query.eq("category", session.category);
+    const tripaddCategory = CATEGORY_TO_TRIPADD[session.category];
+    if (tripaddCategory) query = query.eq("category", tripaddCategory);
   }
 
-  if (isGeoSearch) {
-    // "קרוב אליי" - תיבת-חסימה גסה סביב הקואורדינטות (מצמצמת את מה
-    // שנשלף מה-DB), והסינון המדויק לרדיוס בק"מ קורה אחר כך ב-JS.
-    const lat = session.latitude!;
-    const lng = session.longitude!;
-    const radiusKm = session.radius_km ?? 10;
+  if (searchOrigin) {
+    const lat = searchOrigin.lat;
+    const lng = searchOrigin.lng;
     const latDelta = kmToLatDegrees(radiusKm);
     const lngDelta = kmToLngDegrees(radiusKm, lat);
     query = query
@@ -131,119 +168,125 @@ export async function fetchTripMatchCandidates(
       .lte("latitude", lat + latDelta)
       .gte("longitude", lng - lngDelta)
       .lte("longitude", lng + lngDelta);
-  } else {
-    // *** תיקון: "תל אביב-יפו" (שם רשמי, כפי שנשמר ב-destinations ומוצג
-    // בהשלמה האוטומטית של שדה היעד) לא תאם ל-ILIKE כש-places.city שמור
-    // בתור "תל אביב" בלבד - ה-ILIKE בודק אם *העמודה* מכילה את המחרוזת
-    // שחיפשנו, ו"תל אביב" לא מכילה את "תל אביב-יפו". לוקחים את החלק
-    // העיקרי (לפני מקף) כדי שההתאמה תעבוד גם כשה-DB שמור בגרסה הקצרה.
-    const cityTerm = coreCityTerm(session.city);
-    query = query.or(`city.ilike.%${cityTerm}%,country.ilike.%${session.city}%`);
   }
 
-  if (session.interests.length > 0) {
-    // *** תיקון: הפילטר בדק overlap רק מול trip_type_tags (הטקסונומיה
-    // הישנה) - מקומות שהוזנו/תויגו ידנית באדמין (כפתור "✨ תקן עם AI",
-    // או הזנה ישירה) שומרים את הסיווג שלהם בשדה tags (ולפעמים
-    // cuisine_tags), שלא נבדק בכלל בשאילתה הזו - לכן "אחר" עם תגית כמו
-    // "תרבות, מוזיאונים והיסטוריה" לא מצא מקומות שבפועל קיימים ומתויגים,
-    // רק כי הם לא תויגו בטקסונומיה הישנה הספציפית. עכשיו בודקים חפיפה
-    // מול שלושת השדות (OR), בדיוק כמו שכבר נעשה בצד הלקוח (אחוז ההתאמה
-    // והפילטרים במסך ההחלקות כבר משתמשים בכל השדות יחד).
-    const tagList = session.interests.join(",");
-    query = query.or(`trip_type_tags.ov.{${tagList}},cuisine_tags.ov.{${tagList}},tags.ov.{${tagList}}`);
-  }
-
-  // *** תיקון: לפני זה החרגה כללה רק liked_place_ids/rejected_place_ids
-  // של ה-session **הנוכחי** - session חדש (למשל בפעם הבאה שפותחים
-  // TripMatch לאותה עיר) מתחיל עם מערכים ריקים, כך שמקומות שכבר
-  // הוחלקו (בכל כיוון) בעבר חוזרים ומופיעים שוב. עכשיו מחריגים גם כל
-  // מקום שכבר קיים ב-favorites של המשתמש (liked/saved/skipped).
-  // *** תיקון נוסף: ההחרגה הייתה לצמיתות - מקום שהוחלט עליו פעם נעלם
-  // מהתוצאות לתמיד, גם כעבור חודשים. עכשיו ההחרגה מוגבלת בזמן (14 יום) -
-  // אחרי שבועיים המקום חוזר להופיע (למשל אם הטעם השתנה, או פשוט רוצים
-  // לראות שוב אופציות שכבר "נסגרו"). זה חל רק על ההחרגה המצטברת מ-
-  // favorites - שני המערכים של ה-session הנוכחי עצמו תמיד מוחרגים,
-  // בלי קשר לזמן (לא הגיוני לראות שוב באותו סבב סריקה מקום שכרגע החלטת עליו).
+  // אותה עקרון החרגה כמו הגרסה הישנה (14 יום, session + favorites) - ר' שם להסבר המלא.
   const EXCLUSION_TTL_DAYS = 14;
   const exclusionCutoffIso = new Date(Date.now() - EXCLUSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
   const excluded = new Set([...session.liked_place_ids, ...session.rejected_place_ids]);
   const { data: pastDecisions } = await supabase
     .from("favorites")
     .select("place_id")
     .eq("user_id", session.user_id)
-    .eq("place_type", "place")
     .gte("created_at", exclusionCutoffIso);
   for (const row of pastDecisions ?? []) excluded.add(row.place_id as string);
 
-  if (excluded.size > 0) {
-    query = query.not("id", "in", `(${Array.from(excluded).join(",")})`);
-  }
-
-  // *** חדש (בקשה מפורשת - "החלוקה אמורה להיות קבועה"): בלי ORDER BY, Postgres
-  // מחזיר "60 שורות כלשהן" - ובכל קריאה (למשל אחרי כל החלטה, כשההחרגות
-  // משתנות) חלון אחר של שורות. עכשיו הבחירה דטרמיניסטית: הכי מדורגים
-  // קודם (ואז לפי id כשוברי-שוויון), כך שאותו יעד מחזיר תמיד את אותה חפיסה.
-  const { data, error } = await query
-    .order("rating", { ascending: false, nullsFirst: false })
-    .order("id", { ascending: true })
-    .limit(isGeoSearch ? limit * 3 : limit);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(limit * 3);
   if (error || !data) return [];
 
-  const geoOrigin: LatLng | null = isGeoSearch ? { lat: session.latitude!, lng: session.longitude! } : null;
-  const radiusKm = session.radius_km ?? 10;
+  const rows = (data as Array<Record<string, unknown>>).filter((row) => !excluded.has(row.id as string));
 
-  const mapped = data
-    .filter((row) => row.latitude != null && row.longitude != null)
-    .map((row) => {
-      const distanceKm = geoOrigin ? haversineDistanceKm(geoOrigin, { lat: row.latitude!, lng: row.longitude! }) : 0;
-      return {
-        id: row.id,
-        name: row.name,
-        category: row.category,
-        subcategory: row.subcategory,
-        shortDescription: row.short_description,
-        imageUrls: row.image_urls ?? [],
-        rating: row.rating,
-        ratingCount: row.rating_count,
-        priceLevel: row.price_level,
-        estimatedVisitMinutes: row.estimated_visit_minutes,
-        latitude: row.latitude!,
-        longitude: row.longitude!,
-        distanceKm,
-        etaMinutes: geoOrigin ? estimateTravelMinutes(distanceKm, "drive") : 0,
-        tripTypeTags: row.trip_type_tags ?? [],
-        cuisineTags: row.cuisine_tags ?? [],
-        // *** תיקון: לפני זה השדות tags/tripmatch_scores/dna_scores שהאדמין
-        // ממלא (כפתור "✨ תקן עם AI" ב-/admin/places) בכלל לא הגיעו ל-TripMatch -
-        // רק trip_type_tags/cuisine_tags הישנים היו בשימוש. זו הסיבה שהפילטרים
-        // לא הראו כלום למקומות שהאדמין תייג ידנית עם ה-AI, ושאחוז ההתאמה
-        // התעלם לגמרי מהתאמות שנקבעו באדמין.
-        tags: row.tags ?? [],
-        tripmatchScores: row.tripmatch_scores ?? {},
-        dnaScores: row.dna_scores ?? {},
-        kosher: row.kosher,
-        accessible: row.accessible,
-        suitableChildAges: row.suitable_child_ages ?? [],
-        budgetTier: row.budget_tier,
-        isAreaExperience: row.is_area_experience ?? false,
-        // שדה עזר פנימי לאימות המיקום למטה - לא חלק מ-CandidatePlace,
-        // מוסר לפני ההחזרה הסופית.
-        _city: row.city as string | null | undefined,
-      };
-    });
+  // *** תוספת (בקשה מפורשת - "דירוג triplace"): ממוצע tripadd_reviews לכל המועמדים בבת-אחת (לא שאילתה
+  // נפרדת לכל כרטיס) - אותו עיקרון בדיוק כמו getTripAddPlaceById (עמוד אטרקציה בודד), רק batched.
+  const ratingBySubmission = new Map<string, { avg: number; count: number }>();
+  if (rows.length > 0) {
+    const { data: reviewRows } = await supabase
+      .from("tripadd_reviews")
+      .select("submission_id, rating")
+      .in(
+        "submission_id",
+        rows.map((r) => r.id as string)
+      )
+      .not("rating", "is", null);
+    const bySubmission = new Map<string, number[]>();
+    for (const r of reviewRows ?? []) {
+      const list = bySubmission.get(r.submission_id as string) ?? [];
+      list.push(r.rating as number);
+      bySubmission.set(r.submission_id as string, list);
+    }
+    for (const [id, ratings] of bySubmission) {
+      ratingBySubmission.set(id, { avg: ratings.reduce((a, b) => a + b, 0) / ratings.length, count: ratings.length });
+    }
+  }
 
-  if (!geoOrigin) return mapped.map(stripInternalFields);
+  const mapped = rows.map((row) => {
+    const media = (row.tripadd_submission_media as { sort_order: number; media_assets: { url: string } | null }[] | null)
+      ?.filter((m) => m.media_assets?.url)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const userPhotos = (media ?? []).map((m) => m.media_assets!.url);
+    // *** תוספת (בקשה מפורשת - "איפה כל התמונות?"): כשאין אף תמונה שמשתמש העלה, נופלים חזרה לתמונת ה-
+    // Google היחידה שכבר נשמרת מרגע ההגשה עצמה (google_photo_url, autocomplete) - עדיף תמונה אחת אמיתית
+    // מאשר כרטיס ריק. תמונות משתמשים תמיד קודמות כשקיימות.
+    const imageUrls = userPhotos.length > 0 ? userPhotos : row.google_photo_url ? [row.google_photo_url as string] : [];
 
-  // תיבת-החסימה למעלה גסה (מלבן, לא עיגול) - כאן הסינון המדויק לרדיוס
-  // האמיתי בק"מ (Haversine), וממיינים מהקרוב לרחוק. מריצים את זה *לפני*
-  // אימות המיקום למטה, כדי שהקריאות ל-Geocoding API (היקרות) ירוצו רק
-  // על הרשימה הקטנה שכבר בטווח, לא על כל מה שהוחזר מהתיבה הגסה.
-  const withinRadius = mapped.filter((p) => p.distanceKm <= radiusKm).sort((a, b) => a.distanceKm - b.distanceKm);
+    const distanceKm = distanceOrigin
+      ? haversineDistanceKm(distanceOrigin, { lat: row.latitude as number, lng: row.longitude as number })
+      : 0;
 
-  const verified = await verifyPlaceCities(supabase, withinRadius);
-  return verified.slice(0, limit).map(stripInternalFields);
+    // *** תוספת (בקשה מפורשת - "קטגוריות... לפחות 3 לכל אטרקציה"): רק עובדות אמיתיות שכבר קיימות בשורה -
+    // לא ממציאים תגיות. קטגוריה ראשית + תת-קטגוריה (אם יש) + טווח מחירים/נגישות כשקיימים - בפועל כמעט
+    // תמיד 3+ כשהעשרת ה-AI/Google (tripAddEnrichmentService.ts) כבר רצה על השורה.
+    const categoryLabel = HOME_QUICK_CATEGORY_LABELS[row.category as HomeQuickCategoryId] ?? (row.category as string);
+    const tags = [
+      categoryLabel,
+      row.subcategory as string | null,
+      row.price_level != null ? "₪".repeat(row.price_level as number) : null,
+      row.accessible === true ? "♿ נגיש" : null,
+    ].filter((t): t is string => !!t);
+
+    const rating = ratingBySubmission.get(row.id as string);
+
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      category: row.category as string,
+      subcategory: (row.subcategory as string | null) ?? null,
+      shortDescription: (row.short_description as string | null) ?? null,
+      imageUrls,
+      // "דירוג triplace" - ממוצע הביקורות הקהילתיות (לא Google). null כשעוד אין אף ביקורת.
+      rating: rating?.avg ?? null,
+      ratingCount: rating?.count ?? null,
+      googleRating: (row.google_rating as number | null) ?? null,
+      googleRatingCount: (row.google_rating_count as number | null) ?? null,
+      priceLevel: (row.price_level as number | null) ?? null,
+      estimatedVisitMinutes: null,
+      latitude: row.latitude as number,
+      longitude: row.longitude as number,
+      distanceKm,
+      etaMinutes: distanceOrigin ? estimateTravelMinutes(distanceKm, "drive") : 0,
+      tripTypeTags: [] as string[],
+      cuisineTags: [] as string[],
+      tags,
+      tripmatchScores: {},
+      dnaScores: {},
+      kosher: null,
+      accessible: (row.accessible as boolean | null) ?? null,
+      suitableChildAges: [] as string[],
+      budgetTier: null,
+      isAreaExperience: false,
+    };
+  });
+
+  // *** תיקון: הסינון-לפי-רדיוס חייב להתבסס על מוקד ה*חיפוש* (עיר שנבחרה / "קרוב אליי"), לא על מוקד
+  // ה*הצגה* (userLocation) - אחרת חיפוש עיר רחוקה מהמשתמש (או "קרוב אליי" עם מיקום נוכחי אחר) היה מסנן
+  // בטעות את כל התוצאות שבאמת בתוך העיר שחיפשו, כי הן "רחוקות מדי" מאיפה שהמשתמש נמצא בפועל. ה-distanceKm
+  // שמוצג בכרטיס עדיין מחושב מ-distanceOrigin (userLocation כשידוע) - שני דברים נפרדים בכוונה.
+  const searchDistanceKm = (p: { latitude: number; longitude: number }) =>
+    searchOrigin ? haversineDistanceKm(searchOrigin, { lat: p.latitude, lng: p.longitude }) : 0;
+  const withDistance = searchOrigin
+    ? mapped.filter((p) => searchDistanceKm(p) <= radiusKm).sort((a, b) => searchDistanceKm(a) - searchDistanceKm(b))
+    : mapped;
+  return withDistance.slice(0, limit);
+}
+
+export async function fetchTripMatchCandidates(
+  supabase: SupabaseClient,
+  session: TripMatchSession,
+  limit = 60,
+  userLocation?: LatLng | null
+): Promise<CandidatePlace[]> {
+  // *** שינוי-מקור (ר' ההערה המלאה מעל fetchTripAddCandidates): המקור היחיד עכשיו הוא tripadd_submissions.
+  return fetchTripAddCandidates(supabase, session, limit, userLocation);
 }
 
 /** מסיר את שדה העזר הפנימי (_city) לפני ההחזרה ללקוח - לא חלק מ-CandidatePlace,

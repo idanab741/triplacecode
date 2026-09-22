@@ -17,7 +17,7 @@ export function FilterCircleButton({ onClick, activeFilterCount }: FilterCircleB
     <button
       type="button"
       onClick={onClick}
-      aria-label="פילטרים"
+      aria-label="סינון"
       className="flex w-[58px] shrink-0 flex-col items-center gap-1"
     >
       <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-soft">
@@ -30,7 +30,7 @@ export function FilterCircleButton({ onClick, activeFilterCount }: FilterCircleB
           </span>
         )}
       </span>
-      <span className="w-full text-center text-[10.5px] font-medium leading-tight text-ink">פילטרים</span>
+      <span className="w-full text-center text-[10.5px] font-medium leading-tight text-ink">סינון</span>
     </button>
   );
 }

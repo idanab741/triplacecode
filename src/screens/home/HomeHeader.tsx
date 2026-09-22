@@ -104,6 +104,10 @@ export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
           שמשמש ב-PlacesHeader: /images/places-chat-icon.png - בקשה מפורשת:
           "הכפתור של הצ'אט יהיה כמו הצ'אט שלנו באייקונים"). מוביל ל-Trippy AI
           (/ai) כמו קודם, בלי route חדש. */}
+      {/* *** תיקון (בקשה מפורשת - "עמוד הצ'אט לא מופיע מהכפתור בבר העליון! והוא לא אמור להוביל ל-Trippy AI!"):
+          הכפתור הזה קישר ישירות ל-Trippy AI (/ai), ומעולם לא הגיע לעמוד הצ'אטים החדש (/places/chat) - זו
+          הסיבה שהעמוד "לא הופיע". עכשיו הוא מוביל לעמוד הצ'אטים (רשימת כל השיחות: triplace + משתמשים
+          אחרים) - בדיוק כמו כפתור הצ'אט בבר הסגול של place's (PlacesHeaderRow), שכבר קישר לשם נכון. */}
       {onBack ? (
         // כפתור "חזור" (BackButton של האפליקציה) במקום הצ'אט - באותו עיגול לבן
         // ובאותו מקום בדיוק, כדי שהבר לא "יקפוץ" בין העמודים.
@@ -112,8 +116,8 @@ export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
         </div>
       ) : (
         <Link
-          href="/ai"
-          aria-label="צ'אט"
+          href="/places/chat"
+          aria-label="צ'אטים"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
         >
           {loading ? (

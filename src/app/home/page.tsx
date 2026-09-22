@@ -222,7 +222,10 @@ export default function HomePage() {
                   onClick={() => setLocationSheetOpen(true)}
                   aria-label={locating ? "מאתר מיקום..." : "המיקום שלי"}
                   title="המיקום שלי"
-                  className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
+                  // *** תיקון (בקשה מפורשת - "הכפתור של המיקום צריך להיות בגובה אחיד עם שאר הכפתורים שעיצבנו"):
+                  // h-11 w-11 (44px) - אותו גודל בדיוק כמו עיגולי סוגי-הטיול/כפתור הפילטרים (FilterCircleButton) בשורה
+                  // שמתחת, ושאר העיגולים הלבנים הצפים באפליקציה. קודם היה h-9 w-9 (36px) - נמוך מהם בבירור.
+                  className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
                 >
                   {locating ? (
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink" />

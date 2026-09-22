@@ -1,7 +1,6 @@
 ﻿import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { createTripMatchSession, fetchTripMatchCandidates } from "@/services/tripMatch/tripMatchService";
-import { generateAndSaveDestinationAttractions } from "@/services/tripMatch/destinationAttractionsService";
 import { isValidPlaceCategory } from "@/constants/placeCategories";
 
 export async function POST(request: Request) {
@@ -22,6 +21,11 @@ export async function POST(request: Request) {
   const radiusKm: number = typeof body?.radiusKm === "number" ? body.radiusKm : 10;
   const includeAllCategories: boolean = body?.includeAllCategories === true;
   const isGeoSearch = lat != null && lng != null;
+  // *** תוספת (בקשה מפורשת - "מרחק מהמיקום הנוכחי"): המיקום האמיתי של המשתמש, נפרד מ-lat/lng למעלה (שהם
+  // מוקד ה*חיפוש* ב"קרוב אליי" בלבד) - להצגת מרחק נכון גם כשמחפשים לפי שם עיר. ר' fetchTripAddCandidates.
+  const userLat: number | undefined = typeof body?.userLat === "number" ? body.userLat : undefined;
+  const userLng: number | undefined = typeof body?.userLng === "number" ? body.userLng : undefined;
+  const userLocation = userLat != null && userLng != null ? { lat: userLat, lng: userLng } : undefined;
 
   if (!city || !city.trim()) {
     return NextResponse.json({ error: "יש לספק עיר" }, { status: 400 });
@@ -46,25 +50,14 @@ export async function POST(request: Request) {
     // *** שיפור מהירות (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית"): העדפות
     // המשתמש והמועמדים לא תלויים זה בזה - רצים במקביל במקום אחד אחרי השני.
     const [candidates, userPreferences] = await Promise.all([
-      fetchTripMatchCandidates(supabase, session),
+      fetchTripMatchCandidates(supabase, session, 60, userLocation),
       fetchUserPreferences(supabase, user.id),
     ]);
 
-    // אין עדיין מועמדים ליעד הזה ב-DB (בעיקר יעדים בינלאומיים) - Claude יוצר
-    // רשימת אטרקציות אמיתית, שומר אותה, ואז שולפים שוב.
-    // *** לא רלוונטי ל"קרוב אליי" - שם 0 תוצאות אומר שפשוט אין עדיין
-    // מקומות מתויגים ברדיוס הזה, לא שהיעד לא קיים במערכת בכלל; אין טעם
-    // "להמציא" רשימה חדשה שלא בהכרח נמצאת בפועל במרחק המבוקש.
-    if (candidates.length === 0 && !isGeoSearch) {
-      await generateAndSaveDestinationAttractions(supabase, session.city, session.category, session.interests);
-      const regenerated = await fetchTripMatchCandidates(supabase, session);
-      return NextResponse.json({
-        session,
-        candidates: regenerated,
-        userPreferences,
-      });
-    }
-
+    // *** תיקון (בקשה מפורשת - TripMatch עובר להציג רק אטרקציות tripadd, ר' tripMatchService.ts):
+    // ה-fallback הזה יצר בעבר אטרקציות AI לתוך טבלת places - מקור שכבר לא נסרק כאן בכלל. הרצתו הייתה
+    // קריאת AI מבוזבזת שלא משנה את התוצאה (0 תוצאות tripadd נשארות 0 תוצאות tripadd). הוסר; 0 מועמדים
+    // מוצג כרגיל כ"אין עדיין אטרקציות tripadd באזור הזה" בצד הלקוח.
     return NextResponse.json({
       session,
       candidates,

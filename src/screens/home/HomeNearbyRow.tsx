@@ -134,7 +134,7 @@ export function HomeNearbyRow() {
 
   return (
     <section ref={sectionRef} className="flex flex-col gap-3">
-      <HomeSectionHeader iconSrc="/images/home/section-nearby.webp" title="עוד מקומות בקרבת מקום" />
+      <HomeSectionHeader iconSrc="/images/home/section-nearby.webp" title="עוד אטרקציות בקרבת מקום" />
 
       {/* *** בקשה מפורשת ("שהלשוניות יהיו בתוך המפה, בחלק התחתון - על המפה"): המיכל
           אחד - המפה (או ההודעה/הטעינה) ממלאת אותו, והלשוניות מרחפות עליו בתחתית.

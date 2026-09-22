@@ -136,7 +136,7 @@ export default function ContentPage() {
 
         <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-1">
           <div className="mx-auto w-full max-w-sm">
-            <h1 className="text-center text-[28px] font-extrabold leading-tight tracking-tight">מה ניצור היום?</h1>
+            <h1 className="text-center text-[28px] font-extrabold leading-tight tracking-tight">הצטרפו לקהילת triplace creator&apos;s</h1>
             <p className="mx-auto mb-6 mt-1.5 max-w-[19rem] text-balance text-center text-[14px] leading-snug text-white/55">שתפו את המקומות, הטיולים והרעיונות שלכם</p>
 
             {/* ה-HERO: הדמות "מציצה" מעל קצה הכרטיסיות ומצביעה עליהן. החלק שמתחת לקצה התמונה (האצבע, ~6.6% מרוחב המכולה)

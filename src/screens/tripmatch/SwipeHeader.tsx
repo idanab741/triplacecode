@@ -76,7 +76,7 @@ export function SwipeHeader({
             <button
               type="button"
               onClick={onOpenFilters}
-              aria-label="פילטרים"
+              aria-label="סינון"
               className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-soft"
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary-start)" strokeWidth="2.4" strokeLinecap="round">

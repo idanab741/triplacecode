@@ -214,6 +214,12 @@ tripTypeTags: string[];
   suitableChildAges: string[];
   budgetTier: string | null;
   isAreaExperience: boolean;
+  /** *** תוספת (בקשה מפורשת - "דירוג triplace ודירוג google"): שני דירוגים נפרדים, לא אחד. `rating`/
+   *  `ratingCount` (למעלה) הם כבר דירוג triplace (ממוצע tripadd_reviews) - זה השם שגם FiltersSheet
+   *  (סינון "מינימום דירוג") כבר משתמש בו, אז לא שינינו אותו. googleRating/googleRatingCount הם דירוג
+   *  Google הנפרד (tripadd_submissions.google_rating), null אם עוד לא הושלם ע"י tripAddEnrichmentService. */
+  googleRating?: number | null;
+  googleRatingCount?: number | null;
 }
 
 export interface FinalItineraryStop {

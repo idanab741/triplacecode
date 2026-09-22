@@ -7,40 +7,26 @@ interface CreateMenuSheetProps {
   onClose: () => void;
   onSelectPost: () => void;
   onSelectPlace: () => void;
-  onSelectCollection: () => void;
   onSelectTrip: () => void;
 }
 
-/** אייקון "אוסף" - אין לו PNG בתיקיית images (ל-post/location/trip יש), לכן SVG
- *  באותו סגול ובאותו גודל (22px) כמו שאר האייקונים בתפריט. */
-function CollectionIcon() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="var(--color-places-purple)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Z" />
-      <path d="m3 12 9 4.5 9-4.5" />
-      <path d="m3 16.5 9 4.5 9-4.5" />
-    </svg>
-  );
-}
-
-/** *** עדכון (בקשה מפורשת - "כפתור ה-+ במסך Places: מה בא לכם ליצור?"):
- *  4 פעולות יצירה בלבד - פוסט / מקום / אוסף / טיול.
+/** *** עדכון (בקשה מפורשת - "אוסף/טיול צריך להיות תחת 'תוכן' בבר התחתון, לא Places"):
+ *  "אוסף" (כולל אוסף מסוג טיול) הוסר מתפריט ה-+ של Places - הזרימה היחידה
+ *  ליצירת אוסף היא דרך טאב "תוכן". כאן נשארו רק 3 פעולות - פוסט / מקום / טיול.
  *  "מקום" כולל את מה שהיה בעבר "ביקורת" + "מיקום" (המשתמש לא צריך לדעת אם המקום
  *  כבר קיים): חיפוש -> קיים? ממשיכים לביקורת. לא קיים? מציעים להוסיף.
  *  BottomSheet המשותף כבר מספק handle בר משלו - לא מוסיפים כאן שני. */
 const OPTIONS = [
   { id: "post", label: "פוסט", sub: "שתפו רגע, סיפור או תוכן", icon: "/images/places-menu-post.png" },
   { id: "place", label: "מקום", sub: "ספרו על מקום שביקרתם בו", icon: "/images/places-menu-location.png" },
-  { id: "collection", label: "אוסף", sub: "אספו מקומות או טיולים סביב רעיון אחד", icon: null },
   { id: "trip", label: "טיול", sub: "בנו מסלול עם כמה תחנות", icon: "/images/places-menu-trip.png" },
 ] as const;
 
-export function CreateMenuSheet({ onClose, onSelectPost, onSelectPlace, onSelectCollection, onSelectTrip }: CreateMenuSheetProps) {
+export function CreateMenuSheet({ onClose, onSelectPost, onSelectPlace, onSelectTrip }: CreateMenuSheetProps) {
   function handleSelect(id: (typeof OPTIONS)[number]["id"]) {
     onClose();
     if (id === "post") onSelectPost();
     else if (id === "place") onSelectPlace();
-    else if (id === "collection") onSelectCollection();
     else onSelectTrip();
   }
 
@@ -60,11 +46,7 @@ export function CreateMenuSheet({ onClose, onSelectPost, onSelectPlace, onSelect
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
                 style={{ background: "rgba(124,58,237,0.08)" }}
               >
-                {option.icon ? (
-                  <Image src={option.icon} alt="" width={22} height={22} className="object-contain" />
-                ) : (
-                  <CollectionIcon />
-                )}
+                <Image src={option.icon} alt="" width={22} height={22} className="object-contain" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14.5px] font-bold text-ink">{option.label}</span>

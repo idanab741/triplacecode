@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Input, ImageOptionRow, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
@@ -86,9 +86,16 @@ function CheckIcon() {
  *  3. מקום נבחר (או נוסף) -> נחשף "איך היה לכם?" (כוכבים), ואחרי דירוג - הטקסט, התמונות והפרסום.
  * המשתמש לא צריך להבין אם המקום קיים או חדש. הבר העליון והתחתון קבועים לאורך כל השלבים.
  */
-export default function CreatePlacePage() {
+export function CreatePlacePageContent() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, כשאני כבר יוצר טיול - אל תחזיר אותי אחורה לעמוד
+  // 'מקום' - תן לי להוסיף בטיול עצמו כבר"): כשמגיעים לכאן דרך "לא מוצאים את המקום? הוסיפו אותו
+  // ל-TRIPLACE" מתוך יצירת/עריכת טיול (TripForm.handleGoAddPlace), ?returnTo=... הוא נתיב הטיול
+  // שממנו יצאנו. עם הפרמטר הזה - בסיום (handlePublish למטה) חוזרים לשם עם המקום כבר מוכן להוספה
+  // כתחנה, במקום ל-/places?published=1 הרגיל.
+  const returnTo = searchParams.get("returnTo");
 
   // 1. חיפוש
   const [query, setQuery] = useState("");
@@ -366,6 +373,20 @@ export default function CreatePlacePage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "שגיאה בפרסום הביקורת");
+      }
+      // *** תיקון (ר' ההערה המלאה למעלה על returnTo): הגענו מיצירת/עריכת טיול - במקום הפיד, חוזרים
+      // ישר לטופס הטיול, עם המקום שנוסף/נבחר כאן ממתין להוספה אוטומטית כתחנה (TripForm קורא את זה).
+      if (returnTo && selected) {
+        try {
+          sessionStorage.setItem(
+            "trip_new_place_v1",
+            JSON.stringify({ id: selected.id, name: selected.name, subtitle: [selected.categoryLabel, selected.city].filter(Boolean).join(" · ") || null, imageUrl: selected.imageUrl })
+          );
+        } catch {
+          // sessionStorage חסום - הטיול עדיין ייפתח, פשוט בלי הוספה אוטומטית
+        }
+        router.replace(returnTo);
+        return;
       }
       // חזרה ל-Places Feed - שם מוצגת הודעת ההצלחה והפיד נטען מחדש (הביקורת בראש).
       router.replace("/places?published=1");
@@ -669,5 +690,15 @@ export default function CreatePlacePage() {
 
       <MainBottomNav active="content" />
     </div>
+  );
+}
+
+/** עוטפים ב-Suspense כי useSearchParams (returnTo) דורש את זה ב-App Router - אותו עיקרון בדיוק
+ *  כמו places/collection/create/page.tsx. */
+export default function CreatePlacePage() {
+  return (
+    <Suspense>
+      <CreatePlacePageContent />
+    </Suspense>
   );
 }

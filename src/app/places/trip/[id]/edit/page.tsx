@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { TripForm, newTripFormStop, type TripFormInitial } from "@/screens/trips/TripForm";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
@@ -76,8 +77,13 @@ export default function EditTripPage({ params }: { params: Promise<{ id: string 
           <Skeleton className="h-40 w-full" />
         </div>
       ) : (
-        <TripForm mode="edit" tripId={trip.id} initial={toInitial(trip)} />
+        // ר' ההערה המלאה ב-places/trip/create/page.tsx - אותו תיקון בדיוק (בר תחתון + פס-88px
+        // מתחת לפופאפ "חפשו מקום להוסיף לטיול" שעכשיו יש לו למה "להיתלות").
+        <div className="pb-24">
+          <TripForm mode="edit" tripId={trip.id} initial={toInitial(trip)} />
+        </div>
       )}
+      <MainBottomNav active="places" />
     </div>
   );
 }

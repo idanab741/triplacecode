@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { QUICK_CATEGORIES } from "@/constants/quickCategories";
-import { TRIP_LIMITS, TRIP_TYPE_IDS, formatStopNumber, getTripTypeLabel, type TripTypeId } from "@/services/social/tripTypes";
+import { TRIP_LIMITS, formatStopNumber, type TripTypeId } from "@/services/social/tripTypes";
 import type { PostVisibility } from "@/services/social/types";
 import { CollectionCover } from "@/screens/collections/CollectionCover";
 import { CollectionItemPickerSheet } from "@/screens/collections/CollectionItemPickerSheet";
@@ -16,6 +15,12 @@ import type { CollectionFormItem } from "@/screens/collections/collectionFormTyp
 
 const PURPLE_GRADIENT = "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))";
 const DRAFT_KEY = "trip_draft_v1";
+/** *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, אל תחזיר אותי אחורה לעמוד 'מקום' - תן לי להוסיף
+ *  בטיול עצמו כבר"): שני מפתחות session נפרדים מ-DRAFT_KEY (שקיים רק ב-create) - אלה עובדים גם
+ *  ב-edit, כי הם לא "טיוטת טופס מלאה" אלא רק "לאיזה יום להוסיף" ו"איזה מקום נוצר/נבחר בדרך".
+ *  places/create/page.tsx כותב ל-NEW_PLACE_KEY ממש לפני שהוא מנווט חזרה לכאן (returnTo). */
+const PENDING_DAY_KEY = "trip_add_place_pending_day_v1";
+const NEW_PLACE_KEY = "trip_new_place_v1";
 
 const TITLE_EXAMPLES = ["יום מושלם בירושלים", "סופ״ש בגליל", "טיול שקיעה בים המלח", "3 ימים בצפון"];
 
@@ -179,6 +184,7 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
   const multiDay = days.length > 1;
 
   // שחזור חד-פעמי של טיוטה: אם יצאנו לזרימת "הוספת מקום" הקיימת (לא יוצרים Place מתוך הטיול) וחזרנו.
+  // רק ב-create - ב-edit הבסיס הוא ה-initial שהגיע מהשרת (הטיול האמיתי), לא טיוטה מקומית.
   useEffect(() => {
     if (mode !== "create") return;
     try {
@@ -197,13 +203,56 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
     }
   }, [mode]);
 
-  function handleGoAddPlace() {
+  // *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, כשאני כבר יוצר טיול - אל תחזיר אותי אחורה לעמוד
+  // 'מקום' - תן לי להוסיף בטיול עצמו כבר"): רץ תמיד (גם ב-edit, לא רק create) - אם חזרנו מ-
+  // places/create עם מקום שזה עתה נוצר/נבחר (NEW_PLACE_KEY, ר' ההערה שם), הוא מתווסף אוטומטית
+  // כתחנה ליום שממנו פתחנו את "הוסיפו אותו ל-TRIPLACE" (PENDING_DAY_KEY) - בלי לחפש אותו שוב.
+  // רץ *אחרי* effect השחזור למעלה (סדר ה-hooks בקומפוננטה) - כך שב-create, ה-setDays הפונקציונלי
+  // כאן פועל כבר על גבי days המשוחזרים, לא דורס אותם.
+  useEffect(() => {
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, coverUrl, tripType, visibility, days }));
+      const rawPlace = sessionStorage.getItem(NEW_PLACE_KEY);
+      if (!rawPlace) return;
+      sessionStorage.removeItem(NEW_PLACE_KEY);
+      const place = JSON.parse(rawPlace) as { id: string; name: string; subtitle: string | null; imageUrl: string | null };
+      let dayIndex = 0;
+      try {
+        const rawDay = sessionStorage.getItem(PENDING_DAY_KEY);
+        sessionStorage.removeItem(PENDING_DAY_KEY);
+        if (rawDay != null) dayIndex = Number(rawDay) || 0;
+      } catch {
+        // אין יעד ידוע - נופלים ליום הראשון
+      }
+      setDays((prev) => {
+        if (prev.some((d) => d.stops.some((s) => s.placeId === place.id))) return prev; // כבר נוסף
+        const targetIndex = Math.min(Math.max(dayIndex, 0), prev.length - 1);
+        return prev.map((day, i) =>
+          i === targetIndex
+            ? { ...day, stops: [...day.stops, newTripFormStop({ placeId: place.id, title: place.name, subtitle: place.subtitle, imageUrl: place.imageUrl, note: "" })] }
+            : day
+        );
+      });
     } catch {
-      // sessionStorage חסום - ממשיכים בלי טיוטה
+      // מידע פגום - מתעלמים
     }
-    router.push("/places/create");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleGoAddPlace() {
+    if (mode === "create") {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title, description, coverUrl, tripType, visibility, days }));
+      } catch {
+        // sessionStorage חסום - ממשיכים בלי טיוטה
+      }
+    }
+    try {
+      sessionStorage.setItem(PENDING_DAY_KEY, String(pickerDay ?? 0));
+    } catch {
+      // sessionStorage חסום - המקום פשוט לא יתווסף אוטומטית בחזרה
+    }
+    const returnTo = mode === "edit" && tripId ? `/places/trip/${tripId}/edit` : "/places/trip/create";
+    router.push(`/places/create?returnTo=${encodeURIComponent(returnTo)}`);
   }
 
   function handleDragEnd(dayIndex: number, event: DragEndEvent) {
@@ -342,31 +391,12 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
         className="mb-5 w-full resize-none rounded-card border border-ink-secondary/20 px-4 py-3 text-[15px] focus:outline-none"
       />
 
-      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">סוג הטיול (אופציונלי)</label>
-      <div className="mb-5 flex flex-wrap gap-2">
-        {TRIP_TYPE_IDS.map((id) => {
-          const selected = tripType === id;
-          const icon = QUICK_CATEGORIES.find((c) => c.id === id)?.imageSrc;
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setTripType(selected ? null : id)}
-              className={`flex items-center gap-1.5 rounded-pill py-1.5 pe-3.5 ps-2 text-[13px] font-semibold ${selected ? "text-white" : "bg-bg-secondary text-ink"}`}
-              style={selected ? { background: "var(--color-places-purple)" } : undefined}
-            >
-              {icon && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={icon} alt="" className="h-5 w-5 object-contain" />
-              )}
-              {getTripTypeLabel(id)}
-            </button>
-          );
-        })}
-      </div>
+      {/* *** תיקון (בקשה מפורשת - "צריך להעלים את כל סוגי הטיול - זה לא רלוונטי! זה טיול!!"): הוסרה
+          לגמרי בחירת "סוג הטיול" (חופשה בארץ/טיול יומי/דיוט רומנטי/חו"ל/חיי לילה/מסעדות וכו') -
+          תגיות שנועדו למקום בודד (QUICK_CATEGORIES), לא לטיול שלם. tripType עצמו נשאר null תמיד
+          עכשיו (לא נמחק מה-state/payload - כדי לא לשבור את סכימת ה-API), פשוט אין יותר UI לבחור אותו. */}
 
-      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">קאבר</label>
+      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">תמונת הטיול</label>
       <div className="mb-6 overflow-hidden rounded-2xl shadow-soft">
         <div className="relative">
           <CollectionCover coverUrl={coverUrl ?? stopImages[0] ?? null} collageUrls={[]} type="trips" className="aspect-[16/9]" />
@@ -375,10 +405,10 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
             onClick={() => setCoverSheetOpen(true)}
             className="absolute bottom-2 end-2 rounded-pill bg-black/55 px-3 py-1.5 text-[12px] font-semibold text-white"
           >
-            החלפת קאבר
+            החלפת תמונה
           </button>
         </div>
-        <p className="bg-white px-3 py-2 text-[12px] text-ink-secondary">{coverUrl ? "קאבר שבחרתם" : "קאבר אוטומטי - התמונה של התחנה הראשונה"}</p>
+        <p className="bg-white px-3 py-2 text-[12px] text-ink-secondary">{coverUrl ? "התמונה שבחרתם" : "תמונה אוטומטית - התמונה של התחנה הראשונה"}</p>
       </div>
 
       <div className="mb-2 flex items-center justify-between">
@@ -480,7 +510,8 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
         <CoverPickerSheet
           coverUrl={coverUrl}
           imageUrls={stopImages}
-          autoLabel="קאבר אוטומטי (התחנה הראשונה)"
+          heading="בחירת תמונת הטיול"
+          autoLabel="תמונה אוטומטית (התחנה הראשונה)"
           onSelect={(url) => {
             setCoverUrl(url);
             setCoverSheetOpen(false);

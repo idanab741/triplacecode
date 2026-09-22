@@ -18,6 +18,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   const body = await request.json().catch(() => null);
   const placeId: string | undefined = body?.placeId;
   const liked: boolean | undefined = body?.liked;
+  // *** תוספת (בקשה מפורשת - "מרחק מהמיקום הנוכחי"): ר' ההערה המקבילה ב-/api/tripmatch/sessions.
+  const userLat: number | undefined = typeof body?.userLat === "number" ? body.userLat : undefined;
+  const userLng: number | undefined = typeof body?.userLng === "number" ? body.userLng : undefined;
+  const userLocation = userLat != null && userLng != null ? { lat: userLat, lng: userLng } : undefined;
   if (!placeId || typeof liked !== "boolean") {
     return NextResponse.json({ error: "בקשה לא תקינה" }, { status: 400 });
   }
@@ -62,7 +66,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
 
     try {
       await recordTripMatchDecision(supabase, sessionId, placeId, liked);
-      await toggleFavorite(supabase, user.id, placeId, "place", "liked", "tripmatch").catch(() => {});
+      // *** תיקון (בקשה מפורשת - TripMatch עובר להציג רק אטרקציות tripadd): place_type="tripadd", לא "place" -
+      // תואם למקור האמיתי (tripadd_submissions), ולסוג ה-favorites שכבר תומך בו (migration 0080).
+      await toggleFavorite(supabase, user.id, placeId, "tripadd", "liked", "tripmatch").catch(() => {});
     } catch (e) {
       // הפעולה שהחיוב מימן לא הצליחה בפועל - מחזירים את הטריפים.
       // לא-פעולה אם היה alreadyCharged (retry לגיטימי) - אין מה להחזיר.
@@ -86,7 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   }
 
   const updatedSession = await getTripMatchSession(supabase, sessionId);
-  const candidates = updatedSession ? await fetchTripMatchCandidates(supabase, updatedSession) : [];
+  const candidates = updatedSession ? await fetchTripMatchCandidates(supabase, updatedSession, 60, userLocation) : [];
 
   return NextResponse.json({ candidates, tokenBalance });
 }

@@ -57,6 +57,11 @@ const TAG_LABELS: Record<string, string> = {
 /** תגיות קצרות מתחת לתיאור - נגזרות מהשדות האמיתיים שכבר קיימים על המועמד,
  *  לא ממציאות מידע שאין. (זהה ללוגיקה הקודמת - לא שונתה, רק המיקום הוויזואלי). */
 function deriveTags(candidate: CandidatePlace): string[] {
+  // *** תיקון (בקשה מפורשת - "קטגוריות... לפחות 3 לכל אטרקציה"): candidate.tags כבר מגיע מוכן ואמיתי
+  // מ-tripMatchService.ts (קטגוריה + תת-קטגוריה + מחיר/נגישות כשקיימים) - לא בונים תגיות מ-tripTypeTags/
+  // cuisineTags (ריקים תמיד עכשיו, המקור tripadd לא מכיל אותם). נופלים לגרסה הישנה רק אם tags לא הגיע בכלל.
+  if (candidate.tags && candidate.tags.length > 0) return candidate.tags.slice(0, 5);
+
   const baseTags = Array.from(
     new Set(
       [candidate.category]
@@ -142,7 +147,11 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       </div>
 
       {/* גרדיאנט תחתון */}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(10,12,20,0.88)_0%,rgba(10,12,20,0.55)_30%,rgba(10,12,20,0)_58%)]" />
+      {/* *** תיקון (בקשה מפורשת - "הצל השחור יהיה קצת יותר גבוה, כדי שאפשר יהיה לראות את שם המיקום"): הצל
+          עולה גבוה יותר בכרטיס (התחנה בה הוא כבר שקוף לגמרי - 58% -> 78% מגובה הכרטיס) ומתחיל כהה יותר
+          גם למעלה (0.2 בקצה העליון, היה 0) - כדי שפינת ה-pill של שם העיר (top-[26px]) תמיד תישאר קריאה,
+          גם מעל תמונה בהירה (שמיים/חוף). */}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(10,12,20,0.9)_0%,rgba(10,12,20,0.62)_40%,rgba(10,12,20,0.2)_68%,rgba(10,12,20,0)_78%)]" />
 
       {/* *** חדש (בקשה מפורשת - גלריית תמונות בתוך הכרטיס): פסי התקדמות
           בסגנון סטוריז בראש הכרטיס - פס לכל תמונה, המוצגת כרגע מודגשת.
@@ -180,41 +189,50 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
           *** הועלה (בקשה מפורשת - "להעלות מעט את הטקסט"): pb 22 -> 72,
           כדי שהכפתורים שרוכבים על הקצה התחתון (חצי מ-98px = 49px נכנסים
           לכרטיס) לא יכסו את הטקסט/התגיות. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 px-[18px] pb-[72px] text-white">
+      {/* *** תיקון (בקשה מפורשת - "להוריד קצת את המלל למטה, קצת קצת"): pb-[72px] -> pb-[60px] - הטקסט יורד
+          קצת, נשאר מעל אזור הכפתורים (הם עולים ~49px לתוך הכרטיס). */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-[18px] pb-[60px] text-white">
+        {/* *** שוחזר (בקשה מפורשת - "איפה הדירוג/המרחק/הקטגוריות/התיאור? אני דורש שיהיה"): שני דירוגים
+            נפרדים (triplace - ממוצע ביקורות קהילתי, ו-Google), מרחק מהמיקום הנוכחי, תיאור (Google
+            editorialSummary, ר' tripAddEnrichmentService.ts), ולפחות 3 תגיות אמיתיות (candidate.tags,
+            ר' tripMatchService.ts) - הכל ממקורות אמיתיים, שום דבר לא מומצא. שדה חסר לגמרי (למשל תיאור
+            שעוד לא הושלם) פשוט לא מוצג, לא מוחלף בפלייסהולדר מזויף. */}
         <h2 className="text-[26px] font-extrabold leading-tight">{candidate.name}</h2>
-        <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">
-          {candidate.shortDescription || "מקום מומלץ שנבחר במיוחד עבורכם באזור."}
-        </p>
 
-        <div className="mt-0.5 flex items-center gap-1.5 text-[12.5px] font-semibold">
+        {candidate.shortDescription && (
+          <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">{candidate.shortDescription}</p>
+        )}
+
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] font-semibold">
           {candidate.rating != null && (
+            <span className="flex items-center gap-1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
+                <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
+              </svg>
+              triplace {candidate.rating.toFixed(1)}
+              {candidate.ratingCount != null && ` (${candidate.ratingCount})`}
+            </span>
+          )}
+          {candidate.googleRating != null && (
             <>
+              {candidate.rating != null && <span className="opacity-60">|</span>}
               <span className="flex items-center gap-1">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
                   <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
                 </svg>
-                {candidate.rating.toFixed(1)}
-                {candidate.ratingCount != null && ` (${candidate.ratingCount.toLocaleString()})`}
+                Google {candidate.googleRating.toFixed(1)}
+                {candidate.googleRatingCount != null && ` (${candidate.googleRatingCount.toLocaleString()})`}
               </span>
-              <span className="opacity-60">|</span>
             </>
           )}
+          {(candidate.rating != null || candidate.googleRating != null) && candidate.distanceKm > 0 && <span className="opacity-60">|</span>}
           <DistanceBadge candidate={candidate} />
-          {candidate.priceLevel != null && (
-            <>
-              <span className="opacity-60">|</span>
-              <span>{"₪".repeat(candidate.priceLevel + 1)}</span>
-            </>
-          )}
         </div>
 
         {tags.length > 0 && (
-          <div className="mt-1.5 flex max-h-16 flex-wrap gap-1.5 overflow-hidden">
+          <div className="mt-1 flex max-h-16 flex-wrap gap-1.5 overflow-hidden">
             {tags.map((tag) => (
-              <span
-                key={tag}
-                className="h-fit shrink-0 rounded-pill bg-white/16 px-3 py-1 text-[11.5px] font-semibold text-white backdrop-blur-[2px]"
-              >
+              <span key={tag} className="h-fit shrink-0 rounded-pill bg-white/16 px-3 py-1 text-[11.5px] font-semibold text-white backdrop-blur-[2px]">
                 {tag}
               </span>
             ))}

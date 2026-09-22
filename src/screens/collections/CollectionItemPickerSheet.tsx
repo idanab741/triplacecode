@@ -232,38 +232,45 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
             {trips !== null && trips.length > 0 && filteredTrips.length === 0 && (
               <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>לא נמצא טיול כזה</p>
             )}
-            {filteredTrips.map((trip) => {
-              const added = addedKeys.has(trip.key);
-              return (
-                <button
-                  key={trip.key}
-                  type="button"
-                  disabled={added}
-                  onClick={() =>
-                    onAdd({
-                      key: trip.key,
-                      kind: "trip",
-                      refId: trip.id,
-                      tripSource: trip.source,
-                      title: trip.title,
-                      subtitle: `${trip.stopCount} תחנות`,
-                      imageUrl: trip.imageUrl,
-                      note: "",
-                    })
-                  }
-                  className={rowClass(added, dark)}
-                >
-                  <Thumb url={trip.imageUrl} dark={dark} />
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{trip.title}</span>
-                    <span className={`block text-[12px] ${textSecondary}`}>
-                      {trip.stopCount} תחנות{trip.tag ? ` · ${trip.tag}` : ""}
-                    </span>
-                  </span>
-                  <AddedMark added={added} />
-                </button>
-              );
-            })}
+            {/* *** תיקון (בקשה מפורשת - "עד 3 ברגע נתון, וכמובן גלילה למטה"): הרשימה עצמה מוגבלת
+                לגובה קבוע של 3 שורות (68px לשורה - thumb 48px + ריפוד 10px מכל צד) - לא כל הרשימה
+                (יכולה להכיל עשרות טיולים, ר' תל אביב-יפו כפולים) נפתחת בבת אחת. גלילה פנימית לשאר. */}
+            {filteredTrips.length > 0 && (
+              <div className="max-h-[204px] overflow-y-auto">
+                {filteredTrips.map((trip) => {
+                  const added = addedKeys.has(trip.key);
+                  return (
+                    <button
+                      key={trip.key}
+                      type="button"
+                      disabled={added}
+                      onClick={() =>
+                        onAdd({
+                          key: trip.key,
+                          kind: "trip",
+                          refId: trip.id,
+                          tripSource: trip.source,
+                          title: trip.title,
+                          subtitle: `${trip.stopCount} תחנות`,
+                          imageUrl: trip.imageUrl,
+                          note: "",
+                        })
+                      }
+                      className={rowClass(added, dark)}
+                    >
+                      <Thumb url={trip.imageUrl} dark={dark} />
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{trip.title}</span>
+                        <span className={`block text-[12px] ${textSecondary}`}>
+                          {trip.stopCount} תחנות{trip.tag ? ` · ${trip.tag}` : ""}
+                        </span>
+                      </span>
+                      <AddedMark added={added} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
 
