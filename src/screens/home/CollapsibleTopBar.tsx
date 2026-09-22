@@ -30,16 +30,34 @@ const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 7
 const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
 
 /**
- * *** חדש (בקשה מפורשת - "הבר העליון ישאר - רק עם שורת הלוגו, ההתראות והצ'אט
- * גם כשגוללים למטה. שורת החיפוש תיעלם בגלילה, באופן אנימטיבי ודינמי"):
- * הבר התכלת נדבק לראש המסך (sticky). ככל שגוללים, שורת החיפוש מתכווצת,
- * מתעמעמת ונעלמת - **בהתאמה רציפה למרחק הגלילה** (לא מתג כבוי/דולק), עד
- * שנשארת רק שורת הלוגו/התראות/צ'אט.
+ * *** שונה מהיסוד (בקשה מפורשת - "שורת החיפוש: מוסתרת כברירת מחדל - גם
+ * ברגע הראשון; מושכים כלפי מטה בראש הדף ממש (איפה שפעם היה 'משוך
+ * לרענון') -> מופיעה מיד במלואה, באופן אנימטיבי; נשארת גלויה עד שמתחילים
+ * לגלול/להחליק כלפי מעלה אל תוך הכרטיסים - אז נסגרת שוב"):
  *
- * למה לא משנים את גובה הבר בפועל: הוא היה מזיז את כל העמוד שמתחתיו בכל
- * פיקסל גלילה. במקום זה, כל פיקסל שהבר מתכווץ מקבל margin-bottom זהה -
- * הגובה הכולל בתוך העמוד קבוע, וקצה הבר התחתון נע בדיוק יחד עם התוכן
- * שמתחתיו (כמו גלילה רגילה) - עד שהחיפוש נעלם והבר נדבק.
+ * שורת החיפוש **מוסתרת כברירת מחדל** - גם ברגע הראשון של טעינת העמוד,
+ * לא רק אחרי גלילה. המחווה שחושפת אותה היא מחווה של *משיכה* (touch drag)
+ * כלפי מטה, ורק כשעושים אותה ממש בראש הדף (scrollY<=0, איפה שבעבר
+ * "משוך לרענון" היה קורה - ר' overscroll-behavior-y:none ב-globals.css
+ * שכיבה את הרענון הזה) - לא גלילה רגילה של תוכן. ברגע שנרשמת משיכה כזו
+ * (אפילו כמה פיקסלים) השורה מופיעה מיד במלואה (בלי מעבר הדרגתי/פרופורציונלי
+ * למרחק המשיכה - "מיד במלואה"). היא נשארת גלויה עד שמתחילה גלילה אמיתית
+ * של הדף (scrollY זז משמעותית מ-0, כלומר המשתמש בפועל גולל/מחליק כלפי
+ * מעלה אל תוך הכרטיסים) - אז היא נסגרת שוב, וחוזרים למצב "מוסתר כברירת
+ * מחדל".
+ *
+ * למה touch events ולא scroll: כש-scrollY כבר 0 ואי אפשר לגלול עוד למעלה,
+ * משיכה למטה לא מייצרת אירוע scroll בכלל (במיוחד לא עם overscroll-behavior
+ * כבוי) - הדרך היחידה לזהות את המחווה עצמה (לא רק את התוצאה שלה בעמוד)
+ * היא להאזין ישירות ל-touchstart/touchmove.
+ *
+ * ההסתרה/חשיפה עצמן: accordion בינארי פשוט על ה-clip (height: 0px/auto,
+ * transition קלה) - *לא* טריק margin-bottom+transform מפצה: טריק כזה
+ * מניח שההתכווצות קורית *רק* תוך כדי גלילה בפועל (אז ה-margin המתווסף
+ * "נבלע" ע"י אותה כמות גלילה בדיוק) - אבל כאן ההסתרה יכולה לקרות בלי שום
+ * גלילה (מיד בטעינה), אז margin קבוע כזה היה נשאר רווח ריק אמיתי במקום.
+ * מוסתר = פשוט קטן יותר במקום (בלי טריקים), עם transition קלה על הגובה
+ * לחלקות בסגירה (הפתיחה עצמה כבר מיידית מטבעה - "מיד במלואה").
  * מעודכן ישירות על ה-DOM (לא דרך React state) - בלי רינדור בכל פריים.
  *
  * כל הרקע (הגרדיאנט, הצל, האנימציה העדינה של ההילות, פינות מעוגלות) זהה
@@ -71,49 +89,78 @@ export function CollapsibleTopBar({
     if (!bar || !clip || !content) return;
 
     let naturalHeight = content.offsetHeight;
+    // true = גלויה (בעקבות משיכה למטה בראש הדף). false = מוסתרת (ברירת
+    // המחדל - גם בטעינה הראשונה, לפני כל אינטראקציה).
+    let revealed = false;
+    // מיקום ה-touch ההתחלתי, רק אם המשיכה התחילה בראש הדף ממש
+    // (scrollY<=0) - אחרת null, ואין מעקב אחרי המחווה הזו בכלל.
+    let touchStartY: number | null = null;
     let raf = 0;
 
     function apply() {
       raf = 0;
       if (!bar || !clip || !naturalHeight) return;
-      const progress = Math.min(1, Math.max(0, window.scrollY / naturalHeight));
-      if (progress === 0) {
-        // מצב מלא: הכל חוזר לטבעי (גם כדי שתפריט ההצעות יוכל לצאת מהבר).
-        bar.style.marginBottom = "";
+      if (revealed) {
+        // מצב גלוי: הכל חוזר לטבעי (גם כדי שתפריט ההצעות יוכל לצאת מהבר).
         clip.style.height = "";
         clip.style.overflow = "";
         clip.style.pointerEvents = "";
-        if (content) content.style.transform = "";
         return;
       }
-      const collapsed = naturalHeight * progress;
-      bar.style.marginBottom = `${collapsed}px`;
-      clip.style.height = `${naturalHeight - collapsed}px`;
+      // מצב מוסתר: accordion רגיל ל-0px (בלי margin-bottom/transform
+      // מפצה - ר' ההערה למעלה).
+      clip.style.height = "0px";
       clip.style.overflow = "hidden";
-      clip.style.pointerEvents = progress > 0.5 ? "none" : "";
-      // *** תיקון (בקשה מפורשת - "בעיה בהחלקה כשגוללים חזרה למעלה, פער צבע, צל
-      // מיותר"): קודם השורה התעמעמה (opacity) ועלתה קצת - ובזמן הגלילה חזרה היא
-      // הייתה שקופה למחצה מעל הסגול (גוון עכור), והצל שלה נחתך בקצה התחתון.
-      // עכשיו היא תמיד אטומה לגמרי ופשוט "גולשת" למעלה, מתחת לשורת הכותרת (התוכן
-      // עולה בדיוק במרחק שהבר התכווץ, והקצה התחתון שלה צמוד לקצה התחתון של הבר) -
-      // כמו תוכן שגולל מתחת לבר נדבק. transform בלבד - חלק וללא עכירות.
-      if (content) content.style.transform = `translate3d(0, ${-collapsed}px, 0)`;
+      clip.style.pointerEvents = "none";
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      touchStartY = window.scrollY <= 0 ? e.touches[0].clientY : null;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (touchStartY == null || revealed) return;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      // סף קטן (6px) רק כדי לסנן רעד/נגיעה מקרית - לא "משיכה הדרגתית":
+      // מעבר לסף, השורה מופיעה מיד במלואה (בקשה מפורשת).
+      if (deltaY > 6) {
+        revealed = true;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }
+    }
+
+    function onTouchEnd() {
+      touchStartY = null;
     }
 
     function onScroll() {
-      if (!raf) raf = requestAnimationFrame(apply);
+      const scrollY = Math.max(0, window.scrollY);
+      // גלילה אמיתית של הדף (לא רק "בראש") סוגרת שוב שורה שנחשפה -
+      // "נשארת גלויה עד שמתחילים לגלול/להחליק כלפי מעלה לתוך הכרטיסים".
+      if (revealed && scrollY > 4) {
+        revealed = false;
+        if (!raf) raf = requestAnimationFrame(apply);
+      }
     }
 
     function onResize() {
-      // מודדים מחדש רק כשהחיפוש במצב מלא (אחרת ה-offsetHeight הנוכחי מכווץ).
-      if (window.scrollY === 0 && content) naturalHeight = content.offsetHeight;
-      onScroll();
+      // מודדים מחדש רק כשהשורה גלויה (אחרת ה-offsetHeight הנוכחי מכווץ).
+      if (revealed && content) naturalHeight = content.offsetHeight;
+      if (!raf) raf = requestAnimationFrame(apply);
     }
 
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onResize);
     apply();
     return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
@@ -134,8 +181,8 @@ export function CollapsibleTopBar({
       {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} />}
 
       {collapsible && (
-        <div ref={clipRef}>
-          <div ref={contentRef} data-collapsible-content="" className="px-5 pt-4" style={{ willChange: "transform" }}>
+        <div ref={clipRef} style={{ transition: "height 160ms ease" }}>
+          <div ref={contentRef} data-collapsible-content="" className="px-5 pt-4">
             {children}
           </div>
         </div>
