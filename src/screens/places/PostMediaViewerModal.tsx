@@ -32,6 +32,11 @@ interface PostMediaViewerModalProps {
   authorName: string;
   authorAvatarUrl?: string | null;
   createdAt: string;
+  /** *** תוספת (בקשה מפורשת - אפשרות מחיקה אחרי הוספת מקום/פוסט, גם
+   *  מעמוד הפרופיל): כשמועבר - מציג כפתור מחיקה ליד הסגירה. אופציונלי
+   *  ותואם-לאחור - קריאות קיימות (כמו מ-PostCard, ששם המחיקה כבר
+   *  קיימת בתפריט "⋮" נפרד) פשוט לא מעבירות את זה. */
+  onDelete?: () => Promise<void>;
 }
 
 /**
@@ -51,9 +56,11 @@ export function PostMediaViewerModal({
   authorName,
   authorAvatarUrl,
   createdAt,
+  onDelete,
 }: PostMediaViewerModalProps) {
   const { user } = useAuth();
   const [index, setIndex] = useState(initialIndex);
+  const [deleting, setDeleting] = useState(false);
   const [comments, setComments] = useState<CommentRow[] | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -156,6 +163,27 @@ export function PostMediaViewerModal({
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
+          {onDelete && (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={async () => {
+                if (!window.confirm("למחוק את הפוסט הזה?")) return;
+                setDeleting(true);
+                try {
+                  await onDelete();
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              aria-label="מחיקה"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bg-secondary text-red-500 disabled:opacity-50"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* *** תיקון (בקשה מפורשת - "לא צריך קצוות שחורים, שהתמונה

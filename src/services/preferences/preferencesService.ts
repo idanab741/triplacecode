@@ -1,16 +1,37 @@
 import { createClient } from "@/services/supabase/client";
 import { recomputeTravelDna } from "@/services/travelDna/travelDnaService";
+import type { TaxonomySelections } from "@/locales/he/preferencesTaxonomy";
 
 export interface UserPreferences {
   id: string;
+  /**
+   * *** עמוד ההעדפות (`/preferences`) עבר לטקסונומיה החדשה והעשירה
+   * (ר' `locales/he/preferencesTaxonomy.ts`) ולא ממלא יותר את 4
+   * השדות הישנים למטה (culinary_styles / interests /
+   * accommodation_types / vacation_preferences) - הם נשארים כאן
+   * ובעמודת ה-DB רק כי עשרות קבצים אחרים (matching/ranking/travel
+   * DNA/tripmatch/admin וכו') עדיין קוראים אותם ישירות; חיבור
+   * המערכות האלה לטקסונומיה החדשה הוא עבודת המשך נפרדת שלא בוצעה
+   * כאן. עד אז אלה ישקפו רק נתונים ישנים (או יהיו ריקים למשתמשים
+   * חדשים שמילאו רק את האשף החדש).
+   */
   culinary_styles: string[];
   dietary_restrictions: string[];
   kosher: boolean;
   accessibility: boolean;
+  /** סוגי נגישות ספציפיים - ר' locales/he/preferences.ts ACCESSIBILITY_TYPES. */
+  accessibility_types: string[];
   transportation: string[];
   interests: string[];
   accommodation_types: string[];
   vacation_preferences: string[];
+  /**
+   * בחירות האשף החדש: לכל קטגוריה (food/attraction/nature/shopping/
+   * sleep/nightlife) - קבוצות-משנה שנבחרו בשלמותן + תגיות ספציפיות.
+   * עמודת JSONB חדשה - דורשת מיגרציה ב-DB (לא בוצעה כאן, ר' סיכום).
+   * אופציונלי כי שורות ישנות ב-DB לא יכילו את העמודה הזו עד המיגרציה.
+   */
+  taxonomy_selections?: TaxonomySelections | null;
   onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;

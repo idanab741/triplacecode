@@ -228,6 +228,10 @@ function describeDna(dna: TravelDna | null) {
     kosher: dna.kosher,
     accessibility: dna.accessibility,
     vacation_preferences: dna.vacation_preferences,
+    // *** תוספת (חיבור עמוד ההעדפות החדש - 2026): רשימה עשירה בהרבה
+    // מ-interests הישן - כוללת גם קבוצות-משנה וגם תגיות ספציפיות
+    // שהמשתמש בחר בעמוד ההעדפות החדש (ר' preferencesTaxonomy.ts).
+    detailed_preferences: dna.taxonomy_tags,
     preferred_categories_from_behavior: dna.preferred_categories.map(getCategoryLabel),
     disliked_categories_from_behavior: dna.disliked_categories.map(getCategoryLabel),
   };
@@ -238,7 +242,12 @@ function computeFallbackScore(dna: TravelDna | null, cityStats: CityStats): numb
     return cityStats.avgRating != null ? Math.round((cityStats.avgRating / 5) * 60) : 50;
   }
 
-  const likedSet = new Set([...dna.interests, ...dna.preferred_categories]);
+  // *** תוספת (חיבור עמוד ההעדפות החדש - 2026): taxonomy_categories
+  // (food/attraction/nature/shopping/sleep/nightlife) הוא בדיוק אותו
+  // מרחב ערכים כמו cityStats.categories (places.category) - חפיפה
+  // ישירה ומדויקת, בניגוד ל-interests/preferred_categories הישנים
+  // שערכיהם לא בהכרח תואמים למרחב הזה.
+  const likedSet = new Set([...dna.interests, ...dna.preferred_categories, ...dna.taxonomy_categories]);
   const dislikedSet = new Set(dna.disliked_categories);
 
   const overlap = cityStats.categories.filter((c) => likedSet.has(c)).length;

@@ -6,6 +6,7 @@ import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import type { CandidatePlace, LatLng } from "@/services/tripBuilder/types";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { getTravelDna, type TravelDna } from "@/services/travelDna/travelDnaService";
 
 export interface TripMatchSession {
   id: string;
@@ -98,6 +99,33 @@ function coreCityTerm(city: string): string {
 }
 
 /**
+ * *** חדש (חיבור "למידת המשתמש" להחלקות - בקשה מפורשת: "למידת המשתמש
+ * זה הדבר הכי חשוב!"): עד עכשיו travel_dna עודכן בכל לייק/סקיפ
+ * (favoritesService.ts) אבל היה מחובר רק לדירוג יעדים (matchingService)
+ * - ההחלקות עצמן (TripMatch, כאן) היו ממוינות רק לפי מרחק/תאריך,
+ * בלי שום אישיות. הציון הזה עכשיו קובע את סדר הקלפים: חפיפת קטגוריה
+ * רחבה (taxonomy_categories, זהה למרחב הערכים של places.category) +
+ * למידה התנהגותית (preferred/disliked_categories, מלייקים/סקיפים
+ * קודמים) + החתיכה החזקה ביותר - חפיפה מדויקת ברמת התגית הספציפית
+ * (taxonomy_tags מול taxonomy_tags של המקום, שסווג ע"י
+ * preferencesTaxonomyClassifier.ts).
+ */
+function personalizationScore(
+  row: { category: string; taxonomyTags: string[]; accessible: boolean | null },
+  dna: TravelDna | null
+): number {
+  if (!dna) return 0;
+  let score = 0;
+  if (dna.taxonomy_categories.includes(row.category)) score += 2;
+  if (dna.preferred_categories.includes(row.category)) score += 2;
+  if (dna.disliked_categories.includes(row.category)) score -= 4;
+  const tagOverlap = row.taxonomyTags.filter((t) => dna.taxonomy_tags.includes(t)).length;
+  score += tagOverlap * 3;
+  if (dna.accessibility && row.accessible === true) score += 1;
+  return score;
+}
+
+/**
  * *** שינוי-מקור (בקשה מפורשת - "שיופיעו רק האטרקציות שהמשתמשים הכניסו לאפליקציה, ולא מה שיש בעמוד admin
  *  places! כולל התגיות, כולל הדירוג של גוגל, כולל המרחק, והתיאור"): TripMatch שולף עכשיו אך ורק מ-
  *  tripadd_submissions (המאגר הקהילתי, ר' migration 0078+) - לא מטבלת places (המאגר שמנוהל ע"י admin/places).
@@ -148,7 +176,7 @@ async function fetchTripAddCandidates(
   let query = adminForMedia
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, tripadd_submission_media(sort_order, media_assets(url))"
+      "id, name, category, subcategory, taxonomy_tags, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, tripadd_submission_media(sort_order, media_assets(url))"
     )
     .not("latitude", "is", null)
     .not("longitude", "is", null);
@@ -185,6 +213,24 @@ async function fetchTripAddCandidates(
   if (error || !data) return [];
 
   const rows = (data as Array<Record<string, unknown>>).filter((row) => !excluded.has(row.id as string));
+
+  // *** חדש (חיבור למידת המשתמש - ר' personalizationScore למעלה): נטען
+  // פעם אחת לכל הבאצ' הזה, לא לכל כרטיס בנפרד.
+  const dna = await getTravelDna(supabase, session.user_id);
+  const scoreById = new Map<string, number>();
+  for (const row of rows) {
+    scoreById.set(
+      row.id as string,
+      personalizationScore(
+        {
+          category: row.category as string,
+          taxonomyTags: (row.taxonomy_tags as string[] | null) ?? [],
+          accessible: (row.accessible as boolean | null) ?? null,
+        },
+        dna
+      )
+    );
+  }
 
   // *** תוספת (בקשה מפורשת - "דירוג triplace"): ממוצע tripadd_reviews לכל המועמדים בבת-אחת (לא שאילתה
   // נפרדת לכל כרטיס) - אותו עיקרון בדיוק כמו getTripAddPlaceById (עמוד אטרקציה בודד), רק batched.
@@ -273,9 +319,16 @@ async function fetchTripAddCandidates(
   // שמוצג בכרטיס עדיין מחושב מ-distanceOrigin (userLocation כשידוע) - שני דברים נפרדים בכוונה.
   const searchDistanceKm = (p: { latitude: number; longitude: number }) =>
     searchOrigin ? haversineDistanceKm(searchOrigin, { lat: p.latitude, lng: p.longitude }) : 0;
-  const withDistance = searchOrigin
-    ? mapped.filter((p) => searchDistanceKm(p) <= radiusKm).sort((a, b) => searchDistanceKm(a) - searchDistanceKm(b))
-    : mapped;
+  const withinRadius = searchOrigin ? mapped.filter((p) => searchDistanceKm(p) <= radiusKm) : mapped;
+  // *** תיקון (חיבור למידת המשתמש - ר' personalizationScore למעלה): המיון
+  // הראשי הוא עכשיו לפי ציון האישיות (taxonomy_categories/tags + למידה
+  // התנהגותית מ-favorites), לא לפי מרחק גרידא. מרחק נשאר שובר-שוויון,
+  // כדי שבין שני מקומות שווי-התאמה עדיין נראה קודם את הקרוב יותר.
+  const withDistance = [...withinRadius].sort((a, b) => {
+    const scoreDiff = (scoreById.get(b.id) ?? 0) - (scoreById.get(a.id) ?? 0);
+    if (scoreDiff !== 0) return scoreDiff;
+    return searchDistanceKm(a) - searchDistanceKm(b);
+  });
   return withDistance.slice(0, limit);
 }
 

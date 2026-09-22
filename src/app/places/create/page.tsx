@@ -46,11 +46,12 @@ interface AutocompleteSuggestion {
 }
 
 interface GoogleDetails {
-  placeId: string;
+  placeId: string | null;
   name: string;
   address: string;
   latitude: number;
   longitude: number;
+  imageUrl: string | null;
 }
 
 /** המקום שעליו כותבים - נבחר מהחיפוש, או נוסף עכשיו. */
@@ -117,6 +118,14 @@ export function CreatePlacePageContent() {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // *** תוספת (בקשה מפורשת - "אין אותו באופציות של גוגל - אני רוצה
+  // שיהיה אפשרות להוסיף ידנית"): כשהמקום לא נמצא ברשימת ההצעות של
+  // גוגל, מאפשרים להקליד כתובת חופשית ולגאוקד אותה בלבד (בלי Place ID
+  // ספציפי) - אותו endpoint בדיוק ש-AddPlaceModal כבר משתמש בו למצב הזה.
+  const [manualMode, setManualMode] = useState(false);
+  const [manualAddress, setManualAddress] = useState("");
+  const [manualLocating, setManualLocating] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // 3. ביקורת
   const [selected, setSelected] = useState<SelectedPlace | null>(null);
@@ -253,6 +262,9 @@ export function CreatePlacePageContent() {
     setGooglePlace(null);
     setDuplicateOf(null);
     setAddError(null);
+    setManualMode(false);
+    setManualAddress("");
+    setManualError(null);
     if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     if (value.trim().length < 3) {
       setSuggestions(null);
@@ -296,11 +308,48 @@ export function CreatePlacePageContent() {
         address: details.address ?? s.secondaryText,
         latitude: details.latitude,
         longitude: details.longitude,
+        imageUrl: details.imageUrl ?? null,
       });
     } catch {
       setAddError("שגיאה בטעינת פרטי המקום");
     } finally {
       setCheckingDuplicate(false);
+    }
+  }
+
+  /** גאוקוד כתובת חופשית בלבד (בלי Place ID) - אותו endpoint שמשמש את
+   *  AddPlaceModal למצב "אין GPS/לא נמצא בגוגל" (ר' match-place/route.ts). */
+  async function handleManualLocate() {
+    if (!manualAddress.trim()) {
+      setManualError("הזינו כתובת");
+      return;
+    }
+    setManualLocating(true);
+    setManualError(null);
+    try {
+      const res = await fetch("/api/tripadd/match-place", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: manualAddress.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.latitude == null) {
+        setManualError(data.error ?? "לא הצלחנו לאתר את הכתובת הזו");
+        return;
+      }
+      setDuplicateOf(null);
+      setGooglePlace({
+        placeId: null,
+        name: nameQuery.trim(),
+        address: data.address ?? manualAddress.trim(),
+        latitude: data.latitude,
+        longitude: data.longitude,
+        imageUrl: null,
+      });
+    } catch {
+      setManualError("שגיאת רשת באיתור הכתובת");
+    } finally {
+      setManualLocating(false);
     }
   }
 
@@ -317,7 +366,7 @@ export function CreatePlacePageContent() {
         body: JSON.stringify({
           name: googlePlace.name,
           category,
-          googlePlaceId: googlePlace.placeId,
+          googlePlaceId: googlePlace.placeId ?? undefined,
           address: googlePlace.address,
           latitude: googlePlace.latitude,
           longitude: googlePlace.longitude,
@@ -516,6 +565,42 @@ export function CreatePlacePageContent() {
 
             {checkingDuplicate && <p className="mb-2 text-[12px] text-ink-secondary">בודקים אם המקום כבר קיים...</p>}
 
+            {/* *** תוספת (בקשה מפורשת - הוספה ידנית כשהמקום לא נמצא בגוגל). */}
+            {!googlePlace && !duplicateOf && nameQuery.trim().length >= 3 && (
+              <div className="mb-3">
+                {!manualMode ? (
+                  <button type="button" onClick={() => setManualMode(true)} className="text-[13px]">
+                    <span className="text-ink-secondary">לא מצאתם את זה ברשימה? </span>
+                    <span className="font-bold" style={{ color: "var(--color-places-purple)" }}>
+                      הוסיפו כתובת ידנית
+                    </span>
+                  </button>
+                ) : (
+                  <div className="pc-reveal rounded-card bg-bg-secondary p-3">
+                    <label className="mb-1 block text-[12.5px] font-semibold text-ink-secondary">מה הכתובת?</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={manualAddress}
+                        onChange={(e) => setManualAddress(e.target.value)}
+                        placeholder="רחוב, עיר, מדינה"
+                        className={`${FIELD_CLASS} flex-1 px-4`}
+                      />
+                      <button
+                        type="button"
+                        disabled={manualLocating}
+                        onClick={handleManualLocate}
+                        className="shrink-0 rounded-pill px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
+                        style={{ background: PURPLE_GRADIENT }}
+                      >
+                        {manualLocating ? "מאתר..." : "אתרו"}
+                      </button>
+                    </div>
+                    {manualError && <p className="mt-2 text-[12px] text-red-500">{manualError}</p>}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* המערכת מחליטה מאחורי הקלעים: אם המקום כבר קיים - ממשיכים לביקורת, בלי להסביר. */}
             {duplicateOf && (
               <div className="mb-3 mt-2 rounded-card bg-bg-secondary p-3">
@@ -535,7 +620,14 @@ export function CreatePlacePageContent() {
 
             {googlePlace && (
               <div className="pc-reveal mb-3 mt-2 flex items-center gap-2.5 rounded-card bg-bg-secondary px-3 py-2.5">
-                <PlacesLocationIcon size={32} />
+                {googlePlace.imageUrl ? (
+                  <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-bg-secondary ring-1 ring-black/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={googlePlace.imageUrl} alt="" className="h-full w-full object-cover" />
+                  </span>
+                ) : (
+                  <PlacesLocationIcon size={32} />
+                )}
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] text-ink-secondary">איפה הוא נמצא?</span>
                   <span className="block truncate text-[13px] font-semibold text-ink">{googlePlace.address}</span>

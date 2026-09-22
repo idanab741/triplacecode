@@ -57,7 +57,23 @@ function measureHeaderBand(): Placement | null {
   const search = document.querySelector("[data-home-search]");
   if (search) {
     const sr = search.getBoundingClientRect();
-    const candidate = sr.bottom - rowTop;
+    // *** תיקון (בקשה מפורשת - "החלון מתכווץ אחרי שיורדים קצת בעמוד -
+    // צריך להישאר זהה"): שורת החיפוש לא משנה גובה בפועל בגלילה - היא
+    // רק מוזזת למעלה (transform) ע"י CollapsibleTopBar ומוסתרת חלקית
+    // מתחת לבר. sr.bottom כבר כולל את ההזזה הזו, אז המדידה הישנה
+    // (candidate = sr.bottom - rowTop) הייתה מחזירה גובה קטן יותר ככל
+    // שגוללים יותר - בדיוק הבאג. מפצים כאן על ה-transform שכבר הוחל,
+    // כדי שהמדידה תמיד תשקף את הפריסה המלאה, הלא-מכווצת.
+    const contentEl = search.closest("[data-collapsible-content]") as HTMLElement | null;
+    let translateY = 0;
+    if (contentEl) {
+      const transform = getComputedStyle(contentEl).transform;
+      if (transform && transform !== "none") {
+        const matrix = new DOMMatrixReadOnly(transform);
+        translateY = matrix.m42;
+      }
+    }
+    const candidate = sr.bottom - rowTop - translateY;
     // רק אם החיפוש גלוי במלואו (לא מכווץ בגלילה) והמדידה סבירה.
     if (sr.height > 30 && candidate >= TALL_MIN_HEIGHT && candidate <= 140) height = candidate;
   }

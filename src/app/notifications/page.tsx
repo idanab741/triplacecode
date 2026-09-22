@@ -3,16 +3,29 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Screen, Skeleton } from "@/components/ui";
-import { SimpleAppHeader } from "@/screens/layout/SimpleAppHeader";
+import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { NotificationCard } from "@/screens/notifications/NotificationCard";
 import type { ActivityItem, ActivityTab } from "@/services/notifications/notificationsService";
+import type { SocialNotificationItem } from "@/services/social/socialNotificationsService";
+import { useAuth } from "@/hooks/useAuth";
+import { isPreferencesComplete } from "@/services/preferences/preferencesService";
 
 /**
  * *** תכונה חדשה (MASTER PROMPT - מרכז פעילות/התראות): "מה חדש?" - לא
  * "Notifications"/"מרכז התראות" (בכוונה, ר' סעיף 4 בפרומפט). נשאר בתוך
  * ה-Bottom Nav הראשי (MainBottomNav, בלי טאב חדש) - הפעמון ב-Home הוא
  * ה-entry point היחיד (ר' HomeHeader.tsx).
+ *
+ * *** עדכון (בקשה מפורשת - "חלונית ההתראות צריכה להיות מאוחדת עם
+ * ההתראות ב-place's! עם הבר העליון החדש בצבע תכלת"): שני שינויים -
+ * (1) הבר העליון הוחלף מ-SimpleAppHeader הלבן ל-CollapsibleTopBar
+ * התכלת (כמו בעמוד הבית/פרופיל/עוד), (2) טאב "הכול" ממזג גם התראות
+ * social (עוקבים/לייקים/תגובות) - אותה לוגיקה בדיוק כמו PlacesNotificationBell,
+ * כדי שהרשימה תהיה זהה בין הפעמון לעמוד המלא. טאבים ספציפיים
+ * (טיולים/מערכת/המלצות) נשארים triplace-בלבד - social לא שייכת לאף
+ * אחד מהם קונספטואלית.
  */
 
 const TABS: { id: ActivityTab; label: string }[] = [
@@ -22,23 +35,78 @@ const TABS: { id: ActivityTab; label: string }[] = [
   { id: "recommendations", label: "המלצות" },
 ];
 
+const SOCIAL_TYPE_TEXT: Record<string, string> = {
+  NEW_FOLLOWER: "התחיל/ה לעקוב אחריך",
+  FRIEND_REQUEST: "שלח/ה לך בקשת חברות",
+  FRIEND_ACCEPTED: "אישר/ה את בקשת החברות שלך",
+  POST_LIKE: "אהב/ה את הפוסט שלך",
+  POST_COMMENT: "הגיב/ה על הפוסט שלך",
+  COMMENT_REPLY: "הגיב/ה לתגובה שלך",
+};
+
+function isSocialActivityKey(id: string): boolean {
+  return id.startsWith("social_");
+}
+
+function toActivityItem(item: SocialNotificationItem): ActivityItem {
+  const actionUrl =
+    item.type === "FRIEND_REQUEST"
+      ? "/places/friends/requests"
+      : item.type === "POST_LIKE" || item.type === "POST_COMMENT"
+        ? `/places/post/${item.targetId}`
+        : item.actor.username
+          ? `/places/profile/${item.actor.username}`
+          : null;
+
+  return {
+    id: item.id,
+    category: "system",
+    priority: "normal",
+    title: item.actor.fullName ?? item.actor.username ?? "מטייל",
+    description: SOCIAL_TYPE_TEXT[item.type] ?? "",
+    imageUrl: item.actor.avatarUrl,
+    icon: "🔔",
+    actionUrl,
+    actionLabel: null,
+    timestamp: item.createdAt,
+    isRead: item.isRead,
+  };
+}
+
+const PREFERENCES_REMINDER_ID = "pref_reminder";
+
 export default function NotificationsPage() {
   const router = useRouter();
+  const { preferences, preferencesLoading } = useAuth();
   const [tab, setTab] = useState<ActivityTab>("all");
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   const [error, setError] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
 
-  function load(currentTab: ActivityTab) {
+  async function load(currentTab: ActivityTab) {
     setError(false);
     setItems(null);
-    fetch(`/api/notifications?tab=${currentTab}`)
-      .then((res) => {
+    try {
+      if (currentTab === "all") {
+        const [triplaceRes, socialRes] = await Promise.all([
+          fetch(`/api/notifications?tab=all`).then((r) => (r.ok ? r.json() : Promise.reject())),
+          fetch("/api/social/notifications").then((r) => (r.ok ? r.json() : Promise.reject())),
+        ]);
+        const triplaceItems: ActivityItem[] = triplaceRes.notifications ?? [];
+        const socialItems: ActivityItem[] = (socialRes.notifications ?? []).map(toActivityItem);
+        const merged = [...triplaceItems, ...socialItems].sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setItems(merged);
+      } else {
+        const res = await fetch(`/api/notifications?tab=${currentTab}`);
         if (!res.ok) throw new Error("failed");
-        return res.json();
-      })
-      .then((data) => setItems(data.notifications ?? []))
-      .catch(() => setError(true));
+        const data = await res.json();
+        setItems(data.notifications ?? []);
+      }
+    } catch {
+      setError(true);
+    }
   }
 
   useEffect(() => {
@@ -46,12 +114,43 @@ export default function NotificationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  const unreadCount = items?.filter((i) => !i.isRead).length ?? 0;
+  /** *** תוספת (בקשה מפורשת - התראה קבועה עד השלמת ההתאמות האישיות) -
+   *  אותו רעיון בדיוק כמו ב-PlacesNotificationBell, מוצגת רק בטאב "הכול". */
+  const preferencesReminder: ActivityItem | null =
+    tab === "all" && !preferencesLoading && !isPreferencesComplete(preferences)
+      ? {
+          id: PREFERENCES_REMINDER_ID,
+          category: "system",
+          priority: "important",
+          title: "השלימו את ההתאמות האישיות שלכם",
+          description: "כדי שנציע לכם המלצות מדויקות יותר",
+          imageUrl: null,
+          icon: "🎯",
+          actionUrl: "/preferences",
+          actionLabel: null,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        }
+      : null;
+
+  const displayItems = items ? (preferencesReminder ? [preferencesReminder, ...items] : items) : items;
+  const unreadCount = displayItems?.filter((i) => !i.isRead).length ?? 0;
 
   async function handleOpen(item: ActivityItem) {
+    if (item.id === PREFERENCES_REMINDER_ID) {
+      router.push(item.actionUrl ?? "/preferences");
+      return;
+    }
     if (!item.isRead) {
       setItems((prev) => (prev ? prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i)) : prev));
-      fetch(`/api/notifications/${encodeURIComponent(item.id)}/read`, { method: "POST" }).catch(() => {});
+      const readRequest = isSocialActivityKey(item.id)
+        ? fetch("/api/social/notifications/read", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activityKey: item.id }),
+          })
+        : fetch(`/api/notifications/${encodeURIComponent(item.id)}/read`, { method: "POST" });
+      readRequest.catch(() => {});
     }
     if (item.actionUrl) router.push(item.actionUrl);
   }
@@ -59,9 +158,19 @@ export default function NotificationsPage() {
   async function handleMarkAllRead() {
     if (!items || unreadCount === 0) return;
     setMarkingAll(true);
+    const unreadSocialKeys = items.filter((i) => !i.isRead && isSocialActivityKey(i.id)).map((i) => i.id);
     setItems((prev) => (prev ? prev.map((i) => ({ ...i, isRead: true })) : prev));
     try {
-      await fetch("/api/notifications/read-all", { method: "POST" });
+      await Promise.all([
+        fetch("/api/notifications/read-all", { method: "POST" }),
+        ...unreadSocialKeys.map((activityKey) =>
+          fetch("/api/social/notifications/read", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activityKey }),
+          })
+        ),
+      ]);
     } catch {
       // כשל שקט - ה-state המקומי כבר עודכן, נטען מחדש בפעם הבאה בכל מקרה
     } finally {
@@ -71,10 +180,12 @@ export default function NotificationsPage() {
 
   return (
     <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      <SimpleAppHeader onBack={() => router.push("/home")} title="מה חדש?" />
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.push("/home")} />
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
         <div>
+          <h1 className="text-xl font-bold text-ink">מה חדש?</h1>
           <p className="text-sm text-ink-secondary">כל מה שחשוב לדעת על הטיולים שלכם</p>
         </div>
 
@@ -132,7 +243,7 @@ export default function NotificationsPage() {
           </div>
         )}
 
-        {items !== null && !error && items.length === 0 && (
+        {displayItems !== null && !error && displayItems!.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <span className="text-3xl">✨</span>
             <p className="text-sm font-semibold text-ink">הכול רגוע</p>
@@ -148,9 +259,9 @@ export default function NotificationsPage() {
           </div>
         )}
 
-        {items !== null && !error && items.length > 0 && (
+        {displayItems !== null && !error && displayItems!.length > 0 && (
           <div className="flex flex-col gap-2.5">
-            {items.map((item) => (
+            {displayItems!.map((item) => (
               <NotificationCard key={item.id} item={item} onOpen={handleOpen} />
             ))}
           </div>

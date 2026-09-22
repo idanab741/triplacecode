@@ -49,6 +49,23 @@ export const TRANSPORTATION: PreferenceOption[] = [
   { value: "walking", label: "הליכה ברגל" },
 ];
 
+/**
+ * *** תוספת (בקשה מפורשת - "נגישות - מה זה אומר? צריך סוגי נגישות,
+ * צריך הסבר"): לפני כן "נגישות" היה toggle יחיד בלי שום הסבר. עכשיו
+ * בחירה מרובה של סוגי נגישות ספציפיים, עם כותרת-משנה מסבירה בעמוד
+ * עצמו (ר' page.tsx). לצד זה, השדה הבוליאני הישן `accessibility`
+ * נשאר (נגזר אוטומטית - true אם נבחר סוג אחד לפחות) כי הוא עדיין
+ * נקרא ישירות במקומות אחרים באפליקציה.
+ */
+export const ACCESSIBILITY_TYPES: PreferenceOption[] = [
+  { value: "wheelchair", label: "נגישות לכיסא גלגלים", emoji: "♿" },
+  { value: "stroller", label: "נגישות לעגלת תינוק", emoji: "🚼" },
+  { value: "hearing", label: "התאמה לכבדי שמיעה", emoji: "🦻" },
+  { value: "visual", label: "התאמה לכבדי ראייה", emoji: "🦯" },
+  { value: "accessible_parking", label: "חניה נגישה", emoji: "🅿️" },
+  { value: "service_animal", label: "מתאים לכלב נחייה", emoji: "🦮" },
+];
+
 export const INTERESTS: PreferenceOption[] = [
   { value: "coffee_carts_cafes", label: "עגלות קפה ובתי קפה", emoji: "☕" },
   { value: "nature_trails", label: "מסלולי טבע ונופים", emoji: "🌿" },

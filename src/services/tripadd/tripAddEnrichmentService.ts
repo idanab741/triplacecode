@@ -4,6 +4,7 @@ import { callClaude } from "@/services/ai/claudeService";
 import { applyTripAddEnrichment } from "@/services/tripadd/tripAddService";
 import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
+import { classifyPreferencesTaxonomyTags } from "@/services/tripadd/preferencesTaxonomyClassifier";
 
 /** ממיר enum מחרוזת של Google ("PRICE_LEVEL_MODERATE" וכו') למספר 1-4 -
  *  לא ממציא מחיר מספרי מדויק, רק שומר את רמת המחיר כפי שגוגל מספקת. */
@@ -53,6 +54,7 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       googleRatingCount?: number | null;
       openingHours?: string[] | null;
       shortDescription?: string | null;
+      taxonomyTags?: string[];
     } = {};
 
     // *** תיקון (בקשה מפורשת - "תתי קטגוריה קבועות"): אם המשתמש כבר
@@ -71,6 +73,22 @@ export async function enrichTripAddSubmission(submissionId: string): Promise<voi
       } catch {
         // לא קריטי - ממשיכים בלי subcategory
       }
+    }
+
+    // *** תוספת (חיבור עמוד ההעדפות ל"למידת משתמש" - בקשה מפורשת):
+    // עד 3 תגיות מהטקסונומיה החדשה, בנוסף (לא במקום) לתת-הקטגוריה
+    // הישנה למעלה. רץ תמיד - בניגוד ל-subcategory, אין כאן UI שממלא
+    // את זה מראש, אז אין "לא לדרוס בחירת משתמש" לבדוק.
+    try {
+      const taxonomyTags = await classifyPreferencesTaxonomyTags(
+        submission.category as TripAddCategory,
+        submission.name as string,
+        (submission.address as string | null) ?? null,
+        (submission.subcategory as string | null) ?? patch.subcategory ?? null
+      );
+      if (taxonomyTags.length > 0) patch.taxonomyTags = taxonomyTags;
+    } catch {
+      // לא קריטי - ממשיכים בלי taxonomy_tags
     }
 
     try {

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TaxonomySelections } from "@/locales/he/preferencesTaxonomy";
+import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 
 export interface TravelDna {
   id: string;
@@ -7,14 +9,53 @@ export interface TravelDna {
   dietary_restrictions: string[];
   kosher: boolean;
   accessibility: boolean;
+  accessibility_types: string[];
   transportation: string[];
   interests: string[];
   accommodation_types: string[];
   vacation_preferences: string[];
   preferred_categories: string[];
   disliked_categories: string[];
+  /**
+   * *** תוספת (חיבור עמוד ההעדפות החדש - 2026): שלושה שדות שנגזרים
+   * מ-user_preferences.taxonomy_selections בזמן החישוב (ר' למטה):
+   * - taxonomy_selections: העתק גולמי (קבוצות+תגיות לכל קטגוריה).
+   * - taxonomy_categories: אילו מ-6 הקטגוריות (food/attraction/nature/
+   *   shopping/sleep/nightlife) יש בהן לפחות בחירה אחת - אותו מרחב
+   *   ערכים בדיוק כמו places.category, אז אפשר להצטלב איתו ישירות
+   *   (למשל ב-computeFallbackScore ב-matchingService.ts).
+   * - taxonomy_tags: רשימה שטוחה של כל הקבוצות+התגיות שנבחרו, לשימוש
+   *   בפרומפט ה-AI (תיאור טעם עשיר בהרבה מ-interests/culinary_styles
+   *   הישנים).
+   */
+  taxonomy_selections: TaxonomySelections | null;
+  taxonomy_categories: TripAddCategory[];
+  taxonomy_tags: string[];
   updated_at: string;
   created_at: string;
+}
+
+/** food/attraction/nature/shopping/sleep/nightlife - כדי לא לייבא את כל PREFERENCES_TAXONOMY רק בשביל המפתחות. */
+const TAXONOMY_CATEGORY_IDS: TripAddCategory[] = ["food", "attraction", "nature", "shopping", "sleep", "nightlife"];
+
+/** גוזר מתוך taxonomy_selections הגולמי את שתי הרשימות השטוחות שנשמרות בהמשך על travel_dna. */
+function deriveTaxonomySignals(selections: TaxonomySelections | null | undefined): {
+  categories: TripAddCategory[];
+  tags: string[];
+} {
+  if (!selections) return { categories: [], tags: [] };
+
+  const categories: TripAddCategory[] = [];
+  const tags: string[] = [];
+
+  for (const categoryId of TAXONOMY_CATEGORY_IDS) {
+    const selection = selections[categoryId];
+    if (!selection) continue;
+    if (selection.groups.length > 0 || selection.tags.length > 0) categories.push(categoryId);
+    tags.push(...selection.groups, ...selection.tags);
+  }
+
+  return { categories, tags: Array.from(new Set(tags)) };
 }
 
 /**
@@ -49,18 +90,26 @@ export async function recomputeTravelDna(
   // קטגוריה שגם אהובה וגם נדחתה לא נחשבת "נדחית" חד-משמעית
   const dislikedCategories = disliked.filter((c) => !preferredCategories.includes(c));
 
+  const { categories: taxonomyCategories, tags: taxonomyTags } = deriveTaxonomySignals(
+    preferences?.taxonomy_selections as TaxonomySelections | null | undefined
+  );
+
   const row = {
     user_id: userId,
     culinary_styles: preferences?.culinary_styles ?? [],
     dietary_restrictions: preferences?.dietary_restrictions ?? [],
     kosher: preferences?.kosher ?? false,
     accessibility: preferences?.accessibility ?? false,
+    accessibility_types: preferences?.accessibility_types ?? [],
     transportation: preferences?.transportation ?? [],
     interests: preferences?.interests ?? [],
     accommodation_types: preferences?.accommodation_types ?? [],
     vacation_preferences: preferences?.vacation_preferences ?? [],
     preferred_categories: preferredCategories,
     disliked_categories: dislikedCategories,
+    taxonomy_selections: preferences?.taxonomy_selections ?? null,
+    taxonomy_categories: taxonomyCategories,
+    taxonomy_tags: taxonomyTags,
   };
 
   const { data, error } = await supabase

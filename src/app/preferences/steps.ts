@@ -1,80 +1,60 @@
-import {
-  CULINARY_STYLES,
-  TRANSPORTATION,
-  INTERESTS,
-  ACCOMMODATION_TYPES,
-  VACATION_PREFERENCES,
-  type PreferenceOption,
-} from "@/locales/he/preferences";
+import { PREFERENCES_TAXONOMY, emptyTaxonomySelections, type TaxonomySelections } from "@/locales/he/preferencesTaxonomy";
+import { DIETARY_RESTRICTIONS, TRANSPORTATION } from "@/locales/he/preferences";
+import type { TripAddCategory } from "@/services/tripadd/tripAddService";
 
+/**
+ * *** עיצוב מחדש מלא של אשף ההעדפות (בקשה מפורשת - "מחליף את כל
+ * עמודי ההתאמה האישית"): במקום 5 השלבים הישנים (culinary_styles /
+ * transportation / interests / accommodation_types / vacation_preferences,
+ * כל אחד רשימה שטוחה של 5-19 צ'יפים) - עכשיו שלב אחד לכל אחת מ-6
+ * הקטגוריות הראשיות של הטקסונומיה החדשה (PREFERENCES_TAXONOMY),
+ * ובכל שלב: בחירה ברמת קבוצת-המשנה + אפשרות לפתוח ולבחור תגיות
+ * ספציפיות בתוכה. ר' page.tsx למימוש ה-UI האנימטיבי.
+ *
+ * *** transportation / kosher / accessibility / dietary_restrictions
+ * לא חלק מהטקסונומיה החדשה (זו לא "סוג מקום" אלא צורך/הגבלה נפרדים),
+ * ונשארים בכוונה כשדות עצמאיים בשלב אחרון קומפקטי - הם עדיין
+ * נקראים ישירות במקומות רבים באפליקציה (matching/ranking/travel DNA
+ * וכו') ולכן לא הוסרו.
+ *
+ * *** טיפוסי הבחירה עצמם (CategorySelectionState / TaxonomySelections)
+ * מוגדרים ב-locales/he/preferencesTaxonomy.ts (שכבה משותפת), לא כאן -
+ * כדי ש-preferencesService.ts (שכבת שירות) לא יצטרך לייבא משכבת app/.
+ */
+export type TaxonomyFieldKey = TripAddCategory;
 
-export type MultiFieldKey =
-  | "culinary_styles"
-  | "dietary_restrictions"
-  | "transportation"
-  | "interests"
-  | "accommodation_types"
-  | "vacation_preferences";
-
-export type ToggleFieldKey = "kosher" | "accessibility";
-
-export interface MultiStep {
-  type: "multi";
-  key: MultiFieldKey;
-  title: string;
-  options: PreferenceOption[];
+export interface TaxonomyCategoryStep {
+  type: "taxonomy";
+  key: TaxonomyFieldKey;
 }
 
-export interface ToggleStep {
-  type: "toggle";
-  key: ToggleFieldKey;
-  title: string;
+export interface ExtraStep {
+  type: "extra";
 }
 
-export type PreferenceStep = MultiStep | ToggleStep;
+export type PreferenceStep = TaxonomyCategoryStep | ExtraStep;
 
 export const STEPS: PreferenceStep[] = [
-  { type: "multi", key: "culinary_styles", title: "סגנון קולינרי", options: CULINARY_STYLES },
-  {
-    type: "multi",
-    key: "transportation",
-    title: "מהי דרך ההתניידות המועדפת עליך?",
-    options: TRANSPORTATION,
-  },
-  { type: "multi", key: "interests", title: "תחומי עניין", options: INTERESTS },
-  {
-    type: "multi",
-    key: "accommodation_types",
-    title: "סוגי לינה מועדפים",
-    options: ACCOMMODATION_TYPES,
-  },
-  // העדפות חופשה בחו"ל - זהות לאלה שבשאלון בניית חופשה בחו"ל, לא רשימה נפרדת.
-  {
-    type: "multi",
-    key: "vacation_preferences",
-    title: "העדפות חופשות בחו\"ל",
-    options: VACATION_PREFERENCES,
-  },
+  ...PREFERENCES_TAXONOMY.map((category): TaxonomyCategoryStep => ({ type: "taxonomy", key: category.id })),
+  { type: "extra" },
 ];
 
 export interface PreferencesFormState {
-  culinary_styles: string[];
+  taxonomy: TaxonomySelections;
+  transportation: string[];
   dietary_restrictions: string[];
   kosher: boolean;
-  accessibility: boolean;
-  transportation: string[];
-  interests: string[];
-  accommodation_types: string[];
-  vacation_preferences: string[];
+  accessibility_types: string[];
 }
 
 export const EMPTY_PREFERENCES_STATE: PreferencesFormState = {
-  culinary_styles: [],
+  taxonomy: emptyTaxonomySelections(),
+  transportation: [],
   dietary_restrictions: [],
   kosher: false,
-  accessibility: false,
-  transportation: [],
-  interests: [],
-  accommodation_types: [],
-  vacation_preferences: [],
+  accessibility_types: [],
 };
+
+export { countCategorySelections } from "@/locales/he/preferencesTaxonomy";
+export type { TaxonomySelections, CategorySelectionState } from "@/locales/he/preferencesTaxonomy";
+export { TRANSPORTATION, DIETARY_RESTRICTIONS };

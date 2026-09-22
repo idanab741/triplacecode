@@ -71,7 +71,7 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
     },
     {
       id: "places",
-      label: "places",
+      label: "place's",
       icon: (
         <NavIcon
           active={active === "places"}

@@ -27,7 +27,12 @@ export async function getFeed(
   cursor?: string,
   authorId?: string,
   /** סינון לפי post_type (טאבים בפרופיל): include = רק הסוגים האלה, exclude = הכל חוץ מהסוגים האלה. */
-  postTypes?: { include?: string[]; exclude?: string[] }
+  postTypes?: { include?: string[]; exclude?: string[] },
+  /** *** תוספת (חיבור עמוד הפרופיל ל-PostMediaViewerModal - בקשה
+   *  מפורשת "אמור לפתוח את החלונית כמו ב-places"): כשמועבר, מחזיר
+   *  פוסט בודד לפי id (מתעלם מ-cursor/authorId/postTypes) - נוח לשליפת
+   *  פוסט יחיד לצפייה, בלי לבנות endpoint נפרד עם כפילות לוגיקה. */
+  postId?: string
 ): Promise<{ items: FeedItemDto[]; nextCursor: string | null }> {
   let authorFilterIds: string[] | null = null;
 
@@ -59,6 +64,7 @@ export async function getFeed(
   // הפוסטים של אותו משתמש שה-RLS מרשה לצופה לראות, לא רק אם הוא בין
   // החברים/הנעקבים של הצופה עצמו.
   if (authorId) query = query.eq("author_id", authorId);
+  if (postId) query = query.eq("id", postId);
   if (postTypes?.include?.length) query = query.in("post_type", postTypes.include);
   if (postTypes?.exclude?.length) query = query.not("post_type", "in", `(${postTypes.exclude.join(",")})`);
   if (authorFilterIds) query = query.in("author_id", authorFilterIds);

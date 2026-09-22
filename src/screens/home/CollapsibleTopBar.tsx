@@ -135,7 +135,7 @@ export function CollapsibleTopBar({
 
       {collapsible && (
         <div ref={clipRef}>
-          <div ref={contentRef} className="px-5 pt-4" style={{ willChange: "transform" }}>
+          <div ref={contentRef} data-collapsible-content="" className="px-5 pt-4" style={{ willChange: "transform" }}>
             {children}
           </div>
         </div>

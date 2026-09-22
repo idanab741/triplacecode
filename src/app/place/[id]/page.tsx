@@ -37,17 +37,20 @@ interface PlacePageProps {
  * לא מוסרת.
  */
 export default async function PlacePage({ params, searchParams }: PlacePageProps) {
-  const { id } = await params;
-  const { from } = await searchParams;
+  const [{ id }, { from }] = await Promise.all([params, searchParams]);
   const activeNavTab = from === "ai" ? "ai" : "favorites";
 
-  const tripAddPlace = await getTripAddPlaceById(id);
+  // *** ביצועים (בקשה מפורשת - "הכל צריך לזרום מהר, כמו אינסטגרם/פייסבוק"):
+  // שתי השליפות האלה עצמאיות זו מזו (שתיהן לפי id בלבד) - מריצים אותן
+  // במקביל במקום ברצף, כך שבמקרה הרגיל (מקום, לא tripAddPlace) חוסכים
+  // round-trip שלם במקום לחכות לתשובת tripAddPlace לפני שמתחילים לשלוף
+  // את המקום. העלות: שאילתת getPlaceById "מבוזבזת" בענף של tripAddPlace -
+  // משתלם, כי latency של רשת/DB יקר בהרבה משאילתה מקומית נוספת.
+  const [tripAddPlace, place] = await Promise.all([getTripAddPlaceById(id), getPlaceById(id)]);
   if (tripAddPlace) {
     const savedCount = await getTripAddSavedCount(tripAddPlace.id);
     return <TripAddPlaceView place={tripAddPlace} savedCount={savedCount} />;
   }
-
-  const place = await getPlaceById(id);
 
   if (!place) {
     return (

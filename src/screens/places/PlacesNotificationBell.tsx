@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui";
 import { NotificationCard } from "@/screens/notifications/NotificationCard";
 import type { ActivityItem } from "@/services/notifications/notificationsService";
 import type { SocialNotificationItem } from "@/services/social/socialNotificationsService";
+import { useAuth } from "@/hooks/useAuth";
+import { isPreferencesComplete } from "@/services/preferences/preferencesService";
 
 const TYPE_TEXT: Record<string, string> = {
   NEW_FOLLOWER: "התחיל/ה לעקוב אחריך",
@@ -61,10 +63,34 @@ interface PlacesNotificationBellProps {
 
 export function PlacesNotificationBell({ solid = false }: PlacesNotificationBellProps = {}) {
   const router = useRouter();
+  const { preferences, preferencesLoading } = useAuth();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   const [error, setError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  /** *** תוספת (בקשה מפורשת - "התראה קבועה לכל משתמש שנרשם, כל עוד
+   *  ממלאים את ההתאמות האישיות"): לא מגיעה מה-DB - נבנית מקומית ומוצגת
+   *  תמיד ראשונה כל עוד preferences.onboarding_completed_at ריק. מזהה
+   *  קבוע (לא UUID אמיתי) כדי ש-handleOpenNotification ידע לזהות אותה
+   *  ולדלג על קריאת "סימון כנקרא" ל-API (אין שורה אמיתית לסמן). */
+  const PREFERENCES_REMINDER_ID = "pref_reminder";
+  const preferencesReminder: ActivityItem | null =
+    !preferencesLoading && !isPreferencesComplete(preferences)
+      ? {
+          id: PREFERENCES_REMINDER_ID,
+          category: "system",
+          priority: "important",
+          title: "השלימו את ההתאמות האישיות שלכם",
+          description: "כדי שנציע לכם המלצות מדויקות יותר",
+          imageUrl: null,
+          icon: "🎯",
+          actionUrl: "/preferences",
+          actionLabel: null,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        }
+      : null;
 
   async function fetchNotifications() {
     setError(false);
@@ -97,10 +123,16 @@ export function PlacesNotificationBell({ solid = false }: PlacesNotificationBell
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [open]);
 
-  const unreadCount = items ? items.filter((i) => !i.isRead).length : null;
+  const displayItems = items ? (preferencesReminder ? [preferencesReminder, ...items] : items) : items;
+  const unreadCount = displayItems ? displayItems.filter((i) => !i.isRead).length : null;
 
   async function handleOpenNotification(item: ActivityItem) {
     setOpen(false);
+    // ההתראה הקבועה לא באה מה-DB - אין שורה אמיתית לסמן כנקרא, רק מנווטים.
+    if (item.id === PREFERENCES_REMINDER_ID) {
+      router.push(item.actionUrl ?? "/preferences");
+      return;
+    }
     if (!item.isRead) {
       setItems((prev) => (prev ? prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i)) : prev));
       const readRequest = isSocialActivityKey(item.id)
@@ -159,7 +191,7 @@ export function PlacesNotificationBell({ solid = false }: PlacesNotificationBell
               </div>
             )}
 
-            {items !== null && !error && items.length === 0 && (
+            {items !== null && !error && displayItems!.length === 0 && (
               <div className="flex flex-col items-center gap-1.5 py-8 text-center">
                 <span className="text-2xl">✨</span>
                 <p className="text-xs font-semibold text-ink">הכול רגוע</p>
@@ -167,12 +199,27 @@ export function PlacesNotificationBell({ solid = false }: PlacesNotificationBell
               </div>
             )}
 
-            {items !== null && !error && items.length > 0 && (
+            {items !== null && !error && displayItems!.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                {items.map((item) => (
+                {displayItems!.map((item) => (
                   <NotificationCard key={item.id} item={item} onOpen={handleOpenNotification} />
                 ))}
               </div>
+            )}
+
+            {/* *** תוספת (בקשה מפורשת - "שורה מתחת להתראה האחרונה למעבר
+                לעמוד ההתראות"): תמיד מוצגת אחרי טעינה מוצלחת. */}
+            {items !== null && !error && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  router.push("/notifications");
+                }}
+                className="mt-1 w-full rounded-card py-2.5 text-center text-[12.5px] font-semibold text-accent hover:bg-bg-secondary"
+              >
+                לכל ההתראות
+              </button>
             )}
           </div>
         </div>
