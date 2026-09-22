@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Screen, SwipeCard, BackButton, Chip, ImageOptionRow, SwipeToDeleteRow, type SwipeCardHandle } from "@/components/ui";
@@ -101,10 +101,17 @@ export default function TripMatchPage() {
  *  שוליי ה-px-8 של Home; standalone (/tripmatch) - עם הזוויות הרחבות
  *  המקוריות (4°/-5°) והזזה קטנה יותר כדי לא לחרוג מעל הכותרת. */
 const BACK_CARDS = [
-  { embedded: { rot: 3, y: 0 }, standalone: { rot: 4, y: 0 } },
-  { embedded: { rot: -3.5, y: 0 }, standalone: { rot: -5, y: 0 } },
-  { embedded: { rot: 2, y: -10 }, standalone: { rot: 2.5, y: -6 } },
-  { embedded: { rot: -2, y: -16 }, standalone: { rot: -2.5, y: -10 } },
+  // *** תוקן (בקשה מפורשת - "תקן RESPONSIVE אמיתי, לא overflow:hidden
+  // כטלאי"): הזוויות הוקטנו משמעותית (3→1.2, 3.5→1.3, 2→0.8, 2→0.8) -
+  // ביחד עם cardBox (מדוד ב-JS, 24px שוליים קבועים מכל צד של ה-viewport
+  // עצמו - ר' useLayoutEffect ב-page.tsx) זה מבטיח שהבליטה האופקית של
+  // הסיבוב (∝ גובה כרטיס × sin(זווית)) נשארת בתוך ה-24px גם על כרטיס
+  // גבוה מאוד (~800px). standalone (עמוד /tripmatch העצמאי, כרטיס נמוך
+  // בהרבה) לא השתנה.
+  { embedded: { rot: 1.2, y: 0 }, standalone: { rot: 4, y: 0 } },
+  { embedded: { rot: -1.3, y: 0 }, standalone: { rot: -5, y: 0 } },
+  { embedded: { rot: 0.8, y: -10 }, standalone: { rot: 2.5, y: -6 } },
+  { embedded: { rot: -0.8, y: -16 }, standalone: { rot: -2.5, y: -10 } },
 ] as const;
 
 interface TripMatchPageContentProps {
@@ -121,9 +128,21 @@ interface TripMatchPageContentProps {
    *  מנקה את שורת החיפוש כדי לחזור למצב ההתחלתי (Reverse Scroll),
    *  בלי router.push/שינוי URL. */
   onExitEmbedded?: () => void;
+  /** *** חדש (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד"): נקרא בכל
+   *  שינוי stage, עם true כש-stage==="swiping" (מסך ההחלקה עצמו מוצג)
+   *  ו-false בכל stage אחר (city/category/results...). Home משתמש בזה
+   *  כדי להגביל את גובה אזור הכרטיס בדיוק לגובה המסך הפנוי (עד מעל ה-
+   *  BottomNav) *רק* כשבאמת יש כרטיס להחליק - לא במסכי בחירת יעד/תוצאות,
+   *  שצריכים גלילה חופשית רגילה. */
+  onCardsVisibleChange?: (visible: boolean) => void;
 }
 
-export function TripMatchPageContent({ embedded = false, initialCityQuery, onExitEmbedded }: TripMatchPageContentProps = {}) {
+export function TripMatchPageContent({
+  embedded = false,
+  initialCityQuery,
+  onExitEmbedded,
+  onCardsVisibleChange,
+}: TripMatchPageContentProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -146,6 +165,10 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     return deck;
   });
   const [stage, setStage] = useState<Stage>(restoredDeck ? "swiping" : "city");
+  useEffect(() => {
+    onCardsVisibleChange?.(stage === "swiping");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
   // תיקון (Home - כניסה מוטמעת): כש-embedded=true אין להציג בכלל את
   // תמונת ה-Hero הדקורטיבית ("אין Hero של TripMatch" - Home כבר הציג
   // הירו/חיפוש משלו שהתחלף בכניסה הזו) - מתחילים עם false במקום עם
@@ -249,6 +272,52 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
   // (שיושבים כ-siblings קבועים, לא בתוך האלמנט הנגרר) עדיין גורמים
   // לאותה אנימציית fly-out בדיוק, בלי לזוז בעצמם בזמן גרירה.
   const swipeCardRef = useRef<SwipeCardHandle>(null);
+  // *** תוקן (בקשה מפורשת - "CARD_CENTER ≈ VIEWPORT_CENTER, לא
+  // CONTAINER_CENTER, מדוד בפועל עם getBoundingClientRect - לא חישוב
+  // תיאורטי של CSS"): אחרי כמה ניסיונות מבוססי-CSS בלבד (width%,
+  // margin:auto) שלא נתנו תוצאה עקבית בסביבת ה-build/מכשיר של המשתמש,
+  // עברנו למדידה ומיקום אמיתיים ב-JS - בדיוק כמו gobalHeight (הגובה
+  // שכבר עובד באמינות). cardAreaRef מצביע על .tripmatch-embedded-card-area
+  // (ה-position:relative שמכיל את כל הכרטיסים) - ref, לא query גלובלי,
+  // כי יש כמה כרטיסים כאלה בעמוד (עמודים אחרים/standalone). cardBox הוא
+  // left/width מחושבים (px, לא %) כך שהמרכז של הכרטיס תמיד יתלכד עם
+  // window.innerWidth/2 בדיוק - לא עם מרכז ה-container (שיכול להיות
+  // שונה אם למשל יש לו padding לא-סימטרי איפשהו בשרשרת ההורים).
+  const cardAreaRef = useRef<HTMLDivElement>(null);
+  const [cardBox, setCardBox] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!embedded) return;
+
+    function measure() {
+      const area = cardAreaRef.current;
+      if (!area) return;
+      const containerRect = area.getBoundingClientRect();
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      // מרווח שווה קבוע (24px) מכל צד של ה-viewport עצמו - לא אחוז
+      // מתוך ה-container (שיכול להיות ממוקם לא-סימטרי בעצמו). Math.max
+      // מונע רוחב שלילי/אבסורדי אם מודדים במסך צר מאוד באמצע resize.
+      const sideMargin = 24;
+      const width = Math.max(200, viewportWidth - sideMargin * 2);
+      const viewportCenterX = viewportWidth / 2;
+      // left כאן הוא יחסית ל-container (position:relative) - לא ל-
+      // viewport - לכן מפחיתים את המיקום של ה-container עצמו מה-viewport.
+      const left = viewportCenterX - width / 2 - containerRect.left;
+      setCardBox({ left, width });
+    }
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, stage]);
+
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1164,7 +1233,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
     <Screen
       withBottomNavSpacing={!embedded}
       fullHeight={!embedded}
-      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}
+      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""} ${embedded ? "flex flex-1 min-h-0 flex-col" : ""}`}
     >
       {!embedded && stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
@@ -1208,7 +1277,9 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
         </div>
       )}
 
-      <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
+      <div
+        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "flex-1 min-h-0" : ""}`}
+      >
         {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
         {stage === "city" && !embedded && <TripsIntroCard />}
 
@@ -1469,7 +1540,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
           // בגובה מפורש - ר' .tripmatch-embedded-card-area ב-globals.css),
           // והכפתורים נשארים צמודים לתחתית ההורה. עמוד /tripmatch העצמאי
           // (embedded=false) לא השתנה.
-          <div className={embedded ? "flex flex-col" : "h-viewport-safe flex flex-col"}>
+          <div className={embedded ? "flex flex-1 min-h-0 flex-col" : "h-viewport-safe flex flex-col"}>
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}
@@ -1539,7 +1610,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
             <div
-              className={embedded ? "flex flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1547,11 +1618,12 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
               // מוטים פחות במצב מוטמע (3.5°/3° במקום 5°/4°) כדי שהפינות
               // שלהם ייכנסו בתוך השוליים ולא ייחתכו בקצה המסך. pt-6 (במקום
               // pt-3) - רווח נוסף מפס ההתקדמות, כי פינות הכרטיסים
-              // המסובבים בולטות מעל הכרטיס הקדמי (~11px). overflowX
-              // clip חותך את "הכרטיסים המסובבים" שמאחור ואת אנימציית
-              // ה-fly-out בקצה המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה
-              // אופקית (דפדפן שלא תומך ב-clip פשוט מתעלם - כמו קודם).
-              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflowX: "clip" as const } : null) }}
+              // המסובבים בולטות מעל הכרטיס הקדמי (~11px). overflow:hidden
+              // (שני הצירים, לא רק overflowX:clip - תמיכה אוניברסלית בכל
+              // דפדפן/WebView, בלי הסתמכות על ערך CSS חדש יחסית) חותך את
+              // "הכרטיסים המסובבים" שמאחור ואת אנימציית ה-fly-out בקצה
+              // המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה בשום כיוון.
+              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflow: "hidden" as const } : null) }}
             >
               {!currentCandidate ? (
                 <p className="pt-16 text-center text-ink-secondary">
@@ -1563,6 +1635,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                 </p>
               ) : (
                 <div
+                  ref={cardAreaRef}
                   className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
                   style={embedded ? undefined : { height: "75%" }}
                 >
@@ -1600,12 +1673,32 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       <div
                         key={backCandidate.id}
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                        style={{
-                          height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`,
-                          transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
-                          transformOrigin: "50% 100%",
-                        }}
+                        className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
+                        // *** תוקן (בקשה מפורשת - מדידה אמיתית, לא CSS
+                        // תיאורטי): left/width מגיעים מ-cardBox (מחושב
+                        // ב-getBoundingClientRect, ר' useLayoutEffect
+                        // למעלה) כש-embedded - בדיוק אותו קופסה כמו הכרטיס
+                        // הקדמי, כדי שכל הערימה תתלכד סביב אותו מרכז-
+                        // viewport. בלי cardBox עדיין (למשל standalone,
+                        // או לפני המדידה הראשונה) - נופל חזרה ל-inset-x-0
+                        // (מלא רוחב ה-container, ההתנהגות המקורית).
+                        style={
+                          embedded && cardBox
+                            ? {
+                                height: "100%",
+                                left: cardBox.left,
+                                width: cardBox.width,
+                                transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
+                                transformOrigin: "50% 100%",
+                              }
+                            : {
+                                height: "100%",
+                                left: 0,
+                                right: 0,
+                                transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
+                                transformOrigin: "50% 100%",
+                              }
+                        }
                       >
                         {backCandidate.imageUrls[0] && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -1634,6 +1727,7 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                         matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
                         matchTotal={totalDecisions + visibleCandidates.length}
                         cityLabel={selectedCityLabel || selectedCity || ""}
+                        centerBox={embedded ? cardBox : null}
                       />
                     )}
                   </SwipeCard>
@@ -1646,20 +1740,27 @@ export function TripMatchPageContent({ embedded = false, initialCityQuery, onExi
                       fly-out. גם גדולים ב-30% (בקשה מפורשת): 60→78,
                       44→57. dir="ltr" מפורש - כדי ש-X יישאר תמיד פיזית
                       משמאל והלב מימין, בלי תלות ב-dir="rtl" הגלובלי. */}
-                  {/* *** מוקם מחדש (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
-                      הכרטיסיות לבין הבחוץ, חצי חצי"): מרכז השורה בדיוק על
-                      הקצה התחתון של הכרטיס (bottom = ZONE - חצי מגובה
-                      הכפתור הגדול) - חצי מכל כפתור על הכרטיס וחצי מחוצה לו.
+                  {/* *** מוקם בתוך הכרטיס (בקשה מפורשת - "תכניס את הכפתורים
+                      לתוך הקצה התחתון של הכרטיסייה"): לפני זה השורה רכבה
+                      חצי-חצי על הקצה התחתון (הכרטיס היה נמוך מההורה שלו
+                      ב-ZONE px). עכשיו הכרטיס תופס 100% מההורה, והשורה
+                      יושבת לגמרי בפנים, ZONE px מהקצה התחתון שלו.
                       pointer-events-none על השורה (ו-auto רק על הכפתורים)
                       כדי שהרווחים בין הכפתורים לא יחסמו החלקה/לחיצה על
                       הכרטיס שמתחתיהם. */}
                   <div
                     dir="ltr"
-                    className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center gap-[16px]"
-                    style={{
-                      height: TRIPMATCH_MAIN_BUTTON_SIZE,
-                      bottom: TRIPMATCH_CARD_BUTTON_ZONE - TRIPMATCH_MAIN_BUTTON_SIZE / 2,
-                    }}
+                    className="pointer-events-none absolute z-10 flex items-center justify-center gap-[16px]"
+                    // *** תוקן (בקשה מפורשת - מדידה אמיתית): אותו left/width
+                    // בדיוק כמו הכרטיס עצמו (cardBox) - לא inset-x-0 (רוחב
+                    // מלא של ה-container) - כדי שהכפתורים תמיד ייושרו בדיוק
+                    // מעל מרכז הכרטיס, גם אם ה-container עצמו לא ממורכז
+                    // ב-viewport מסיבה כלשהי.
+                    style={
+                      embedded && cardBox
+                        ? { height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE, left: cardBox.left, width: cardBox.width }
+                        : { height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE, left: 0, right: 0 }
+                    }
                   >
                     <button
                       type="button"

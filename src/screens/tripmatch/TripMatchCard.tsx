@@ -9,14 +9,15 @@ const MAX_REASONABLE_DRIVING_KM = 400; // מעבר לזה, "X דק' נסיעה" 
 /** גודל הכפתור הגדול (X / לב) - px. */
 export const TRIPMATCH_MAIN_BUTTON_SIZE = 98; // הוגדל ב-25% (בקשה מפורשת): 78 -> 98
 
-/** *** שטח שמור *מתחת* לכרטיס (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
- *  הכרטיסיות לבין הבחוץ, חצי חצי"): הכפתורים כבר לא יושבים כולם מתחת
- *  לכרטיס אלא רוכבים על הקצה התחתון שלו - חצי מהגובה שלהם על הכרטיס
- *  וחצי מחוצה לו. לכן מתחת לכרטיס נדרש רק חצי מגובה הכפתור הגדול
- *  (49px) + מעט אוויר, במקום 100px כמו קודם - והכרטיס גבוה בהתאם.
- *  page.tsx משתמש באותו מספר בדיוק (מיובא מכאן) גם לגובה ה"כרטיסים"
- *  המציצים מאחור ולמיקום שורת הכפתורים - כדי שהכל יתיישר לאותו קו. */
-export const TRIPMATCH_CARD_BUTTON_ZONE = 56;
+/** *** שונה (בקשה מפורשת - "תכניס את הכפתורים לתוך הקצה התחתון של
+ *  הכרטיסייה"): לפני זה היה שטח שמור *מתחת* לכרטיס (הכפתורים רכבו
+ *  חצי-חצי על הקצה התחתון שלו). עכשיו הכרטיס תופס 100% מגובה ההורה שלו
+ *  (חלק מ"הכרטיסייה תתארך עד קצה העמוד") והכפתורים יושבים *לגמרי בתוך*
+ *  הכרטיס, קרוב לקצה התחתון שלו - הערך הזה הוא המרחק (px) בין הקצה
+ *  התחתון של שורת הכפתורים לקצה התחתון של הכרטיס. page.tsx משתמש באותו
+ *  מספר בדיוק (מיובא מכאן) למיקום שורת הכפתורים - כדי שהכל יתיישר לאותו
+ *  קו. */
+export const TRIPMATCH_CARD_BUTTON_ZONE = 24;
 
 /** צד הכרטיס שלחיצה עליו מחליפה תמונה - כל צד תופס 30% מהרוחב, האמצע
  *  (40%) פותח את עמוד המקום. */
@@ -43,6 +44,13 @@ interface TripMatchCardProps {
   /** האינדקס (0-based) של התמונה המוצגת מתוך candidate.imageUrls. מנוהל
    *  ב-page.tsx (ולא כאן) כי הלחיצה נקלטת ב-SwipeCard, מחוץ לכרטיס. */
   imageIndex?: number;
+  /** *** חדש (בקשה מפורשת - "CARD_CENTER ≈ VIEWPORT_CENTER, מדוד בפועל
+   *  לא CSS תיאורטי"): left/width מחושבים ב-px ב-page.tsx דרך
+   *  getBoundingClientRect (לא % / margin:auto) - מבטיח שהמרכז של
+   *  הכרטיס תמיד יתלכד עם מרכז ה-viewport בפועל, לא עם מרכז ה-container
+   *  שלו (שיכול להיות שונה). null/undefined (standalone, או לפני
+   *  המדידה הראשונה) - נופל חזרה ל-inset-x-0 (מלא רוחב ה-container). */
+  centerBox?: { left: number; width: number } | null;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -107,7 +115,7 @@ function DistanceBadge({ candidate }: { candidate: CandidatePlace }) {
  * ב-tripmatch/page.tsx, מעל ה-SwipeCard אבל לא בתוכו, כך שהם לא זזים
  * עם ה-transform שלו בזמן גרירה. ר' הערה שם.
  */
-export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, imageIndex = 0 }: TripMatchCardProps) {
+export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, imageIndex = 0, centerBox = null }: TripMatchCardProps) {
   const tags = deriveTags(candidate);
   const images = candidate.imageUrls;
   const safeIndex = Math.min(Math.max(imageIndex, 0), Math.max(images.length - 1, 0));
@@ -129,8 +137,27 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // של הכרטיס לא משתנה, רק התוכן נכנס 2px פנימה (ה-overflow-hidden
       // חותך לפי הרדיוס הפנימי). אותה מסגרת בדיוק על שני הכרטיסים המציצים
       // מאחור ב-tripmatch/page.tsx.
-      className="absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
-      style={{ height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)` }}
+      // *** תוקן (בקשה מפורשת - "הכרטיסייה רחבה מדי ביחס לשטח הזמין,
+      // חייבת להיות RESPONSIVE וממורכזת בלי transform"): הכרטיס (100%
+      // רוחב ה-container) גובה מאוד עכשיו, וכשהכרטיסים המסובבים מאחוריו
+      // (rotate) מסתובבים, הבליטה האופקית שלהם (∝ גובה × sin(זווית))
+      // חורגת מהשוליים הקיימים במסכים צרים - זו הסיבה האמיתית ל"חריגה",
+      // לא הרוחב של הכרטיס הקדמי עצמו (שהוא סימטרי ותקין). התיקון: 85%
+      // רוחב + מירכוז אמיתי עם margin-inline:auto (mx-auto) - *לא*
+      // left:50%/transform - מוודא מרווח קבוע ושווה בכל רוחב מסך, מספיק
+      // כדי להכיל גם את הבליטה מהסיבוב (ר' גם BACK_CARDS ב-page.tsx,
+      // שם הזוויות עצמן גם קוטנו). מאומת חישובית על 320-430px רוחב.
+      // *** תוקן (בקשה מפורשת - "מדוד בפועל bounding boxes, לא CSS
+      // תיאורטי; CARD_CENTER ≈ VIEWPORT_CENTER"): left/width מגיעים
+      // מ-centerBox (מחושב ב-page.tsx דרך getBoundingClientRect אמיתי)
+      // כשקיים - לא width:85%+mx-auto (שהתברר לא אמין בסביבת ה-build) -
+      // בלי centerBox (standalone) נופל חזרה ל-inset-x-0 המקורי.
+      className="absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
+      style={
+        centerBox
+          ? { height: "100%", left: centerBox.left, width: centerBox.width }
+          : { height: "100%", left: 0, right: 0 }
+      }
     >
       <div className="absolute inset-0 bg-bg-secondary">
         {images[safeIndex] ? (
@@ -186,12 +213,12 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       </div>
 
       {/* תוכן תחתון - שם/תיאור/מטא-דאטה/תגיות, עברי-כתב לבן על התמונה.
-          *** הועלה (בקשה מפורשת - "להעלות מעט את הטקסט"): pb 22 -> 72,
-          כדי שהכפתורים שרוכבים על הקצה התחתון (חצי מ-98px = 49px נכנסים
-          לכרטיס) לא יכסו את הטקסט/התגיות. */}
-      {/* *** תיקון (בקשה מפורשת - "להוריד קצת את המלל למטה, קצת קצת"): pb-[72px] -> pb-[60px] - הטקסט יורד
-          קצת, נשאר מעל אזור הכפתורים (הם עולים ~49px לתוך הכרטיס). */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-[18px] pb-[60px] text-white">
+          *** שונה (בקשה מפורשת - "תכניס את הכפתורים לתוך הקצה התחתון"):
+          הכפתורים כבר לא רוכבים על הקצה (חצי בפנים/חצי בחוץ) - הם לגמרי
+          בתוך הכרטיס עכשיו, מ-24px עד 122px מהתחתית (ZONE + SIZE).
+          ה-padding גדל בהתאם (היה 60px) כדי שהטקסט/התגיות תמיד יישארו
+          מעל שורת הכפתורים, לא מתחתיה. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-[18px] pb-[140px] text-white">
         {/* *** שוחזר (בקשה מפורשת - "איפה הדירוג/המרחק/הקטגוריות/התיאור? אני דורש שיהיה"): שני דירוגים
             נפרדים (triplace - ממוצע ביקורות קהילתי, ו-Google), מרחק מהמיקום הנוכחי, תיאור (Google
             editorialSummary, ר' tripAddEnrichmentService.ts), ולפחות 3 תגיות אמיתיות (candidate.tags,
