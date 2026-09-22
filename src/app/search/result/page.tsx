@@ -158,6 +158,7 @@ function SearchResultContent() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="drop-shadow-[0_1px_3px_rgba(0,0,0,0.45)]"
+                style={{ transform: "scaleX(-1)" }}
               >
                 <path d="m14 6-6 6 6 6" />
               </svg>

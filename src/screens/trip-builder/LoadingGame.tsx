@@ -251,7 +251,7 @@ export function LoadingGame({ statusText, steps }: LoadingGameProps) {
             className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"
             aria-label="חזרה לדף הבית"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(-1)" }}>
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </Link>

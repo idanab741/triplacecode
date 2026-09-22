@@ -52,7 +52,7 @@ function AppleIcon() {
 
 function BackIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(-1)" }}>
       <path d="m14 6-6 6 6 6" />
     </svg>
   );
