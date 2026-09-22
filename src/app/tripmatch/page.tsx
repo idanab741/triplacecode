@@ -121,21 +121,9 @@ interface TripMatchPageContentProps {
    *  מנקה את שורת החיפוש כדי לחזור למצב ההתחלתי (Reverse Scroll),
    *  בלי router.push/שינוי URL. */
   onExitEmbedded?: () => void;
-  /** *** חדש (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד"): נקרא בכל
-   *  שינוי stage, עם true כש-stage==="swiping" (מסך ההחלקה עצמו מוצג)
-   *  ו-false בכל stage אחר (city/category/results...). Home משתמש בזה
-   *  כדי להגביל את גובה אזור הכרטיס בדיוק לגובה המסך הפנוי (עד מעל ה-
-   *  BottomNav) *רק* כשבאמת יש כרטיס להחליק - לא במסכי בחירת יעד/תוצאות,
-   *  שצריכים גלילה חופשית רגילה. */
-  onCardsVisibleChange?: (visible: boolean) => void;
 }
 
-export function TripMatchPageContent({
-  embedded = false,
-  initialCityQuery,
-  onExitEmbedded,
-  onCardsVisibleChange,
-}: TripMatchPageContentProps = {}) {
+export function TripMatchPageContent({ embedded = false, initialCityQuery, onExitEmbedded }: TripMatchPageContentProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -158,10 +146,6 @@ export function TripMatchPageContent({
     return deck;
   });
   const [stage, setStage] = useState<Stage>(restoredDeck ? "swiping" : "city");
-  useEffect(() => {
-    onCardsVisibleChange?.(stage === "swiping");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage]);
   // תיקון (Home - כניסה מוטמעת): כש-embedded=true אין להציג בכלל את
   // תמונת ה-Hero הדקורטיבית ("אין Hero של TripMatch" - Home כבר הציג
   // הירו/חיפוש משלו שהתחלף בכניסה הזו) - מתחילים עם false במקום עם
@@ -1180,7 +1164,7 @@ export function TripMatchPageContent({
     <Screen
       withBottomNavSpacing={!embedded}
       fullHeight={!embedded}
-      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""} ${embedded ? "flex flex-1 min-h-0 flex-col" : ""}`}
+      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""}`}
     >
       {!embedded && stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
@@ -1224,9 +1208,7 @@ export function TripMatchPageContent({
         </div>
       )}
 
-      <div
-        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "flex-1 min-h-0" : ""}`}
-      >
+      <div className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"}`}>
         {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
         {stage === "city" && !embedded && <TripsIntroCard />}
 
@@ -1479,15 +1461,15 @@ export function TripMatchPageContent({
         )}
 
         {stage === "swiping" && (
-          // *** שונה (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד"): כש-
-          // embedded=true הגובה כבר לא נקבע ע"י תוכן קבוע/clamp - זו שרשרת
-          // flex-1/min-h-0 שיורדת מ-home/page.tsx (שם התיבה החיצונית מוגבלת
-          // ל-100dvh פחות ה-BottomNav, רק כש-stage==="swiping"), דרך כל
-          // הרמות כאן, עד .tripmatch-embedded-card-area (flex:1 ב-
-          // globals.css) - כך אזור הכרטיס תמיד תופס בדיוק את מה שנשאר,
-          // בלי גלילה, עד קצה ה-BottomNav. עמוד /tripmatch העצמאי
-          // (embedded=false) לא השתנה - עדיין h-viewport-safe רגיל.
-          <div className={embedded ? "flex flex-1 min-h-0 flex-col" : "h-viewport-safe flex flex-col"}>
+          // *** תיקון (בקשה מפורשת - "הרווח מתחת לכפתורי הלייק/אנלייק
+          // גדול מדי עד הבר התחתון"): כש-embedded=true אין יותר גובה
+          // קבוע של 100dvh לכל המכל - הוא היה יוצר "שטח מת" (25% שנשארו
+          // אחרי הקטנת הכרטיס ל-75%) *מתחת* לכפתורים, מעל ה-pb של Home.
+          // עכשיו הגובה נקבע רק ע"י תוכן המכל (header + קטגוריות + כרטיס
+          // בגובה מפורש - ר' .tripmatch-embedded-card-area ב-globals.css),
+          // והכפתורים נשארים צמודים לתחתית ההורה. עמוד /tripmatch העצמאי
+          // (embedded=false) לא השתנה.
+          <div className={embedded ? "flex flex-col" : "h-viewport-safe flex flex-col"}>
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}
@@ -1527,11 +1509,10 @@ export function TripMatchPageContent({
 
             {/* *** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת
                 לפילטרים"): במצב מוטמע פס ההתקדמות יושב *אחרי* שורת הסוגים
-                (והפילטר), ישר מעל הכרטיס - לא מעליהם. אותם שוליים אופקיים
-                כמו הכרטיס (px-14, עודכן יחד עם צמצום רוחב הכרטיס למטה -
-                כדי שהפס יישאר מיושר בדיוק עם קצוות הכרטיס). */}
+                (והפילטר), ישר מעל הכרטיס - לא מעליהם. באותם שוליים
+                אופקיים (px-6) כמו שורת החיפוש והכרטיס. */}
             {embedded && currentCandidate && (
-              <div className="px-14 pt-1.5">
+              <div className="px-8 pt-1.5">
                 <SwipeProgressBar currentIndex={totalDecisions} total={totalDecisions + visibleCandidates.length} />
               </div>
             )}
@@ -1558,32 +1539,19 @@ export function TripMatchPageContent({
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-14 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
-              // *** תוקן (בקשה מפורשת - "לצמצם את הרוחב של הכרטיסייה כדי
-              // שיתאים לגובה החדש"): px-8 (32px) -> px-14 (56px) לכל צד.
-              // הכרטיס גבוה משמעותית יותר עכשיו (עד קצה העמוד), אז הבליטה
-              // האופקית של הכרטיסים המסובבים מאחור (rotate סביב הקצה
-              // התחתון - גדלה עם הגובה) צריכה יותר מרווח צדדי כדי שלא
-              // תגיע לקצה המסך - פתרון פשוט וישיר יותר מלנסות לכוון מיקום
-              // פיקסלי מדויק.
-              // *** תוקן (Bug מפורש - "הכרטיסייה בורחת מהעמוד שמאלה" + גלילה
-              // אנכית לא רצויה): overflowX:"clip" לבדו כבר לא מספיק, משתי
-              // סיבות: (1) הכרטיס גבה משמעותית (הכרטיסייה עכשיו נמתחת עד
-              // קצה העמוד - בקשה קודמת), אז הבליטה האופקית של הכרטיסים
-              // המסובבים מאחור (rotate סביב הקצה התחתון - ככל שהכרטיס גבוה
-              // יותר, הפינות מתרחקות יותר הצידה) גדלה בהתאם ועברה את גבול
-              // ה-32px (px-8, שהוגדל מאז ל-px-14/56px - ר' הערה למטה); (2)
-              // קביעת overflow-x בלי overflow-y גורמת
-              // לדפדפנים "לקדם" את ה-y ל-auto באופן שקוף (חוק CSS: לא ניתן
-              // לערבב visible עם ציר לא-visible) - וברגע שהבליטה האנכית
-              // (מעל הכרטיס הקדמי) עברה גם היא את ה-pt-10 השמור לה, זה
-              // יצר scrollbar אנכי מקומי בדיוק על אזור הכרטיס. הפתרון: עוצרים
-              // חיתוך אמיתי ואחיד בשני הצירים - overflow:"hidden" (לא "clip":
-              // תמיכה אוניברסלית בכל דפדפן/WebView, בלי הסתמכות על ערך
-              // חדש יחסית שלא כל WebView תומך בו). ה-pt-10 עדיין משאיר
-              // חלק מהבליטה העליונה גלוי (האפקט הדקורטיבי לא נעלם לגמרי,
-              // רק נחתך בגבול הקבוע במקום לברוח מהעמוד).
-              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflow: "hidden" as const } : null) }}
+              className={embedded ? "flex flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
+              // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
+              // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
+              // נוספת - "בצדדים תיצור שוליים"). הכרטיסים המסובבים שמאחור
+              // מוטים פחות במצב מוטמע (3.5°/3° במקום 5°/4°) כדי שהפינות
+              // שלהם ייכנסו בתוך השוליים ולא ייחתכו בקצה המסך. pt-6 (במקום
+              // pt-3) - רווח נוסף מפס ההתקדמות, כי פינות הכרטיסים
+              // המסובבים בולטות מעל הכרטיס הקדמי (~11px). overflowX
+              // clip חותך את "הכרטיסים המסובבים" שמאחור ואת אנימציית
+              // ה-fly-out בקצה המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה
+              // אופקית (דפדפן שלא תומך ב-clip פשוט מתעלם - כמו קודם).
+              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflowX: "clip" as const } : null) }}
             >
               {!currentCandidate ? (
                 <p className="pt-16 text-center text-ink-secondary">
@@ -1596,10 +1564,7 @@ export function TripMatchPageContent({
               ) : (
                 <div
                   className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
-                  // *** תוקן (Bug מפורש חוזר - "הכרטיס מוזז שמאלה"): width/margin
-                  // מפורשים ב-inline style, בנוסף למחלקות (w-full) - חיזוק
-                  // נוסף שאין אף gap/margin אופקי סמוי שדוחף את התוכן.
-                  style={embedded ? { width: "100%", marginLeft: 0, marginRight: 0 } : { height: "75%" }}
+                  style={embedded ? undefined : { height: "75%" }}
                 >
                   {/* *** הקטנת גובה נוספת (בקשה מפורשת - "עוד 25%"): הכרטיס
                       (וה"כרטיסים" מאחוריו) לא ממלאים יותר 100% מהגובה
@@ -1635,16 +1600,10 @@ export function TripMatchPageContent({
                       <div
                         key={backCandidate.id}
                         aria-hidden="true"
-                        className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                        // *** תוקן (בקשה מפורשת - "תצר את הכרטיסייה עצמה"): רוחב
-                        // מפורש (90%, כמו הכרטיס הקדמי) עם מירכוז - translateX
-                        // מתווסף *לפני* ה-translateY/rotate הקיימים (סדר transform
-                        // חשוב: מימין לשמאל בפועל - קודם ממרכזים, ואז מטים).
+                        className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
                         style={{
-                          height: "100%",
-                          width: "90%",
-                          left: "50%",
-                          transform: `translate(-50%, ${cfg.y}px) rotate(${cfg.rot}deg)`,
+                          height: `calc(100% - ${TRIPMATCH_CARD_BUTTON_ZONE}px)`,
+                          transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
                           transformOrigin: "50% 100%",
                         }}
                       >
@@ -1687,24 +1646,19 @@ export function TripMatchPageContent({
                       fly-out. גם גדולים ב-30% (בקשה מפורשת): 60→78,
                       44→57. dir="ltr" מפורש - כדי ש-X יישאר תמיד פיזית
                       משמאל והלב מימין, בלי תלות ב-dir="rtl" הגלובלי. */}
-                  {/* *** מוקם בתוך הכרטיס (בקשה מפורשת - "בחלק התחתון של
-                      הכרטיסייה יהיו הכפתורים שלנו"): לפני זה השורה רכבה
-                      חצי-חצי על הקצה התחתון (הכרטיס היה נמוך מההורה שלו
-                      ב-ZONE px). עכשיו הכרטיס תופס 100% מההורה, והשורה
-                      יושבת לגמרי בפנים, ZONE px מהקצה התחתון שלו.
+                  {/* *** מוקם מחדש (בקשה מפורשת - "כפתורי לב/איקס/חזור בין
+                      הכרטיסיות לבין הבחוץ, חצי חצי"): מרכז השורה בדיוק על
+                      הקצה התחתון של הכרטיס (bottom = ZONE - חצי מגובה
+                      הכפתור הגדול) - חצי מכל כפתור על הכרטיס וחצי מחוצה לו.
                       pointer-events-none על השורה (ו-auto רק על הכפתורים)
                       כדי שהרווחים בין הכפתורים לא יחסמו החלקה/לחיצה על
                       הכרטיס שמתחתיהם. */}
                   <div
                     dir="ltr"
-                    className="pointer-events-none absolute z-10 flex items-center justify-center gap-[16px]"
-                    // *** תוקן (Bug מפורש חוזר - "הכרטיס מוזז שמאלה"): left/right
-                    // מפורשים, לא inset-x-0 (ר' אותה הערה ב-TripMatchCard.tsx).
+                    className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center gap-[16px]"
                     style={{
                       height: TRIPMATCH_MAIN_BUTTON_SIZE,
-                      bottom: TRIPMATCH_CARD_BUTTON_ZONE,
-                      left: 0,
-                      right: 0,
+                      bottom: TRIPMATCH_CARD_BUTTON_ZONE - TRIPMATCH_MAIN_BUTTON_SIZE / 2,
                     }}
                   >
                     <button

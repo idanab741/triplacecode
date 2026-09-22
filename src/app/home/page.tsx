@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -79,21 +79,6 @@ export default function HomePage() {
   // מכריח remount נקי של הרכיב המוטמע בכל יעד חדש - כדי שלא "יגרור"
   // מצב (stage/candidates) מהיעד הקודם.
   const [embeddedKey, setEmbeddedKey] = useState(0);
-  // *** חדש (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד"): true רק
-  // כש-TripMatchPageContent המוטמע נמצא בפועל במסך ההחלקה (לא בבחירת
-  // יעד/תוצאות) - ר' onCardsVisibleChange. משמש להגביל את גובה אזור
-  // הכרטיס בדיוק לשטח הפנוי מעל ה-BottomNav, רק כשזה רלוונטי.
-  const [cardsVisible, setCardsVisible] = useState(false);
-  // *** תוקן (Bug מפורש חוזר - "הכרטיסייה גדולה מדי, לא נכנסת לעמוד"):
-  // לפני זה הגובה חושב עם CSS calc() ומספרים קבועים מנוחשים (66px לגובה
-  // ה-BottomNav, 22px ל-safe-area וכו') - שלא תמיד תאמו את הגובה *האמיתי*
-  // שהבר תופס בפועל (הוא תלוי בפונט/רוחב מסך/safe-area אמיתי של המכשיר,
-  // לא קבוע). עכשיו נמדד ישירות מה-DOM: getBoundingClientRect של ה-
-  // BottomNav האמיתי (data-main-bottom-nav, ר' BottomNav.tsx) מול
-  // window.innerHeight/visualViewport - בלי שום מספר מנוחש. null = עוד
-  // לא נמדד (לפני שה-BottomNav בכלל ברנדר) - במצב הזה לא מגבילים גובה
-  // בכלל (עדיף גלילה רגילה על פני מספר שגוי).
-  const [foldHeight, setFoldHeight] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const autoRanRef = useRef(false);
@@ -118,7 +103,6 @@ export default function HomePage() {
     setLocateError(null);
     setSessionDestination(label);
     setDestinationQuery(label);
-    setCardsVisible(false);
     setEmbeddedKey((k) => k + 1);
   }
 
@@ -179,33 +163,8 @@ export default function HomePage() {
   function handleExitEmbedded() {
     clearSessionDestination();
     setDestinationQuery(null);
-    setCardsVisible(false);
     setEmbeddedKey((k) => k + 1);
   }
-
-  // *** מודד את הגובה הפנוי האמיתי מעל ה-BottomNav (ר' foldHeight למעלה) -
-  // רק כש-cardsVisible, כי זו הפעם היחידה שבה זה בכלל בשימוש. נמדד מחדש
-  // בכל שינוי גודל/סיבוב מסך (resize) וגם דרך visualViewport אם קיים
-  // (מדויק יותר בנייד - כולל למשל כשה-safe-area משתנה). ה-BottomNav עצמו
-  // הוא fixed (לא זז עם גלילה) אז אין צורך למדוד אותו שוב בגלילה.
-  useLayoutEffect(() => {
-    if (!cardsVisible) return;
-
-    function measure() {
-      const nav = document.querySelector<HTMLElement>("[data-main-bottom-nav]");
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const navHeight = nav?.getBoundingClientRect().height ?? 0;
-      setFoldHeight(Math.max(0, viewportHeight - navHeight));
-    }
-
-    measure();
-    window.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("resize", measure);
-    };
-  }, [cardsVisible]);
 
   useEffect(() => {
     if (loading || profileLoading || !user) return;
@@ -237,104 +196,70 @@ export default function HomePage() {
       <HomeStatusBarTint />
       <SearchIntroOverlay open={introOpen} onClose={handleCloseIntro} />
       <div className="relative mx-auto flex max-w-xl flex-col">
-        {/* *** חדש (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד, עד סוף
-            החלק שלא צריך בו גלילה, ושבחלק התחתון שלה יהיו כפתורי
-            הלייק/איקס/חזור"): כש-cardsVisible (מסך ההחלקה בפועל, לא
-            בחירת יעד/תוצאות) - התיבה הזו מקבלת גובה קבוע: בדיוק השטח
-            הפנוי מעל ה-BottomNav *כפי שנמדד בפועל מה-DOM* (foldHeight,
-            ר' useLayoutEffect למעלה) - לא ערך מנוחש/calc(). ה-header (הבר
-            העליון) נשאר בגודלו הטבעי (shrink-0 מובנה - הוא לא flex item
-            שמתכווץ), וה-flex-1 שכבר היה על התיבה שמכילה את TripMatchPageContent
-            (למטה) סופג את כל מה שנשאר - כך הכרטיס עצמו (עד קצה ה-
-            BottomNav) תמיד נכנס בלי גלילה. בכל stage אחר (או לפני שיש
-            יעד בכלל, או לפני שנמדד בכלל) אין הגבלת גובה - גלילה רגילה. */}
-        <div
-          className="flex flex-col"
-          style={
-            cardsVisible && destinationQuery && foldHeight != null
-              ? { height: `${foldHeight}px`, minHeight: 0 }
-              : undefined
-          }
-        >
-          {/* *** בקשה מפורשת - "הרקע של החלק עד שורת החיפוש כולל בצבע כחול
-              כמו האייקון שלנו, עם קצוות מעוגלים": ההדר + שורת החיפוש יושבים
-              על רקע גרדיאנט תכלת→כחול (צבעים דגומים מאייקון האפליקציה), עם
-              פינות תחתונות מעוגלות. בלי overflow-hidden - כדי שתפריט ההצעות
-              של החיפוש והבועה של ההתראות יוכלו לצאת מתחתיו. */}
-          {/* *** שונה (בקשה מפורשת - "הבר העליון ישאר, רק עם שורת הלוגו/התראות/
-              צ'אט, גם בגלילה; החיפוש נעלם בגלילה באופן אנימטיבי"): הבר התכלת
-              (הרקע, הגרדיאנט, ההילות - הכל כמו שהיה) עבר ל-CollapsibleTopBar,
-              שנדבק לראש המסך ומכווץ את שורת החיפוש בהתאם לגלילה. שורת החיפוש
-              עצמה (כולל כפתור "קרוב אלי" בתוכה) נשארה בדיוק אותו דבר - היא
-              ה-children שנעלמים.
-              *** תוקן (בקשה מפורשת - "החיפוש יופיע רק אם יחליקו למעלה"):
-              CollapsibleTopBar עצמו שונה - הכיווץ/הופעה מבוססים עכשיו על
-              *כיוון* הגלילה (גוללים למטה = נעלם, גוללים למעלה = מופיע),
-              לא רק על המרחק המוחלט מראש הדף. ר' ההערה בתוך הקובץ עצמו. */}
-          <CollapsibleTopBar loading={loading || profileLoading}>
-            <div data-home-search="">
-            <SearchBarLink
-              destinationMode
-              variant="hero"
-              onSelectDestination={handleSelectDestination}
-              containerClassName="relative"
-              endAdornment={
-                <>
-                  <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />
-                  <button
-                    type="button"
-                    onClick={() => setLocationSheetOpen(true)}
-                    aria-label={locating ? "מאתר מיקום..." : "המיקום שלי"}
-                    title="המיקום שלי"
-                    // *** תיקון (בקשה מפורשת - "הכפתור של המיקום צריך להיות בגובה אחיד עם שאר הכפתורים שעיצבנו"):
-                    // h-11 w-11 (44px) - אותו גודל בדיוק כמו עיגולי סוגי-הטיול/כפתור הפילטרים (FilterCircleButton) בשורה
-                    // שמתחת, ושאר העיגולים הלבנים הצפים באפליקציה. קודם היה h-9 w-9 (36px) - נמוך מהם בבירור.
-                    className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
-                  >
-                    {locating ? (
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink" />
-                    ) : (
-                      <Image src="/icons/location.png" alt="" width={22} height={22} />
-                    )}
-                  </button>
-                </>
-              }
-            />
-            </div>
-          </CollapsibleTopBar>
-          {locateError && <p className="mt-1 px-6 text-center text-xs text-danger">{locateError}</p>}
-
-          {/* HERO - מערכת ה-TripMatch (Card Stack הניתן להחלקה). מתחבר
-              ישירות לקטגוריות/חיפוש שמעליו - זה בדיוק אותו רכיב עם אותה
-              לוגיקה בדיוק שקיימת ב-/tripmatch, רק מוטמע כאן. */}
-          {/* תיקון (בקשה מפורשת - "להעלות קצת את הפילטרים שיתקרבו לשורת
-              החיפוש"): כשה-TripMatch המוטמע מוצג, המרווח מעל השורה קטן
-              (mt-2 במקום mt-5). במצב הפתיחה (איור "מחפשים לאן לצאת?") mt-2 - האיור
-              נצמד לבר התכלת. */}
-          {/* *** תוקן (Bug מפורש - "הכרטיסייה בורחת מהעמוד"): לתיבה הזו
-              יש flex-1 min-h-0 מההורה שלה (התיבה עם ה-100dvh), אז היא
-              *מקבלת* גובה קבוע נכון - אבל בלי flex (display:flex) על
-              עצמה, היא לא *מעבירה* את הגובה הזה הלאה ל-TripMatchPageContent
-              (שרנדר את עצמו רק לפי הגובה הטבעי של התוכן שלו, בלי קשר
-              לגובה ההורה) - וכל שרשרת ה-flex-1 הפנימית ב-tripmatch/page.tsx
-              נשארה בלי גבול אמיתי לצמוח בתוכו, ולכן "ברחה" מעבר לעמוד.
-              flex flex-col כאן סוגר את הפער - עכשיו TripMatchPageContent
-              (שכבר flex flex-col מבפנים) נמתח בדיוק לגובה הפנוי. */}
-          <div className={`${destinationQuery ? "mt-3" : "mt-2"} flex min-h-0 flex-1 flex-col`}>
-            {destinationQuery ? (
-              <TripMatchPageContent
-                key={embeddedKey}
-                embedded
-                initialCityQuery={destinationQuery}
-                onExitEmbedded={handleExitEmbedded}
-                onCardsVisibleChange={setCardsVisible}
-              />
-            ) : // *** הוסר (בקשה מפורשת - "להעיף את כל עיצובי הטעינה, שזה ישר יקבל את
-            // המיקום של המשתמש"): אין יותר מסך המתנה (איור/טקסט) בעמוד הבית.
-            // איתור המיקום מתחיל מיד בטעינת העמוד (ה-useEffect של
-            // handleUseNearMe למעלה), והכרטיסים מופיעים ברגע שיש יעד.
-            null}
+        {/* *** בקשה מפורשת - "הרקע של החלק עד שורת החיפוש כולל בצבע כחול
+            כמו האייקון שלנו, עם קצוות מעוגלים": ההדר + שורת החיפוש יושבים
+            על רקע גרדיאנט תכלת→כחול (צבעים דגומים מאייקון האפליקציה), עם
+            פינות תחתונות מעוגלות. בלי overflow-hidden - כדי שתפריט ההצעות
+            של החיפוש והבועה של ההתראות יוכלו לצאת מתחתיו. */}
+        {/* *** שונה (בקשה מפורשת - "הבר העליון ישאר, רק עם שורת הלוגו/התראות/
+            צ'אט, גם בגלילה; החיפוש נעלם בגלילה באופן אנימטיבי"): הבר התכלת
+            (הרקע, הגרדיאנט, ההילות - הכל כמו שהיה) עבר ל-CollapsibleTopBar,
+            שנדבק לראש המסך ומכווץ את שורת החיפוש בהתאם לגלילה. שורת החיפוש
+            עצמה (כולל כפתור "קרוב אלי" בתוכה) נשארה בדיוק אותו דבר - היא
+            ה-children שנעלמים. */}
+        <CollapsibleTopBar loading={loading || profileLoading}>
+          <div data-home-search="">
+          <SearchBarLink
+            destinationMode
+            variant="hero"
+            onSelectDestination={handleSelectDestination}
+            containerClassName="relative"
+            endAdornment={
+              <>
+                <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />
+                <button
+                  type="button"
+                  onClick={() => setLocationSheetOpen(true)}
+                  aria-label={locating ? "מאתר מיקום..." : "המיקום שלי"}
+                  title="המיקום שלי"
+                  // *** תיקון (בקשה מפורשת - "הכפתור של המיקום צריך להיות בגובה אחיד עם שאר הכפתורים שעיצבנו"):
+                  // h-11 w-11 (44px) - אותו גודל בדיוק כמו עיגולי סוגי-הטיול/כפתור הפילטרים (FilterCircleButton) בשורה
+                  // שמתחת, ושאר העיגולים הלבנים הצפים באפליקציה. קודם היה h-9 w-9 (36px) - נמוך מהם בבירור.
+                  className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition active:scale-90 disabled:opacity-60"
+                >
+                  {locating ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink" />
+                  ) : (
+                    <Image src="/icons/location.png" alt="" width={22} height={22} />
+                  )}
+                </button>
+              </>
+            }
+          />
           </div>
+        </CollapsibleTopBar>
+        {locateError && <p className="mt-1 px-6 text-center text-xs text-danger">{locateError}</p>}
+
+        {/* HERO - מערכת ה-TripMatch (Card Stack הניתן להחלקה). מתחבר
+            ישירות לקטגוריות/חיפוש שמעליו - זה בדיוק אותו רכיב עם אותה
+            לוגיקה בדיוק שקיימת ב-/tripmatch, רק מוטמע כאן. */}
+        {/* תיקון (בקשה מפורשת - "להעלות קצת את הפילטרים שיתקרבו לשורת
+            החיפוש"): כשה-TripMatch המוטמע מוצג, המרווח מעל השורה קטן
+            (mt-2 במקום mt-5). במצב הפתיחה (איור "מחפשים לאן לצאת?") mt-2 - האיור
+            נצמד לבר התכלת. */}
+        <div className={`${destinationQuery ? "mt-3" : "mt-2"} min-h-0 flex-1`}>
+          {destinationQuery ? (
+            <TripMatchPageContent
+              key={embeddedKey}
+              embedded
+              initialCityQuery={destinationQuery}
+              onExitEmbedded={handleExitEmbedded}
+            />
+          ) : // *** הוסר (בקשה מפורשת - "להעיף את כל עיצובי הטעינה, שזה ישר יקבל את
+          // המיקום של המשתמש"): אין יותר מסך המתנה (איור/טקסט) בעמוד הבית.
+          // איתור המיקום מתחיל מיד בטעינת העמוד (ה-useEffect של
+          // handleUseNearMe למעלה), והכרטיסים מופיעים ברגע שיש יעד.
+          null}
         </div>
 
         {/* *** חדש (בקשה מפורשת - "מתחת לכפתורים של ההחלקות"): שני קטעים

@@ -32,7 +32,7 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
   const dark = tone === "dark";
   const inactiveLabelColor = dark ? "#fff" : "var(--color-ink-secondary, #8a94a6)";
   return (
-    <nav data-main-bottom-nav="" className="fixed inset-x-0 bottom-0 z-50">
+    <nav className="fixed inset-x-0 bottom-0 z-50">
 <div
         className={`relative flex items-end justify-around px-2 pb-[max(env(safe-area-inset-bottom),22px)] pt-1.5 ${
           dark ? "border-t border-white/10 bg-black" : "bg-white shadow-[0_-2px_16px_rgba(16,24,40,0.08)]"
