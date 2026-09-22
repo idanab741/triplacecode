@@ -1,6 +1,8 @@
-import Image from "next/image";
-import { PlaceHeroActions } from "./PlaceHeroActions";
+import { AttractionTopBar } from "./AttractionTopBar";
+import { AttractionSaveShareRow } from "./AttractionSaveShareRow";
 import { PlaceNavigationCard } from "./PlaceNavigationCard";
+import { GoogleRatingCard } from "./GoogleRatingCard";
+import { TripAddRatingSection } from "./TripAddRatingSection";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { Icon } from "@/components/ui/Icon";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
@@ -11,15 +13,6 @@ import type { TripAddPlace } from "@/services/tripadd/tripAddPlaceService";
 interface TripAddPlaceViewProps {
   place: TripAddPlace;
   savedCount: number;
-}
-
-function StarIcon({ size = 14 }: { size?: number }) {
-  // *** אותו path/צבע בדיוק כמו PlaceMapPopupCard.tsx (StarIcon) - לא אייקון חדש.
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5">
-      <path d="M12 2.5l2.9 6.1 6.6.7-4.9 4.5 1.3 6.6L12 17l-5.9 3.4 1.3-6.6-4.9-4.5 6.6-.7L12 2.5z" />
-    </svg>
-  );
 }
 
 /** סרט/סימנייה מלא - אותו איקון בדיוק כמו PlaceCommunityStatsSection.tsx
@@ -39,13 +32,17 @@ function BookmarkIcon() {
  * מהעמוד הישן במלואו כי הוא תלוי עמוק ב-TripMatch/מערכת ה-swiping
  * הישנה - לא רלוונטית כאן.
  *
- * *** עיצוב-מחדש (בקשה מפורשת - "נראה על הפנים, אני רוצה את הפרטים
- * של החלונית שעשינו"): שורת הדירוגים, שורת הכתובת+פתוח/סגור, ושורת
- * קטגוריה+נגישות בנויות עכשיו בדיוק לפי אותה שפה חזותית של
- * PlaceMapPopupCard.tsx (לוגו TripLace/Google אמיתיים, לא טקסט
- * גולמי; טווח מחירים ב-₪; אייקוני Waze/Google Maps אמיתיים דרך
- * PlaceNavigationCard) - לא מומצא עיצוב חדש, רק "מוגדל" לגרסת עמוד
- * מלא במקום חלונית קומפקטית.
+ * *** עיצוב-מחדש מלא (בקשה מפורשת - "צריך להיות אחיד לכל העמודים של
+ * האטרקציות! ... בר עליון בצבע תכלת (עם כפתורי חזור ופעמון בצדדים) /
+ * מתחת התמונה / מתחת שני כפתורים - שמירה ושיתוף / מתחת שם האטרקציה,
+ * מיקום, תיאור / מתחת הקטגוריות / מתחת מפה, מעל המפה מרחק מהבית,
+ * מתחתיה גוגל מאפס ו-Waze / מתחת דירוג גוגל / דירוג triplace עם
+ * הלוגואים + כפתור 'דרגו את המקום הזה'"): הסדר הזה משותף עכשיו, מילה
+ * במילה, עם /place/[id]/page.tsx (עמוד ה-place הישן) - דרך אותן
+ * קומפוננטות בדיוק (AttractionTopBar/AttractionSaveShareRow/
+ * GoogleRatingCard/PlaceRatingCard), כך ששני סוגי העמודים נראים
+ * זהים לחלוטין מנקודת המבט של המשתמש, גם אם מקור הדאטה שונה מתחת
+ * למכסה המנוע (places הישנה מול tripadd_submissions).
  */
 export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
   const categoryLabel = HOME_QUICK_CATEGORY_LABELS[place.category] ?? place.category;
@@ -63,19 +60,25 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
 
   return (
     <div className="min-h-screen bg-white pb-28">
-      <div className="relative h-72 w-full bg-bg-secondary">
-        <PlaceHeroActions placeId={place.id} placeName={place.name} placeType="tripadd" />
+      {/* 1. בר עליון תכלת - חזור + לוגו + פעמון (הבר התקני של triplace,
+          כמו HomeHeader/PlacesHeaderRow) - יושב *מעל* ה-HERO, לא כ-overlay שקוף עליו */}
+      <AttractionTopBar />
+
+      {/* 2. תמונת HERO - מוזזת מעט למעלה ומאחורי הבר (ר' הסבר ב-page.tsx
+          התאום) כדי שתמלא את פינות העיגול המעוגלות של הבר מלמטה. */}
+      <div className="relative z-0 -mt-8 h-72 w-full bg-bg-secondary">
         {place.photoUrls[0] && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={place.photoUrls[0]} alt={place.name} className="h-full w-full object-cover" />
         )}
       </div>
 
-      {/* *** גלריית תמונות נוספות שאנשים מעלים (בקשה מפורשת) - כל
-          התמונות שהצטברו מכל הביקורות על המקום הזה (לא רק ממי
-          שיצר אותו) - ר' upsertTripAddReview, שמוסיף תמונות לאותה
-          גלריה משותפת. מוצג רק אם יש יותר מתמונה אחת - אחרת מיותר
-          (ה-HERO כבר מציג את היחידה). */}
+      {/* 3. שמירה + שיתוף */}
+      <AttractionSaveShareRow placeId={place.id} placeName={place.name} placeType="tripadd" />
+
+      {/* גלריית תמונות נוספות שאנשים מעלים - כל התמונות שהצטברו מכל
+          הביקורות על המקום הזה (לא רק ממי שיצר אותו). מוצג רק אם יש
+          יותר מתמונה אחת. */}
       {place.photoUrls.length > 1 && (
         <div className="flex gap-2 overflow-x-auto px-5 pt-3" style={{ scrollbarWidth: "none" }}>
           {place.photoUrls.slice(1).map((url) => (
@@ -86,60 +89,8 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
       )}
 
       <div className="flex flex-col gap-5 px-5 pt-5">
-        {/* *** שורת דירוגים - לוגואים אמיתיים (לא טקסט "Google" גולמי),
-            בדיוק לפי PlaceMapPopupCard.tsx. + טווח מחירים (₪) על אותה
-            שורה, שם היה קיים בחלונית ונעדר לגמרי מהעמוד. */}
-        {/* *** תיקון (בקשה מפורשת - מסמך העדכון, סעיף 9: "TRIPLACE +
-            Google חייבים להישאר באותה שורה בכל גודל מסך, לעולם לא
-            לשבור לשתי שורות, גם לא במסכים קטנים"): flex-wrap הוחלף
-            ב-flex-nowrap - זו הייתה הפרה ממשית של הכלל, לא רק תיאורטית.
-            shrink-0 על כל קבוצה מונע מהתוכן להידחס/להיחתך; אם הכל לא
-            נכנס ברוחב המסך, overflow-x-auto מאפשר גלילה אופקית מבוקרת
-            (הטכניקה שהמסמך עצמו מתיר) - במקום לשבור שורה. */}
-        <div className="flex flex-nowrap items-center gap-x-2.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {place.rating != null && (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <Image src="/images/triplace-logo-black.png" alt="TripLace" width={70} height={22} className="h-[18px] w-auto object-contain" />
-              <span className="flex items-center gap-1 text-sm font-bold text-ink whitespace-nowrap">
-                <StarIcon size={14} />
-                {place.rating.toFixed(1)}
-              </span>
-              {place.reviewCount > 0 && <span className="whitespace-nowrap text-xs text-ink-secondary">({place.reviewCount})</span>}
-            </div>
-          )}
-
-          {place.googleRating != null && (
-            <>
-              <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
-              <a href={googleReviewsUrl} target="_blank" rel="noopener noreferrer" className="flex shrink-0 items-center gap-1.5">
-                <Image src="/images/google-logo.png" alt="Google" width={200} height={70} className="h-[18px] w-auto object-contain" />
-                <span className="flex items-center gap-1 text-sm font-bold text-ink whitespace-nowrap">
-                  <StarIcon size={14} />
-                  {place.googleRating.toFixed(1)}
-                </span>
-                {place.googleRatingCount != null && (
-                  <span className="whitespace-nowrap text-xs text-ink-secondary">({place.googleRatingCount.toLocaleString()})</span>
-                )}
-              </a>
-            </>
-          )}
-
-          {place.priceLevel != null && (
-            <>
-              <span className="h-4 w-px shrink-0 bg-ink-secondary/20" />
-              <span className="shrink-0 whitespace-nowrap text-sm font-bold text-ink" aria-label="טווח מחירים">
-                {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
-              </span>
-            </>
-          )}
-        </div>
-
+        {/* 4. שם + מיקום + תיאור */}
         <div className="flex flex-col gap-2">
-          {/* *** תוספת (מסמך העדכון, סעיף 5 - "נקודת התאמה ירוקה") */}
-          {/* *** תיקון (בקשה מפורשת - "השם של המקום מיושר משמאל לימין,
-              אני רוצה מימין לשמאל"): הוספתי text-right ו-justify-end
-              במפורש - לא מסתמכים על הירושה של dir="rtl" הגלובלי
-              בלבד, כדי שלא יהיה שום ספק. */}
           <h1 className="flex items-center justify-end gap-1.5 text-right text-2xl font-extrabold text-ink">
             {(place.googleMatchStatus === "matched" || place.googleMatchStatus === "manual") && (
               <span
@@ -150,11 +101,7 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
             )}
             <span dir="rtl">{place.name}</span>
           </h1>
-          {/* תיאור כללי (short_description, ממולא ע"י AI) - הטקסט האישי
-              של כל מגיש/ה עבר להיות ביקורת משלו, ר' סקציית "ביקורות" למטה. */}
-          {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}
 
-          {/* *** כתובת + פתוח/סגור על אותה שורה, בדיוק כמו PlaceMapPopupCard.tsx. */}
           <div className="flex flex-wrap items-center justify-end gap-2 text-right text-sm">
             {isOpen != null && (
               <span className="flex shrink-0 items-center gap-1.5">
@@ -173,9 +120,19 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
               </span>
             )}
           </div>
+
+          {/* תיאור כללי (short_description, ממולא ע"י AI) - הטקסט האישי
+              של כל מגיש/ה עבר להיות ביקורת משלו, ר' סקציית הדירוגים למטה. */}
+          {place.shortDescription && <p className="text-sm leading-relaxed text-ink-secondary">{place.shortDescription}</p>}
+
+          {place.priceLevel != null && (
+            <span className="self-end text-sm font-bold text-ink" aria-label="טווח מחירים">
+              {"₪".repeat(Math.min(4, Math.max(1, place.priceLevel)))}
+            </span>
+          )}
         </div>
 
-        {/* *** קטגוריה+תת-קטגוריה עם אייקון עגול, בדיוק כמו PlaceMapPopupCard.tsx -
+        {/* 5. קטגוריה+תת-קטגוריה עם אייקון עגול, בדיוק כמו PlaceMapPopupCard.tsx -
             במקום צ'יפים גנריים. נגישות צמודה לאותה שורה, לא צ'יפ נפרד. */}
         <div className="flex items-center gap-2.5">
           {categoryIconSrc && (
@@ -221,9 +178,7 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
           </div>
         )}
 
-        {/* *** "כמה שמרו" - תמיד מוצג (בקשה מפורשת - "פרטים כמה זה
-            פופולרי"), גם ב-0, עם ניסוח מזמין במקום להסתתר לגמרי -
-            כדי שהפיצ'ר יהיה גלוי וברור שהוא קיים, לא רק כשיש כבר נתונים. */}
+        {/* "כמה שמרו" - תמיד מוצג, גם ב-0, עם ניסוח מזמין. */}
         <div className="flex items-center gap-3 rounded-card border border-ink-secondary/10 bg-white p-4">
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
@@ -242,9 +197,17 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
           </p>
         </div>
 
-        {/* *** ניווט - Waze + Google Maps (בקשה מפורשת - "יש לנו
-            אייקונים מאפס"), + תצוגת מפה ו"זמן הגעה משוער". */}
+        {/* 6. מפה - מרחק מהבית מעל המפה, מפה, Google Maps + Waze מתחתיה
+            (הסדר הזה כבר מובנה בתוך PlaceNavigationCard). */}
         <PlaceNavigationCard placeId={place.id} latitude={place.latitude} longitude={place.longitude} />
+
+        {/* 7. דירוג Google */}
+        {place.googleRating != null && (
+          <GoogleRatingCard rating={place.googleRating} ratingCount={place.googleRatingCount} googleUrl={googleReviewsUrl} />
+        )}
+
+        {/* 8. דירוג TripLace (לוגואים + כפתור "דרגו את המקום הזה") */}
+        <TripAddRatingSection place={place} />
 
         {place.phone && (
           <a
@@ -282,41 +245,6 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
                 {line}
               </p>
             ))}
-          </div>
-        )}
-
-        {/* *** ביקורות (בקשה מפורשת - "צריכות להיות רשומות למטה
-            מסודרות"): כל השורות מ-tripadd_reviews של המקום הזה (ר'
-            migration 0081) - כולל, אחרי איחוד מקומות כפולים, ביקורות
-            שהצטברו מכמה הוספות נפרדות של אותו מקום פיזי. מסודרות
-            מהחדשה לישנה. בלי שם/זהות של אף כותב/ת - אותו עיקרון בדיוק
-            כמו שאר האפליקציה (אף מקום לא חושף מי בדיוק כתב מה). */}
-        {place.reviews.length > 0 && (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm font-bold text-ink">ביקורות ({place.reviews.length})</p>
-            <div className="flex flex-col gap-2.5">
-              {place.reviews.map((review) => (
-                <div key={review.id} className="flex flex-col gap-1.5 rounded-card border border-ink-secondary/10 bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    {review.rating != null ? (
-                      <div className="flex items-center gap-0.5" aria-hidden="true">
-                        {[1, 2, 3, 4, 5].map((n) => (
-                          <span key={n} className={n <= review.rating! ? "text-amber-500" : "text-ink-secondary/25"}>
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span />
-                    )}
-                    <span className="text-[11px] text-ink-secondary">
-                      {new Date(review.createdAt).toLocaleDateString("he-IL")}
-                    </span>
-                  </div>
-                  {review.description && <p className="text-sm leading-relaxed text-ink">{review.description}</p>}
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>

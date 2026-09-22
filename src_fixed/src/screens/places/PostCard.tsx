@@ -182,6 +182,10 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   const isLongText = (displayText?.length ?? 0) > LONG_TEXT_CHARS || (displayText?.split("\n").length ?? 0) > LONG_TEXT_LINES;
   const media = item.media;
   const extraMedia = media.length - MAX_MEDIA_TILES;
+  // *** fallback: אם לאטרקציה עצמה (tripadd_submission) אין תמונה משלה
+  // ב-taxonomy_media, משתמשים בתמונה הראשונה של הפוסט עצמו (post_media) -
+  // כדי שה-chip תמיד יציג משהו אם יש בכלל תמונה זמינה בפוסט.
+  const placeChipImageUrl = item.place?.imageUrl ?? media[0]?.url ?? null;
 
   return (
     <article className="flex gap-3 border-b border-black/[0.07] px-4 py-3.5">
@@ -359,10 +363,17 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
               href={item.place ? `/place/${item.place.id}` : `/destination/${item.destination?.id}`}
               className="mt-2.5 flex items-center gap-2 rounded-xl border border-black/[0.08] px-3 py-2 transition hover:bg-black/[0.02]"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
-                <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
-                <circle cx="12" cy="10" r="2.5" />
-              </svg>
+              {placeChipImageUrl ? (
+                <span className="block h-6 w-6 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={placeChipImageUrl} alt="" className="h-full w-full object-cover" />
+                </span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
+                  <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+              )}
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{item.place?.name ?? item.destination?.name}</span>
               <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
                 <path d="m14 6-6 6 6 6" />

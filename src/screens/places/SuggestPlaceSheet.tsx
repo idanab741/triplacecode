@@ -312,7 +312,14 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
 
         {selected && (
           <div className="mt-2 flex items-center gap-2 rounded-card bg-bg-secondary px-3 py-2.5">
-            <span style={{ color: "var(--color-places-purple)" }}>📍</span>
+            {selected.photoUrl ? (
+              <span className="block h-8 w-8 shrink-0 overflow-hidden rounded-full bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={selected.photoUrl} alt="" className="h-full w-full object-cover" />
+              </span>
+            ) : (
+              <span className="shrink-0" style={{ color: "var(--color-places-purple)" }}>📍</span>
+            )}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-semibold text-ink">{selected.name}</span>
               <span className="block truncate text-[11.5px] text-ink-secondary">{selected.address}</span>

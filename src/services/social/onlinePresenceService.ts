@@ -29,35 +29,35 @@ export interface OnlineFriendDto {
   status: OnlineStatus;
 }
 
-/** רשימת "חברים אונליין" - רק מתוך Friends מאושרים, בהתאם לפרטיות
- *  (סעיף 8: "אין לחשוף מידע מעבר למה שהגדרות הפרטיות מאפשרות"). */
+/** "מחוברים עכשיו" - כל מי שיש עמו עקיבה הדדית (Mutual Follow): גם אני עוקב
+ *  אחריו וגם הוא עוקב אחריי (טבלת follows, לא friendships). מוחזרים *כולם*,
+ *  מחוברים ולא-מחוברים כאחד - הצבע (ירוק/צהוב) ב-UI הוא מה שמבדיל ביניהם. */
 export async function getOnlineFriends(supabase: SupabaseClient, userId: string): Promise<OnlineFriendDto[]> {
-  const { data: friendships, error } = await supabase
-    .from("friendships")
-    .select(
-      "requester_id, addressee_id, requester:profiles!friendships_requester_id_fkey(id, username, full_name, avatar_url, last_seen), addressee:profiles!friendships_addressee_id_fkey(id, username, full_name, avatar_url, last_seen)"
-    )
-    .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
-    .eq("status", "accepted");
-  if (error) throw error;
+  const [{ data: following, error: followingError }, { data: followers, error: followersError }] = await Promise.all([
+    supabase.from("follows").select("following_id").eq("follower_id", userId),
+    supabase.from("follows").select("follower_id").eq("following_id", userId),
+  ]);
+  if (followingError) throw followingError;
+  if (followersError) throw followersError;
 
-  const friends = (friendships ?? []).map((row) => {
-    const isRequester = row.requester_id === userId;
-    const friend = (isRequester ? row.addressee : row.requester) as unknown as {
-      id: string;
-      username: string | null;
-      full_name: string | null;
-      avatar_url: string | null;
-      last_seen: string | null;
-    };
-    return {
-      id: friend.id,
-      username: friend.username,
-      fullName: friend.full_name,
-      avatarUrl: friend.avatar_url,
-      status: computeOnlineStatus(friend.last_seen),
-    };
-  });
+  const followingIds = new Set((following ?? []).map((row) => row.following_id as string));
+  const mutualIds = (followers ?? [])
+    .map((row) => row.follower_id as string)
+    .filter((id) => followingIds.has(id));
 
-  return friends.filter((f) => f.status !== "offline");
+  if (mutualIds.length === 0) return [];
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, username, full_name, avatar_url, last_seen")
+    .in("id", mutualIds);
+  if (profilesError) throw profilesError;
+
+  return (profiles ?? []).map((profile) => ({
+    id: profile.id,
+    username: profile.username,
+    fullName: profile.full_name,
+    avatarUrl: profile.avatar_url,
+    status: computeOnlineStatus(profile.last_seen),
+  }));
 }

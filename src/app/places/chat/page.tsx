@@ -9,6 +9,10 @@ import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { Skeleton } from "@/components/ui";
 import { getAvatarUrl } from "@/constants/avatar";
+import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
+import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
+import { ensureConversation, listConversations, type DmConversationListItemDto } from "@/services/social/dmService";
+import { formatRelativeTimeHe } from "@/utils/relativeTime";
 
 interface PersonResult {
   id: string;
@@ -17,22 +21,63 @@ interface PersonResult {
   avatar_url: string | null;
 }
 
+/** תצוגה מקדימה של ההודעה האחרונה בשיחה - "אתה: ..." אם ההודעה שלי,
+ *  אחרת הטקסט עצמו. שיתוף (trip/place/post/review) עדיין תמיד text=null
+ *  כרגע (kind='text' בלבד נתמך בשליחה) - שם קריא כגיבוי לשלב הבא. */
+function lastMessagePreview(item: DmConversationListItemDto): string {
+  if (!item.lastMessage) return "עדיין אין הודעות";
+  const body =
+    item.lastMessage.kind === "text"
+      ? item.lastMessage.text ?? ""
+      : { trip: "📍 שיתוף מסלול", place: "📍 שיתוף אטרקציה", post: "🖼️ שיתוף פוסט", review: "⭐ שיתוף ביקורת" }[item.lastMessage.kind];
+  return item.lastMessage.isMine ? `אתה: ${body}` : body;
+}
+
+
 /**
- * "צ'אטים" - עמוד אחד לכל השיחות. *** בקשה מפורשת - "הצ'אט שבבר העליון צריך להיות עמוד אחר של כל השיחות
- * שלנו עם המשתמשים: בר עליון קבוע של triplace (כולל חיפוש), שיחה ראשונה עם triplace נעוצה, ושאר השיחות
- * עם משתמשים אחרים במידה ויש".
+ * "צ'אטים" - עמוד אחד לכל השיחות: בר עליון קבוע של triplace (כולל חיפוש), שיחה ראשונה עם triplace
+ * נעוצה (הודעות מערכת ושירות לקוחות, /support), ואחריה שאר השיחות האמיתיות עם משתמשים אחרים (ר'
+ * dmService.ts + migration 0093) - לא רשימה מדומה.
  *
- * מה בנוי בפועל, בכנות: שורת החיפוש מחפשת אנשים (משתמשת ב-/api/social/search, כבר קיים ואמיתי) - לחיצה
- * על תוצאה פותחת את הפרופיל שלהם (עדיין אין מערכת הודעות פנימיות בין משתמשים באפליקציה - ר' ההערה
- * שהייתה בעמוד הקודם, /places/chat: "מערכת ה-Chat המלאה... שלב 2 באפיון"). לכן "שאר השיחות עם משתמשים
- * אחרים" תמיד ריק כרגע, ומוצג ככה בכנות - לא כרשימת שיחות מדומה. השיחה הראשונה עם "triplace" היא אמיתית
- * ועובדת: זו בדיוק שיחת Trippy AI הקיימת (/ai).
+ * *** תיקון (בקשה מפורשת - "אי אפשר לשלוח הודעות למשתמשים! זה מוביל לעמוד הפרופיל במקום לעמוד צ'אט"):
+ * לחיצה על תוצאת חיפוש כבר לא פותחת פרופיל - פותחת (או יוצרת, אם זו הפעם הראשונה) שיחה אמיתית עם אותו
+ * משתמש ומנווטת אליה (/places/chat/[conversationId], DmChatScreen). אותו דבר לכל שיחה קיימת ברשימה.
  */
 export default function ChatsInboxPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PersonResult[] | null>(null);
+  const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[]>([]);
+  const [conversations, setConversations] = useState<DmConversationListItemDto[] | null>(null);
+  const [openingUserId, setOpeningUserId] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* שיחות אמיתיות עם משתמשים אחרים - ר' dmService.ts. נטען פעם אחת
+     בכניסה לעמוד; מתעדכן שוב אחרי חזרה משיחה (focus) כדי לשקף הודעות
+     חדשות/נקראו בלי לדרוש רענון ידני. */
+  useEffect(() => {
+    function loadConversations() {
+      listConversations()
+        .then(setConversations)
+        .catch(() => setConversations([]));
+    }
+    loadConversations();
+    window.addEventListener("focus", loadConversations);
+    return () => window.removeEventListener("focus", loadConversations);
+  }, []);
+
+  /* "מחוברים עכשיו" - מוצג *רק* בעמוד הזה (בקשה מפורשת, הוסר מעמוד Places):
+     כל מי שיש עמו עקיבה הדדית (אני עוקב אחריו *והוא* עוקב אחריי) - ראה
+     onlinePresenceService.getOnlineFriends. ה-heartbeat כאן מעדכן את ה-
+     last_seen של המשתמש הנוכחי גם כשהוא לא ביקר בעמוד Places בכלל. */
+  useEffect(() => {
+    fetch("/api/social/presence/online-friends")
+      .then((res) => res.json())
+      .then((data) => setOnlineFriends(data.friends ?? []))
+      .catch(() => setOnlineFriends([]));
+    fetch("/api/social/presence/heartbeat", { method: "POST" }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -50,6 +95,21 @@ export default function ChatsInboxPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
+
+  /* פותחת (או יוצרת) שיחה עם משתמש ומנווטת לעמוד הצ'אט שלה - זו הנקודה
+     היחידה שמחליפה את הניווט הישן לפרופיל (בקשה מפורשת). */
+  async function openChatWith(userId: string) {
+    setOpenError(null);
+    setOpeningUserId(userId);
+    try {
+      const conversation = await ensureConversation(userId);
+      router.push(`/places/chat/${conversation.id}`);
+    } catch (e) {
+      setOpenError(e instanceof Error ? e.message : "פתיחת הצ'אט נכשלה");
+      setOpeningUserId(null);
+    }
+  }
+
 
   return (
     <div className="min-h-screen bg-white pb-24">
@@ -94,6 +154,15 @@ export default function ChatsInboxPage() {
         </div>
       </CollapsibleTopBar>
 
+      {/* *** תיקון (בקשה מפורשת - "הטקסט 'צ'אטים' צריך להיות מתחת לבלוק של מחוברים עכשיו"): הכותרת
+          הוזזה מתחת לבלוק "מחוברים עכשיו" (לפני זה הייתה מעליו). הבלוק עצמו עדיין לא מוצג בזמן
+          חיפוש אנשים ולא מוצג כשאין חברים מחוברים (OnlineFriendsSection מחזיר null במקרה הזה). */}
+      {!query.trim() && (
+        <div className="pt-5">
+          <OnlineFriendsSection friends={onlineFriends} title="מחוברים עכשיו" hideCount />
+        </div>
+      )}
+
       <h1 className="px-5 pb-1 pt-5 text-xl font-bold text-ink">צ&apos;אטים</h1>
 
       {query.trim() ? (
@@ -108,10 +177,12 @@ export default function ChatsInboxPage() {
             <p className="px-6 py-10 text-center text-[13.5px] text-ink-secondary">לא נמצאו אנשים בשם הזה.</p>
           ) : (
             results.map((person) => (
-              <Link
+              <button
                 key={person.id}
-                href={`/places/profile/${person.username ?? person.id}`}
-                className="flex items-center gap-3 rounded-2xl px-3 py-3 transition active:bg-bg-secondary"
+                type="button"
+                onClick={() => openChatWith(person.id)}
+                disabled={openingUserId === person.id}
+                className="flex items-center gap-3 rounded-2xl px-3 py-3 text-start transition active:bg-bg-secondary disabled:opacity-60"
               >
                 <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,7 +192,10 @@ export default function ChatsInboxPage() {
                   <span className="block truncate text-[14.5px] font-bold text-ink">{person.full_name || person.username}</span>
                   {person.username && <span className="block truncate text-[12.5px] text-ink-secondary">@{person.username}</span>}
                 </span>
-              </Link>
+                {openingUserId === person.id && (
+                  <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-ink-secondary/30 border-t-ink-secondary" />
+                )}
+              </button>
             ))
           )}
         </div>
@@ -151,12 +225,52 @@ export default function ChatsInboxPage() {
               בלי 📌 - קו מלא לכל רוחב העמוד (לא רק בתוך השורה) מפריד בין triplace לשאר השיחות. */}
           <hr className="-mx-2 my-2 border-t border-ink-secondary/12" />
 
-          {/* *** בקשה מפורשת - "שאר הצ'אטים עם המשתמשים האחרים במידה ויש": אין עדיין מערכת הודעות בין
-              משתמשים באפליקציה - מוצג בכנות, לא כרשימת שיחות מדומה (ר' ההערה המלאה למעלה). */}
-          <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
-            <p className="text-[13.5px] text-ink-secondary">אין עדיין שיחות עם משתמשים אחרים.</p>
-            <p className="text-[12px] text-ink-secondary/70">חפשו אדם למעלה כדי לעבור לפרופיל שלו.</p>
-          </div>
+          {openError && <p className="px-4 py-2 text-center text-[13px] text-danger">{openError}</p>}
+
+          {/* *** תיקון (בקשה מפורשת - "אי אפשר לפתח שיחה בנתיים עם אף בן אדם! זה מוביל לעמוד הפרופיל
+              במקום לעמוד צ'אט"): שיחות אמיתיות עם משתמשים אחרים, לא רשימה מדומה - dmService.ts +
+              migration 0093. לחיצה פותחת את עמוד השיחה (/places/chat/[id]), לא את הפרופיל. */}
+          {conversations === null ? (
+            <div className="flex flex-col gap-2 px-3 py-2">
+              {[0, 1].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="flex flex-col items-center gap-1 px-6 py-12 text-center">
+              <p className="text-[13.5px] text-ink-secondary">אין עדיין שיחות עם משתמשים אחרים.</p>
+              <p className="text-[12px] text-ink-secondary/70">חפשו אדם למעלה כדי להתחיל שיחה.</p>
+            </div>
+          ) : (
+            conversations.map((conversation) => (
+              <Link
+                key={conversation.id}
+                href={`/places/chat/${conversation.id}`}
+                className="flex items-center gap-3 rounded-2xl px-3 py-3 transition active:bg-bg-secondary"
+              >
+                <span className="block h-12 w-12 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={getAvatarUrl(conversation.otherUser?.avatarUrl)} alt="" className="h-full w-full object-cover" />
+                </span>
+                <span className="min-w-0 flex-1 text-start">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[14.5px] font-bold text-ink">
+                      {conversation.otherUser?.fullName || conversation.otherUser?.username || "משתמש"}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-ink-secondary">{formatRelativeTimeHe(conversation.lastMessageAt)}</span>
+                  </span>
+                  <span className={`block truncate text-[12.5px] ${conversation.unreadCount > 0 ? "font-bold text-ink" : "text-ink-secondary"}`}>
+                    {lastMessagePreview(conversation)}
+                  </span>
+                </span>
+                {conversation.unreadCount > 0 && (
+                  <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-white">
+                    {conversation.unreadCount}
+                  </span>
+                )}
+              </Link>
+            ))
+          )}
         </div>
       )}
 

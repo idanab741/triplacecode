@@ -2,9 +2,11 @@ import Link from "next/link";
 import { getPlaceById } from "@/services/places/placesServerService";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { Screen } from "@/components/ui";
-import { PlaceHeroActions } from "@/screens/place/PlaceHeroActions";
+import { AttractionTopBar } from "@/screens/place/AttractionTopBar";
+import { AttractionSaveShareRow } from "@/screens/place/AttractionSaveShareRow";
 import { PlaceNavigationCard } from "@/screens/place/PlaceNavigationCard";
 import { PlaceCommunityStatsSection } from "@/screens/place/PlaceCommunityStatsSection";
+import { GoogleRatingCard } from "@/screens/place/GoogleRatingCard";
 import { TripLaceRatingSection } from "@/screens/place/TripLaceRatingSection";
 import { TripAddPlaceView } from "@/screens/place/TripAddPlaceView";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -23,18 +25,26 @@ interface PlacePageProps {
 
 /**
  * מסך אטרקציה/מקום - נפתח בלחיצה על כל מקום שמופיע ב-TripMatch (וגם
- * במקומות אחרים באפליקציה שמקשרים ל-/place/[id]). כולל: בר עליון עם
- * שיתוף+שמירה, תמונת HERO בגודל קבוע, דירוג, שם+תיאור+מיקום, קטגוריות,
- * מפה, וכפתורי דירוג (Google - קישור בלבד, לא קריאת API; TripLace -
- * דירוג פנימי אמיתי עם אפשרות למשתמשים לדרג).
+ * במקומות אחרים באפליקציה שמקשרים ל-/place/[id]). כולל: בר עליון תכלת
+ * (חזור+פעמון), תמונת HERO, שמירה+שיתוף, דירוג, שם+תיאור+מיקום,
+ * קטגוריות, מפה, וכפתורי דירוג (Google - קישור בלבד, לא קריאת API;
+ * TripLace - דירוג פנימי אמיתי עם אפשרות למשתמשים לדרג).
  *
  * *** תוספת (בקשה מפורשת - "אמורים לעשות עמוד לכל אטרקציה שקיימת
  * במאגר [TripAdd]"): tripadd_submissions נבדק **ראשון** - זה מקור
  * הדאטה החי מעכשיו (ר' HomeMap.tsx/pins route). אם המקום נמצא שם,
- * מוצג ב-TripAddPlaceView (עיצוב מקביל, לא תלוי ב-TripMatch/במבנה
- * הישן) - בלי בכלל לגעת ב-getPlaceById. הנפילה-חזרה לטבלת places
- * הישנה (הקוד שממשיך למטה) נשארת בשביל קישורים ישנים שכבר קיימים,
- * לא מוסרת.
+ * מוצג ב-TripAddPlaceView - בלי בכלל לגעת ב-getPlaceById. הנפילה-חזרה
+ * לטבלת places הישנה (הקוד שממשיך למטה) נשארת בשביל קישורים ישנים
+ * שכבר קיימים, לא מוסרת.
+ *
+ * *** עיצוב-מחדש מלא (בקשה מפורשת - "צריך להיות אחיד לכל העמודים של
+ * האטרקציות!"): אותו סדר בדיוק, מילה במילה, כמו TripAddPlaceView -
+ * בר תכלת / HERO / שמירה+שיתוף / שם+מיקום+תיאור / קטגוריות / מפה
+ * (מרחק מהבית מעל, Google Maps+Waze מתחת) / דירוג Google / דירוג
+ * TripLace עם הלוגואים + כפתור "דרגו את המקום הזה" - דרך אותן
+ * קומפוננטות משותפות בדיוק (AttractionTopBar/AttractionSaveShareRow/
+ * GoogleRatingCard), כדי ששני סוגי העמודים ייראו זהים ב-100% מנקודת
+ * המבט של המשתמש.
  */
 export default async function PlacePage({ params, searchParams }: PlacePageProps) {
   const [{ id }, { from }] = await Promise.all([params, searchParams]);
@@ -101,35 +111,38 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
 
   return (
     <div className="min-h-screen bg-white pb-28">
-      {/* *** תיקון (בקשה מפורשת - בר שקוף מעל ה-HERO): PlaceHeroActions
-          עבר להיות **בתוך** קונטיינר ה-HERO (relative) - לא sibling
-          לפניו - כדי שיחפוף את התמונה עצמה (position absolute), בלי
-          רקע לבן נפרד שדוחף אותה למטה. */}
-      <div className="relative h-72 w-full bg-bg-secondary">
-        <PlaceHeroActions placeId={place.id} placeName={place.name} />
+      {/* 1. בר עליון תכלת - חזור + פעמון */}
+      <AttractionTopBar />
+
+      {/* 2. תמונת HERO */}
+      <div className="h-72 w-full bg-bg-secondary">
         {place.image_urls?.[0] && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={place.image_urls[0]} alt={place.name} className="h-full w-full object-cover" />
         )}
       </div>
 
-      <div className="flex flex-col gap-5 px-5 pt-5">
-        {place.rating != null && (
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-            <span className="text-amber-500">★</span>
-            <span>{place.rating.toFixed(1)}</span>
-            {place.rating_count != null && <span className="font-normal text-ink-secondary">({place.rating_count})</span>}
-          </div>
-        )}
+      {/* 3. שמירה + שיתוף */}
+      <AttractionSaveShareRow placeId={place.id} placeName={place.name} />
 
+      <div className="flex flex-col gap-5 px-5 pt-5">
+        {/* 4. שם + מיקום + תיאור */}
         <div className="flex flex-col gap-2">
+          {place.rating != null && (
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+              <span className="text-amber-500">★</span>
+              <span>{place.rating.toFixed(1)}</span>
+              {place.rating_count != null && <span className="font-normal text-ink-secondary">({place.rating_count})</span>}
+            </div>
+          )}
           <h1 className="text-2xl font-extrabold text-ink">{place.name}</h1>
-          {place.short_description && <p className="text-sm leading-relaxed text-ink-secondary">{place.short_description}</p>}
           {(place.address || place.city) && (
             <p className="text-sm text-ink-secondary">{[place.address, place.city].filter(Boolean).join(" · ")}</p>
           )}
+          {place.short_description && <p className="text-sm leading-relaxed text-ink-secondary">{place.short_description}</p>}
         </div>
 
+        {/* 5. קטגוריות */}
         {categoryChips.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {categoryChips.map((chip) => (
@@ -142,32 +155,14 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
 
         <PlaceCommunityStatsSection stats={communityStats} />
 
-        {/* מפה + מרחק/זמן הגעה + כפתור ניווט (Leaflet משלנו, לא Google) */}
+        {/* 6. מפה - מרחק מהבית מעל המפה, מפה, Google Maps + Waze מתחתיה
+            (הסדר הזה כבר מובנה בתוך PlaceNavigationCard). */}
         <PlaceNavigationCard placeId={place.id} latitude={place.latitude} longitude={place.longitude} />
 
-        {/* כפתור דירוגי Google - קישור החוצה בלבד, לא הטמעה/קריאת API */}
-        {place.rating != null && (
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between rounded-card border border-ink-secondary/15 bg-white px-4 py-3"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🌐</span>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-ink">דירוגי Google</span>
-                <span className="text-xs text-ink-secondary">
-                  {place.rating.toFixed(1)} ★{place.rating_count != null ? ` · ${place.rating_count} ביקורות` : ""}
-                </span>
-              </div>
-            </div>
-            <span className="text-ink-secondary">›</span>
-          </a>
-        )}
+        {/* 7. דירוג Google */}
+        {place.rating != null && <GoogleRatingCard rating={place.rating} ratingCount={place.rating_count} googleUrl={googleMapsUrl} />}
 
-        {/* דירוגי TripLace - מערכת דירוג פנימית משלנו, כולל אפשרות
-            למשתמשים לדרג בכוכבים + תיאור חופשי. */}
+        {/* 8. דירוג TripLace (לוגואים + כפתור "דרגו את המקום הזה") */}
         <TripLaceRatingSection placeId={place.id} />
       </div>
 

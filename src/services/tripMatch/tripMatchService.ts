@@ -116,7 +116,7 @@ function personalizationScore(
 ): number {
   if (!dna) return 0;
   let score = 0;
-  if (dna.taxonomy_categories.includes(row.category)) score += 2;
+  if (dna.taxonomy_categories.includes(row.category as HomeQuickCategoryId)) score += 2;
   if (dna.preferred_categories.includes(row.category)) score += 2;
   if (dna.disliked_categories.includes(row.category)) score -= 4;
   const tagOverlap = row.taxonomyTags.filter((t) => dna.taxonomy_tags.includes(t)).length;

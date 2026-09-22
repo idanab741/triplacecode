@@ -10,7 +10,6 @@ import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import dynamic from "next/dynamic";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
 import { SuggestedPeopleCircles } from "@/screens/places/SuggestedPeopleCircles";
-import { OnlineFriendsSection } from "@/screens/places/OnlineFriendsSection";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
 import { PostCard } from "@/screens/places/PostCard";
@@ -26,7 +25,6 @@ import type { FeedTab } from "@/services/social/feedService";
 import type { FeedEntryDto } from "@/services/social/collectionTypes";
 import type { PlacesFeedView } from "@/screens/places/FeedTabs";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
-import type { OnlineFriendDto } from "@/services/social/onlinePresenceService";
 import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח, ורק כשנכנסים ללשונית "מפה".
@@ -61,7 +59,6 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
   const [creators, setCreators] = useState<CreatorCardDto[] | null>(null);
   const [suggestedTravelers, setSuggestedTravelers] = useState<SuggestedTravelerDto[] | null>(null);
-  const [onlineFriends, setOnlineFriends] = useState<OnlineFriendDto[] | null>(null);
   // *** הפיד מכיל פוסטים *ו*אוספים (Collections) ממוזגים לפי זמן - ר' feedPageService.ts.
   // מגיע כבר מלא מהשרת (initialEntries) - לא null - כך שאין הבהוב של שלד בטעינה הראשונה.
   const [feedItems, setFeedItems] = useState<FeedEntryDto[] | null>(initialEntries);
@@ -153,9 +150,9 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
     fetchJson<{ travelers: SuggestedTravelerDto[] }>("/api/social/suggested-travelers")
       .then((r) => setSuggestedTravelers(r.travelers))
       .catch(() => setSuggestedTravelers([]));
-    fetchJson<{ friends: OnlineFriendDto[] }>("/api/social/presence/online-friends")
-      .then((r) => setOnlineFriends(r.friends))
-      .catch(() => setOnlineFriends([]));
+    // *** "מחוברים עכשיו" הועבר לעמוד הצ'אטים בלבד (בקשה מפורשת) - הוסר מכאן.
+    // ה-heartbeat עצמו נשאר: הוא זה שמעדכן את ה-last_seen של המשתמש הנוכחי,
+    // ונדרש בלי קשר לאיפה הפיצ'ר *מוצג*.
     fetch("/api/social/presence/heartbeat", { method: "POST" }).catch(() => {});
   }, [user]);
 
@@ -285,19 +282,6 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
         </div>
       ) : (
         <CreatorsSection creators={creators} onFollowToggle={handleFollowToggle} />
-      )}
-
-      {onlineFriends === null ? (
-        <div className="px-4 py-3">
-          <Skeleton className="mb-3 h-4 w-32" />
-          <div className="flex gap-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-12 w-12 shrink-0 rounded-full" />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <OnlineFriendsSection friends={onlineFriends} />
       )}
 
 
