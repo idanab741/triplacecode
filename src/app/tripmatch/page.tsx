@@ -1527,10 +1527,11 @@ export function TripMatchPageContent({
 
             {/* *** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת
                 לפילטרים"): במצב מוטמע פס ההתקדמות יושב *אחרי* שורת הסוגים
-                (והפילטר), ישר מעל הכרטיס - לא מעליהם. באותם שוליים
-                אופקיים (px-6) כמו שורת החיפוש והכרטיס. */}
+                (והפילטר), ישר מעל הכרטיס - לא מעליהם. אותם שוליים אופקיים
+                כמו הכרטיס (px-14, עודכן יחד עם צמצום רוחב הכרטיס למטה -
+                כדי שהפס יישאר מיושר בדיוק עם קצוות הכרטיס). */}
             {embedded && currentCandidate && (
-              <div className="px-8 pt-1.5">
+              <div className="px-14 pt-1.5">
                 <SwipeProgressBar currentIndex={totalDecisions} total={totalDecisions + visibleCandidates.length} />
               </div>
             )}
@@ -1557,14 +1558,22 @@ export function TripMatchPageContent({
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 flex-col px-14 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              // *** תוקן (בקשה מפורשת - "לצמצם את הרוחב של הכרטיסייה כדי
+              // שיתאים לגובה החדש"): px-8 (32px) -> px-14 (56px) לכל צד.
+              // הכרטיס גבוה משמעותית יותר עכשיו (עד קצה העמוד), אז הבליטה
+              // האופקית של הכרטיסים המסובבים מאחור (rotate סביב הקצה
+              // התחתון - גדלה עם הגובה) צריכה יותר מרווח צדדי כדי שלא
+              // תגיע לקצה המסך - פתרון פשוט וישיר יותר מלנסות לכוון מיקום
+              // פיקסלי מדויק.
               // *** תוקן (Bug מפורש - "הכרטיסייה בורחת מהעמוד שמאלה" + גלילה
               // אנכית לא רצויה): overflowX:"clip" לבדו כבר לא מספיק, משתי
               // סיבות: (1) הכרטיס גבה משמעותית (הכרטיסייה עכשיו נמתחת עד
               // קצה העמוד - בקשה קודמת), אז הבליטה האופקית של הכרטיסים
               // המסובבים מאחור (rotate סביב הקצה התחתון - ככל שהכרטיס גבוה
               // יותר, הפינות מתרחקות יותר הצידה) גדלה בהתאם ועברה את גבול
-              // ה-32px (px-8); (2) קביעת overflow-x בלי overflow-y גורמת
+              // ה-32px (px-8, שהוגדל מאז ל-px-14/56px - ר' הערה למטה); (2)
+              // קביעת overflow-x בלי overflow-y גורמת
               // לדפדפנים "לקדם" את ה-y ל-auto באופן שקוף (חוק CSS: לא ניתן
               // לערבב visible עם ציר לא-visible) - וברגע שהבליטה האנכית
               // (מעל הכרטיס הקדמי) עברה גם היא את ה-pt-10 השמור לה, זה
@@ -1627,13 +1636,15 @@ export function TripMatchPageContent({
                         key={backCandidate.id}
                         aria-hidden="true"
                         className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                        // *** תוקן (Bug מפורש חוזר - "הכרטיס מוזז שמאלה"): left/right
-                        // מפורשים, לא inset-x-0 (ר' אותה הערה ב-TripMatchCard.tsx).
+                        // *** תוקן (בקשה מפורשת - "תצר את הכרטיסייה עצמה"): רוחב
+                        // מפורש (90%, כמו הכרטיס הקדמי) עם מירכוז - translateX
+                        // מתווסף *לפני* ה-translateY/rotate הקיימים (סדר transform
+                        // חשוב: מימין לשמאל בפועל - קודם ממרכזים, ואז מטים).
                         style={{
                           height: "100%",
-                          left: 0,
-                          right: 0,
-                          transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
+                          width: "90%",
+                          left: "50%",
+                          transform: `translate(-50%, ${cfg.y}px) rotate(${cfg.rot}deg)`,
                           transformOrigin: "50% 100%",
                         }}
                       >

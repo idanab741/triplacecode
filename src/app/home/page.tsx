@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -84,6 +84,16 @@ export default function HomePage() {
   // יעד/תוצאות) - ר' onCardsVisibleChange. משמש להגביל את גובה אזור
   // הכרטיס בדיוק לשטח הפנוי מעל ה-BottomNav, רק כשזה רלוונטי.
   const [cardsVisible, setCardsVisible] = useState(false);
+  // *** תוקן (Bug מפורש חוזר - "הכרטיסייה גדולה מדי, לא נכנסת לעמוד"):
+  // לפני זה הגובה חושב עם CSS calc() ומספרים קבועים מנוחשים (66px לגובה
+  // ה-BottomNav, 22px ל-safe-area וכו') - שלא תמיד תאמו את הגובה *האמיתי*
+  // שהבר תופס בפועל (הוא תלוי בפונט/רוחב מסך/safe-area אמיתי של המכשיר,
+  // לא קבוע). עכשיו נמדד ישירות מה-DOM: getBoundingClientRect של ה-
+  // BottomNav האמיתי (data-main-bottom-nav, ר' BottomNav.tsx) מול
+  // window.innerHeight/visualViewport - בלי שום מספר מנוחש. null = עוד
+  // לא נמדד (לפני שה-BottomNav בכלל ברנדר) - במצב הזה לא מגבילים גובה
+  // בכלל (עדיף גלילה רגילה על פני מספר שגוי).
+  const [foldHeight, setFoldHeight] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const autoRanRef = useRef(false);
@@ -173,6 +183,30 @@ export default function HomePage() {
     setEmbeddedKey((k) => k + 1);
   }
 
+  // *** מודד את הגובה הפנוי האמיתי מעל ה-BottomNav (ר' foldHeight למעלה) -
+  // רק כש-cardsVisible, כי זו הפעם היחידה שבה זה בכלל בשימוש. נמדד מחדש
+  // בכל שינוי גודל/סיבוב מסך (resize) וגם דרך visualViewport אם קיים
+  // (מדויק יותר בנייד - כולל למשל כשה-safe-area משתנה). ה-BottomNav עצמו
+  // הוא fixed (לא זז עם גלילה) אז אין צורך למדוד אותו שוב בגלילה.
+  useLayoutEffect(() => {
+    if (!cardsVisible) return;
+
+    function measure() {
+      const nav = document.querySelector<HTMLElement>("[data-main-bottom-nav]");
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const navHeight = nav?.getBoundingClientRect().height ?? 0;
+      setFoldHeight(Math.max(0, viewportHeight - navHeight));
+    }
+
+    measure();
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [cardsVisible]);
+
   useEffect(() => {
     if (loading || profileLoading || !user) return;
 
@@ -207,23 +241,18 @@ export default function HomePage() {
             החלק שלא צריך בו גלילה, ושבחלק התחתון שלה יהיו כפתורי
             הלייק/איקס/חזור"): כש-cardsVisible (מסך ההחלקה בפועל, לא
             בחירת יעד/תוצאות) - התיבה הזו מקבלת גובה קבוע: בדיוק השטח
-            הפנוי מעל ה-BottomNav (100dvh פחות אותו חישוב גובה שה-
-            BottomNav כבר תופס, ר' ה-paddingBottom למעלה). ה-header (הבר
+            הפנוי מעל ה-BottomNav *כפי שנמדד בפועל מה-DOM* (foldHeight,
+            ר' useLayoutEffect למעלה) - לא ערך מנוחש/calc(). ה-header (הבר
             העליון) נשאר בגודלו הטבעי (shrink-0 מובנה - הוא לא flex item
             שמתכווץ), וה-flex-1 שכבר היה על התיבה שמכילה את TripMatchPageContent
             (למטה) סופג את כל מה שנשאר - כך הכרטיס עצמו (עד קצה ה-
             BottomNav) תמיד נכנס בלי גלילה. בכל stage אחר (או לפני שיש
-            יעד בכלל) אין הגבלת גובה - גלילה רגילה כרגיל. */}
+            יעד בכלל, או לפני שנמדד בכלל) אין הגבלת גובה - גלילה רגילה. */}
         <div
           className="flex flex-col"
           style={
-            cardsVisible && destinationQuery
-              ? // *** תוספת (בטיחות): +14px נוספים, כדי שפינות "הכרטיסים המציצים"
-                // המסובבים מאחורי הכרטיס הקדמי (rotate סביב הקצה התחתון - ר'
-                // BACK_CARDS ב-tripmatch/page.tsx) לא יבלטו מתחת לקצה התחתון
-                // של הכרטיס הקדמי ויחצו את ה-BottomNav. בלי זה הן היו מגיעות
-                // בערך עד לקצה המדויק, בלי שום מרווח בטיחות.
-                { height: "calc(100dvh - (66px + max(env(safe-area-inset-bottom), 22px) + 12px + 14px))", minHeight: 0 }
+            cardsVisible && destinationQuery && foldHeight != null
+              ? { height: `${foldHeight}px`, minHeight: 0 }
               : undefined
           }
         >

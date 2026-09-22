@@ -131,10 +131,11 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // חותך לפי הרדיוס הפנימי). אותה מסגרת בדיוק על שני הכרטיסים המציצים
       // מאחור ב-tripmatch/page.tsx.
       className="absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
-      // *** תוקן (Bug מפורש חוזר - "הכרטיס מוזז שמאלה, לא ממורכז"): left/right
-      // מפורשים ב-inline style, לא רק מחלקת Tailwind (inset-x-0) - כדי שהמיקום
-      // האופקי לא תלוי בקומפילציה נכונה של אותה מחלקה ספציפית בסביבת ה-build.
-      style={{ height: "100%", left: 0, right: 0 }}
+      // *** תוקן (בקשה מפורשת - "תצר את הכרטיסייה עצמה"): רוחב מפורש (90%,
+      // לא 100%) עם מירכוז דרך left:50%+translateX - במקום להסתמך על
+      // left:0;right:0 (שהחישוב הרוחב שלו הוא הבעיה) הכרטיס עצמו עכשיו
+      // צר יותר מההורה שלו, עם שוליים שווים בדיוק בכל צד.
+      style={{ height: "100%", width: "90%", left: "50%", transform: "translateX(-50%)" }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
         {images[safeIndex] ? (
