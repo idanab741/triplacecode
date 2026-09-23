@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from "react";
 import Image from "next/image";
@@ -303,17 +303,52 @@ export function TripMatchPageContent({
   // שוליים כמו שורת ההתקדמות/הקטגוריות שמעליו, px-8 גם הן) - הכרטיס
   // ממלא בדיוק את הרוחב הפנוי הזה, בלי כיווץ נוסף, ולכן גם ממורכז
   // בצורה עקבית ביחס לשאר האלמנטים בעמוד.
+  // The embedded card is sized from the ACTUAL available card-area rectangle.
+  // This keeps the exact 0.55 aspect ratio, centers it mathematically, and
+  // prevents vertical page scrolling: the card can never be taller than the
+  // space available between the categories and the bottom navigation.
+  const [embeddedCardSize, setEmbeddedCardSize] = useState<{ width: number; height: number } | null>(null);
+  const cardAreaRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!embedded || stage !== "swiping") {
+      setEmbeddedCardSize(null);
+      return;
+    }
+
+    const area = cardAreaRef.current;
+    if (!area) return;
+
+    const measure = () => {
+      const rect = area.getBoundingClientRect();
+      const availableHeight = Math.max(0, rect.height - 16);
+      const width = Math.max(0, Math.min(rect.width, availableHeight * 0.55));
+      const height = width / 0.55;
+      setEmbeddedCardSize({ width, height });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(area);
+    window.visualViewport?.addEventListener("resize", measure);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      observer.disconnect();
+      window.visualViewport?.removeEventListener("resize", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [embedded, stage]);
+
   const CARD_BOX_STYLE = {
     position: "absolute" as const,
-    left: 0,
-    right: 0,
+    left: "50%",
+    right: "auto",
     top: 16,
-    // The card size is determined by its width/aspect-ratio only.
-    // IMPORTANT: do not cap its height by the available flex area. When the
-    // collapsible search bar opens, that area becomes shorter; capping the
-    // card here would shrink the card. The search bar must move the card down,
-    // not resize it.
+    width: embedded && embeddedCardSize ? embeddedCardSize.width : undefined,
+    height: embedded && embeddedCardSize ? embeddedCardSize.height : undefined,
     aspectRatio: "0.55",
+    transform: "translateX(-50%)",
   };
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
@@ -1631,7 +1666,7 @@ export function TripMatchPageContent({
                 (8px) + ה-16px הפנימיים = 24px, קרוב ועקבי לשאר הרווחים
                 בעמוד הזה (pt-1.5 מעל פס ההתקדמות, למשל). */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2 -translate-x-1" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1654,6 +1689,7 @@ export function TripMatchPageContent({
               }}
             >
               <div
+                ref={embedded ? cardAreaRef : undefined}
                 className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
                 style={embedded ? undefined : { height: "75%" }}
               >
