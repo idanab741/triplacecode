@@ -266,8 +266,12 @@ export default function HomePage() {
     // בדיוק גובה ה-MainBottomNav (≈66px תוכן + max(safe-area, 22px)) +
     // 12px אוויר - במקום pb-28 (112px) הקבוע. במצב הפתיחה (בלי כרטיסים)
     // נשאר pb-28 כמו קודם.
+    // *** תוסף (בקשה מפורשת - "הדף לא יזלוג החוצה"): overflow-x-hidden
+    // ברמת ה-div הזה (לא html/body - ר' Screen.tsx לאותו הסבר) - רשת
+    // ביטחון ממוקדת לעמוד הבית עצמו, בלי לפגוע בגלילה האופקית
+    // הפנימית הלגיטימית של שורת הקטגוריות.
     <div
-      className={`min-h-screen bg-bg ${destinationQuery ? "" : "pb-28"}`}
+      className={`min-h-screen overflow-x-hidden bg-bg ${destinationQuery ? "" : "pb-28"}`}
       style={destinationQuery ? { paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" } : undefined}
     >
       <HomeStatusBarTint />

@@ -53,7 +53,15 @@ export function HomeQuickCategories({ selected, onToggle, leading }: HomeQuickCa
       // הדרוש כדי שהטבעת (3px) לא תיחתך, בלי לשנות את המראה כשאין
       // בחירה (ה-pb-1 שכבר היה שם לא מספיק, כי הוא בתחתית).
       className="flex gap-2 overflow-x-auto ps-6 pb-1 pt-1"
-      style={{ scrollbarWidth: "none" }}
+      // *** תוספת (בקשה מפורשת - "אי אפשר להחליק שמאלה לסוגי הטיול"):
+      // touch-action:pan-x מפורש - אחרי שהוספנו רשת ביטחון גורפת שחוסמת
+      // גלילה אופקית של *הדף* (html { overflow-x:hidden }), חלק מהדפדפנים
+      // הניידים (בעיקר iOS Safari) לפעמים "מתבלבלים" ולא מזהים גלילה
+      // אופקית פנימית לגיטימית בתוך קונטיינר מקונן כזה, גם שה-CSS מתיר
+      // אותה עקרונית. הצהרה מפורשת ב-touch-action על השורה הזו עצמה
+      // מבטיחה שהדפדפן תמיד יכיר בה כאזור שמותר להחליק בו אופקית, בלי
+      // תלות ברשת הביטחון של ה-html שמעליה.
+      style={{ scrollbarWidth: "none", touchAction: "pan-x" }}
     >
       {leading}
       {HOME_QUICK_CATEGORIES.map((category) => {

@@ -280,75 +280,37 @@ export function TripMatchPageContent({
   // (שיושבים כ-siblings קבועים, לא בתוך האלמנט הנגרר) עדיין גורמים
   // לאותה אנימציית fly-out בדיוק, בלי לזוז בעצמם בזמן גרירה.
   const swipeCardRef = useRef<SwipeCardHandle>(null);
-  // *** תוקן (בקשה מפורשת - "CARD_CENTER ≈ VIEWPORT_CENTER, לא
-  // CONTAINER_CENTER, מדוד בפועל עם getBoundingClientRect - לא חישוב
-  // תיאורטי של CSS"): אחרי כמה ניסיונות מבוססי-CSS בלבד (width%,
-  // margin:auto) שלא נתנו תוצאה עקבית בסביבת ה-build/מכשיר של המשתמש,
-  // עברנו למדידה ומיקום אמיתיים ב-JS - בדיוק כמו foldHeight (הגובה
-  // שכבר עובד באמינות). cardAreaRef מצביע על .tripmatch-embedded-card-area
-  // (ה-position:relative שמכיל את כל הכרטיסים) - ref, לא query גלובלי,
-  // כי יש כמה כרטיסים כאלה בעמוד (עמודים אחרים/standalone).
-  //
-  // *** שונה מהיסוד (בקשה מפורשת - מסמך מפורט: "אל תיתן לכרטיס למלא
-  // 100% מהגובה הפנוי ולהיות ענק - הגובה צריך להיגזר מהרוחב לפי יחס
-  // תמונה, לא להיות גובה קבוע/מלא. שוליים ברורים גם מעל וגם מתחת, לא
-  // רק בצדדים"): cardBox עכשיו הוא קופסה מלאה - left/top/width/height,
-  // לא רק left/width. הרוחב הוא 86% מה-viewport (בתוך הטווח 84-88%
-  // שהתבקש). הגובה נגזר מהרוחב לפי יחס-תמונה (aspectRatio) קבוע - לא
-  // "100% מהאב" - ומוגבל גם (Math.min) לגובה הפנוי בפועל בתוך ה-
-  // container, פחות שוליים אנכיים ברורים מעל ומתחת (לא רק תיאורטיים -
-  // אם הכרטיס לפי יחס-התמונה עדיין גבוה מדי לתת שוליים, הוא מצטמצם
-  // עוד לפי הגובה הפנוי בפועל, לא "בורח" למעלה/מתחת). top ממרכז אנכית
-  // את הכרטיס בתוך השטח הפנוי - כך שהשוליים מעל ומתחת יוצאים שווים.
-  const cardAreaRef = useRef<HTMLDivElement>(null);
-  const [cardBox, setCardBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
-
-  useLayoutEffect(() => {
-    if (!embedded) return;
-
-    function measure() {
-      const area = cardAreaRef.current;
-      if (!area) return;
-      const containerRect = area.getBoundingClientRect();
-      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-
-      // רוחב: 86% מה-viewport (טווח שהתבקש: 84-88%), ממורכז אופקית
-      // ביחס ל-viewport עצמו (לא ל-container) - כמו קודם.
-      const width = Math.max(200, viewportWidth * 0.86);
-      const viewportCenterX = viewportWidth / 2;
-      const left = viewportCenterX - width / 2 - containerRect.left;
-
-      // גובה: נגזר מהרוחב לפי יחס-תמונה portrait קבוע (0.72 ≈ 5:7,
-      // יחס נפוץ לכרטיסי טיולים/Tinder-style) - *לא* גובה קבוע/100%.
-      // Math.min מוודא שגם אם ה-container נמוך מדי לגובה הזה, הכרטיס
-      // עדיין משאיר שוליים אנכיים אמיתיים (16px) מעל ומתחת בתוכו -
-      // לא נוגע/חורג מהקצוות העליון/תחתון של אזור הכרטיסייה.
-      const aspectRatio = 0.72; // width / height
-      const verticalMargin = 16;
-      const heightFromWidth = width / aspectRatio;
-      const maxHeightAvailable = containerRect.height - verticalMargin * 2;
-      const height = Math.max(200, Math.min(heightFromWidth, maxHeightAvailable));
-
-      // top ממרכז את הכרטיס (בגובה שנקבע) בתוך השטח האנכי הפנוי של
-      // ה-container - כך שהשוליים מעל ומתחת יוצאים שווים ולא הכרטיס
-      // תמיד "נדבק" לראש ה-container.
-      const top = Math.max(verticalMargin, (containerRect.height - height) / 2);
-
-      setCardBox({ left, top, width, height });
-    }
-
-    measure();
-    const raf = requestAnimationFrame(measure);
-    window.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("resize", measure);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("resize", measure);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embedded, stage]);
-
+  // *** שונה מהיסוד שוב (Bug חוזר - "זה שוב בורח" - אחרי כמה סבבים של
+  // חישובי-JS (getBoundingClientRect, window.innerWidth וכו') שכל אחד
+  // מהם תיקן משהו אבל הביא איתו תקלה חדשה (כולל תקלה שדוחפת את *כל*
+  // העמוד, לא רק את הכרטיס, לגלילה אופקית - סימן שמשהו בחישוב עצמו
+  // מפיק ערך שגוי במצבים מסוימים שלא תפסנו): זרקנו את כל מנגנון ה-JS
+  // (useLayoutEffect, getBoundingClientRect, cardBox state) והחלפנו
+  // ב-CSS טהור עם aspect-ratio - תכונה סטנדרטית שהדפדפן עצמו מחשב,
+  // בלי שום חשבון ידני שיכול לצאת שגוי. CARD_BOX_STYLE (למטה) הוא
+  // "התיבה" המשותפת (מיקום+גודל) שמוחלת בדיוק אותו דבר על: הכרטיס
+  // הקדמי, כל כרטיס מאחור, ושורת הכפתורים - כולם משתמשים באותה תיבה
+  // בדיוק (via CSS, לא via ערך JS מחושב), אז הם תמיד מיושרים.
+  // *** תוקן (בקשה מפורשת - "לסדר את הרוחב של העמוד, לסדר את
+  // הכרטיסיות, והדף לא יזלוג החוצה"): left/right היו "7%" - אבל
+  // CARD_BOX_STYLE מוחל (embedded בלבד) בתוך container שכבר יש לו
+  // px-8 (32px) padding אופקי משלו (ר' "px-8 pt-10" למטה) - זה כפל
+  // כיווץ לא עקבי (7% *מתוך* רוחב שכבר הוקטן ב-64px, לא 7% מה-viewport
+  // כמו שהכוונה המקורית הייתה), שיוצר גם רווח לא-סימטרי/גדול מדי סביב
+  // הכרטיס וגם (יחד עם ה-back cards המסובבים שחולקים את אותה תיבה)
+  // חוסר עקביות שהובילה לחריגה אופקית. left:0/right:0 - ה-container
+  // עם ה-px-8 הוא עכשיו מקור השוליים האופקיים *היחיד* (בדיוק אותם
+  // שוליים כמו שורת ההתקדמות/הקטגוריות שמעליו, px-8 גם הן) - הכרטיס
+  // ממלא בדיוק את הרוחב הפנוי הזה, בלי כיווץ נוסף, ולכן גם ממורכז
+  // בצורה עקבית ביחס לשאר האלמנטים בעמוד.
+  const CARD_BOX_STYLE = {
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    top: 16,
+    aspectRatio: "0.55",
+    maxHeight: "calc(100% - 32px)",
+  };
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1649,8 +1611,14 @@ export function TripMatchPageContent({
                 מתחת לקטגוריות) - הכרטיס עכשיו נצמד ישר לקטגוריות
                 שמעליו; השטח שהתפנה מהקטנת הגובה (75%) נשאר למטה, לפני
                 ה-BottomNav, לא דוחף את הכרטיס למטה. pt-3->pt-1.5. */}
+            {/* *** תוקן (בקשה מפורשת - "הכרטיסייה... משאירה מלא רווח בין
+                שורת ההתקדמות לכרטיסייה עצמה"): pt-10 (40px) בנוסף ל-16px
+                שכבר שמורים בתוך CARD_BOX_STYLE (top:16) יצר כ-56px רווח
+                ריק בין פס ההתקדמות לכרטיס - הרבה יותר מהכוונה. pt-2
+                (8px) + ה-16px הפנימיים = 24px, קרוב ועקבי לשאר הרווחים
+                בעמוד הזה (pt-1.5 מעל פס ההתקדמות, למשל). */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-10" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1666,7 +1634,6 @@ export function TripMatchPageContent({
               style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflow: "hidden" as const } : null) }}
             >
               <div
-                ref={cardAreaRef}
                 className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
                 style={embedded ? undefined : { height: "75%" }}
               >
@@ -1676,30 +1643,26 @@ export function TripMatchPageContent({
                   // עליה 'להוספת מקומות לחצו כאן'"): לפני זה זה היה טקסט
                   // ריק בלי שום כרטיס - עכשיו יש תמיד "כרטיס" לראות, בין אם
                   // אין בכלל מועמדים (לא מצאנו כלום), ובין אם סיימו להחליק
-                  // על כל מה שהיה. אותו cardBox (מדוד ב-JS) כמו כרטיסי
-                  // מועמד רגילים - נשאר ממורכז/responsive באותו אופן בדיוק.
+                  // על כל מה שהיה. אותו CARD_BOX_STYLE כמו כרטיסי מועמד
+                  // רגילים - נשאר ממורכז/responsive באותו אופן בדיוק.
                   <>
                     {[2, -2].map((rot, i) => (
                       <div
                         key={i}
                         aria-hidden="true"
-                        className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
+                        className="pointer-events-none absolute overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
                         style={
-                          embedded && cardBox
-                            ? { top: cardBox.top, height: cardBox.height, left: cardBox.left, width: cardBox.width, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
-                            : { height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                          embedded
+                            ? { ...CARD_BOX_STYLE, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            : { top: 0, height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                         }
                       />
                     ))}
                     <button
                       type="button"
                       onClick={handleAddPlaceClick}
-                      className="absolute top-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
-                      style={
-                        embedded && cardBox
-                          ? { top: cardBox.top, height: cardBox.height, left: cardBox.left, width: cardBox.width }
-                          : { height: "100%", left: 0, right: 0 }
-                      }
+                      className="absolute flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
+                      style={embedded ? CARD_BOX_STYLE : { top: 0, height: "100%", left: 0, right: 0 }}
                     >
                       <span
                         className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
@@ -1753,26 +1716,19 @@ export function TripMatchPageContent({
                       <div
                         key={backCandidate.id}
                         aria-hidden="true"
-                        className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
-                        // *** תוקן (בקשה מפורשת - מדידה אמיתית, לא CSS
-                        // תיאורטי): left/width מגיעים מ-cardBox (מחושב
-                        // ב-getBoundingClientRect, ר' useLayoutEffect
-                        // למעלה) כש-embedded - בדיוק אותו קופסה כמו הכרטיס
-                        // הקדמי, כדי שכל הערימה תתלכד סביב אותו מרכז-
-                        // viewport. בלי cardBox עדיין (למשל standalone,
-                        // או לפני המדידה הראשונה) - נופל חזרה ל-inset-x-0
-                        // (מלא רוחב ה-container, ההתנהגות המקורית).
+                        className="pointer-events-none absolute overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
+                        // *** תוקן שוב (בקשה מפורשת - "זה שוב בורח"): לא עוד
+                        // חישוב JS (cardBox) - CARD_BOX_STYLE הוא CSS טהור
+                        // (aspect-ratio), אותו דבר בדיוק לכל הכרטיסים
+                        // (הקדמי, המאחור, הכפתורים) - תמיד מיושרים כי הם
+                        // כולם נגזרים מאותה הגדרת CSS, לא מחישוב שיכול
+                        // לצאת שגוי. בלי embedded (standalone) - נופל חזרה
+                        // ל-inset-x-0 (מלא רוחב ה-container, כמו קודם).
                         style={
-                          embedded && cardBox
-                            ? {
-                                top: cardBox.top,
-                                height: cardBox.height,
-                                left: cardBox.left,
-                                width: cardBox.width,
-                                transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
-                                transformOrigin: "50% 100%",
-                              }
+                          embedded
+                            ? { ...CARD_BOX_STYLE, transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`, transformOrigin: "50% 100%" }
                             : {
+                                top: 0,
                                 height: "100%",
                                 left: 0,
                                 right: 0,
@@ -1808,7 +1764,7 @@ export function TripMatchPageContent({
                         matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
                         matchTotal={totalDecisions + visibleCandidates.length}
                         cityLabel={selectedCityLabel || selectedCity || ""}
-                        centerBox={embedded ? cardBox : null}
+                        centerBox={embedded ? CARD_BOX_STYLE : null}
                       />
                     )}
                   </SwipeCard>
@@ -1830,26 +1786,22 @@ export function TripMatchPageContent({
                       כדי שהרווחים בין הכפתורים לא יחסמו החלקה/לחיצה על
                       הכרטיס שמתחתיהם. */}
                   <div
-                    dir="ltr"
-                    className="pointer-events-none absolute z-10 flex items-center justify-center gap-[16px]"
-                    // *** תוקן שוב (בקשה מפורשת - מסמך מפורט): הכרטיס כבר
-                    // לא ממלא 100% מהאב (יש לו top/height מחושבים) - אז
-                    // "bottom: ZONE" (יחסית לתחתית ה-container) כבר לא
-                    // מיישר לקצה התחתון של *הכרטיס* עצמו. עכשיו ממוקם
-                    // לפי top, יחסית לקצה התחתון של הכרטיס בפועל
-                    // (cardBox.top + cardBox.height), פחות ה-ZONE וגובה
-                    // הכפתורים - כדי שתמיד יישארו בתוך הכרטיס, קרוב לתחתיתו.
-                    style={
-                      embedded && cardBox
-                        ? {
-                            height: TRIPMATCH_MAIN_BUTTON_SIZE,
-                            top: cardBox.top + cardBox.height - TRIPMATCH_CARD_BUTTON_ZONE - TRIPMATCH_MAIN_BUTTON_SIZE,
-                            left: cardBox.left,
-                            width: cardBox.width,
-                          }
-                        : { height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE, left: 0, right: 0 }
-                    }
+                    aria-hidden="true"
+                    // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד קואורדינטות
+                    // מ-JS (cardBox.top+height) - העטיפה עצמה מקבלת בדיוק את
+                    // אותה תיבת CSS כמו הכרטיס (CARD_BOX_STYLE, spread) - אז
+                    // יש לה בדיוק את אותו גודל/מיקום כמו הכרטיס, מחושב ע"י
+                    // הדפדפן (לא JS). בתוך העטיפה הזו, שורת הכפתורים בפועל
+                    // ממוקמת ב-bottom:ZONE *יחסית לעטיפה* (לא לקונטיינר החיצוני)
+                    // - כלומר תמיד קרוב לתחתית *הכרטיס עצמו*, לא משנה מה הגובה
+                    // המחושב שלו בפועל.
+                    style={embedded ? { ...CARD_BOX_STYLE, pointerEvents: "none" as const } : { top: 0, height: "100%", left: 0, right: 0 }}
                   >
+                    <div
+                      dir="ltr"
+                      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center gap-[16px]"
+                      style={{ height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE }}
+                    >
                     <button
                       type="button"
                       disabled={busy}
@@ -1879,6 +1831,7 @@ export function TripMatchPageContent({
                     >
                       <Image src="/images/tripmatch/action-like-btn.png" alt="" width={98} height={98} className="h-full w-full object-contain" />
                     </button>
+                    </div>
                   </div>
 
                   {/* *** תוספת (בקשה מפורשת - "פלואו מושלם"): במהלך אישור

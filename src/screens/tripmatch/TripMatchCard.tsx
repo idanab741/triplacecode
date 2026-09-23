@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type { CSSProperties } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
@@ -50,7 +51,10 @@ interface TripMatchCardProps {
    *  הכרטיס תמיד יתלכד עם מרכז ה-viewport בפועל, לא עם מרכז ה-container
    *  שלו (שיכול להיות שונה). null/undefined (standalone, או לפני
    *  המדידה הראשונה) - נופל חזרה ל-inset-x-0 (מלא רוחב ה-container). */
-  centerBox?: { left: number; top: number; width: number; height: number } | null;
+  /** *** שונה שוב (Bug חוזר - "זה שוב בורח"): עכשיו זה style object CSS
+   *  טהור (CARD_BOX_STYLE מ-page.tsx, עם aspect-ratio) - לא קואורדינטות
+   *  מחושבות ב-JS. React.CSSProperties כדי לקבל כל מה שיש בו כמו שהוא. */
+  centerBox?: CSSProperties | null;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -147,21 +151,11 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // left:50%/transform - מוודא מרווח קבוע ושווה בכל רוחב מסך, מספיק
       // כדי להכיל גם את הבליטה מהסיבוב (ר' גם BACK_CARDS ב-page.tsx,
       // שם הזוויות עצמן גם קוטנו). מאומת חישובית על 320-430px רוחב.
-      // *** תוקן (בקשה מפורשת - "מדוד בפועל bounding boxes, לא CSS
-      // תיאורטי; CARD_CENTER ≈ VIEWPORT_CENTER"): left/width מגיעים
-      // מ-centerBox (מחושב ב-page.tsx דרך getBoundingClientRect אמיתי)
-      // כשקיים - לא width:85%+mx-auto (שהתברר לא אמין בסביבת ה-build) -
-      // בלי centerBox (standalone) נופל חזרה ל-inset-x-0 המקורי.
-      // *** תוקן שוב (בקשה מפורשת - מסמך מפורט: "אל תמלא 100% מהגובה -
-      // הגובה נגזר מהרוחב לפי יחס תמונה, עם שוליים ברורים מעל ומתחת"):
-      // centerBox עכשיו מכיל גם top/height (לא רק left/width) - מחושבים
-      // ב-page.tsx לפי יחס-תמונה קבוע, לא "100% מהאב".
+      // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד חישוב JS - centerBox
+      // הוא עכשיו CSS style object טהור (CARD_BOX_STYLE, עם aspect-ratio)
+      // שמוחלת כמו שהיא, בלי לפרק/להרכיב מחדש left/top/width/height.
       className="absolute overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
-      style={
-        centerBox
-          ? { top: centerBox.top, height: centerBox.height, left: centerBox.left, width: centerBox.width }
-          : { top: 0, height: "100%", left: 0, right: 0 }
-      }
+      style={centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
         {images[safeIndex] ? (
