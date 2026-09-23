@@ -30,3 +30,15 @@ export function BackButton({ onBack, disabled }: BackButtonProps) {
     </button>
   );
 }
+
+/** כפתור חזור בתוך עיגול לבן - אותו עיצוב בדיוק כמו ב-HomeHeader (הבר העליון החדש).
+ *  ממקמים אותו מבחוץ (className) - בעמודי hero: "absolute start-5 top-3" (ימין ב-RTL, כמו הבר). */
+export function CircleBackButton({ onBack, className = "" }: { onBack: () => void; className?: string }) {
+  return (
+    <div
+      className={`flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)] ${className}`}
+    >
+      <BackButton onBack={onBack} />
+    </div>
+  );
+}

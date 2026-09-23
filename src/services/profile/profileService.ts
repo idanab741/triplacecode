@@ -1,4 +1,5 @@
 import { createClient } from "@/services/supabase/client";
+import { WELCOME_ONBOARDING_ENABLED } from "@/constants/onboarding";
 
 export interface Profile {
   id: string;
@@ -36,6 +37,8 @@ export function isProfileComplete(profile: Profile | null): boolean {
 
 /** Existing accounts remain recognised while the status migration is rolled out. */
 export function isMainOnboardingComplete(profile: Profile | null): boolean {
+  // עמודי ה-Welcome כבויים (ר' constants/onboarding.ts) - אף אחד לא "חסר" אותם.
+  if (!WELCOME_ONBOARDING_ENABLED) return true;
   return Boolean(profile?.main_onboarding_completed_at ?? profile?.intro_completed_at);
 }
 

@@ -4,10 +4,10 @@ import { useEffect } from "react";
 
 /** צבע קצה העליון של גרדיאנט הבר התכלת של עמוד הבית (#3FCBFD -> #007CFE,
  *  זווית 150deg) - ממוצע של השורה העליונה, כדי שסרגל הסטטוס יתמזג איתו. */
-const HOME_TINT = "#fcfafc"; // *** הבר שקוף עכשיו - סרגל הסטטוס בצבע רקע העמוד (--color-bg)
+const HOME_TINT = "#ffffff"; // *** הבר שקוף עכשיו - סרגל הסטטוס בצבע רקע העמוד (--color-bg)
 /** place's (כל מי שמעביר את הסגול הישן) - רקע העמוד של place's (--color-places-bg). */
 const LEGACY_PURPLE = "#7c3aed";
-const PLACES_BG = "#f8f5fc";
+const PLACES_BG = "#ffffff"; // place's: רקע העמוד לבן
 
 /** כמה px מלמעלה נצבעים בתכלת ברקע ה-html (מספיק כדי לכסות את אזור
  *  ה-safe-area העליון של האייפון, ~59px, וגם משיכת-יתר כלפי מטה). */
@@ -28,9 +28,12 @@ const TINT_STRIP_PX = 140;
 interface HomeStatusBarTintProps {
   /** צבע הצביעה (ברירת מחדל: תכלת של הבית). place's מעביר את הסגול שלו. */
   color?: string;
+  /** true - כל הרקע מאחורי העמוד (html + body) בצבע הזה, ולא רק פס בראש. כך גם משיכת-יתר (הקפיצה בקצוות)
+   *  נראית באותו צבע. משמש את place's (לבן מלא). */
+  solidBackground?: boolean;
 }
 
-export function HomeStatusBarTint({ color: requestedColor = HOME_TINT }: HomeStatusBarTintProps = {}) {
+export function HomeStatusBarTint({ color: requestedColor = HOME_TINT, solidBackground = false }: HomeStatusBarTintProps = {}) {
   const color = requestedColor.toLowerCase() === LEGACY_PURPLE ? PLACES_BG : requestedColor;
   useEffect(() => {
     // 1) theme-color
@@ -51,7 +54,10 @@ export function HomeStatusBarTint({ color: requestedColor = HOME_TINT }: HomeSta
       backgroundImage: root.style.backgroundImage,
       backgroundRepeat: root.style.backgroundRepeat,
     };
-    root.style.backgroundColor = "var(--color-bg-secondary)";
+    const body = document.body;
+    const prevBodyBackground = body.style.backgroundColor;
+    root.style.backgroundColor = solidBackground ? color : "var(--color-bg-secondary)";
+    if (solidBackground) body.style.backgroundColor = color;
     root.style.backgroundImage = `linear-gradient(to bottom, ${color} 0px, ${color} ${TINT_STRIP_PX}px, transparent ${TINT_STRIP_PX}px)`;
     root.style.backgroundRepeat = "no-repeat";
 
@@ -63,8 +69,9 @@ export function HomeStatusBarTint({ color: requestedColor = HOME_TINT }: HomeSta
       root.style.backgroundColor = prev.backgroundColor;
       root.style.backgroundImage = prev.backgroundImage;
       root.style.backgroundRepeat = prev.backgroundRepeat;
+      if (solidBackground) body.style.backgroundColor = prevBodyBackground;
     };
-  }, [color]);
+  }, [color, solidBackground]);
 
   return null;
 }

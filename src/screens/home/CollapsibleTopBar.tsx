@@ -256,9 +256,7 @@ export function CollapsibleTopBar({
       const floating = !hidden && y > 4;
       bar.style.transform = hidden ? "translateY(-100%)" : "";
       // על רקע כהה (לוגו לבן) - רקע כהה-שקוף במקום לבן, כדי שהלוגו הלבן יישאר קריא.
-      bar.style.backgroundColor = floating ? (logoTone === "white" ? "rgba(10, 12, 20, 0.72)" : "rgba(255, 255, 255, 0.82)") : "transparent";
-      bar.style.backdropFilter = floating ? "blur(14px)" : "";
-      (bar.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter = floating ? "blur(14px)" : "";
+      bar.style.backgroundColor = floating ? (logoTone === "white" ? "rgba(10, 12, 20, 0.72)" : "#ffffff") : "transparent";
       bar.style.boxShadow = floating ? "0 8px 24px -16px rgba(16, 24, 40, 0.35)" : "none";
     }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
+import { WELCOME_ONBOARDING_ENABLED } from "@/constants/onboarding";
 
 /** Completes email/OAuth authentication and resumes the same entry flow as password login. */
 export async function GET(request: Request) {
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
 
   const destination = !profile?.full_name
     ? "/profile-setup"
-    : !(profile.main_onboarding_completed_at ?? profile.intro_completed_at)
+    : WELCOME_ONBOARDING_ENABLED && !(profile.main_onboarding_completed_at ?? profile.intro_completed_at)
       ? "/onboarding"
       : "/home";
   return NextResponse.redirect(`${origin}${destination}`);

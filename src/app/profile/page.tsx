@@ -109,15 +109,6 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
           <button
             type="button"
-            onClick={() => router.push("/onboarding")}
-            className="flex w-full items-center justify-between rounded-card border-2 border-accent bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <span className="font-bold text-ink">הכירו את triplace</span>
-            <ChevronLeft />
-          </button>
-
-          <button
-            type="button"
             onClick={() => router.push("/preferences?returnTo=/profile")}
             className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
           >

@@ -17,6 +17,7 @@ import {
 import { getProfile } from "@/services/profile/profileService";
 import { getPostAuthPath } from "@/services/onboarding/onboardingService";
 import { isValidEmail, MIN_PASSWORD_LENGTH } from "@/utils/validation";
+import { CircleBackButton } from "@/components/ui/BackButton";
 import { OtpInput } from "@/screens/auth/OtpInput";
 import {
   consumePendingInviteCode,
@@ -46,14 +47,6 @@ function AppleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
       <path d="M16.365 1.43c0 1.14-.437 2.15-1.31 3.06-.9.94-1.98 1.48-3.17 1.4-.05-1.1.44-2.15 1.3-3.05.95-.99 2.1-1.55 3.18-1.41zM20.6 17.02c-.55 1.27-.82 1.83-1.53 2.95-1 1.57-2.4 3.52-4.14 3.54-1.55.02-1.95-1.01-4.05-1-2.1.01-2.54 1.02-4.1 1-1.75-.02-3.08-1.79-4.08-3.35-2.8-4.32-3.1-9.4-1.37-12.1 1.23-1.9 3.17-3.02 5-3.02 1.87 0 3.05 1.03 4.6 1.03 1.5 0 2.4-1.03 4.6-1.03 1.63 0 3.36.89 4.58 2.42-4.03 2.2-3.37 7.94.49 9.56z" />
-    </svg>
-  );
-}
-
-function BackIcon() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(-1)" }}>
-      <path d="m14 6-6 6 6 6" />
     </svg>
   );
 }
@@ -266,14 +259,7 @@ function AuthPageContent() {
           priority
           className="h-auto w-full"
         />
-        <button
-          type="button"
-          onClick={() => router.back()}
-          aria-label="חזרה"
-          className="absolute end-4 top-4 flex h-10 w-10 items-center justify-center text-ink"
-        >
-          <BackIcon />
-        </button>
+        <CircleBackButton onBack={() => router.back()} className="absolute start-5 top-3" />
       </div>
 
       <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pt-6 pb-4">
@@ -342,7 +328,7 @@ function AuthPageContent() {
         {tab === "signup" && awaitingOtp && (
           <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
             <p className="text-center text-sm text-ink-secondary">
-              שלחנו קוד בן 8 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
+              שלחנו קוד בן 6 ספרות לכתובת <span className="font-semibold text-ink">{suEmail}</span> - יש להזין אותו כאן:
             </p>
             <Field label="קוד אימות">
               <OtpInput value={otpCode} onChange={setOtpCode} />

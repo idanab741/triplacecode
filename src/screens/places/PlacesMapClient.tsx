@@ -26,8 +26,8 @@ export function PlacesMapClient() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <div className="relative min-h-screen bg-places-bg pb-0">
-      <HomeStatusBarTint color="#f8f5fc" />
+    <div className="relative min-h-screen bg-white pb-0">
+      <HomeStatusBarTint color="#ffffff" solidBackground />
       {/* *** בקשה מפורשת: בר שקוף, לוגו places בסגול - "מרחף" מעל המפה. */}
       {/* *** בקשה מפורשת: שורת החיפוש מופיעה רק במשיכה למטה (כמו בבית). המשיכה נקלטת רק על הבר
           עצמו - גרירה על המפה/הכרטיסים לא פותחת אותה. */}

@@ -187,7 +187,7 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
   if (effectiveAuthLoading || !user) {
     return (
-      <div className="min-h-screen bg-places-bg px-4 pt-6">
+      <div className="min-h-screen bg-white px-4 pt-6">
         <Skeleton className="mb-4 h-10 w-full" />
         <Skeleton className="mb-4 h-20 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -196,8 +196,8 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
   }
 
   return (
-    <div className="min-h-screen bg-places-bg pb-24">
-      <HomeStatusBarTint color="#f8f5fc" />
+    <div className="min-h-screen bg-white pb-24">
+      <HomeStatusBarTint color="#ffffff" solidBackground />
       {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
           ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
           נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
@@ -232,7 +232,7 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
       {/* הפיד: שטוח ולבן ברוחב מלא, כמו פידים מוכרים (בקשה מפורשת - "נראה מצועצע"). */}
       {/* *** בקשה מפורשת - "הרקע של העמוד כמו הרקע של הבר": בלי bg-white -
-          הפיד יושב על אותו רקע כמו הבר העליון (bg-places-bg של העמוד). */}
+          הפיד יושב על אותו רקע כמו הבר העליון (bg-white של העמוד). */}
       <div>
 
         {feedItems === null && (

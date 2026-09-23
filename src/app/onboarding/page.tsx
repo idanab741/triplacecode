@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
+import { WELCOME_ONBOARDING_ENABLED } from "@/constants/onboarding";
 import { useAuth } from "@/hooks/useAuth";
 import { OnboardingProgress } from "@/screens/onboarding/OnboardingProgress";
 import { OnboardingBackdrop } from "@/screens/onboarding/OnboardingBackdrop";
@@ -35,7 +36,7 @@ function BackArrow() {
   );
 }
 
-export default function OnboardingPage() {
+function WelcomeOnboarding() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
@@ -239,4 +240,10 @@ export default function OnboardingPage() {
       </div>
     </div>
   );
+}
+
+export default function OnboardingPage() {
+  // עמודי ה-Welcome כבויים כרגע (ר' constants/onboarding.ts) - כל כניסה ישירה ל-/onboarding נוחתת בעמוד הבית.
+  if (!WELCOME_ONBOARDING_ENABLED) redirect("/home");
+  return <WelcomeOnboarding />;
 }

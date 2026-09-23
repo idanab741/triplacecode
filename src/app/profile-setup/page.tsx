@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button, Checkbox, Field, Icon, Input, Screen, Select } from "@/components/ui";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useAuth } from "@/hooks/useAuth";
-import { updateProfile, isMainOnboardingComplete, isProfileComplete, getProfile } from "@/services/profile/profileService";
+import { updateProfile, isProfileComplete } from "@/services/profile/profileService";
 import { isReasonableBirthDate, MAX_AGE, MIN_AGE } from "@/utils/validation";
 import { COUNTRIES } from "@/constants/countries";
+import { DEFAULT_PROFILE_HERO_URL } from "@/constants/profileCover";
+import { CircleBackButton } from "@/components/ui/BackButton";
 
 const HEBREW_MONTHS = [
   "ינואר",
@@ -78,10 +79,6 @@ export default function ProfileSetupPage() {
   useEffect(() => {
     if (manualNavigationRef.current) return;
     if (!profileLoading && isProfileComplete(profile)) {
-      if (!isMainOnboardingComplete(profile)) {
-        router.replace("/onboarding");
-        return;
-      }
       router.replace("/home");
     }
   }, [profileLoading, profile, router]);
@@ -130,14 +127,7 @@ export default function ProfileSetupPage() {
     manualNavigationRef.current = true;
     await refreshProfile();
 
-    if (user) {
-      const freshProfile = await getProfile(user.id);
-      if (!isMainOnboardingComplete(freshProfile)) {
-        router.push("/onboarding");
-        return;
-      }
-    }
-
+    // מיד אחרי בניית הפרופיל - ישר לעמוד הבית (עמודי ה-Welcome כבויים, ר' constants/onboarding.ts).
     router.push("/home");
   }
 
@@ -151,30 +141,21 @@ export default function ProfileSetupPage() {
 
   return (
     <Screen withBottomNavSpacing={false} className="!bg-bg !px-0 !pt-0">
-      <div className="relative w-full">
-        <Image
-          src="/images/hero-profile-setup.png"
-          alt="קמע triplace מברך לשלום"
-          width={800}
-          height={800}
-          priority
-          className="h-auto w-full"
+      {/* אותו hero בדיוק כמו בעמוד הפרופיל (profile-default-hero): המסגרת עם ה-HERO והטבעת הכחולה,
+          ותמונת הפרופיל (עם כפתור ההעלאה) יושבת מעל החור בטבעת - אותם אחוזי מיקום/גודל כמו ב-ProfileView. */}
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={DEFAULT_PROFILE_HERO_URL}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
         />
-          <div className="absolute end-4 top-4">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              aria-label="חזרה"
-              className="flex h-10 w-10 items-center justify-center text-ink"
-            >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: "scaleX(-1)" }}>
-                <path d="m14 6-6 6 6 6" />
-              </svg>
-            </button>
-          </div>
+        <CircleBackButton onBack={() => router.back()} className="absolute start-5 top-3 z-10" />
         <div
-          className="absolute aspect-square -translate-x-1/2 -translate-y-1/2"
-          style={{ left: "49.73%", top: "71.7%", width: "42%" }}
+          className="absolute left-[50.08%] top-[69.03%] aspect-square w-[43.7%] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: "#0A6DFE" }}
         >
           {user && (
             <AvatarUploader
