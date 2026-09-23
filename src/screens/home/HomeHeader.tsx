@@ -84,14 +84,14 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
             (brightness(0) invert(1)) - בלי קובץ לוגו חדש.
             *** הוגדל ב-25% (בקשה מפורשת - "להגדיל מעט את הלוגו"): 120x37 ->
             150x46. -my-1 מקזז את הגובה הנוסף כדי שגובה ההדר לא יקפוץ. */}
-        {/* *** בר שקוף (בקשה מפורשת): הלוגו בתכלת. נצבע דרך CSS mask מאותו
+        {/* *** בר שקוף (בקשה מפורשת): הלוגו בשחור. נצבע דרך CSS mask מאותו
             קובץ הלוגו השחור - הצורה זהה ב-100%, רק הצבע משתנה. */}
         <span
           role="img"
           aria-label="TRIPLACE"
           className="block h-[46px] w-[150px] select-none"
           style={{
-            backgroundColor: logoTone === "white" ? "#ffffff" : "#0AA9FD",
+            backgroundColor: logoTone === "white" ? "#ffffff" : "#000000", // *** בקשה מפורשת: triplace בשחור (על הבר השקוף)
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",
             maskImage: "url(/images/triplace-logo-black.png)",
             WebkitMaskSize: "contain",

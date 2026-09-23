@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
+import { createAdminClient } from "@/services/supabase/admin";
 import {
   getOtherUserId,
   mapConversationRow,
   mapMessageRow,
   type DmConversationRow,
   type DmMessageRow,
+  type DmSharedPreview,
 } from "@/services/social/dmMappers";
 
 async function getAuthedUser() {
@@ -31,6 +33,68 @@ async function loadOwnConversation(
     .maybeSingle();
   if (error) throw error;
   return data as DmConversationRow | null;
+}
+
+/** מעשיר הודעות שיתוף (post/place) בתצוגה מקדימה: כותרת, תמונה וקישור. שאילתה אחת לכל סוג (בלי N+1).
+ *  המדיה נשלפת עם admin client (media_assets מוגבל לבעלים ב-RLS) - בטוח כי הפוסטים עצמם נשלפים עם ה-client הרגיל,
+ *  כלומר רק פוסטים שהצופה רשאי לראות מקבלים תצוגה מקדימה. */
+async function buildSharedPreviews(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  messages: DmMessageRow[]
+): Promise<Map<string, DmSharedPreview>> {
+  const out = new Map<string, DmSharedPreview>();
+  const postIds = [...new Set(messages.filter((m) => m.kind === "post" && m.post_id).map((m) => m.post_id as string))];
+  const placeIds = [...new Set(messages.filter((m) => m.kind === "place" && m.place_id).map((m) => m.place_id as string))];
+  if (postIds.length === 0 && placeIds.length === 0) return out;
+
+  const [postsRes, placesRes, mediaRes] = await Promise.all([
+    postIds.length ? supabase.from("posts").select("id, text, author_id").in("id", postIds) : Promise.resolve({ data: [] }),
+    placeIds.length ? supabase.from("places").select("id, name, image_urls").in("id", placeIds) : Promise.resolve({ data: [] }),
+    postIds.length
+      ? createAdminClient()
+          .from("post_media")
+          .select("post_id, sort_order, media:media_assets(url, thumbnail_url, type)")
+          .in("post_id", postIds)
+          .order("sort_order", { ascending: true })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const posts = (postsRes.data ?? []) as { id: string; text: string | null; author_id: string }[];
+  const authorIds = [...new Set(posts.map((p) => p.author_id))];
+  const { data: authors } = authorIds.length
+    ? await supabase.from("profiles").select("id, username, full_name").in("id", authorIds)
+    : { data: [] };
+  const authorById = new Map((authors ?? []).map((a) => [a.id as string, a]));
+
+  const firstMedia = new Map<string, string>();
+  for (const row of (mediaRes.data ?? []) as unknown as { post_id: string; media: { url: string; thumbnail_url: string | null; type: string } | { url: string; thumbnail_url: string | null; type: string }[] | null }[]) {
+    if (firstMedia.has(row.post_id)) continue;
+    const media = Array.isArray(row.media) ? row.media[0] : row.media;
+    if (media) firstMedia.set(row.post_id, media.type === "video" ? (media.thumbnail_url ?? media.url) : media.url);
+  }
+
+  const postById = new Map(posts.map((p) => [p.id, p]));
+  const placeById = new Map(((placesRes.data ?? []) as { id: string; name: string; image_urls: string[] | null }[]).map((p) => [p.id, p]));
+
+  for (const m of messages) {
+    if (m.kind === "post" && m.post_id) {
+      const post = postById.get(m.post_id);
+      if (!post) continue;
+      const author = authorById.get(post.author_id) as { full_name: string | null; username: string | null } | undefined;
+      const authorName = author?.full_name ?? author?.username ?? "מטייל";
+      out.set(m.id, {
+        href: `/places/post/${post.id}`,
+        title: post.text?.trim() ? post.text.trim().slice(0, 80) : `פוסט של ${authorName}`,
+        subtitle: post.text?.trim() ? `פוסט של ${authorName}` : null,
+        imageUrl: firstMedia.get(post.id) ?? null,
+      });
+    } else if (m.kind === "place" && m.place_id) {
+      const place = placeById.get(m.place_id);
+      if (!place) continue;
+      out.set(m.id, { href: `/place/${place.id}`, title: place.name, subtitle: "מקום", imageUrl: place.image_urls?.[0] ?? null });
+    }
+  }
+  return out;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -63,6 +127,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     await supabase.from("dm_messages").update({ read_at: new Date().toISOString() }).in("id", unreadFromOtherIds);
   }
 
+  const sharedByMessage = await buildSharedPreviews(supabase, messages);
+
   return NextResponse.json({
     conversation: mapConversationRow(conversation, user.id),
     otherUser: otherProfileRes.data
@@ -73,7 +139,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           avatarUrl: otherProfileRes.data.avatar_url,
         }
       : null,
-    messages: messages.map(mapMessageRow),
+    messages: messages.map((m) => ({ ...mapMessageRow(m), shared: sharedByMessage.get(m.id) ?? null })),
   });
 }
 
@@ -84,10 +150,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json().catch(() => null);
   const text: string | undefined = body?.text?.trim();
-  // *** kind='text' בלבד לעת עתה - שיתוף מסלולים/אטרקציות/פוסטים/ביקורות
-  // (trip/place/post/review) מגיע כשלב הבא, ישירות מעל אותו schema/route
-  // (ר' migration 0093 - כבר תומכת בכל סוגי ה-kind).
-  if (!text) return NextResponse.json({ error: "יש להזין הודעה" }, { status: 400 });
+  const shareKind: "post" | "place" | undefined = body?.kind === "post" || body?.kind === "place" ? body.kind : undefined;
+  // הודעת טקסט רגילה חייבת טקסט. הודעת שיתוף (post/place) חייבת מזהה, והטקסט הוא הערה אופציונלית.
+  if (!shareKind && !text) return NextResponse.json({ error: "יש להזין הודעה" }, { status: 400 });
+  if (shareKind === "post" && !body?.postId) return NextResponse.json({ error: "חסר postId" }, { status: 400 });
+  if (shareKind === "place" && !body?.placeId) return NextResponse.json({ error: "חסר placeId" }, { status: 400 });
 
   let conversation: DmConversationRow | null;
   try {
@@ -97,11 +164,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   if (!conversation) return NextResponse.json({ error: "השיחה לא נמצאה" }, { status: 404 });
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("dm_messages")
-    .insert({ conversation_id: id, sender_id: user.id, kind: "text", text })
-    .select("*")
-    .single();
+  let row: Record<string, unknown> = { conversation_id: id, sender_id: user.id, kind: "text", text };
+  if (shareKind === "post") {
+    row = { conversation_id: id, sender_id: user.id, kind: "post", post_id: body.postId, text: text ?? null };
+  } else if (shareKind === "place") {
+    // place_id ב-dm_messages מפנה ל-places בלבד. מקום שהועלה ע"י משתמש (tripadd) לא שם - במקרה כזה שולחים את הפוסט.
+    const { data: placeRow } = await supabase.from("places").select("id").eq("id", body.placeId).maybeSingle();
+    if (placeRow) {
+      row = { conversation_id: id, sender_id: user.id, kind: "place", place_id: body.placeId, text: text ?? null };
+    } else if (body.fallbackPostId) {
+      row = { conversation_id: id, sender_id: user.id, kind: "post", post_id: body.fallbackPostId, text: text ?? null };
+    } else {
+      return NextResponse.json({ error: "אי אפשר לשתף את המקום הזה" }, { status: 422 });
+    }
+  }
+
+  const { data: inserted, error: insertError } = await supabase.from("dm_messages").insert(row).select("*").single();
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
 
   return NextResponse.json({ message: mapMessageRow(inserted as DmMessageRow) });

@@ -70,7 +70,7 @@ interface Tile {
 const TILES: Tile[] = [
   { id: "post", title: "פוסט", sub: "שתפו רגע מהדרך", a: "#FF7AB6", b: "#FFA96B" },
   { id: "place", title: "מקום", sub: "המלצה על מקום שאהבתם", a: "#A78BFA", b: "#5EC8FF" },
-  { id: "collection", title: "אוסף", sub: "מקומות וטיולים תחת רעיון אחד", a: "#4ADE9C", b: "#38D6E8" },
+  { id: "collection", title: "חוויות", sub: "מקומות וטיולים תחת רעיון אחד", a: "#4ADE9C", b: "#38D6E8" },
   { id: "trip", title: "טיול", sub: "מסלול תחנות מוכן לדרך", a: "#FCC24A", b: "#FF7F8E" },
 ];
 
@@ -132,7 +132,8 @@ export default function ContentPage() {
         <span className="cx-glow -z-10" aria-hidden="true" />
 
         {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות) */}
-        <CollapsibleTopBar />
+        {/* *** בקשה מפורשת: בעמוד הזה בלבד (רקע כהה) - הלוגו triplace בלבן. */}
+        <CollapsibleTopBar logoTone="white" />
 
         <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-1">
           <div className="mx-auto w-full max-w-sm">

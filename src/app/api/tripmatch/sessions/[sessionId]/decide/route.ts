@@ -68,7 +68,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
       await recordTripMatchDecision(supabase, sessionId, placeId, liked);
       // *** תיקון (בקשה מפורשת - TripMatch עובר להציג רק אטרקציות tripadd): place_type="tripadd", לא "place" -
       // תואם למקור האמיתי (tripadd_submissions), ולסוג ה-favorites שכבר תומך בו (migration 0080).
-      await toggleFavorite(supabase, user.id, placeId, "tripadd", "liked", "tripmatch").catch(() => {});
+      // *** החפיסה כוללת עכשיו גם מקומות מהמאגר (places) שמשתמשים פרסמו/דירגו עליהם - לא רק tripadd.
+      // סוג ה-favorite נקבע לפי המקור האמיתי של ה-id.
+      const { data: tripaddRow } = await supabase.from("tripadd_submissions").select("id").eq("id", placeId).maybeSingle();
+      await toggleFavorite(supabase, user.id, placeId, tripaddRow ? "tripadd" : "place", "liked", "tripmatch").catch(() => {});
     } catch (e) {
       // הפעולה שהחיוב מימן לא הצליחה בפועל - מחזירים את הטריפים.
       // לא-פעולה אם היה alreadyCharged (retry לגיטימי) - אין מה להחזיר.

@@ -119,16 +119,15 @@ export default async function PlacePage({ params, searchParams }: PlacePageProps
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.city ?? ""}`)}`;
 
   return (
-    <div className="min-h-screen bg-white pb-28">
-      {/* 1. בר עליון תכלת - חזור + לוגו + פעמון (הבר התקני של triplace,
-          כמו HomeHeader/PlacesHeaderRow) - יושב *מעל* ה-HERO, לא כ-overlay שקוף עליו */}
+    <div className="relative min-h-screen bg-white pb-28">
+      {/* 1. בר עליון - חזור + לוגו + פעמון, כמסגרת זכוכית שקופה (blur) שיושבת מעל תמונת ה-HERO */}
       <AttractionTopBar />
 
       {/* 2. תמונת HERO - מוזזת מעט למעלה (מרווח שלילי ששווה בדיוק לרדיוס
           הפינות המעוגלות של הבר, rounded-b-[32px]) ומאחורי הבר (z-index
           נמוך יותר) כדי שהתמונה תמלא את פינות העיגול מלמטה, ולא ייראה
           "משולש" רקע לבן של העמוד מציץ בין הבר לתמונה בשני הצדדים. */}
-      <div className="relative z-0 -mt-8 h-72 w-full bg-bg-secondary">
+      <div className="relative z-0 h-72 w-full bg-bg-secondary">
         {place.image_urls?.[0] && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={place.image_urls[0]} alt={place.name} className="h-full w-full object-cover" />

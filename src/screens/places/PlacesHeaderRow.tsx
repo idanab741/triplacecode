@@ -26,11 +26,14 @@ export function PlacesHeaderRow({
   onBack,
   menuHref,
   logoTone = "brand",
+  badgeTone = "blue",
 }: {
   onBack?: () => void;
   menuHref?: string;
   /** "white" - לוגו לבן על הבר הצבעוני (בית / place's). ברירת מחדל: סגול (בר שקוף). */
   logoTone?: "brand" | "white";
+  /** צבע עיגול מונה ההתראות - "purple" רק בבית ובמפה (בקשה מפורשת). */
+  badgeTone?: "blue" | "purple";
 }) {
   return (
     <header className="relative z-10 grid h-[52px] grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
@@ -78,7 +81,7 @@ export function PlacesHeaderRow({
             </svg>
           </Link>
         ) : (
-          <PlacesNotificationBell solid />
+          <PlacesNotificationBell solid badgeTone={badgeTone} />
         )}
       </div>
     </header>

@@ -23,6 +23,8 @@ interface CollapsibleTopBarProps {
    *  "colored" - הבר הצבעוני הקודם (gradient + פינות מעוגלות + הילות),
    *  לעמוד הבית ול-place's (בקשה מפורשת - "places על רקע כחול"). */
   variant?: "transparent" | "colored";
+  /** צבע הלוגו triplace בבר (ברירת מחדל: שחור). "white" - לעמודים עם רקע כהה (עמוד "תוכן"). */
+  logoTone?: "brand" | "white";
   /** התוכן שנעלם בגלילה (שורת החיפוש). בלי children - בר קבוע פשוט. */
   children?: ReactNode;
   /** מרים את הבר מעל שכבת ההסבר (SearchIntroOverlay), כדי שיישאר מוגדר
@@ -30,6 +32,14 @@ interface CollapsibleTopBarProps {
   raised?: boolean;
   /** פתיחה חד-פעמית של שורת החיפוש מתוך הסבר "צור טיול". */
   forceReveal?: boolean;
+  /** *** עמוד המפה: שורת החיפוש תמיד גלויה, והבר לא נעלם/נפתח בכלל - כדי שהחלקות על המפה
+   *  ועל הכרטיסים לא יפתחו אותו בטעות וישנו את הגובה שלו (בקשה מפורשת - "החלוניות נופלות"). */
+  alwaysRevealed?: boolean;
+  /** *** עמוד המפה: שורת החיפוש מוסתרת כברירת מחדל ונפתחת רק במשיכה למטה שמתחילה *על הבר
+   *  עצמו* (לא על המפה/הכרטיסים - שם גרירה היא הזזת מפה). משיכה למעלה בכל מקום סוגרת אותה. */
+  pullFromBarOnly?: boolean;
+  /** נקרא כששורת החיפוש נפתחת/נסגרת - כדי שתוכן שמתחת לבר יוכל לזוז בהתאם. */
+  onRevealChange?: (revealed: boolean) => void;
 }
 
 const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)";
@@ -78,11 +88,15 @@ export function CollapsibleTopBar({
   shadow = BAR_SHADOW,
   tone = "blue",
   variant = "transparent",
+  logoTone = "brand",
   onBack,
   menuHref,
   children,
   raised = false,
   forceReveal = false,
+  alwaysRevealed = false,
+  pullFromBarOnly = false,
+  onRevealChange,
 }: CollapsibleTopBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
@@ -102,15 +116,21 @@ export function CollapsibleTopBar({
     // המחדל - גם בטעינה הראשונה, לפני כל אינטראקציה).
     // כאשר נפתח ההסבר מתוך "צור טיול", שורת החיפוש חייבת להיות גלויה
     // מיד. זה override חד-פעמי לפתיחה בלבד; סגירה בגלילה נשארת כרגיל.
-    let revealed = forceReveal;
+    let revealed = forceReveal || alwaysRevealed;
     // מיקום ה-touch ההתחלתי, רק אם המשיכה התחילה בראש הדף ממש
     // (scrollY<=0) - אחרת null, ואין מעקב אחרי המחווה הזו בכלל.
     let touchStartY: number | null = null;
+    let closeStartY: number | null = null;
     let raf = 0;
+    let lastReported: boolean | null = null;
 
     function apply() {
       raf = 0;
       if (!bar || !clip || !naturalHeight) return;
+      if (lastReported !== revealed) {
+        lastReported = revealed;
+        onRevealChange?.(revealed);
+      }
       if (revealed) {
         // מצב גלוי: הכל חוזר לטבעי (גם כדי שתפריט ההצעות יוכל לצאת מהבר).
         clip.style.height = "";
@@ -126,10 +146,23 @@ export function CollapsibleTopBar({
     }
 
     function onTouchStart(e: TouchEvent) {
-      touchStartY = window.scrollY <= 0 ? e.touches[0].clientY : null;
+      if (alwaysRevealed) return;
+      const y = e.touches[0].clientY;
+      const fromBar = !!bar && e.target instanceof Node && bar.contains(e.target);
+      touchStartY = window.scrollY <= 0 && (!pullFromBarOnly || fromBar) ? y : null;
+      closeStartY = pullFromBarOnly && revealed ? y : null;
     }
 
     function onTouchMove(e: TouchEvent) {
+      // עמוד בלי גלילה (מפה): משיכה למעלה סוגרת את שורת החיפוש שנפתחה.
+      if (pullFromBarOnly && revealed && !forceReveal && closeStartY != null) {
+        if (e.touches[0].clientY - closeStartY < -6) {
+          revealed = false;
+          closeStartY = null;
+          if (!raf) raf = requestAnimationFrame(apply);
+        }
+        return;
+      }
       if (touchStartY == null || revealed) return;
       const deltaY = e.touches[0].clientY - touchStartY;
       // סף קטן (6px) רק כדי לסנן רעד/נגיעה מקרית - לא "משיכה הדרגתית":
@@ -142,6 +175,7 @@ export function CollapsibleTopBar({
 
     function onTouchEnd() {
       touchStartY = null;
+      closeStartY = null;
     }
 
     function onScroll() {
@@ -149,7 +183,7 @@ export function CollapsibleTopBar({
       // בזמן הסבר "צור טיול" שורת החיפוש חייבת להישאר פתוחה.
       // ה-smooth scroll לראש והנעילה של ה-overlay יכולים לייצר אירועי
       // scroll אחרי שה-forceReveal הופעל; אסור לאירועים האלה לסגור אותה.
-      if (forceReveal) return;
+      if (forceReveal || alwaysRevealed) return;
 
       // במצב הרגיל: גלילה אמיתית של הדף סוגרת שוב שורה שנחשפה.
       if (revealed && scrollY > 4) {
@@ -180,7 +214,8 @@ export function CollapsibleTopBar({
       window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [collapsible, forceReveal]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsible, forceReveal, alwaysRevealed, pullFromBarOnly]);
 
   // *** בר עליון חדש (בקשה מפורשת - "רק הלוגו, רקע שקוף; נגלל עם העמוד,
   // אבל כשעולים למעלה הוא מופיע"): headroom - גלילה למטה מסתירה את הבר
@@ -203,7 +238,7 @@ export function CollapsibleTopBar({
       const y = Math.max(0, window.scrollY);
       const delta = y - lastY;
       const barHeight = bar.offsetHeight;
-      if (raised || forceReveal || y <= barHeight) {
+      if (raised || forceReveal || alwaysRevealed || y <= barHeight) {
         hidden = false;
         lastY = y;
       } else if (delta > THRESHOLD) {
@@ -220,7 +255,8 @@ export function CollapsibleTopBar({
       }
       const floating = !hidden && y > 4;
       bar.style.transform = hidden ? "translateY(-100%)" : "";
-      bar.style.backgroundColor = floating ? "rgba(255, 255, 255, 0.82)" : "transparent";
+      // על רקע כהה (לוגו לבן) - רקע כהה-שקוף במקום לבן, כדי שהלוגו הלבן יישאר קריא.
+      bar.style.backgroundColor = floating ? (logoTone === "white" ? "rgba(10, 12, 20, 0.72)" : "rgba(255, 255, 255, 0.82)") : "transparent";
       bar.style.backdropFilter = floating ? "blur(14px)" : "";
       (bar.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter = floating ? "blur(14px)" : "";
       bar.style.boxShadow = floating ? "0 8px 24px -16px rgba(16, 24, 40, 0.35)" : "none";
@@ -236,7 +272,7 @@ export function CollapsibleTopBar({
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [raised, forceReveal, colored]);
+  }, [raised, forceReveal, colored, logoTone, alwaysRevealed]);
 
   return (
     <div
@@ -250,7 +286,7 @@ export function CollapsibleTopBar({
       }}
     >
       {colored && <AnimatedHeaderBackdrop tone={tone} />}
-      {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} />}
+      {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} logoTone={logoTone} />}
 
       {collapsible && (
         <div ref={clipRef} style={{ transition: "height 160ms ease" }}>

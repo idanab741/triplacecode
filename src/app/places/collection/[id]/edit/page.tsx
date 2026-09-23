@@ -28,10 +28,10 @@ export default function EditCollectionPage({ params }: { params: Promise<{ id: s
     fetch(`/api/social/collections/${id}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת האוסף");
+        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת החוויה");
         return data.collection as CollectionDetailDto;
       })
-      .then((c) => (c.viewerState.isSelf ? setCollection(c) : setError("רק היוצר יכול לערוך את האוסף")))
+      .then((c) => (c.viewerState.isSelf ? setCollection(c) : setError("רק היוצר יכול לערוך את החוויה")))
       .catch((err) => setError(err.message));
   }, [id, user]);
 

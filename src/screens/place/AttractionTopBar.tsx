@@ -2,46 +2,34 @@
 
 import { HomeHeader } from "@/screens/home/HomeHeader";
 
-/** אותו גרדיאנט+צל בדיוק כמו הבר התכלת של עמוד הבית (BAR_GRADIENT/BAR_SHADOW
- *  ב-CollapsibleTopBar.tsx) - מקור אמת יחיד, מועתק לכאן במקום import כדי
- *  לא לגרור את כל לוגיקת ה-collapse/scroll שלא רלוונטית כאן (בר סטטי בלבד). */
-const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)";
-const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
-
 interface AttractionTopBarProps {
   backHref?: string;
 }
 
-/**
- * *** תיקון (בקשה מפורשת - "ככה לא נראה הבר שלנו!!! ככה הוא נראה!!!
- * [צילום מסך של הבר האמיתי]"): שני ניסיונות קודמים ניסו *לשחזר* את
- * מראה הבר התכלת עם קוד עצמאי משלהם - וזה בדיוק מה שיצר את הפער.
- * התיקון האמיתי: **שימוש ישיר ברכיב HomeHeader עצמו** (screens/home/
- * HomeHeader.tsx) - אותו רכיב, מייבוא, בלי לשכתב אף פיקסל ממנו - עטוף
- * באותו container (גרדיאנט+פינות מעוגלות למטה) שעוטף אותו בעמוד הבית
- * (ר' BAR_GRADIENT/BAR_SHADOW/rounded-b ב-CollapsibleTopBar.tsx), רק
- * בלי לוגיקת ה-scroll/collapse של שורת החיפוש שלא קיימת כאן (בר סטטי).
- * עם onBack - כפתור החזרה של האפליקציה מחליף את כפתור הצ'אט, **באותו
- * עיגול לבן ובאותו מיקום בדיוק** (זו כבר ההתנהגות המובנית של
- * HomeHeader.onBack - לא קוד חדש). כך שיש בטחון מוחלט של 100% זהות
- * ויזואלית לבר האמיתי - אין יותר "שחזור", יש שימוש חוזר.
- */
+/** בר עליון של עמודי מקום/אטרקציה: חזור + לוגו + פעמון (HomeHeader עצמו, בלי שכפול) - עכשיו כמסגרת זכוכית שקופה מעל התמונה. */
 export function AttractionTopBar({ backHref }: AttractionTopBarProps) {
   return (
-    <div className="relative z-10 rounded-b-[32px] pb-4" style={{ background: BAR_GRADIENT, boxShadow: BAR_SHADOW }}>
-      {/* *** עמודים עם תמונה (מקום/אטרקציה): הבר הכחול חזר (בקשה מפורשת),
-          לוגו לבן - כמו לפני הבר השקוף. */}
-      <HomeHeader
-        loading={false}
-        logoTone="white"
-        onBack={() => {
-          if (backHref) {
-            window.location.href = backHref;
-          } else {
-            window.history.back();
-          }
-        }}
-      />
+    // *** שינוי (בקשה מפורשת - "במקום התכלת - מסגרת שקופה, לא בפוקוס"): במקום הבר התכלת
+    // הסולידי - זכוכית חלבית שקופה (backdrop-blur) שיושבת *על* תמונת ה-HERO. העמוד
+    // האב חייב להיות position:relative והתמונה מתחילה מראש העמוד (בלי מרווח שלילי).
+    <div
+      className="absolute inset-x-0 top-0 z-10 rounded-b-[32px] border-b border-white/30 pb-4 backdrop-blur-xl backdrop-saturate-150"
+      style={{ background: "rgba(255, 255, 255, 0.14)", WebkitBackdropFilter: "blur(20px) saturate(1.5)" }}
+    >
+      {/* צל עדין מאחורי הלוגו הלבן, כדי שיישאר קריא גם על תמונה בהירה */}
+      <div style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.35))" }}>
+        <HomeHeader
+          loading={false}
+          logoTone="white"
+          onBack={() => {
+            if (backHref) {
+              window.location.href = backHref;
+            } else {
+              window.history.back();
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }

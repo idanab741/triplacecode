@@ -1,6 +1,6 @@
-import type { DmMessageDto } from "./dmMappers";
+import type { DmMessageDto, DmSharedPreview } from "./dmMappers";
 
-export type { DmMessageDto };
+export type { DmMessageDto, DmSharedPreview };
 
 export interface DmConversationDto {
   id: string;
@@ -66,5 +66,29 @@ export async function sendTextMessage(conversationId: string, text: string): Pro
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "שליחת ההודעה נכשלה");
+  return data.message as DmMessageDto;
+}
+
+export interface ShareTarget {
+  kind: "post" | "place";
+  /** id של הפוסט (kind=post) או של המקום (kind=place). */
+  id: string;
+  /** kind=place: פוסט לגיבוי - אם המקום אינו ברשימת ה-places (למשל מקום שהועלה ע"י משתמש), נשלח הפוסט במקומו. */
+  fallbackPostId?: string;
+}
+
+/** שולחת שיתוף תוכן (פוסט/מקום) בשיחה קיימת, עם הערה אופציונלית. */
+export async function sendSharedMessage(conversationId: string, target: ShareTarget, note?: string): Promise<DmMessageDto> {
+  const res = await fetch(`/api/social/conversations/${conversationId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      kind: target.kind,
+      ...(target.kind === "post" ? { postId: target.id } : { placeId: target.id, fallbackPostId: target.fallbackPostId }),
+      ...(note?.trim() ? { text: note.trim() } : {}),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "השיתוף נכשל");
   return data.message as DmMessageDto;
 }

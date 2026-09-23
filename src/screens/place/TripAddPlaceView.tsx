@@ -59,14 +59,13 @@ export function TripAddPlaceView({ place, savedCount }: TripAddPlaceViewProps) {
     today && today !== "closed" ? `${minutesToTimeLabel(today.openMinutes)}–${minutesToTimeLabel(today.closeMinutes)}` : null;
 
   return (
-    <div className="min-h-screen bg-white pb-28">
-      {/* 1. בר עליון תכלת - חזור + לוגו + פעמון (הבר התקני של triplace,
-          כמו HomeHeader/PlacesHeaderRow) - יושב *מעל* ה-HERO, לא כ-overlay שקוף עליו */}
+    <div className="relative min-h-screen bg-white pb-28">
+      {/* 1. בר עליון - חזור + לוגו + פעמון, כמסגרת זכוכית שקופה (blur) שיושבת מעל תמונת ה-HERO */}
       <AttractionTopBar />
 
       {/* 2. תמונת HERO - מוזזת מעט למעלה ומאחורי הבר (ר' הסבר ב-page.tsx
           התאום) כדי שתמלא את פינות העיגול המעוגלות של הבר מלמטה. */}
-      <div className="relative z-0 -mt-8 h-72 w-full bg-bg-secondary">
+      <div className="relative z-0 h-72 w-full bg-bg-secondary">
         {place.photoUrls[0] && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={place.photoUrls[0]} alt={place.name} className="h-full w-full object-cover" />

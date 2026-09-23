@@ -24,7 +24,7 @@ export function CollectionTypeSheet({
   return (
     <BottomSheet onClose={onClose} dark={dark}>
       <div className="px-5 pb-2">
-        <h2 className={`mb-3 text-[17px] font-bold ${dark ? "text-white" : "text-ink"}`}>מה תרצו לאסוף?</h2>
+        <h2 className={`mb-3 text-[17px] font-bold ${dark ? "text-white" : "text-ink"}`}>מה תרצו לכלול בחוויה?</h2>
         <div className="flex flex-col gap-1">
           {OPTIONS.map((option) => (
             <button

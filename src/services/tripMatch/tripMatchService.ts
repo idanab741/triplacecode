@@ -180,7 +180,7 @@ async function fetchTripAddCandidates(
   let query = adminForMedia
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, taxonomy_tags, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, tripadd_submission_media(sort_order, media_assets(url))"
+      "id, name, category, subcategory, taxonomy_tags, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, google_place_id, tripadd_submission_media(sort_order, media_assets(url))"
     )
     .not("latitude", "is", null)
     .not("longitude", "is", null);
@@ -317,13 +317,32 @@ async function fetchTripAddCandidates(
     };
   });
 
+  // *** איחוד + מקורות קהילתיים (בקשה מפורשת - "יש עוד המון מקומות שלא מופיעים. לא הגיוני שיש
+  // ולא מופיע פה"): אותם מקורות כמו מפת place's - לא רק מקומות שהוספו (tripadd), אלא גם מקומות מהמאגר
+  // שמשתמשים פרסמו עליהם פוסט או כתבו עליהם ביקורת; כפילויות מאוחדות לכרטיס אחד; ותמונות המשתמשים
+  // מהפוסטים/הביקורות נכנסות לכרטיס. ר' mergeCommunityCandidates למטה.
+  const combined = await mergeCommunityCandidates({
+    supabase,
+    admin: adminForMedia,
+    session,
+    tripadd: mapped,
+    googleIdById: new Map(rows.map((r) => [r.id as string, (r.google_place_id as string | null) ?? null])),
+    googleFallbackPhotos: new Set(rows.map((r) => r.google_photo_url as string | null).filter((u): u is string => !!u)),
+    excluded,
+    searchOrigin,
+    radiusKm,
+    distanceOrigin,
+    scoreById,
+    dna,
+  });
+
   // *** תיקון: הסינון-לפי-רדיוס חייב להתבסס על מוקד ה*חיפוש* (עיר שנבחרה / "קרוב אליי"), לא על מוקד
   // ה*הצגה* (userLocation) - אחרת חיפוש עיר רחוקה מהמשתמש (או "קרוב אליי" עם מיקום נוכחי אחר) היה מסנן
   // בטעות את כל התוצאות שבאמת בתוך העיר שחיפשו, כי הן "רחוקות מדי" מאיפה שהמשתמש נמצא בפועל. ה-distanceKm
   // שמוצג בכרטיס עדיין מחושב מ-distanceOrigin (userLocation כשידוע) - שני דברים נפרדים בכוונה.
   const searchDistanceKm = (p: { latitude: number; longitude: number }) =>
     searchOrigin ? haversineDistanceKm(searchOrigin, { lat: p.latitude, lng: p.longitude }) : 0;
-  const withinRadius = searchOrigin ? mapped.filter((p) => searchDistanceKm(p) <= radiusKm) : mapped;
+  const withinRadius = searchOrigin ? combined.filter((p) => searchDistanceKm(p) <= radiusKm) : combined;
   // *** תיקון (חיבור למידת המשתמש - ר' personalizationScore למעלה): המיון
   // הראשי הוא עכשיו לפי ציון האישיות (taxonomy_categories/tags + למידה
   // התנהגותית מ-favorites), לא לפי מרחק גרידא. מרחק נשאר שובר-שוויון,
@@ -334,6 +353,276 @@ async function fetchTripAddCandidates(
     return searchDistanceKm(a) - searchDistanceKm(b);
   });
   return withDistance.slice(0, limit);
+}
+
+// ============================================================================
+// מקורות קהילתיים + איחוד כפילויות לחפיסת ההחלקות
+// ============================================================================
+
+const MERGE_DISTANCE_KM = 0.06;
+const IN_CHUNK = 150;
+
+function normalizePlaceName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/["'`׳״.,\-–—_()|/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function placeNamesMatch(a: string, b: string): boolean {
+  const na = normalizePlaceName(a);
+  const nb = normalizePlaceName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const [short, long] = na.length <= nb.length ? [na, nb] : [nb, na];
+  return short.length >= 3 && long.includes(short);
+}
+
+async function selectInChunks(
+  ids: string[],
+  run: (chunk: string[]) => PromiseLike<{ data: unknown }>
+): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    try {
+      const { data } = await run(ids.slice(i, i + IN_CHUNK));
+      if (Array.isArray(data)) out.push(...(data as Record<string, unknown>[]));
+    } catch {
+      // השלמה בלבד - כשל חלקי לא מפיל את החפיסה.
+    }
+  }
+  return out;
+}
+
+type MediaCell = { type?: string | null; url?: string | null; thumbnail_url?: string | null } | null;
+
+function photoOf(m: MediaCell | MediaCell[] | undefined): string | null {
+  const cell = Array.isArray(m) ? m[0] : m;
+  if (!cell) return null;
+  if (cell.type === "video") return cell.thumbnail_url ?? null;
+  return cell.url ?? cell.thumbnail_url ?? null;
+}
+
+/**
+ * מקבל את מועמדי ה-tripadd (כבר ממופים) ומחזיר רשימה משולבת:
+ *  1. מאחד כפילויות בין מקומות שהוספו (אותו google_place_id, או עד 60 מ' ושם תואם) - כרטיס אחד,
+ *     עם כל התמונות של כל ההעלאות.
+ *  2. מוסיף לכל כרטיס את התמונות מפוסטים שמשתמשים פרסמו על המקום.
+ *  3. מוסיף מקומות מהמאגר (places) שמשתמשים פרסמו עליהם פוסט או כתבו ביקורת - באותו רדיוס וקטגוריה.
+ *     מקום כזה שהוא כפילות של מקום שהוסף - לא נוסף שוב; רק התמונות שלו מצטרפות לכרטיס הקיים.
+ * הפוסטים נשלפים עם הלקוח הרגיל (RLS - אותה נראות כמו בפיד); מדיה עם admin (כמו בפיד ובמפה).
+ */
+async function mergeCommunityCandidates(args: {
+  supabase: SupabaseClient;
+  admin: ReturnType<typeof createAdminClient>;
+  session: TripMatchSession;
+  tripadd: CandidatePlace[];
+  googleIdById: Map<string, string | null>;
+  /** תמונות Google שהוצגו רק כי לא היו תמונות משתמשים - יורדות ברגע שיש תמונת משתמש. */
+  googleFallbackPhotos: Set<string>;
+  excluded: Set<string>;
+  searchOrigin: LatLng | null;
+  radiusKm: number;
+  distanceOrigin: LatLng | null;
+  scoreById: Map<string, number>;
+  dna: TravelDna | null;
+}): Promise<CandidatePlace[]> {
+  const { supabase, admin, session, googleIdById, excluded, searchOrigin, radiusKm, distanceOrigin, scoreById, dna } = args;
+
+  /** מוסיף תמונות משתמשים; תמונת Google (fallback) יורדת ברגע שיש תמונת משתמש אמיתית. */
+  const addPhotosFront = (target: CandidatePlace, photos: string[]) => {
+    const fresh = photos.filter((u) => !target.imageUrls.includes(u));
+    if (!fresh.length) return;
+    const userOnly = target.imageUrls.filter((u) => !args.googleFallbackPhotos.has(u));
+    target.imageUrls = [...userOnly, ...fresh];
+  };
+
+  // ---------- 1. איחוד כפילויות בין מקומות שהוספו ----------
+  const merged: CandidatePlace[] = [];
+  const repOf = new Map<string, CandidatePlace>();
+  const googleOfRep = new Map<CandidatePlace, string | null>();
+  for (const c of args.tripadd) {
+    const g = googleIdById.get(c.id) ?? null;
+    const dup = merged.find((d) => {
+      const dg = googleOfRep.get(d) ?? null;
+      if (g && dg) return g === dg;
+      return (
+        haversineDistanceKm({ lat: d.latitude, lng: d.longitude }, { lat: c.latitude, lng: c.longitude }) <= MERGE_DISTANCE_KM &&
+        placeNamesMatch(d.name, c.name)
+      );
+    });
+    if (dup) {
+      const userPhotos = c.imageUrls.filter((u) => !args.googleFallbackPhotos.has(u));
+      if (userPhotos.length) addPhotosFront(dup, userPhotos);
+      if (!googleOfRep.get(dup) && g) googleOfRep.set(dup, g);
+      repOf.set(c.id, dup);
+      continue;
+    }
+    const copy: CandidatePlace = { ...c, imageUrls: [...c.imageUrls] };
+    merged.push(copy);
+    googleOfRep.set(copy, g);
+    repOf.set(c.id, copy);
+  }
+
+
+  // ---------- 2. תמונות מפוסטים על מקומות שהוספו ----------
+  const tripaddIds = [...repOf.keys()];
+  const tripaddPosts = await selectInChunks(tripaddIds, (chunk) =>
+    supabase.from("posts").select("id, tripadd_submission_id").is("deleted_at", null).in("tripadd_submission_id", chunk)
+  );
+
+  // ---------- 3. מקומות מהמאגר שמשתמשים פרסמו/דירגו עליהם ----------
+  const [placePostsRes, placeReviewsRes] = await Promise.all([
+    supabase
+      .from("posts")
+      .select("id, place_id")
+      .is("deleted_at", null)
+      .not("place_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1500),
+    supabase.from("place_reviews").select("id, place_id, rating").limit(2000),
+  ]);
+  const placePosts = (placePostsRes.data ?? []) as Record<string, unknown>[];
+  const placeReviews = (placeReviewsRes.data ?? []) as Record<string, unknown>[];
+  const communityPlaceIds = [
+    ...new Set([...placePosts.map((p) => p.place_id as string), ...placeReviews.map((r) => r.place_id as string)].filter(Boolean)),
+  ].filter((id) => !excluded.has(id));
+
+  let placeRows = await selectInChunks(communityPlaceIds, (chunk) => {
+    let q = supabase
+      .from("places")
+      .select("id, name, category, subcategory, short_description, latitude, longitude, city, rating, rating_count, price_level, image_urls, google_place_id, accessible, kosher")
+      .in("id", chunk)
+      .not("latitude", "is", null)
+      .not("longitude", "is", null);
+    if (!session.include_all_categories) q = q.eq("category", session.category);
+    if (searchOrigin) {
+      const latDelta = kmToLatDegrees(radiusKm);
+      const lngDelta = kmToLngDegrees(radiusKm, searchOrigin.lat);
+      q = q
+        .gte("latitude", searchOrigin.lat - latDelta)
+        .lte("latitude", searchOrigin.lat + latDelta)
+        .gte("longitude", searchOrigin.lng - lngDelta)
+        .lte("longitude", searchOrigin.lng + lngDelta);
+    }
+    return q;
+  });
+  placeRows = placeRows.filter((r) => !excluded.has(r.id as string));
+
+  // ---------- מדיה (admin) לכל הפוסטים/ביקורות הרלוונטיים ----------
+  const placeIdSet = new Set(placeRows.map((r) => r.id as string));
+  const relevantPlacePosts = placePosts.filter((p) => placeIdSet.has(p.place_id as string));
+  const relevantReviews = placeReviews.filter((r) => placeIdSet.has(r.place_id as string));
+  const allPostIds = [...tripaddPosts.map((p) => p.id as string), ...relevantPlacePosts.map((p) => p.id as string)];
+  const [postMedia, reviewMedia] = await Promise.all([
+    selectInChunks(allPostIds, (chunk) =>
+      admin.from("post_media").select("post_id, sort_order, media:media_assets(type, url, thumbnail_url)").in("post_id", chunk).order("sort_order", { ascending: true })
+    ),
+    selectInChunks(
+      relevantReviews.map((r) => r.id as string),
+      (chunk) =>
+        admin.from("review_media").select("review_id, sort_order, media:media_assets(type, url, thumbnail_url)").in("review_id", chunk).order("sort_order", { ascending: true })
+    ),
+  ]);
+  const photosByPost = new Map<string, string[]>();
+  for (const m of postMedia) {
+    const url = photoOf(m.media as MediaCell);
+    if (!url) continue;
+    const list = photosByPost.get(m.post_id as string) ?? [];
+    if (!list.includes(url)) list.push(url);
+    photosByPost.set(m.post_id as string, list);
+  }
+  const photosByReview = new Map<string, string[]>();
+  for (const m of reviewMedia) {
+    const url = photoOf(m.media as MediaCell);
+    if (!url) continue;
+    const list = photosByReview.get(m.review_id as string) ?? [];
+    if (!list.includes(url)) list.push(url);
+    photosByReview.set(m.review_id as string, list);
+  }
+
+  // תמונות פוסטים -> כרטיסי tripadd
+  for (const p of tripaddPosts) {
+    const target = repOf.get(p.tripadd_submission_id as string);
+    if (target) addPhotosFront(target, photosByPost.get(p.id as string) ?? []);
+  }
+
+  // מקומות מהמאגר -> כרטיס חדש, או מיזוג לכרטיס קיים אם זו כפילות
+  const ratingsByPlace = new Map<string, number[]>();
+  for (const r of relevantReviews) {
+    if (r.rating == null) continue;
+    const list = ratingsByPlace.get(r.place_id as string) ?? [];
+    list.push(r.rating as number);
+    ratingsByPlace.set(r.place_id as string, list);
+  }
+
+  for (const row of placeRows) {
+    const id = row.id as string;
+    const lat = row.latitude as number;
+    const lng = row.longitude as number;
+    const name = row.name as string;
+    const google = (row.google_place_id as string | null) ?? null;
+    const userPhotos: string[] = [];
+    for (const p of relevantPlacePosts) if (p.place_id === id) for (const u of photosByPost.get(p.id as string) ?? []) if (!userPhotos.includes(u)) userPhotos.push(u);
+    for (const r of relevantReviews) if (r.place_id === id) for (const u of photosByReview.get(r.id as string) ?? []) if (!userPhotos.includes(u)) userPhotos.push(u);
+
+    const dup = merged.find((d) => {
+      const dg = googleOfRep.get(d) ?? null;
+      if (google && dg) return google === dg;
+      return haversineDistanceKm({ lat: d.latitude, lng: d.longitude }, { lat, lng }) <= MERGE_DISTANCE_KM && placeNamesMatch(d.name, name);
+    });
+    if (dup) {
+      addPhotosFront(dup, userPhotos);
+      continue;
+    }
+
+    const imageUrls = userPhotos.length ? userPhotos : ((row.image_urls as string[] | null) ?? []).slice(0, 1);
+    const category = CATEGORY_TO_TRIPADD[row.category as string] ?? (row.category as string);
+    const categoryLabel = HOME_QUICK_CATEGORY_LABELS[category as HomeQuickCategoryId] ?? getCategoryLabel(row.category as string);
+    const ratings = ratingsByPlace.get(id) ?? [];
+    const distanceKm = distanceOrigin ? haversineDistanceKm(distanceOrigin, { lat, lng }) : 0;
+    const accessible = (row.accessible as boolean | null) ?? null;
+
+    const candidate: CandidatePlace = {
+      id,
+      name,
+      category,
+      subcategory: (row.subcategory as string | null) ?? null,
+      shortDescription: (row.short_description as string | null) ?? null,
+      imageUrls,
+      rating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null,
+      ratingCount: ratings.length || null,
+      googleRating: row.rating != null ? Number(row.rating) : null,
+      googleRatingCount: (row.rating_count as number | null) ?? null,
+      priceLevel: (row.price_level as number | null) ?? null,
+      estimatedVisitMinutes: null,
+      latitude: lat,
+      longitude: lng,
+      distanceKm,
+      etaMinutes: distanceOrigin ? estimateTravelMinutes(distanceKm, "drive") : 0,
+      tripTypeTags: [],
+      cuisineTags: [],
+      tags: [
+        categoryLabel,
+        (row.subcategory as string | null) ?? null,
+        row.price_level != null ? "₪".repeat(row.price_level as number) : null,
+        accessible === true ? "♿ נגיש" : null,
+      ].filter((t): t is string => !!t),
+      tripmatchScores: {},
+      dnaScores: {},
+      kosher: (row.kosher as boolean | null) ?? null,
+      accessible,
+      suitableChildAges: [],
+      budgetTier: null,
+      isAreaExperience: false,
+    } as CandidatePlace;
+    merged.push(candidate);
+    googleOfRep.set(candidate, google);
+    scoreById.set(id, personalizationScore({ category, taxonomyTags: [], accessible }, dna));
+  }
+
+  return merged;
 }
 
 export async function fetchTripMatchCandidates(

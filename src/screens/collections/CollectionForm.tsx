@@ -193,7 +193,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
               body: JSON.stringify(body),
             });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "שגיאה בשמירת האוסף");
+      if (!res.ok) throw new Error(data.error ?? "שגיאה בשמירת החוויה");
       // *** תיקון (אותה בקשה - "שמירה קבועה"): פורסם בהצלחה - מוחקים את הטיוטה הקבועה, כדי שאוסף
       // הבא (create) לא "יירש" בטעות את הפריטים של האוסף הזה.
       if (mode === "create") {
@@ -205,20 +205,20 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
       }
       router.replace(`/places/collection/${mode === "create" ? data.id : collectionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בשמירת האוסף");
+      setError(err instanceof Error ? err.message : "שגיאה בשמירת החוויה");
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
-    if (!collectionId || !window.confirm("למחוק את האוסף? הפעולה לא הפיכה.")) return;
+    if (!collectionId || !window.confirm("למחוק את החוויה? הפעולה לא הפיכה.")) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/social/collections/${collectionId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("שגיאה במחיקת האוסף");
+      if (!res.ok) throw new Error("שגיאה במחיקת החוויה");
       router.replace("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה במחיקת האוסף");
+      setError(err instanceof Error ? err.message : "שגיאה במחיקת החוויה");
       setSubmitting(false);
     }
   }
@@ -228,16 +228,16 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
   return (
     <div className="px-5 pb-12 pt-6">
       <h1 className="mb-5 text-[22px] font-extrabold leading-tight text-ink">
-        {mode === "create" ? "יצירת אוסף" : "עריכת אוסף"}
+        {mode === "create" ? "יצירת חוויה" : "עריכת חוויה"}
         <span className="ms-2 text-[15px] font-bold text-ink-secondary">{type === "places" ? "📍 מקומות" : "✈️ טיולים"}</span>
       </h1>
 
-      <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">כותרת האוסף</label>
+      <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">כותרת החוויה</label>
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         maxLength={COLLECTION_LIMITS.maxTitle}
-        placeholder="מה תרצו לאסוף?"
+        placeholder="איך תקראו לחוויה?"
         className="w-full rounded-card border border-ink-secondary/20 px-4 py-3 text-[16px] focus:outline-none"
         style={{ borderColor: title ? "var(--color-places-purple)" : undefined }}
       />
@@ -249,11 +249,11 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         onChange={(e) => setDescription(e.target.value)}
         maxLength={COLLECTION_LIMITS.maxDescription}
         rows={3}
-        placeholder="ספרו בקצרה על האוסף..."
+        placeholder="ספרו בקצרה על החוויה..."
         className="mb-5 w-full resize-none rounded-card border border-ink-secondary/20 px-4 py-3 text-[15px] focus:outline-none"
       />
 
-      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">תמונת האוסף</label>
+      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">תמונת החוויה</label>
       <div className="mb-5 overflow-hidden rounded-2xl shadow-soft">
         <div className="relative">
           <CollectionCover coverUrl={coverUrl} collageUrls={itemImages} type={type} className="aspect-[16/9]" />
@@ -262,11 +262,11 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
             onClick={() => setCoverSheetOpen(true)}
             className="absolute bottom-2 end-2 rounded-pill bg-black/55 px-3 py-1.5 text-[12px] font-semibold text-white"
           >
-            החלפת תמונת האוסף
+            החלפת תמונת החוויה
           </button>
         </div>
         <p className="bg-white px-3 py-2 text-[12px] text-ink-secondary">
-          {coverUrl ? "תמונת האוסף שבחרתם" : "תמונת אוסף אוטומטית - נוצרת מהתמונות של הפריטים הראשונים"}
+          {coverUrl ? "תמונת החוויה שבחרתם" : "תמונת חוויה אוטומטית - נוצרת מהתמונות של הפריטים הראשונים"}
         </p>
       </div>
 
@@ -322,12 +322,12 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         className="w-full rounded-pill py-3.5 text-[15px] font-bold text-white disabled:opacity-50"
         style={{ background: PURPLE_GRADIENT }}
       >
-        {submitting ? "שומרים..." : mode === "create" ? "פרסום האוסף" : "שמירת שינויים"}
+        {submitting ? "שומרים..." : mode === "create" ? "פרסום החוויה" : "שמירת שינויים"}
       </button>
 
       {mode === "edit" && (
         <button type="button" onClick={handleDelete} disabled={submitting} className="mt-3 w-full py-2.5 text-[13.5px] font-bold text-red-500 disabled:opacity-50">
-          מחיקת האוסף
+          מחיקת החוויה
         </button>
       )}
 
@@ -349,8 +349,8 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         <CoverPickerSheet
           coverUrl={coverUrl}
           imageUrls={itemImages}
-          heading="בחירת תמונת האוסף"
-          autoLabel="תמונת אוסף אוטומטית"
+          heading="בחירת תמונת החוויה"
+          autoLabel="תמונת חוויה אוטומטית"
           onSelect={(url) => {
             setCoverUrl(url);
             setCoverSheetOpen(false);

@@ -5,7 +5,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 export default function ContentLoading() {
   return (
     <div className="min-h-screen bg-white pb-24">
-      <CollapsibleTopBar />
+      <CollapsibleTopBar logoTone="white" />
       <div className="mx-auto mt-6 flex max-w-sm flex-col items-center gap-4 px-4">
         <div className="h-6 w-56 animate-pulse rounded bg-bg-secondary" />
         <div className="h-11 w-full animate-pulse rounded-full bg-bg-secondary" />

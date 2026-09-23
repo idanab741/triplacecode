@@ -42,7 +42,7 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
   const body = (raw ?? {}) as Record<string, unknown>;
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  if (!title) throw new CollectionInputError("חסרה כותרת לאוסף");
+  if (!title) throw new CollectionInputError("חסרה כותרת לחוויה");
   if (title.length > COLLECTION_LIMITS.maxTitle) {
     throw new CollectionInputError(`הכותרת ארוכה מדי (עד ${COLLECTION_LIMITS.maxTitle} תווים)`);
   }
@@ -55,7 +55,7 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
   let coverUrl: string | null = null;
   if (typeof body.coverUrl === "string" && body.coverUrl.trim()) {
     coverUrl = body.coverUrl.trim();
-    if (!/^https:\/\//i.test(coverUrl) || coverUrl.length > 1000) throw new CollectionInputError("תמונת האוסף לא תקינה");
+    if (!/^https:\/\//i.test(coverUrl) || coverUrl.length > 1000) throw new CollectionInputError("תמונת החוויה לא תקינה");
   }
 
   const visibility = (body.visibility ?? "public") as PostVisibility;
@@ -72,7 +72,7 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
     const expectedKind = type === "places" ? "place" : "trip";
     if (item.kind !== expectedKind) {
       // "אין לערבב Places ו-Trips באותו אוסף"
-      throw new CollectionInputError(type === "places" ? "אוסף מקומות יכול להכיל מקומות בלבד" : "אוסף טיולים יכול להכיל טיולים בלבד");
+      throw new CollectionInputError(type === "places" ? "חוויית מקומות יכולה להכיל מקומות בלבד" : "חוויית טיולים יכולה להכיל טיולים בלבד");
     }
 
     let tripSource: CollectionTripSource | undefined;
@@ -96,10 +96,10 @@ export function parseCollectionInput(type: CollectionType, raw: unknown): SaveCo
   }
 
   if (items.length < COLLECTION_LIMITS.minItems) {
-    throw new CollectionInputError(`אוסף חייב להכיל לפחות ${COLLECTION_LIMITS.minItems} פריטים`);
+    throw new CollectionInputError(`חוויה חייבת להכיל לפחות ${COLLECTION_LIMITS.minItems} פריטים`);
   }
   if (items.length > COLLECTION_LIMITS.maxItems) {
-    throw new CollectionInputError(`אפשר להוסיף עד ${COLLECTION_LIMITS.maxItems} פריטים לאוסף`);
+    throw new CollectionInputError(`אפשר להוסיף עד ${COLLECTION_LIMITS.maxItems} פריטים לחוויה`);
   }
 
   return { title, description, coverUrl, visibility, items };
@@ -141,7 +141,7 @@ async function assertItemsUsable(
   if (trippyRes.error) throw trippyRes.error;
   if (socialTripsRes.error) throw socialTripsRes.error;
   if ((sessionsRes.data ?? []).length !== sessionIds.length || (trippyRes.data ?? []).length !== trippyIds.length) {
-    throw new CollectionInputError("אפשר להוסיף לאוסף רק טיולים שמורים שלכם");
+    throw new CollectionInputError("אפשר להוסיף לחוויה רק טיולים שמורים שלכם");
   }
   if ((socialTripsRes.data ?? []).length !== socialTripIds.length) {
     throw new CollectionInputError("אחד הטיולים לא נמצא - ייתכן שהוסר או שהפך לפרטי");
@@ -233,8 +233,8 @@ export async function updateCollection(
     .eq("id", collectionId)
     .maybeSingle();
   if (existingError) throw existingError;
-  if (!existing) throw new CollectionInputError("האוסף לא נמצא");
-  if (existing.author_id !== userId) throw new CollectionInputError("רק היוצר יכול לערוך את האוסף");
+  if (!existing) throw new CollectionInputError("החוויה לא נמצאה");
+  if (existing.author_id !== userId) throw new CollectionInputError("רק היוצר יכול לערוך את החוויה");
 
   const type = existing.collection_type as CollectionType;
   const input = parseCollectionInput(type, raw);

@@ -35,6 +35,14 @@ export interface DmConversationDto {
   lastMessageAt: string;
 }
 
+/** תצוגה מקדימה של תוכן ששותף בהודעה (פוסט / מקום) - מחושבת בשרת בטעינת השיחה. */
+export interface DmSharedPreview {
+  href: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+}
+
 export interface DmMessageDto {
   id: string;
   conversationId: string;
@@ -47,6 +55,8 @@ export interface DmMessageDto {
   reviewId: string | null;
   readAt: string | null;
   createdAt: string;
+  /** רק בהודעות שיתוף (kind != text) - מולא ע"י GET /api/social/conversations/[id]. */
+  shared?: DmSharedPreview | null;
 }
 
 export function getOtherUserId(row: DmConversationRow, viewerId: string): string {

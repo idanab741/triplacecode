@@ -203,7 +203,7 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
           נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
       {/* *** בקשה מפורשת - "רקע לבן, רק הטקסט places בסגול": הבר השקוף
           (על רקע העמוד הבהיר), לוגו places בסגול. */}
-      <CollapsibleTopBar headerRow={<PlacesHeaderRow />}>
+      <CollapsibleTopBar headerRow={<PlacesHeaderRow badgeTone="purple" />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 

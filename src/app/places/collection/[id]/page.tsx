@@ -45,14 +45,14 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
     fetch(`/api/social/collections/${id}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת האוסף");
+        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת החוויה");
         setCollection(data.collection as CollectionDetailDto);
       })
       .catch((err) => setError(err.message));
   }, [id, user]);
 
   async function handleDelete() {
-    if (!window.confirm("למחוק את האוסף? הפעולה לא הפיכה.")) return;
+    if (!window.confirm("למחוק את החוויה? הפעולה לא הפיכה.")) return;
     const res = await fetch(`/api/social/collections/${id}`, { method: "DELETE" });
     if (res.ok) router.replace("/home");
   }
@@ -208,7 +208,7 @@ function CollectionBody({
       )}
 
       <div className="px-4 pt-4">
-        {collection.items.length === 0 && <p className="py-8 text-center text-[13px] text-ink-secondary">אין פריטים להצגה באוסף הזה.</p>}
+        {collection.items.length === 0 && <p className="py-8 text-center text-[13px] text-ink-secondary">אין פריטים להצגה בחוויה הזו.</p>}
 
         {collection.type === "places" && view === "gallery" && (
           <div className="grid grid-cols-2 gap-x-3 gap-y-4">
@@ -235,7 +235,7 @@ function CollectionBody({
           (hasMapPoints ? (
             <DiscoveryPlacesMap places={mapPlaces} heightClassName="h-[62vh]" />
           ) : (
-            <p className="py-8 text-center text-[13px] text-ink-secondary">אין נתוני מיקום למקומות באוסף הזה.</p>
+            <p className="py-8 text-center text-[13px] text-ink-secondary">אין נתוני מיקום למקומות בחוויה הזו.</p>
           ))}
 
         {collection.type === "trips" && (

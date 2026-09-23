@@ -59,9 +59,11 @@ function toActivityItem(item: SocialNotificationItem): ActivityItem {
 interface PlacesNotificationBellProps {
   /** true (בר place's הסגול): עיגול לבן מלא עם צל - בדיוק כמו הפעמון בבר של עמוד הבית. */
   solid?: boolean;
+  /** צבע עיגול המונה: "purple" - בית ומפה (place's); ברירת מחדל כחול בכל שאר האפליקציה. */
+  badgeTone?: "blue" | "purple";
 }
 
-export function PlacesNotificationBell({ solid = false }: PlacesNotificationBellProps = {}) {
+export function PlacesNotificationBell({ solid = false, badgeTone = "blue" }: PlacesNotificationBellProps = {}) {
   const router = useRouter();
   const { preferences, preferencesLoading } = useAuth();
   const [open, setOpen] = useState(false);
@@ -164,7 +166,7 @@ export function PlacesNotificationBell({ solid = false }: PlacesNotificationBell
         {unreadCount != null && unreadCount > 0 && (
           <span
             className="absolute -left-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white"
-            style={{ background: "var(--color-primary-start)" }}
+            style={{ background: badgeTone === "purple" ? "var(--color-places-purple)" : "var(--color-primary-start)" }}
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>

@@ -5,101 +5,106 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
-import { useAuth } from "@/hooks/useAuth";
-import { formatRelativeTimeHe } from "@/utils/relativeTime";
-import { getAvatarUrl } from "@/constants/avatar";
+import { PostCard } from "@/screens/places/PostCard";
+import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
+import type { FeedItemDto } from "@/services/social/feedService";
 
-interface CommentRow {
-  id: string;
-  text: string;
-  created_at: string;
-  parent_comment_id: string | null;
-  author: { id: string; username: string | null; full_name: string | null; avatar_url: string | null };
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { error?: string }).error ?? "שגיאה");
+  return data as T;
 }
 
+/**
+ * עמוד פוסט / ביקורת: הפוסט עצמו (כמו בפיד - טקסט, תמונות, מקום, לייק / שמירה / שיתוף) והתגובות פתוחות מתחתיו.
+ * אליו מגיעים מהאריחים בפרופיל, מהתראות ומשיתוף בצ'אט. קודם העמוד הזה הציג רק תגובות.
+ */
 export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { user } = useAuth();
   const router = useRouter();
-  const [comments, setComments] = useState<CommentRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
+  const [post, setPost] = useState<FeedItemDto | null>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "notfound" | "error">("loading");
+  const [reviewTarget, setReviewTarget] = useState<{ placeId: string; placeName: string } | null>(null);
 
   function load() {
-    fetch(`/api/social/posts/${id}/comments`)
-      .then((r) => r.json())
-      .then((data) => setComments(data.comments ?? []))
-      .catch(() => setError("שגיאה בטעינת התגובות"));
+    setStatus("loading");
+    fetch(`/api/social/posts/${id}`)
+      .then(async (res) => {
+        if (res.status === 404) return setStatus("notfound");
+        if (!res.ok) return setStatus("error");
+        const data = await res.json();
+        setPost(data.post as FeedItemDto);
+        setStatus("ready");
+      })
+      .catch(() => setStatus("error"));
   }
 
   useEffect(load, [id]);
 
-  async function handleSend() {
-    if (!text.trim()) return;
-    setSending(true);
-    try {
-      await fetch(`/api/social/posts/${id}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim() }),
-      });
-      setText("");
-      load();
-    } finally {
-      setSending(false);
-    }
+  async function handleLikeToggle(postId: string) {
+    const { liked } = await fetchJson<{ liked: boolean }>(`/api/social/posts/${postId}/like`, { method: "POST" });
+    return liked;
+  }
+  async function handleSaveToggle(postId: string) {
+    const { saved } = await fetchJson<{ saved: boolean }>(`/api/social/posts/${postId}/save`, { method: "POST" });
+    return saved;
+  }
+  async function handleEditPost(postId: string, newText: string) {
+    await fetchJson(`/api/social/posts/${postId}`, { method: "PATCH", body: JSON.stringify({ text: newText }) });
+  }
+  async function handleDeletePost(postId: string) {
+    await fetchJson(`/api/social/posts/${postId}`, { method: "DELETE" });
+    router.back();
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <PlacesHeader onBack={() => router.back()} />
 
-      <div className="flex-1 overflow-y-auto">
-        {comments === null && !error && (
+      <div className="flex-1 pb-10">
+        {status === "loading" && (
           <div className="p-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="mb-3 h-12 w-full" />
-            ))}
+            <Skeleton className="mb-3 h-12 w-full" />
+            <Skeleton className="mb-3 h-64 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
         )}
-        {error && <PlacesEmptyState title={error} actionLabel="נסה שוב" onAction={load} />}
-        {comments?.length === 0 && <PlacesEmptyState title="אין עדיין תגובות - היה הראשון להגיב" />}
-        {comments?.map((comment) => (
-          <div key={comment.id} className="flex gap-2.5 px-4 py-3">
-            <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={getAvatarUrl(comment.author.avatar_url)} alt="" className="h-full w-full object-cover" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] text-ink">
-                <span className="font-bold">{comment.author.full_name ?? comment.author.username}</span> {comment.text}
-              </p>
-              <span className="text-[11px] text-ink-secondary">{formatRelativeTimeHe(comment.created_at)}</span>
-            </div>
+
+        {status === "notfound" && <PlacesEmptyState title="הפוסט לא נמצא - ייתכן שנמחק או שאין לך הרשאה לראות אותו." />}
+
+        {status === "error" && (
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
+            <p className="text-sm text-ink-secondary">לא הצלחנו לטעון את הפוסט.</p>
+            <button type="button" onClick={load} className="text-sm font-semibold text-places-purple">
+              נסו שוב
+            </button>
           </div>
-        ))}
+        )}
+
+        {status === "ready" && post && (
+          <PostCard
+            item={post}
+            defaultCommentsOpen
+            onLikeToggle={handleLikeToggle}
+            onSaveToggle={handleSaveToggle}
+            onWriteReview={(placeId, placeName) => setReviewTarget({ placeId, placeName })}
+            onEditPost={handleEditPost}
+            onDeletePost={handleDeletePost}
+          />
+        )}
       </div>
 
-      {user && (
-        <div className="flex items-center gap-2 border-t border-ink-secondary/10 px-4 py-3">
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="הוסף תגובה..."
-            className="flex-1 rounded-pill border border-ink-secondary/20 px-4 py-2.5 text-[13.5px] focus:outline-none"
-          />
-          <button
-            type="button"
-            disabled={sending || !text.trim()}
-            onClick={handleSend}
-            className="rounded-pill px-4 py-2.5 text-[13px] font-bold text-white disabled:opacity-50"
-            style={{ background: "var(--color-places-purple)" }}
-          >
-            שלח
-          </button>
-        </div>
+      {reviewTarget && (
+        <CreateReviewSheet
+          placeId={reviewTarget.placeId}
+          placeName={reviewTarget.placeName}
+          onClose={() => setReviewTarget(null)}
+          onSubmitted={() => {
+            setReviewTarget(null);
+            load();
+          }}
+        />
       )}
     </div>
   );

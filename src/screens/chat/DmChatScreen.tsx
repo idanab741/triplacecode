@@ -8,6 +8,7 @@ import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { DmChatHeader } from "./DmChatHeader";
 import { DmComposer } from "./DmComposer";
+import { DmSharedCard } from "./DmSharedCard";
 import {
   fetchConversation,
   sendTextMessage,
@@ -33,9 +34,8 @@ function tempMessage(conversationId: string, senderId: string, text: string): Dm
   };
 }
 
-/** תוכן הודעה שאינה טקסט (trip/place/post/review) - שיתוף תוכן עצמו
- *  מגיע כשלב הבא (הכרטיסים העשירים); כרגע, ליתר ביטחון, תצוגת גיבוי
- *  קריאה ולא ריקה למקרה שהודעה כזו כבר קיימת ב-DB. */
+/** תצוגת גיבוי להודעת שיתוף שאין לה תצוגה מקדימה (סוג שלא נתמך עדיין, או שהתוכן נמחק/אינו נגיש).
+ *  שיתוף פוסט/מקום מוצג כרגיל דרך DmSharedCard. */
 function fallbackLabel(kind: DmMessageDto["kind"]): string {
   switch (kind) {
     case "trip":
@@ -159,6 +159,7 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
 
             {messages.map((message) => {
               const isMine = message.senderId === currentUserId;
+              if (message.shared) return <DmSharedCard key={message.id} message={message} isMine={isMine} />;
               const content = message.kind === "text" ? message.text ?? "" : fallbackLabel(message.kind);
               return isMine ? (
                 <UserBubble key={message.id}>{content}</UserBubble>

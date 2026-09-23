@@ -226,7 +226,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
             {trips === null && <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>טוען את הטיולים שלכם...</p>}
             {trips !== null && trips.length === 0 && (
               <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>
-                אין עדיין טיולים להוסיף. צרו טיול, או שמרו טיול של מישהו אחר, ואז תוכלו לאסוף אותו כאן.
+                אין עדיין טיולים להוסיף. צרו טיול, או שמרו טיול של מישהו אחר, ואז תוכלו להוסיף אותו כאן.
               </p>
             )}
             {trips !== null && trips.length > 0 && filteredTrips.length === 0 && (

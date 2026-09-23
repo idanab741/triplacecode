@@ -7,6 +7,8 @@ import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import { getAvatarUrl } from "@/constants/avatar";
 import { PostMediaViewerModal } from "./PostMediaViewerModal";
 import { PostInlineComments } from "./PostInlineComments";
+import { PostLikersStrip } from "./PostLikersStrip";
+import { ShareToFriendsSheet, type ShareOption } from "./ShareToFriendsSheet";
 
 interface PostCardProps {
   item: FeedItemDto;
@@ -15,6 +17,8 @@ interface PostCardProps {
   onWriteReview: (placeId: string, placeName: string) => void;
   onEditPost: (postId: string, newText: string) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
+  /** בעמוד הפוסט עצמו התגובות פתוחות מההתחלה. */
+  defaultCommentsOpen?: boolean;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -54,6 +58,15 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" {...ICON} fill={filled ? "currentColor" : "none"}>
       <path d="M6.5 4h11a1 1 0 0 1 1 1v15.2l-6.5-4.3-6.5 4.3V5a1 1 0 0 1 1-1Z" />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}>
+      <path d="m21.5 3-19 7.4 7.3 2.8L12.6 21l8.9-18Z" />
+      <path d="m9.8 13.2 5.4-5" />
     </svg>
   );
 }
@@ -101,7 +114,7 @@ function ActionButton({
  * כל הפעולות (לייק אופטימי, שמירה, עריכה, מחיקה, ביקורת, תגובות, צפייה במדיה)
  * נשארו בדיוק אותו דבר.
  */
-export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEditPost, onDeletePost }: PostCardProps) {
+export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEditPost, onDeletePost, defaultCommentsOpen = false }: PostCardProps) {
   const [liked, setLiked] = useState(item.viewerState.liked);
   const [saved, setSaved] = useState(item.viewerState.saved);
   const [likeCount, setLikeCount] = useState(item.stats.likes);
@@ -116,7 +129,10 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   const [busy, setBusy] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
-  const [commentsExpanded, setCommentsExpanded] = useState(false);
+  const [commentsExpanded, setCommentsExpanded] = useState(defaultCommentsOpen);
+  const [shareOpen, setShareOpen] = useState(false);
+  /** עולה אחרי כל לייק/ביטול לייק שהשרת אישר - מרענן את עיגולי המגיבים. */
+  const [likersRefresh, setLikersRefresh] = useState(0);
 
   function openViewer(index: number) {
     setViewerIndex(index);
@@ -155,6 +171,7 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
     if (next) setLikePop((n) => n + 1);
     try {
       const confirmed = await onLikeToggle(item.id);
+      setLikersRefresh((n) => n + 1);
       if (confirmed !== next) {
         setLiked(confirmed);
         setLikeCount((c) => Math.max(0, c + (confirmed ? 1 : -1) - (next ? 1 : -1)));
@@ -186,6 +203,12 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   // ב-taxonomy_media, משתמשים בתמונה הראשונה של הפוסט עצמו (post_media) -
   // כדי שה-chip תמיד יציג משהו אם יש בכלל תמונה זמינה בפוסט.
   const placeChipImageUrl = item.place?.imageUrl ?? media[0]?.url ?? null;
+
+  /** מה אפשר לשלוח לחבר: הפוסט עצמו, ואם הוא מקושר למקום - גם המקום (עם הפוסט כגיבוי אם המקום לא ברשימת ה-places). */
+  const shareOptions: ShareOption[] = [
+    { label: "הפוסט", target: { kind: "post", id: item.id } },
+    ...(item.place ? [{ label: "המקום", target: { kind: "place" as const, id: item.place.id, fallbackPostId: item.id } }] : []),
+  ];
 
   return (
     <article className="flex gap-3 border-b border-black/[0.07] px-4 py-3.5">
@@ -356,12 +379,12 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
           </div>
         )}
 
-        {/* מקום / יעד - קישור עדין */}
+        {/* מקום / יעד - קישור עדין. "כתוב ביקורת" בתוך המסגרת, בצד שמאל */}
         {(item.place || item.destination) && (
-          <>
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-black/[0.08] px-3 py-2 transition hover:bg-black/[0.02]">
             <Link
               href={item.place ? `/place/${item.place.id}` : `/destination/${item.destination?.id}`}
-              className="mt-2.5 flex items-center gap-2 rounded-xl border border-black/[0.08] px-3 py-2 transition hover:bg-black/[0.02]"
+              className="flex min-w-0 flex-1 items-center gap-2"
             >
               {placeChipImageUrl ? (
                 <span className="block h-6 w-6 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
@@ -375,21 +398,25 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
                 </svg>
               )}
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{item.place?.name ?? item.destination?.name}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
-                <path d="m14 6-6 6 6 6" />
-              </svg>
             </Link>
-            {item.place && (
+            {item.place ? (
               <button
                 type="button"
                 onClick={() => onWriteReview(item.place!.id, item.place!.name)}
-                className="mt-1.5 text-[13.5px] font-semibold text-places-purple"
+                className="shrink-0 whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] font-semibold text-places-purple transition active:scale-95"
               >
                 כתוב ביקורת
               </button>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
+                <path d="m14 6-6 6 6 6" />
+              </svg>
             )}
-          </>
+          </div>
         )}
+
+        {/* מי עשה לייק - עיגולי תמונות פרופיל מעל שורת הפעולות */}
+        <PostLikersStrip postId={item.id} likeCount={likeCount} refreshKey={likersRefresh} />
 
         {/* פעולות */}
         <div className="mt-1.5 flex items-center justify-between">
@@ -399,6 +426,9 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
           <ActionButton label="אהבתי" count={likeCount} color={liked ? LIKE_COLOR : undefined} onClick={handleLike} popKey={likePop}>
             <HeartIcon filled={liked} />
           </ActionButton>
+          <ActionButton label="שיתוף" onClick={() => setShareOpen(true)}>
+            <ShareIcon />
+          </ActionButton>
           <ActionButton label={saved ? "נשמר" : "שמירה"} color={saved ? "var(--color-places-purple)" : undefined} onClick={handleSave} popKey={savePop}>
             <BookmarkIcon filled={saved} />
           </ActionButton>
@@ -406,6 +436,8 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
 
         {commentsExpanded && <PostInlineComments postId={item.id} />}
       </div>
+
+      {shareOpen && <ShareToFriendsSheet options={shareOptions} onClose={() => setShareOpen(false)} />}
 
       {viewerOpen && (
         <PostMediaViewerModal

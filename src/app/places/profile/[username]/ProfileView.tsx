@@ -105,12 +105,12 @@ export default function ProfileView({
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => router.back()} menuHref={isSelf ? "/profile" : undefined} />
 
-      {/* הקאבר: מסגרת מלאה (ריבוע) שנכנסת מתחת לפינות המעוגלות של הבר (-mt-8 = רדיוס הפינות, בלי רווח לבן).
+      {/* הקאבר: מתחיל מראש המסך ממש, מתחת לבר השקוף (-mt-16 = גובה הבר: 52px + pb-3), בלי פס לבן מעליו.
           כל המידות באחוזים מרוחב הקאבר. שני מצבים:
           א. בלי קאבר משלו: התמונה המלאה עם ה-HERO (profile-default-hero) -> תמונת הפרופיל מעליה.
           ב. עם קאבר משלו: המסגרת הריקה -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> הטבעת (profile-cover-ring, מעל הקאבר,
              ולכן חסר לקאבר חלק מתחת) -> תמונת הפרופיל. */}
-      <div className="relative -mt-8 aspect-square w-full overflow-hidden bg-white">
+      <div className="relative -mt-16 aspect-square w-full overflow-hidden bg-white">
         {coverUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -213,14 +213,14 @@ export default function ProfileView({
             <div className="text-[15px] font-bold text-ink">{profile.counts.media}</div>
             <div className="text-[11.5px] text-ink-secondary">מדיה</div>
           </div>
-          <div className="flex-1">
+          <Link href={`/places/profile/${encodeURIComponent(username)}/followers`} className="flex-1 transition active:opacity-60">
             <div className="text-[15px] font-bold text-ink">{profile.counts.followers}</div>
             <div className="text-[11.5px] text-ink-secondary">עוקבים</div>
-          </div>
-          <div className="flex-1">
+          </Link>
+          <Link href={`/places/profile/${encodeURIComponent(username)}/following`} className="flex-1 transition active:opacity-60">
             <div className="text-[15px] font-bold text-ink">{profile.counts.following}</div>
             <div className="text-[11.5px] text-ink-secondary">במעקב</div>
-          </div>
+          </Link>
         </div>
       </div>
 

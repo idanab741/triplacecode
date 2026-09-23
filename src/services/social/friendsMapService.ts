@@ -13,6 +13,8 @@ export interface FriendsMapContribution {
   id: string;
   kind: "post" | "review" | "added";
   userId: string;
+  /** לקישור לפרופיל (/places/profile/[username]) - ואם חסר, משתמשים ב-userId. */
+  username: string | null;
   name: string;
   avatarUrl: string | null;
   isSelf: boolean;
@@ -394,6 +396,7 @@ export async function getFriendsMapPins(
       id,
       kind,
       userId,
+      username: (profile?.username as string | null) ?? null,
       name: (profile?.full_name as string | null) ?? (profile?.username as string | null) ?? "מטייל",
       avatarUrl: (profile?.avatar_url as string | null) ?? null,
       isSelf: userId === viewerId,

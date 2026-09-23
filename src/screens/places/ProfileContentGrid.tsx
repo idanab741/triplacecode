@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui";
 import type { ProfileContentFilter, ProfileTileDto } from "@/services/social/profileContentTypes";
-import type { FeedItemDto } from "@/services/social/feedService";
 import { ContentTypeIcon } from "./contentTypeIcons";
-import { PostMediaViewerModal } from "./PostMediaViewerModal";
 
 const TABS: { id: ProfileContentFilter; label: string }[] = [
   { id: "all", label: "הכל" },
   { id: "post", label: "פוסטים" },
   { id: "review", label: "ביקורות" },
-  { id: "collection", label: "אוספים" },
+  { id: "collection", label: "חוויות" },
   { id: "trip", label: "טיולים" },
 ];
 
@@ -20,7 +18,7 @@ const EMPTY_TEXT: Record<ProfileContentFilter, { self: string; other: string }> 
   all: { self: "עוד לא פרסמתם תוכן - לחצו על ה־+ כדי להתחיל.", other: "אין עדיין תוכן להצגה כאן." },
   post: { self: "עוד לא פרסמתם פוסט.", other: "אין עדיין פוסטים להצגה כאן." },
   review: { self: "עוד לא כתבתם ביקורת.", other: "אין עדיין ביקורות להצגה כאן." },
-  collection: { self: "עוד לא יצרתם אוסף.", other: "אין עדיין אוספים להצגה כאן." },
+  collection: { self: "עוד לא יצרתם חוויה.", other: "אין עדיין חוויות להצגה כאן." },
   trip: { self: "עוד לא יצרתם טיול.", other: "אין עדיין טיולים להצגה כאן." },
 };
 
@@ -47,15 +45,8 @@ async function fetchTiles(username: string, kind: ProfileContentFilter, cursor?:
   return (await res.json()) as { tiles: ProfileTileDto[]; nextCursor: string | null };
 }
 
-export function ProfileTile({ tile, onOpenPost }: { tile: ProfileTileDto; onOpenPost?: (tile: ProfileTileDto) => void }) {
-  // *** תיקון (בקשה מפורשת - "בעמוד הפרופיל א"א ללחוץ על הפוסט - הוא
-  // מעביר ישר לתגובות - אמור לפתוח את חלונית הפוסט עם התמונה, כמו
-  // ב-places"): פוסט/ביקורת עם תמונה נפתחים בחלונית המדיה (בדיוק כמו
-  // ב-PostCard של ה-Feed הרגיל), לא בניווט לעמוד תגובות נפרד. אוספים/
-  // טיולים, ותוכן-טקסט בלי תמונה (אין מה להציג בחלונית תמונה) - נשארים
-  // כמו שהיו (Link רגיל).
-  const opensInModal = onOpenPost && (tile.kind === "post" || tile.kind === "review") && tile.imageUrl;
-
+/** אריח בגריד הפרופיל. לחיצה פותחת את עמוד התוכן עצמו (פוסט / ביקורת / חוויה / טיול) - לא חלונית ולא רק תגובות. */
+export function ProfileTile({ tile }: { tile: ProfileTileDto }) {
   const content = (
     <>
       {tile.imageUrl ? (
@@ -89,14 +80,6 @@ export function ProfileTile({ tile, onOpenPost }: { tile: ProfileTileDto; onOpen
     </>
   );
 
-  if (opensInModal) {
-    return (
-      <button type="button" onClick={() => onOpenPost(tile)} className="relative block aspect-[3/4] w-full overflow-hidden bg-bg-secondary text-start">
-        {content}
-      </button>
-    );
-  }
-
   return (
     <Link href={tile.href} className="relative block aspect-[3/4] overflow-hidden bg-bg-secondary">
       {content}
@@ -126,20 +109,6 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
   const versionRef = useRef(0);
   const firstRunRef = useRef(true);
   const bucket = buckets[active];
-  // *** תוספת (ר' ProfileTile למעלה - פתיחת חלונית המדיה במקום ניווט).
-  const [viewerPost, setViewerPost] = useState<FeedItemDto | null>(null);
-
-  async function handleOpenPost(tile: ProfileTileDto) {
-    try {
-      const res = await fetch(`/api/social/posts/${tile.id}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.post) setViewerPost(data.post as FeedItemDto);
-    } catch {
-      // כשל שקט - פשוט לא נפתחת חלונית, בלי קריסה של הגריד.
-    }
-  }
-
   // איפוס כשמשתמש/גרסה משתנים (לא בטעינה הראשונה - שם יש נתוני התחלה מהשרת)
   useEffect(() => {
     if (firstRunRef.current) {
@@ -222,7 +191,7 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
         <>
           <div className="grid grid-cols-3 gap-0.5 pt-0.5">
             {bucket.tiles.map((tile) => (
-              <ProfileTile key={tile.key} tile={tile} onOpenPost={handleOpenPost} />
+              <ProfileTile key={tile.key} tile={tile} />
             ))}
           </div>
           {bucket.next && (
@@ -236,32 +205,6 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
             </button>
           )}
         </>
-      )}
-
-      {viewerPost && (
-        <PostMediaViewerModal
-          postId={viewerPost.id}
-          media={viewerPost.media}
-          initialIndex={0}
-          onClose={() => setViewerPost(null)}
-          authorName={viewerPost.author.fullName || viewerPost.author.username || ""}
-          authorAvatarUrl={viewerPost.author.avatarUrl}
-          createdAt={viewerPost.createdAt}
-          onDelete={
-            viewerPost.viewerState.isSelf
-              ? async () => {
-                  await fetch(`/api/social/posts/${viewerPost.id}`, { method: "DELETE" });
-                  setViewerPost(null);
-                  // מרעננים את הבאקט הפעיל כדי שהאריח שנמחק ייעלם מהגריד מיד.
-                  setBuckets((prev) => {
-                    const cur = prev[active];
-                    if (!cur) return prev;
-                    return { ...prev, [active]: { ...cur, tiles: cur.tiles.filter((t) => t.id !== viewerPost.id) } };
-                  });
-                }
-              : undefined
-          }
-        />
       )}
     </div>
   );

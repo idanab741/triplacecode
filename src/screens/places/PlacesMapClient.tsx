@@ -23,27 +23,29 @@ const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap
 export function PlacesMapClient() {
   const router = useRouter();
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-places-bg pb-0">
+    <div className="relative min-h-screen bg-places-bg pb-0">
       <HomeStatusBarTint color="#f8f5fc" />
       {/* *** בקשה מפורשת: בר שקוף, לוגו places בסגול - "מרחף" מעל המפה. */}
-      <CollapsibleTopBar headerRow={<PlacesHeaderRow />}>
+      {/* *** בקשה מפורשת: שורת החיפוש מופיעה רק במשיכה למטה (כמו בבית). המשיכה נקלטת רק על הבר
+          עצמו - גרירה על המפה/הכרטיסים לא פותחת אותה. */}
+      <CollapsibleTopBar pullFromBarOnly onRevealChange={setSearchOpen} headerRow={<PlacesHeaderRow badgeTone="purple" />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
-      {/* הבר שקוף - המפה מתחילה מראש המסך ממש, מתחת לבר (marginTop שלילי
-          בגובה הבר: 52px שורה + 12px pb-3 = 64px), והבר מרחף מעליה. */}
+      {/* *** תיקון (בקשה מפורשת - "החלוניות של המקומות נופלות למטה כשמתחילים להחליק"): המפה
+          כבר לא בזרימת העמוד מתחת לבר - היא שכבה קבועה מראש המסך ועד הבר התחתון, והבר השקוף
+          מרחף מעליה. כך גובה הבר (למשל שורת החיפוש) לא יכול להזיז את המפה ואת הכרטיסים. */}
       <div
-        className="relative isolate z-0"
-        style={{
-          marginTop: -64,
-          height: "max(472px, calc(100dvh - 66px - max(env(safe-area-inset-bottom), 22px)))",
-        }}
+        className="absolute inset-x-0 top-0 isolate z-0"
+        style={{ height: "calc(100dvh - 66px - max(env(safe-area-inset-bottom), 22px))" }}
       >
         <PlacesFriendsMap
           onCreate={() => setCreateMenuOpen(true)}
-          topOffsetPx={72}
+          // מתחת לבר: שורת הלוגו (52) + pb-3 (12) + מרווח; כששורת החיפוש פתוחה - עוד 64
+          topOffsetPx={searchOpen ? 136 : 72}
         />
       </div>
 

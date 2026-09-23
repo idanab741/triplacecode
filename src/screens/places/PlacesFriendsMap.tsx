@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MapContainer, TileLayer, AttributionControl, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -222,6 +223,12 @@ function PlaceContributionsSheet({
           {pin.contributions.map((c) => (
             <div key={c.id} className="border-b border-black/[0.05] px-5 py-3.5 last:border-b-0">
               <div className="flex items-center gap-2.5">
+                {/* לחיצה על האווטאר/השם מובילה לפרופיל של המשתמש */}
+                <Link
+                  href={`/places/profile/${c.username ?? c.userId}`}
+                  aria-label={`לפרופיל של ${c.name}`}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 transition active:opacity-70"
+                >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={getAvatarUrl(c.avatarUrl)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
                 <div className="min-w-0 flex-1">
@@ -234,6 +241,7 @@ function PlaceContributionsSheet({
                     {KIND_LABEL[c.kind]} · {timeAgo(c.createdAt)}
                   </p>
                 </div>
+                </Link>
                 {c.rating != null && <Stars value={c.rating} />}
               </div>
 

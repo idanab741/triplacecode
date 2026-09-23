@@ -5,7 +5,11 @@
  * הקובץ עצמו נמצא ב-public/avatars/default-avatar.png כדי שיוגש כנכס
  * סטטי ישירות מה-CDN/שרת ה-Next.js.
  */
-export const DEFAULT_AVATAR_URL = "/avatars/default-avatar.png";
+export const DEFAULT_AVATAR_URL = "/avatars/default-avatar-v2.png";
+
+/** *** בקשה מפורשת: תמונת הפרופיל הגנרית הוחלפה (אפורה במקום הכחולה). משתמש שנשמרה אצלו
+ *  במפורש הכתובת של התמונה הכחולה הישנה - מקבל גם הוא את החדשה. */
+const LEGACY_DEFAULT_AVATAR_URLS = ["/avatars/default-avatar.png"];
 
 /**
  * מחזיר את כתובת התמונה בפועל להצגה: התמונה שהמשתמש העלה אם קיימת,
@@ -13,5 +17,8 @@ export const DEFAULT_AVATAR_URL = "/avatars/default-avatar.png";
  * במקום לבדוק avatarUrl ולהציג ראשי תיבות/אימוג'י כ-fallback.
  */
 export function getAvatarUrl(avatarUrl?: string | null): string {
-  return avatarUrl && avatarUrl.trim().length > 0 ? avatarUrl : DEFAULT_AVATAR_URL;
+  const url = avatarUrl?.trim();
+  if (!url) return DEFAULT_AVATAR_URL;
+  if (LEGACY_DEFAULT_AVATAR_URLS.some((legacy) => url === legacy || url.endsWith(legacy))) return DEFAULT_AVATAR_URL;
+  return url;
 }

@@ -61,13 +61,15 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
       icon: (
         <NavIcon
           active={active === "home"}
-          activeSrc="/images/icon-home-active.png"
+          activeSrc="/images/icon-home-active-v2.png"
           inactiveSrc="/images/icon-home-inactive.png"
           alt="בית"
           whiteWhenInactive={whiteWhenInactive}
         />
       ),
       href: "/home",
+      // *** בקשה מפורשת: אייקון בית סגול מלא כשנמצאים עליו; גם הכיתוב באותו סגול.
+      activeColor: "#8203DB",
     },
     {
       id: "places",
