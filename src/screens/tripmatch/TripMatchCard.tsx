@@ -50,7 +50,7 @@ interface TripMatchCardProps {
    *  הכרטיס תמיד יתלכד עם מרכז ה-viewport בפועל, לא עם מרכז ה-container
    *  שלו (שיכול להיות שונה). null/undefined (standalone, או לפני
    *  המדידה הראשונה) - נופל חזרה ל-inset-x-0 (מלא רוחב ה-container). */
-  centerBox?: { left: number; width: number } | null;
+  centerBox?: { left: number; top: number; width: number; height: number } | null;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -152,11 +152,15 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // מ-centerBox (מחושב ב-page.tsx דרך getBoundingClientRect אמיתי)
       // כשקיים - לא width:85%+mx-auto (שהתברר לא אמין בסביבת ה-build) -
       // בלי centerBox (standalone) נופל חזרה ל-inset-x-0 המקורי.
-      className="absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
+      // *** תוקן שוב (בקשה מפורשת - מסמך מפורט: "אל תמלא 100% מהגובה -
+      // הגובה נגזר מהרוחב לפי יחס תמונה, עם שוליים ברורים מעל ומתחת"):
+      // centerBox עכשיו מכיל גם top/height (לא רק left/width) - מחושבים
+      // ב-page.tsx לפי יחס-תמונה קבוע, לא "100% מהאב".
+      className="absolute overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
       style={
         centerBox
-          ? { height: "100%", left: centerBox.left, width: centerBox.width }
-          : { height: "100%", left: 0, right: 0 }
+          ? { top: centerBox.top, height: centerBox.height, left: centerBox.left, width: centerBox.width }
+          : { top: 0, height: "100%", left: 0, right: 0 }
       }
     >
       <div className="absolute inset-0 bg-bg-secondary">

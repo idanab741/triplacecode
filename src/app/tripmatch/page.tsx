@@ -284,15 +284,24 @@ export function TripMatchPageContent({
   // CONTAINER_CENTER, מדוד בפועל עם getBoundingClientRect - לא חישוב
   // תיאורטי של CSS"): אחרי כמה ניסיונות מבוססי-CSS בלבד (width%,
   // margin:auto) שלא נתנו תוצאה עקבית בסביבת ה-build/מכשיר של המשתמש,
-  // עברנו למדידה ומיקום אמיתיים ב-JS - בדיוק כמו gobalHeight (הגובה
+  // עברנו למדידה ומיקום אמיתיים ב-JS - בדיוק כמו foldHeight (הגובה
   // שכבר עובד באמינות). cardAreaRef מצביע על .tripmatch-embedded-card-area
   // (ה-position:relative שמכיל את כל הכרטיסים) - ref, לא query גלובלי,
-  // כי יש כמה כרטיסים כאלה בעמוד (עמודים אחרים/standalone). cardBox הוא
-  // left/width מחושבים (px, לא %) כך שהמרכז של הכרטיס תמיד יתלכד עם
-  // window.innerWidth/2 בדיוק - לא עם מרכז ה-container (שיכול להיות
-  // שונה אם למשל יש לו padding לא-סימטרי איפשהו בשרשרת ההורים).
+  // כי יש כמה כרטיסים כאלה בעמוד (עמודים אחרים/standalone).
+  //
+  // *** שונה מהיסוד (בקשה מפורשת - מסמך מפורט: "אל תיתן לכרטיס למלא
+  // 100% מהגובה הפנוי ולהיות ענק - הגובה צריך להיגזר מהרוחב לפי יחס
+  // תמונה, לא להיות גובה קבוע/מלא. שוליים ברורים גם מעל וגם מתחת, לא
+  // רק בצדדים"): cardBox עכשיו הוא קופסה מלאה - left/top/width/height,
+  // לא רק left/width. הרוחב הוא 86% מה-viewport (בתוך הטווח 84-88%
+  // שהתבקש). הגובה נגזר מהרוחב לפי יחס-תמונה (aspectRatio) קבוע - לא
+  // "100% מהאב" - ומוגבל גם (Math.min) לגובה הפנוי בפועל בתוך ה-
+  // container, פחות שוליים אנכיים ברורים מעל ומתחת (לא רק תיאורטיים -
+  // אם הכרטיס לפי יחס-התמונה עדיין גבוה מדי לתת שוליים, הוא מצטמצם
+  // עוד לפי הגובה הפנוי בפועל, לא "בורח" למעלה/מתחת). top ממרכז אנכית
+  // את הכרטיס בתוך השטח הפנוי - כך שהשוליים מעל ומתחת יוצאים שווים.
   const cardAreaRef = useRef<HTMLDivElement>(null);
-  const [cardBox, setCardBox] = useState<{ left: number; width: number } | null>(null);
+  const [cardBox, setCardBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!embedded) return;
@@ -302,16 +311,30 @@ export function TripMatchPageContent({
       if (!area) return;
       const containerRect = area.getBoundingClientRect();
       const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
-      // מרווח שווה קבוע (24px) מכל צד של ה-viewport עצמו - לא אחוז
-      // מתוך ה-container (שיכול להיות ממוקם לא-סימטרי בעצמו). Math.max
-      // מונע רוחב שלילי/אבסורדי אם מודדים במסך צר מאוד באמצע resize.
-      const sideMargin = 24;
-      const width = Math.max(200, viewportWidth - sideMargin * 2);
+
+      // רוחב: 86% מה-viewport (טווח שהתבקש: 84-88%), ממורכז אופקית
+      // ביחס ל-viewport עצמו (לא ל-container) - כמו קודם.
+      const width = Math.max(200, viewportWidth * 0.86);
       const viewportCenterX = viewportWidth / 2;
-      // left כאן הוא יחסית ל-container (position:relative) - לא ל-
-      // viewport - לכן מפחיתים את המיקום של ה-container עצמו מה-viewport.
       const left = viewportCenterX - width / 2 - containerRect.left;
-      setCardBox({ left, width });
+
+      // גובה: נגזר מהרוחב לפי יחס-תמונה portrait קבוע (0.72 ≈ 5:7,
+      // יחס נפוץ לכרטיסי טיולים/Tinder-style) - *לא* גובה קבוע/100%.
+      // Math.min מוודא שגם אם ה-container נמוך מדי לגובה הזה, הכרטיס
+      // עדיין משאיר שוליים אנכיים אמיתיים (16px) מעל ומתחת בתוכו -
+      // לא נוגע/חורג מהקצוות העליון/תחתון של אזור הכרטיסייה.
+      const aspectRatio = 0.72; // width / height
+      const verticalMargin = 16;
+      const heightFromWidth = width / aspectRatio;
+      const maxHeightAvailable = containerRect.height - verticalMargin * 2;
+      const height = Math.max(200, Math.min(heightFromWidth, maxHeightAvailable));
+
+      // top ממרכז את הכרטיס (בגובה שנקבע) בתוך השטח האנכי הפנוי של
+      // ה-container - כך שהשוליים מעל ומתחת יוצאים שווים ולא הכרטיס
+      // תמיד "נדבק" לראש ה-container.
+      const top = Math.max(verticalMargin, (containerRect.height - height) / 2);
+
+      setCardBox({ left, top, width, height });
     }
 
     measure();
@@ -1663,7 +1686,7 @@ export function TripMatchPageContent({
                         className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
                         style={
                           embedded && cardBox
-                            ? { height: "100%", left: cardBox.left, width: cardBox.width, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            ? { top: cardBox.top, height: cardBox.height, left: cardBox.left, width: cardBox.width, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                             : { height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                         }
                       />
@@ -1674,7 +1697,7 @@ export function TripMatchPageContent({
                       className="absolute top-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
                       style={
                         embedded && cardBox
-                          ? { height: "100%", left: cardBox.left, width: cardBox.width }
+                          ? { top: cardBox.top, height: cardBox.height, left: cardBox.left, width: cardBox.width }
                           : { height: "100%", left: 0, right: 0 }
                       }
                     >
@@ -1742,7 +1765,8 @@ export function TripMatchPageContent({
                         style={
                           embedded && cardBox
                             ? {
-                                height: "100%",
+                                top: cardBox.top,
+                                height: cardBox.height,
                                 left: cardBox.left,
                                 width: cardBox.width,
                                 transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
@@ -1808,14 +1832,21 @@ export function TripMatchPageContent({
                   <div
                     dir="ltr"
                     className="pointer-events-none absolute z-10 flex items-center justify-center gap-[16px]"
-                    // *** תוקן (בקשה מפורשת - מדידה אמיתית): אותו left/width
-                    // בדיוק כמו הכרטיס עצמו (cardBox) - לא inset-x-0 (רוחב
-                    // מלא של ה-container) - כדי שהכפתורים תמיד ייושרו בדיוק
-                    // מעל מרכז הכרטיס, גם אם ה-container עצמו לא ממורכז
-                    // ב-viewport מסיבה כלשהי.
+                    // *** תוקן שוב (בקשה מפורשת - מסמך מפורט): הכרטיס כבר
+                    // לא ממלא 100% מהאב (יש לו top/height מחושבים) - אז
+                    // "bottom: ZONE" (יחסית לתחתית ה-container) כבר לא
+                    // מיישר לקצה התחתון של *הכרטיס* עצמו. עכשיו ממוקם
+                    // לפי top, יחסית לקצה התחתון של הכרטיס בפועל
+                    // (cardBox.top + cardBox.height), פחות ה-ZONE וגובה
+                    // הכפתורים - כדי שתמיד יישארו בתוך הכרטיס, קרוב לתחתיתו.
                     style={
                       embedded && cardBox
-                        ? { height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE, left: cardBox.left, width: cardBox.width }
+                        ? {
+                            height: TRIPMATCH_MAIN_BUTTON_SIZE,
+                            top: cardBox.top + cardBox.height - TRIPMATCH_CARD_BUTTON_ZONE - TRIPMATCH_MAIN_BUTTON_SIZE,
+                            left: cardBox.left,
+                            width: cardBox.width,
+                          }
                         : { height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE, left: 0, right: 0 }
                     }
                   >
