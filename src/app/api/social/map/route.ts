@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/services/supabase/server";
 import { getFriendsMapPins } from "@/services/social/friendsMapService";
 
-/** GET - פיני "המפה" בעמוד place's: כל המקומות שהחברים (והצופה) המליצו עליהם בפוסטים. */
+/** GET - פיני המפה בעמוד place's: כל המקומות שמשתמשים העלו/דירגו/פרסמו עליהם (כל המשתמשים),
+ *  מאוחדים לפין אחד למקום, עם כל התרומות והתמונות שלהם. ר' friendsMapService.ts. */
 export async function GET() {
   const supabase = await createClient();
   const {

@@ -16,7 +16,7 @@ import { MapTilerBaseLayer } from "@/components/map/MapTilerBaseLayer";
 import { getAvatarUrl } from "@/constants/avatar";
 import { getSessionLocation } from "@/utils/sessionLocation";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
-import type { FriendsMapPin } from "@/services/social/friendsMapService";
+import type { FriendsMapPin, FriendsMapContribution } from "@/services/social/friendsMapService";
 import { getFriendPinIcon } from "./friendPin";
 
 type Filter = "all" | "friends" | "mine";
@@ -36,7 +36,7 @@ const USER_ICON = L.divIcon({
 });
 
 /** מרחק אנכי (px) שמזיזים את מרכז המפה כדי שהנעץ הנבחר יופיע *מעל* פס הכרטיסים שבתחתית. */
-const SELECT_OFFSET_PX = 60;
+const SELECT_OFFSET_PX = 95; // הכרטיסים גבוהים יותר עכשיו (שורת תמונות)
 
 /** רדיוס (ק"מ) של "אזור אחד" - פינים רחוקים יותר לא נכנסים לתצוגה ההתחלתית. */
 const NEAR_KM = 60;
@@ -91,7 +91,7 @@ function MapController({
       map.setView(points[0], 14, { animate: false });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 72], paddingBottomRight: [44, 150], maxZoom: 15, animate: false });
+    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 72], paddingBottomRight: [44, 220], maxZoom: 15, animate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToken]);
 
@@ -127,12 +127,151 @@ function AvatarStack({ recommenders }: { recommenders: FriendsMapPin["recommende
 
 function recommendersLabel(pin: FriendsMapPin): string {
   const others = pin.recommenders.filter((r) => !r.isSelf);
-  const self = pin.hasSelf;
-  if (others.length === 0) return "המלצה שלך";
+  if (others.length === 0) return "שיתפת את המקום";
   const first = others[0].name;
   const extra = pin.recommendersCount - 1;
-  if (extra <= 0) return `${first} המליץ/ה`;
-  return self && others.length === 1 ? `${first} ואתם המלצתם` : `${first} ועוד ${extra} המליצו`;
+  if (extra <= 0) return `${first} שיתף/ה`;
+  return pin.hasSelf && pin.recommendersCount === 2 ? `${first} ואת/ה שיתפתם` : `${first} ועוד ${extra} שיתפו`;
+}
+
+const KIND_LABEL: Record<FriendsMapContribution["kind"], string> = {
+  added: "העלה/תה את המקום",
+  review: "ביקורת",
+  post: "פוסט",
+};
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.round(diff / 60000);
+  if (min < 1) return "עכשיו";
+  if (min < 60) return `לפני ${min} דק'`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `לפני ${h} שעות`;
+  const d = Math.round(h / 24);
+  if (d < 30) return d === 1 ? "אתמול" : `לפני ${d} ימים`;
+  const m = Math.round(d / 30);
+  if (m < 12) return m === 1 ? "לפני חודש" : `לפני ${m} חודשים`;
+  const y = Math.round(m / 12);
+  return y === 1 ? "לפני שנה" : `לפני ${y} שנים`;
+}
+
+function Stars({ value }: { value: number }) {
+  return (
+    <span className="text-[12px] leading-none tracking-tight" aria-label={`דירוג ${value} מתוך 5`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span key={i} className={i <= Math.round(value) ? "text-[#F59E0B]" : "text-black/15"}>
+          ★
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * *** חדש (בקשה מפורשת - "בתוך המקום המאוחד להכניס את כל מה שהמשתמשים מעלים,
+ * עם תמונות של המשתמש שהעלה/דירג"): גיליון תחתון עם כל התרומות לאותו מקום -
+ * לכל משתמש: אווטאר, שם, סוג (העלאה / ביקורת / פוסט), דירוג, טקסט והתמונות שהוא
+ * העלה. לחיצה על תמונה פותחת אותה במסך מלא.
+ */
+function PlaceContributionsSheet({
+  pin,
+  onClose,
+  onOpenPlace,
+}: {
+  pin: FriendsMapPin;
+  onClose: () => void;
+  onOpenPlace: () => void;
+}) {
+  const [viewer, setViewer] = useState<string | null>(null);
+  const rating = pin.userRatingAvg ?? pin.rating;
+
+  return (
+    <div className="absolute inset-0 z-[1200] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={pin.name}>
+      <button type="button" aria-label="סגור" onClick={onClose} className="absolute inset-0 bg-black/35 backdrop-blur-[1px]" />
+      <div className="relative flex max-h-[78%] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_-18px_40px_-20px_rgba(20,10,60,0.6)]">
+        <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-black/10" />
+        <div className="flex shrink-0 items-start gap-3 px-5 pb-3 pt-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[18px] font-extrabold text-ink">{pin.name}</h2>
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-[12.5px] text-ink-secondary">
+              {rating != null && (
+                <>
+                  <span className="text-[#F59E0B]">★</span>
+                  <span className="font-semibold text-ink">{rating.toFixed(1)}</span>
+                  {pin.userRatingAvg != null && <span>({pin.userRatingCount})</span>}
+                </>
+              )}
+              {rating != null && pin.city && <span className="opacity-50">·</span>}
+              {pin.city && <span className="truncate">{pin.city}</span>}
+            </p>
+            <p className="mt-1 text-[12.5px] font-bold text-places-purple">
+              {pin.recommendersCount === 1 ? "משתמש אחד שיתף" : `${pin.recommendersCount} משתמשים שיתפו`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenPlace}
+            className="shrink-0 rounded-full px-3.5 py-2 text-[12.5px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(124,58,237,0.9)] transition active:scale-95"
+            style={{ background: "linear-gradient(135deg, var(--color-places-violet), var(--color-places-purple))" }}
+          >
+            לעמוד המקום
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-black/[0.06] pb-6">
+          {pin.contributions.map((c) => (
+            <div key={c.id} className="border-b border-black/[0.05] px-5 py-3.5 last:border-b-0">
+              <div className="flex items-center gap-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={getAvatarUrl(c.avatarUrl)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-extrabold text-ink">
+                    {c.name}
+                    {c.isSelf && <span className="font-semibold text-ink-secondary"> (את/ה)</span>}
+                    {!c.isSelf && c.isFriend && <span className="font-semibold text-places-purple"> · חבר/ה</span>}
+                  </p>
+                  <p className="truncate text-[12px] text-ink-secondary">
+                    {KIND_LABEL[c.kind]} · {timeAgo(c.createdAt)}
+                  </p>
+                </div>
+                {c.rating != null && <Stars value={c.rating} />}
+              </div>
+
+              {c.text && <p className="mt-2 whitespace-pre-line text-[14px] leading-relaxed text-ink">{c.text}</p>}
+
+              {c.photos.length > 0 && (
+                <div className="stories-rail-track -mx-5 mt-2.5 flex gap-2 overflow-x-auto px-5" style={{ scrollbarWidth: "none" }}>
+                  {c.photos.map((url) => (
+                    <button
+                      key={url}
+                      type="button"
+                      onClick={() => setViewer(url)}
+                      className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-places-bg transition active:scale-[0.97]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {viewer && (
+        <button
+          type="button"
+          aria-label="סגור תמונה"
+          onClick={() => setViewer(null)}
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 p-4"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewer} alt="" className="max-h-full max-w-full rounded-xl object-contain" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -159,6 +298,7 @@ export function PlacesFriendsMap({
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [fly, setFly] = useState<{ key: string; n: number } | null>(null);
   const [locateToken, setLocateToken] = useState(0);
   const [userLoc, setUserLoc] = useState<LatLng | null>(() => {
@@ -251,6 +391,7 @@ export function PlacesFriendsMap({
       : [32.0853, 34.7818];
 
   const isEmpty = pins !== null && filtered.length === 0;
+  const sheetPin = sheetKey ? (pins ?? []).find((p) => p.key === sheetKey) ?? null : null;
 
   return (
     // *** תיקון (בקשה מפורשת - "המפה צריכה להיות בגוונים ובעיצוב שלנו, כמו מפת עמוד הבית"):
@@ -353,12 +494,12 @@ export function PlacesFriendsMap({
             </svg>
           </span>
           <p className="mt-3 text-[16px] font-extrabold text-ink">
-            {error ? "לא הצלחנו לטעון את המפה" : filter === "mine" ? "עוד לא המלצתם על מקומות" : "אין עדיין המלצות על המפה"}
+            {error ? "לא הצלחנו לטעון את המפה" : filter === "mine" ? "עוד לא שיתפתם מקומות" : filter === "friends" ? "החברים שלכם עוד לא שיתפו מקומות" : "אין עדיין מקומות על המפה"}
           </p>
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
               ? "נסו שוב בעוד רגע."
-              : "כשתפרסמו פוסט על מקום, או שחברים ימליצו על מקומות, הם יופיעו כאן על המפה."}
+              : "כשמשתמשים יעלו מקומות, יכתבו ביקורות או יפרסמו פוסט על מקום, הם יופיעו כאן על המפה."}
           </p>
           {!error && onCreate && (
             <button
@@ -393,7 +534,10 @@ export function PlacesFriendsMap({
                   else cardRefs.current.delete(pin.key);
                 }}
                 type="button"
-                onClick={() => router.push(`/place/${pin.placeId}`)}
+                onClick={() => {
+                  selectByUser(pin.key);
+                  setSheetKey(pin.key);
+                }}
                 className={`w-[68%] max-w-[260px] shrink-0 snap-center rounded-2xl bg-white p-2.5 text-start shadow-[0_12px_28px_-12px_rgba(20,10,60,0.55)] transition-all duration-300 ${
                   selected ? "ring-2 ring-places-purple" : "opacity-95 ring-1 ring-black/5"
                 }`}
@@ -408,17 +552,34 @@ export function PlacesFriendsMap({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-extrabold leading-tight text-ink">{pin.name}</span>
                     <span className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-ink-secondary">
-                      {pin.rating != null && (
+                      {(pin.userRatingAvg ?? pin.rating) != null && (
                         <>
                           <span className="text-[#F59E0B]">★</span>
-                          <span className="font-semibold text-ink">{pin.rating.toFixed(1)}</span>
+                          <span className="font-semibold text-ink">{(pin.userRatingAvg ?? pin.rating)!.toFixed(1)}</span>
                         </>
                       )}
-                      {pin.rating != null && pin.city && <span className="opacity-50">·</span>}
+                      {(pin.userRatingAvg ?? pin.rating) != null && pin.city && <span className="opacity-50">·</span>}
                       {pin.city && <span className="truncate">{pin.city}</span>}
                     </span>
                   </span>
                 </span>
+
+                {/* *** התמונות שהמשתמשים עצמם העלו (בקשה מפורשת) - עד 4, והשאר כ-"+N". */}
+                {pin.photos.length > 0 && (
+                  <span className="mt-2 grid grid-cols-4 gap-1">
+                    {pin.photos.slice(0, 4).map((url, i) => (
+                      <span key={url} className="relative block aspect-square overflow-hidden rounded-lg bg-places-bg">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+                        {i === 3 && pin.photos.length > 4 && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[12px] font-bold text-white">
+                            +{pin.photos.length - 4}
+                          </span>
+                        )}
+                      </span>
+                    ))}
+                  </span>
+                )}
 
                 <span className="mt-2 flex items-center gap-1.5">
                   <AvatarStack recommenders={pin.recommenders} />
@@ -428,6 +589,14 @@ export function PlacesFriendsMap({
             );
           })}
         </div>
+      )}
+
+      {sheetPin && (
+        <PlaceContributionsSheet
+          pin={sheetPin}
+          onClose={() => setSheetKey(null)}
+          onOpenPlace={() => router.push(`/place/${sheetPin.placeId}`)}
+        />
       )}
     </div>
   );

@@ -187,7 +187,7 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
   if (effectiveAuthLoading || !user) {
     return (
-      <div className="min-h-screen bg-white px-4 pt-6">
+      <div className="min-h-screen bg-places-bg px-4 pt-6">
         <Skeleton className="mb-4 h-10 w-full" />
         <Skeleton className="mb-4 h-20 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -197,18 +197,19 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
   return (
     <div className="min-h-screen bg-places-bg pb-24">
-      <HomeStatusBarTint color="#1FB3FD" />
+      <HomeStatusBarTint color="#f8f5fc" />
       {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
           ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
           נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
-      {/* *** בקשה מפורשת - "places על רקע כחול": הבר הצבעוני (כחול) עם לוגו places לבן. */}
-      <CollapsibleTopBar variant="colored" tone="blue" headerRow={<PlacesHeaderRow logoTone="white" />}>
+      {/* *** בקשה מפורשת - "רקע לבן, רק הטקסט places בסגול": הבר השקוף
+          (על רקע העמוד הבהיר), לוגו places בסגול. */}
+      <CollapsibleTopBar headerRow={<PlacesHeaderRow />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
 
       {/* הטאבים "עבורך / חברים" - צמודים מתחת לבר הסגול. */}
-      <div className="mt-3 bg-white">
+      <div className="mt-3">
         <FeedTabs active={view} onChange={setView} />
       </div>
 
@@ -230,7 +231,9 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
 
       {/* הפיד: שטוח ולבן ברוחב מלא, כמו פידים מוכרים (בקשה מפורשת - "נראה מצועצע"). */}
-      <div className="bg-white">
+      {/* *** בקשה מפורשת - "הרקע של העמוד כמו הרקע של הבר": בלי bg-white -
+          הפיד יושב על אותו רקע כמו הבר העליון (bg-places-bg של העמוד). */}
+      <div>
 
         {feedItems === null && (
           <div className="p-4">

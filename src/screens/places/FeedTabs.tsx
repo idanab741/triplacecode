@@ -22,7 +22,7 @@ export function FeedTabs({ active, onChange }: { active: PlacesFeedView; onChang
   );
 
   return (
-    <div role="tablist" aria-label="תצוגת פיד" className="relative grid grid-cols-2 border-b border-black/[0.08] bg-white">
+    <div role="tablist" aria-label="תצוגת פיד" className="relative grid grid-cols-2 border-b border-black/[0.08] bg-transparent">
       {TABS.map((tab) => {
         const selected = active === tab.id;
         return (

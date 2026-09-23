@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -23,34 +23,27 @@ const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap
 export function PlacesMapClient() {
   const router = useRouter();
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
-  const [mapTouching, setMapTouching] = useState(false);
-  const mapTouchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function handleMapInteracting(active: boolean) {
-    if (mapTouchTimerRef.current) clearTimeout(mapTouchTimerRef.current);
-    if (active) setMapTouching(true);
-    else mapTouchTimerRef.current = setTimeout(() => setMapTouching(false), 1100);
-  }
 
   return (
     <div className="min-h-screen bg-places-bg pb-0">
-      <HomeStatusBarTint color="#1FB3FD" />
-      <CollapsibleTopBar variant="colored" tone="blue" headerRow={<PlacesHeaderRow logoTone="white" />}>
+      <HomeStatusBarTint color="#f8f5fc" />
+      {/* *** בקשה מפורשת: בר שקוף, לוגו places בסגול - "מרחף" מעל המפה. */}
+      <CollapsibleTopBar headerRow={<PlacesHeaderRow />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
-      {/* הבר הכחול עם פינות מעוגלות - המפה ממשיכה מתחתיהן (marginTop שלילי של 32px). */}
+      {/* הבר שקוף - המפה מתחילה מראש המסך ממש, מתחת לבר (marginTop שלילי
+          בגובה הבר: 52px שורה + 12px pb-3 = 64px), והבר מרחף מעליה. */}
       <div
         className="relative isolate z-0"
         style={{
-          marginTop: -32,
-          height: "max(472px, calc(100dvh - 40px - 66px - max(env(safe-area-inset-bottom), 22px)))",
+          marginTop: -64,
+          height: "max(472px, calc(100dvh - 66px - max(env(safe-area-inset-bottom), 22px)))",
         }}
       >
         <PlacesFriendsMap
           onCreate={() => setCreateMenuOpen(true)}
-          onInteractingChange={handleMapInteracting}
-          topOffsetPx={mapTouching ? 44 : 52}
+          topOffsetPx={72}
         />
       </div>
 
