@@ -40,14 +40,23 @@ export function PlacesHeaderRow({ onBack, menuHref }: { onBack?: () => void; men
           של triplace גבוה 34px (מהעולה ל-l עד היורד של p), ושל place's היה 40px בתיבה
           150x46. תיבה מוקטנת ב-0.85 (128x39) נותנת בדיוק 34px - אותו גודל אות. */}
       <div className="flex h-10 items-center justify-center">
-        <Image
-          src="/images/places-logo.png"
-          alt="place's"
-          width={128}
-          height={39}
-          priority
-          className="h-[39px] w-[128px] select-none object-contain"
-          style={{ filter: "brightness(0) invert(1)" }}
+        {/* *** בר שקוף (בקשה מפורשת): הלוגו בסגול של place's. נצבע דרך CSS
+            mask מאותו קובץ לוגו - הצורה זהה ב-100%, רק הצבע משתנה. */}
+        <span
+          role="img"
+          aria-label="place's"
+          className="block h-[39px] w-[128px] select-none"
+          style={{
+            backgroundColor: "var(--color-places-purple)",
+            WebkitMaskImage: "url(/images/places-logo.png)",
+            maskImage: "url(/images/places-logo.png)",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            maskPosition: "center",
+          }}
         />
       </div>
 

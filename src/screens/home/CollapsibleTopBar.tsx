@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 
 interface CollapsibleTopBarProps {
@@ -69,9 +68,11 @@ const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
 export function CollapsibleTopBar({
   loading = false,
   headerRow,
-  gradient = BAR_GRADIENT,
-  shadow = BAR_SHADOW,
-  tone = "blue",
+  // gradient/shadow/tone נשארים ב-API לתאימות לאחור (כל העמודים מעבירים
+  // אותם), אבל הבר עכשיו שקוף - הם לא מוחלים יותר.
+  gradient: _gradient = BAR_GRADIENT,
+  shadow: _shadow = BAR_SHADOW,
+  tone: _tone = "blue",
   onBack,
   menuHref,
   children,
@@ -176,17 +177,67 @@ export function CollapsibleTopBar({
     };
   }, [collapsible, forceReveal]);
 
+  // *** בר עליון חדש (בקשה מפורשת - "רק הלוגו, רקע שקוף; נגלל עם העמוד,
+  // אבל כשעולים למעלה הוא מופיע"): headroom - גלילה למטה מסתירה את הבר
+  // (translateY(-100%)), גלילה למעלה מחזירה אותו. בראש הדף הוא שקוף לגמרי;
+  // כשהוא חוזר מעל תוכן (באמצע הדף) הוא מקבל רקע לבן-שקוף עדין עם טשטוש,
+  // כדי שהלוגו והכפתורים לא יתערבבו עם התוכן שמתחתיו. מעודכן ישירות על
+  // ה-DOM (לא state) - בלי רינדור בכל פריים.
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    let lastY = Math.max(0, window.scrollY);
+    let hidden = false;
+    let raf = 0;
+    const THRESHOLD = 6;
+
+    function update() {
+      raf = 0;
+      if (!bar) return;
+      const y = Math.max(0, window.scrollY);
+      const delta = y - lastY;
+      const barHeight = bar.offsetHeight;
+      if (raised || forceReveal || y <= barHeight) {
+        hidden = false;
+        lastY = y;
+      } else if (delta > THRESHOLD) {
+        hidden = true;
+        lastY = y;
+      } else if (delta < -THRESHOLD) {
+        hidden = false;
+        lastY = y;
+      }
+      const floating = !hidden && y > 4;
+      bar.style.transform = hidden ? "translateY(-100%)" : "";
+      bar.style.backgroundColor = floating ? "rgba(255, 255, 255, 0.82)" : "transparent";
+      bar.style.backdropFilter = floating ? "blur(14px)" : "";
+      (bar.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter = floating ? "blur(14px)" : "";
+      bar.style.boxShadow = floating ? "0 8px 24px -16px rgba(16, 24, 40, 0.35)" : "none";
+    }
+
+    function onScroll() {
+      if (!raf) raf = requestAnimationFrame(update);
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [raised, forceReveal]);
+
   return (
     <div
       ref={barRef}
       data-home-top-bar=""
-      className={`sticky top-0 rounded-b-[32px] pb-5 ${raised ? "z-[65]" : "z-30"}`}
+      className={`sticky top-0 pb-3 ${raised ? "z-[65]" : "z-30"}`}
       style={{
-        background: gradient,
-        boxShadow: shadow,
+        backgroundColor: "transparent",
+        transition: "transform 240ms cubic-bezier(0.22, 1, 0.36, 1), background-color 200ms ease, box-shadow 200ms ease",
+        willChange: "transform",
       }}
     >
-      <AnimatedHeaderBackdrop tone={tone} />
       {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} />}
 
       {collapsible && (

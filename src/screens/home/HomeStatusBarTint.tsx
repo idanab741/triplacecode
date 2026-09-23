@@ -4,7 +4,10 @@ import { useEffect } from "react";
 
 /** צבע קצה העליון של גרדיאנט הבר התכלת של עמוד הבית (#3FCBFD -> #007CFE,
  *  זווית 150deg) - ממוצע של השורה העליונה, כדי שסרגל הסטטוס יתמזג איתו. */
-const HOME_TINT = "#1FB3FD";
+const HOME_TINT = "#fcfafc"; // *** הבר שקוף עכשיו - סרגל הסטטוס בצבע רקע העמוד (--color-bg)
+/** place's (כל מי שמעביר את הסגול הישן) - רקע העמוד של place's (--color-places-bg). */
+const LEGACY_PURPLE = "#7c3aed";
+const PLACES_BG = "#f8f5fc";
 
 /** כמה px מלמעלה נצבעים בתכלת ברקע ה-html (מספיק כדי לכסות את אזור
  *  ה-safe-area העליון של האייפון, ~59px, וגם משיכת-יתר כלפי מטה). */
@@ -27,7 +30,8 @@ interface HomeStatusBarTintProps {
   color?: string;
 }
 
-export function HomeStatusBarTint({ color = HOME_TINT }: HomeStatusBarTintProps = {}) {
+export function HomeStatusBarTint({ color: requestedColor = HOME_TINT }: HomeStatusBarTintProps = {}) {
+  const color = requestedColor.toLowerCase() === LEGACY_PURPLE ? PLACES_BG : requestedColor;
   useEffect(() => {
     // 1) theme-color
     let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');

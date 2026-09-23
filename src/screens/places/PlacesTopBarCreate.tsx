@@ -20,7 +20,7 @@ interface PlacesTopBarCreateProps {
  */
 export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
   return (
-    <div className="flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_3px_8px_-4px_rgba(50,10,120,0.35)]">
+    <div className="flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(50,10,120,0.28)] ring-1 ring-black/[0.06]">
       <Link href="/places/search" aria-label="חיפוש ב-place's" className="flex min-w-0 flex-1 items-center gap-2.5 text-right">
         <svg
           width={20}

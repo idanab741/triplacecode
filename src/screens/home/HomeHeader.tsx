@@ -82,13 +82,23 @@ export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
             (brightness(0) invert(1)) - בלי קובץ לוגו חדש.
             *** הוגדל ב-25% (בקשה מפורשת - "להגדיל מעט את הלוגו"): 120x37 ->
             150x46. -my-1 מקזז את הגובה הנוסף כדי שגובה ההדר לא יקפוץ. */}
-        <Image
-          src="/images/triplace-logo-black.png"
-          alt="TRIPLACE"
-          width={150}
-          height={46}
-          className="object-contain"
-          style={{ filter: "brightness(0) invert(1)" }}
+        {/* *** בר שקוף (בקשה מפורשת): הלוגו בתכלת. נצבע דרך CSS mask מאותו
+            קובץ הלוגו השחור - הצורה זהה ב-100%, רק הצבע משתנה. */}
+        <span
+          role="img"
+          aria-label="TRIPLACE"
+          className="block h-[46px] w-[150px] select-none"
+          style={{
+            backgroundColor: "#0AA9FD",
+            WebkitMaskImage: "url(/images/triplace-logo-black.png)",
+            maskImage: "url(/images/triplace-logo-black.png)",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            maskPosition: "center",
+          }}
         />
       </div>
 

@@ -142,7 +142,7 @@ export function SearchBarLink({
       <div
         className={
           variant === "hero"
-            ? "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-6px_rgba(0,50,120,0.4)] transition focus-within:ring-2 focus-within:ring-white/70"
+            ? "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(0,50,120,0.28)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[#0AA9FD]/40"
             : "flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft"
         }
       >

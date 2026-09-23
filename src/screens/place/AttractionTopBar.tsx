@@ -5,8 +5,8 @@ import { HomeHeader } from "@/screens/home/HomeHeader";
 /** אותו גרדיאנט+צל בדיוק כמו הבר התכלת של עמוד הבית (BAR_GRADIENT/BAR_SHADOW
  *  ב-CollapsibleTopBar.tsx) - מקור אמת יחיד, מועתק לכאן במקום import כדי
  *  לא לגרור את כל לוגיקת ה-collapse/scroll שלא רלוונטית כאן (בר סטטי בלבד). */
-const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)";
-const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
+// (בר שקוף - הגרדיאנט/הצל הוסרו, בקשה מפורשת)
+
 
 interface AttractionTopBarProps {
   backHref?: string;
@@ -28,7 +28,7 @@ interface AttractionTopBarProps {
  */
 export function AttractionTopBar({ backHref }: AttractionTopBarProps) {
   return (
-    <div className="relative z-10 rounded-b-[32px] pb-4" style={{ background: BAR_GRADIENT, boxShadow: BAR_SHADOW }}>
+    <div className="relative z-10 pb-3">
       <HomeHeader
         loading={false}
         onBack={() => {

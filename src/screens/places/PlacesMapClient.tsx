@@ -39,12 +39,11 @@ export function PlacesMapClient() {
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
-      {/* המפה ממשיכה מתחת לפינות המעוגלות של הבר (marginTop שלילי של 32px). */}
+      {/* הבר שקוף עכשיו - המפה מתחילה ישר מתחתיו (בלי marginTop שלילי). */}
       <div
         className="relative isolate z-0"
         style={{
-          marginTop: -32,
-          height: "max(472px, calc(100dvh - 136px + 32px - 66px - max(env(safe-area-inset-bottom), 22px)))",
+          height: "max(472px, calc(100dvh - 64px - 66px - max(env(safe-area-inset-bottom), 22px)))",
         }}
       >
         <PlacesFriendsMap
