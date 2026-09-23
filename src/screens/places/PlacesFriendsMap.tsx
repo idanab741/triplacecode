@@ -139,6 +139,8 @@ const KIND_LABEL: Record<FriendsMapContribution["kind"], string> = {
   added: "העלה/תה את המקום",
   review: "ביקורת",
   post: "פוסט",
+  trip: "הוסיף/ה לטיול",
+  collection: "הוסיף/ה לאוסף",
 };
 
 function timeAgo(iso: string): string {
@@ -502,12 +504,12 @@ export function PlacesFriendsMap({
             </svg>
           </span>
           <p className="mt-3 text-[16px] font-extrabold text-ink">
-            {error ? "לא הצלחנו לטעון את המפה" : filter === "mine" ? "עוד לא שיתפתם מקומות" : filter === "friends" ? "החברים שלכם עוד לא שיתפו מקומות" : "אין עדיין מקומות על המפה"}
+            {error ? "לא הצלחנו לטעון את המפה" : filter === "mine" ? "עוד אין לכם מקומות על המפה" : filter === "friends" ? "לחברים שלכם עוד אין מקומות על המפה" : "אין עדיין מקומות על המפה"}
           </p>
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
               ? "נסו שוב בעוד רגע."
-              : "כשמשתמשים יעלו מקומות, יכתבו ביקורות או יפרסמו פוסט על מקום, הם יופיעו כאן על המפה."}
+              : "מקומות שיועלו, יקבלו ביקורת, יפורסמו בפוסט או יתווספו לטיול או לאוסף יופיעו כאן על המפה."}
           </p>
           {!error && onCreate && (
             <button

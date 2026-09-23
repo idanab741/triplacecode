@@ -80,6 +80,8 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
           הלוגו פשוט "גולש" (overflow) מעל/מתחת לרצועה, ולא משפיע על השורה. זהה
           בדיוק ל-PlacesHeaderRow. */}
       <div className="flex h-10 items-center justify-center">
+        {/* *** תיקון (בקשה מפורשת - "הלוגו של triplace צריך להיות בגודל של places"): 150x46 -> 128x39,
+            אותה תיבה בדיוק כמו הלוגו של place's ב-PlacesHeaderRow (128x39). */}
         {/* בקשה מפורשת - רקע כחול לאזור העליון: הלוגו השחור הופך ללבן
             (brightness(0) invert(1)) - בלי קובץ לוגו חדש.
             *** הוגדל ב-25% (בקשה מפורשת - "להגדיל מעט את הלוגו"): 120x37 ->
@@ -89,7 +91,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
         <span
           role="img"
           aria-label="TRIPLACE"
-          className="block h-[46px] w-[150px] select-none"
+          className="block h-[39px] w-[128px] select-none"
           style={{
             backgroundColor: logoTone === "white" ? "#ffffff" : "#000000", // *** בקשה מפורשת: triplace בשחור (על הבר השקוף)
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",
