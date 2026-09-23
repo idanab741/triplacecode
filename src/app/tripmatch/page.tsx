@@ -295,6 +295,45 @@ export function TripMatchPageContent({
   // (שיושבים כ-siblings קבועים, לא בתוך האלמנט הנגרר) עדיין גורמים
   // לאותה אנימציית fly-out בדיוק, בלי לזוז בעצמם בזמן גרירה.
   const swipeCardRef = useRef<SwipeCardHandle>(null);
+
+  // *** גובה הכרטיס עד ה-Bottom Nav (בקשה מפורשת - "תאריך את הגובה של
+  // הכרטיסיות שיגיע עד הבר התחתון"): הרוחב והמרכוז נשארים מבניים (CSS,
+  // DECK_STYLE). רק הגובה נמדד: המרחק מראש תיבת הכרטיס (במצב גלילה 0)
+  // עד הקצה העליון של ה-Bottom Nav הקבוע - כך החצי-עיגול בתחתית הכרטיס
+  // יושב בדיוק על הבר, סביב עיגול ה-trippy AI. נמדד ב-mount, ב-resize
+  // ואחרי טעינת פונטים בלבד - *לא* כשהחיפוש העליון נפתח (כדי שהכרטיס לא
+  // יתכווץ אז; הוא פשוט יורד למטה). עד המדידה - aspect-ratio כ-fallback.
+  const deckStageRef = useRef<HTMLDivElement | null>(null);
+  const [deckStageHeight, setDeckStageHeight] = useState<number | null>(null);
+  const deckStageMounted = embedded && stage === "swiping";
+  const hasCandidatesForDeck = candidates.length > 0;
+  useLayoutEffect(() => {
+    if (!deckStageMounted) return;
+    const measure = () => {
+      const el = deckStageRef.current;
+      const nav = document.querySelector("[data-main-bottom-nav]");
+      if (!el || !nav) return;
+      const stageDocTop = el.getBoundingClientRect().top + window.scrollY;
+      const navTop = nav.getBoundingClientRect().top; // fixed - קבוע ביחס ל-viewport
+      const width = el.getBoundingClientRect().width;
+      const h = Math.round(navTop - stageDocTop);
+      // רצפה: הכרטיס לא יהיה "שטוח" מדי במסכים נמוכים מאוד (אז הוא פשוט
+      // ממשיך מתחת לבר וגוללים). 1.15 = גובה מינימלי ביחס לרוחב.
+      setDeckStageHeight(width > 0 ? Math.max(h, Math.round(width * 1.15)) : null);
+    };
+    measure();
+    let cancelled = false;
+    document.fonts?.ready.then(() => { if (!cancelled) measure(); }).catch(() => {});
+    window.addEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+    // hasCandidates: שורת הקטגוריות ופס ההתקדמות מופיעים רק אחרי שהמועמדים
+    // נטענים ודוחפים את הכרטיס למטה - מודדים שוב כדי שלא יחרוג מתחת לבר.
+  }, [deckStageMounted, hasCandidatesForDeck]);
   // *** שונה מהיסוד שוב (Bug חוזר - "זה שוב בורח" - אחרי כמה סבבים של
   // חישובי-JS (getBoundingClientRect, window.innerWidth וכו') שכל אחד
   // מהם תיקן משהו אבל הביא איתו תקלה חדשה (כולל תקלה שדוחפת את *כל*
@@ -1698,8 +1737,15 @@ export function TripMatchPageContent({
                 style={embedded ? DECK_STYLE : { height: "75%" }}
               >
                 <div
+                  ref={deckStageRef}
                   className={embedded ? "tripmatch-deck-stage" : "contents"}
-                  style={embedded ? DECK_STAGE_STYLE : undefined}
+                  style={
+                    embedded
+                      ? deckStageHeight != null
+                        ? { ...DECK_STAGE_STYLE, aspectRatio: "auto", height: deckStageHeight }
+                        : DECK_STAGE_STYLE
+                      : undefined
+                  }
                 >
                 {!currentCandidate ? (
                   // *** חדש (בקשה מפורשת - "גם אם יגמרו ההחלקות, תמיד תהיה
@@ -1914,9 +1960,12 @@ export function TripMatchPageContent({
                       disabled={busy || lastDecision == null}
                       onClick={handleRewind}
                       aria-label="חזור לכרטיס הקודם"
-                      className="pointer-events-auto flex h-[71px] w-[71px] items-center justify-center transition active:scale-90 disabled:opacity-40"
+                      // *** כולו בתוך הכרטיס (בקשה מפורשת): 71→54px ומיושר לראש
+                      // השורה (self-start) - התחתית שלו ~68px מעל תחתית הכרטיס,
+                      // מעל החצי-עיגול (רדיוס 57px), כך שהוא לא "חצי בחוץ".
+                      className="pointer-events-auto flex h-[54px] w-[54px] self-start items-center justify-center transition active:scale-90 disabled:opacity-40"
                     >
-                      <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={71} height={71} className="h-full w-full object-contain" />
+                      <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={54} height={54} className="h-full w-full object-contain" />
                     </button>
 
                     <button

@@ -58,10 +58,6 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
                   className="ai-ring absolute inset-[3px] rounded-full"
                   style={!isActive ? { background: "conic-gradient(from 0deg, transparent 0%, #0f1522 30%, #3a4150 50%, transparent 70%)" } : undefined}
                 />
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-[3px] z-[6] rounded-full border-[3px] border-white border-t-transparent bg-transparent"
-                />
                 <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
                   <AiGlobeIcon active={isActive} size={56} />
                 </span>
