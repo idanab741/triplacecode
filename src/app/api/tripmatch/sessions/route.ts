@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     // *** שיפור מהירות (בקשה מפורשת - "הכרטיסיות אמורות לעלות מיידית"): העדפות
     // המשתמש והמועמדים לא תלויים זה בזה - רצים במקביל במקום אחד אחרי השני.
     const [candidates, userPreferences] = await Promise.all([
-      fetchTripMatchCandidates(supabase, session, 60, userLocation),
+      fetchTripMatchCandidates(supabase, session, 150, userLocation),
       fetchUserPreferences(supabase, user.id),
     ]);
 

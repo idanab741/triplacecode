@@ -135,6 +135,13 @@ interface TripMatchPageContentProps {
    *  BottomNav) *רק* כשבאמת יש כרטיס להחליק - לא במסכי בחירת יעד/תוצאות,
    *  שצריכים גלילה חופשית רגילה. */
   onCardsVisibleChange?: (visible: boolean) => void;
+  /** *** חדש (בקשה מפורשת - "גם אם יגמרו ההחלקות, תמיד תהיה כרטיסייה -
+   *  להוספת מקומות"): נקרא כשלוחצים על כרטיס ה"הוספת מקום" (מוצג במקום
+   *  ה"נגמרו המועמדים" הישן, כל פעם שאין עוד מועמד להציג). embedded
+   *  (Home) מעביר פונקציה שפותחת את AddPlaceModal הקיים ישירות (בלי
+   *  ניווט/רענון עמוד). בלי embedded (standalone /tripmatch) - נופל
+   *  חזרה לניווט ל-/home?openAddPlace=1 (ר' שימוש בהמשך). */
+  onAddPlaceClick?: () => void;
 }
 
 export function TripMatchPageContent({
@@ -142,6 +149,7 @@ export function TripMatchPageContent({
   initialCityQuery,
   onExitEmbedded,
   onCardsVisibleChange,
+  onAddPlaceClick,
 }: TripMatchPageContentProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1214,6 +1222,15 @@ export function TripMatchPageContent({
     setLastDecision(null);
   }
 
+  /** כרטיס "להוספת מקומות" - מוצג כשאין עוד מועמד להחליק (ר' JSX למטה).
+   *  embedded: קורא ל-onAddPlaceClick (Home פותחת את ה-AddPlaceModal
+   *  הקיים שלה ישירות). standalone: מנווט ל-/home עם ?openAddPlace=1
+   *  (אין AddPlaceModal בעמוד /tripmatch העצמאי עצמו). */
+  function handleAddPlaceClick() {
+    if (embedded && onAddPlaceClick) onAddPlaceClick();
+    else router.push("/home?openAddPlace=1");
+  }
+
   // *** מסך טעינה מפורש בזמן טעינת/המשך טיול שמור - בלי זה, הבקשה
   // האיטית (יצירת המלצות AI לקטגוריה חדשה יכולה לקחת עשרות שניות)
   // נראית כאילו "כלום לא קורה" בזמן שבפועל היא עדיין בתהליך.
@@ -1625,21 +1642,61 @@ export function TripMatchPageContent({
               // המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה בשום כיוון.
               style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflow: "hidden" as const } : null) }}
             >
-              {!currentCandidate ? (
-                <p className="pt-16 text-center text-ink-secondary">
-                  {candidates.length === 0
-                    ? `לא מצאנו עדיין מקומות ב${selectedCityLabel || selectedCity} בקטגוריה הזו.`
-                    : visibleCandidates.length === 0
-                      ? "אין תוצאות עם הפילטרים שנבחרו. נסו לרוקן חלק מהם."
-                      : "נגמרו המועמדים כרגע."}
-                </p>
-              ) : (
-                <div
-                  ref={cardAreaRef}
-                  className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
-                  style={embedded ? undefined : { height: "75%" }}
-                >
-                  {/* *** הקטנת גובה נוספת (בקשה מפורשת - "עוד 25%"): הכרטיס
+              <div
+                ref={cardAreaRef}
+                className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
+                style={embedded ? undefined : { height: "75%" }}
+              >
+                {!currentCandidate ? (
+                  // *** חדש (בקשה מפורשת - "גם אם יגמרו ההחלקות, תמיד תהיה
+                  // כרטיסייה - עם רקע לבן, כרטיסיות פיקטיביות מאחורה, ושכתוב
+                  // עליה 'להוספת מקומות לחצו כאן'"): לפני זה זה היה טקסט
+                  // ריק בלי שום כרטיס - עכשיו יש תמיד "כרטיס" לראות, בין אם
+                  // אין בכלל מועמדים (לא מצאנו כלום), ובין אם סיימו להחליק
+                  // על כל מה שהיה. אותו cardBox (מדוד ב-JS) כמו כרטיסי
+                  // מועמד רגילים - נשאר ממורכז/responsive באותו אופן בדיוק.
+                  <>
+                    {[2, -2].map((rot, i) => (
+                      <div
+                        key={i}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-0 overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
+                        style={
+                          embedded && cardBox
+                            ? { height: "100%", left: cardBox.left, width: cardBox.width, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            : { height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                        }
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleAddPlaceClick}
+                      className="absolute top-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
+                      style={
+                        embedded && cardBox
+                          ? { height: "100%", left: cardBox.left, width: cardBox.width }
+                          : { height: "100%", left: 0, right: 0 }
+                      }
+                    >
+                      <span
+                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
+                        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                      >
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                      <span className="px-8 text-center text-[16px] font-bold text-ink">להוספת מקומות לחצו כאן</span>
+                      <span className="px-10 text-center text-[13px] text-ink-secondary">
+                        {candidates.length === 0
+                          ? `עוד לא מצאנו מקומות ב${selectedCityLabel || selectedCity} בקטגוריה הזו`
+                          : "סיימתם לסרוק את מה שיש כרגע"}
+                      </span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* *** הקטנת גובה נוספת (בקשה מפורשת - "עוד 25%"): הכרטיס
                       (וה"כרטיסים" מאחוריו) לא ממלאים יותר 100% מהגובה
                       הפנוי - רק 75% ממנו, ממורכז אנכית (justify-center
                       על ההורה) - כדי שגם החלק החיצוני יראה קטן יותר, לא
@@ -1805,10 +1862,11 @@ export function TripMatchPageContent({
                       </div>
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>
+        </div>
         )}
 
         {stage === "results" && (

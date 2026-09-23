@@ -92,7 +92,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
   }
 
   const updatedSession = await getTripMatchSession(supabase, sessionId);
-  const candidates = updatedSession ? await fetchTripMatchCandidates(supabase, updatedSession, 60, userLocation) : [];
+  const candidates = updatedSession ? await fetchTripMatchCandidates(supabase, updatedSession, 150, userLocation) : [];
 
   return NextResponse.json({ candidates, tokenBalance });
 }

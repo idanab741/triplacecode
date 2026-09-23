@@ -183,8 +183,16 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className={`h-full select-none ${allowVerticalScroll ? "touch-pan-y" : "touch-none"}`}
-        style={{ willChange: "transform" }}
+        className="h-full select-none"
+        // *** תוקן (Bug מפורש - "ההחלקה לא עובדת ימינה ושמאלה בטלפון"):
+        // touch-action נקבע עכשיו ב-inline style, לא רק במחלקת Tailwind
+        // (touch-pan-y/touch-none) - מאותה סיבה בדיוק שכבר תוקנה במקומות
+        // אחרים בשיחה הזו: מחלקות Tailwind ספציפיות לא תמיד מתקמפלות/
+        // נטענות באופן אמין בסביבת ה-build. touch-action הוא קריטי
+        // למובייל בפרט - בלעדיו (או עם ערך שגוי), הדפדפן יכול "לתפוס"
+        // את המחווה לגלילה רגילה במקום להעביר אותה ל-pointer events שלנו,
+        // בדיוק התסמין שתואר (עובד בעכבר/דסקטופ, לא בטלפון עם מגע אמיתי).
+        style={{ willChange: "transform", touchAction: allowVerticalScroll ? "pan-y" : "none" }}
       >
         <div className="relative h-full">
           {resolvedChildren}

@@ -212,7 +212,13 @@ export default function HomePage() {
       // טווח סביר לבר תחתון אמיתי (כולל safe-area) - מחוץ לטווח = מדידה
       // לא אמינה (למשל 0 כי עוד לא צויר), לא מיישמים אותה.
       if (navHeight < 40 || navHeight > 200) return;
-      setFoldHeight(Math.max(0, viewportHeight - navHeight));
+      // *** תוספת (בקשה מפורשת - "אסור שהכרטיס ייגע/יסתיר את ה-bottom
+      // navigation, צריך מרווח ברור"): לפני זה foldHeight היה בדיוק
+      // viewport פחות ה-BottomNav - אפס מרווח מכוון, הכרטיס יכול להגיע
+      // *בדיוק* לקצה העליון של הבר. 16px נוספים כאן משאירים רווח נשימה
+      // אמיתי וברור מתחת לכרטיס, לפני הבר התחתון.
+      const bottomBreathingRoom = 16;
+      setFoldHeight(Math.max(0, viewportHeight - navHeight - bottomBreathingRoom));
     }
 
     measure();
@@ -349,6 +355,7 @@ export default function HomePage() {
                 initialCityQuery={destinationQuery}
                 onExitEmbedded={handleExitEmbedded}
                 onCardsVisibleChange={setCardsVisible}
+                onAddPlaceClick={() => setAddPlaceOpen(true)}
               />
             ) : // *** הוסר (בקשה מפורשת - "להעיף את כל עיצובי הטעינה, שזה ישר יקבל את
             // המיקום של המשתמש"): אין יותר מסך המתנה (איור/טקסט) בעמוד הבית.

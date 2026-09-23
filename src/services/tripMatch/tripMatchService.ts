@@ -152,12 +152,16 @@ async function fetchTripAddCandidates(
   // המפה - רק lat/lng תמיד נשמרים, ר' tripAddService.ts: `city: input.city ?? null`). עכשיו מגאוקדים את
   // שם העיר שחיפשנו לקואורדינטות, ומסננים לפי מרחק אמיתי - בלי תלות בעמודת city של השורה בכלל.
   let searchOrigin: LatLng | null = isGeoSearch ? { lat: session.latitude!, lng: session.longitude! } : null;
+  // *** תוקן (בקשה מפורשת - "טווח של 10 ק''מ, גם במיקום הנוכחי וגם ביעד
+  // ספציפי שמזינים"): לפני זה חיפוש-עיר (יעד מוקלד) קיבל רדיוס רחב יותר
+  // (20 ק"מ) מ"קרוב אליי" (10 ק"מ) - עכשיו שני המצבים משתמשים באותו
+  // רדיוס בדיוק (10 ק"מ), אלא אם המשתמש עצמו ביקש רדיוס אחר (session.radius_km).
   let radiusKm = session.radius_km ?? 10;
   if (!isGeoSearch) {
     const cityCoords = await geocodePlaceName(session.city);
     if (cityCoords) {
       searchOrigin = cityCoords;
-      radiusKm = 20; // רדיוס עיר סביר (כולל פרברים קרובים) - לא 10 (מכוון ל"קרוב אליי" ברמת שכונה)
+      radiusKm = session.radius_km ?? 10;
     }
     // גיאוקוד נכשל (API key חסר/שגיאת רשת) - fail open: ממשיכים בלי סינון גיאוגרפי כלל, במקום 0 תוצאות.
   }
@@ -335,7 +339,14 @@ async function fetchTripAddCandidates(
 export async function fetchTripMatchCandidates(
   supabase: SupabaseClient,
   session: TripMatchSession,
-  limit = 60,
+  // *** תוקן (בקשה מפורשת - "לא תהיה הגבלה של 10 אטרקציות") + תוקן שוב
+  // (Bug מפורש - "אין כלום בכלל!"): 300 (השאילתה הגולמית .limit(limit*3)
+  // = 900 שורות + JOIN על תמונות) היה כבד/איטי מדי, וכשה-fetch הראשוני
+  // נכשל/timeout־ת, ה-stage כלל לא מתקדם ל-"swiping" - אז אפילו כרטיס
+  // ה"הוספת מקום" (שרק מוצג *בתוך* מסך ה-swiping) לא מופיע, והעמוד
+  // נשאר ריק לגמרי. 150 (450 שורות גולמיות) הרבה יותר ממה שרדיוס 10
+  // ק"מ אמיתי מחזיר כמעט תמיד, אבל קל משמעותית מ-300.
+  limit = 150,
   userLocation?: LatLng | null
 ): Promise<CandidatePlace[]> {
   // *** שינוי-מקור (ר' ההערה המלאה מעל fetchTripAddCandidates): המקור היחיד עכשיו הוא tripadd_submissions.
