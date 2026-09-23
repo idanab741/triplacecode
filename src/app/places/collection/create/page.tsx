@@ -31,7 +31,7 @@ function CreateCollectionContent() {
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (!type) router.replace("/places");
+    if (!type) router.replace("/home");
   }, [type, router]);
 
   if (authLoading || !user || !type) {

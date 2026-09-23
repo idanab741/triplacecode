@@ -63,7 +63,7 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
   async function handleDelete() {
     if (!window.confirm("למחוק את הטיול? הפעולה לא הפיכה.")) return;
     const res = await fetch(`/api/social/trips/${id}`, { method: "DELETE" });
-    if (res.ok) router.replace("/places");
+    if (res.ok) router.replace("/home");
   }
 
   return (

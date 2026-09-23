@@ -355,7 +355,7 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
     try {
       const res = await fetch(`/api/social/trips/${tripId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("שגיאה במחיקת הטיול");
-      router.replace("/places");
+      router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה במחיקת הטיול");
       setSubmitting(false);

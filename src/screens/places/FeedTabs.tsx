@@ -1,12 +1,12 @@
 "use client";
 
-/** *** בקשה מפורשת: במקום "עבורך / חברים" - "עבורך / מפה" (המפה תציג בהמשך את כל
- *  ההמלצות של החברים). */
-export type PlacesFeedView = "for_you" | "map";
+/** *** בקשה מפורשת: הפיד עבר לעמוד הבית עם "עבורך / חברים". המפה יצאה מהפיד
+ *  והפכה לעמוד place's עצמו. */
+export type PlacesFeedView = "for_you" | "friends";
 
 const TABS: { id: PlacesFeedView; label: string }[] = [
   { id: "for_you", label: "עבורך" },
-  { id: "map", label: "מפה" },
+  { id: "friends", label: "חברים" },
 ];
 
 /**

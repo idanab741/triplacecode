@@ -136,7 +136,7 @@ export default function CreatePostPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "שגיאה בפרסום הפוסט");
-      router.replace("/places?published=post");
+      router.replace("/home?published=post");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בפרסום הפוסט");
       setSubmitting(false);

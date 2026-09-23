@@ -438,7 +438,7 @@ export function CreatePlacePageContent() {
         return;
       }
       // חזרה ל-Places Feed - שם מוצגת הודעת ההצלחה והפיד נטען מחדש (הביקורת בראש).
-      router.replace("/places?published=1");
+      router.replace("/home?published=1");
     } catch (err) {
       setReviewError(err instanceof Error ? err.message : "שגיאה");
       setPublishing(false);

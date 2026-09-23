@@ -85,7 +85,9 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
       // צבע הטקסט כשהטאב פעיל - הסגול של אייקון הגלובוס (icon-globe-active.png).
       activeColor: "#6c02a5",
     },
-    { id: "ai", label: "trippy AI", icon: "AI", href: elevatedOverride ? undefined : "/ai", elevated: true, elevatedIcon: elevatedOverride?.icon },
+    // *** tripmatch (בקשה מפורשת): הכפתור האמצעי - לשעבר "trippy AI" - מוביל עכשיו
+    // לערימת הכרטיסיות (/tripmatch). הצ'אט של trippy AI (/ai) לא מקושר מהבר בינתיים.
+    { id: "tripmatch", label: "tripmatch", icon: "AI", href: elevatedOverride ? undefined : "/tripmatch", elevated: true, elevatedIcon: elevatedOverride?.icon },
     {
       // *** שינוי (בקשה מפורשת - "תוסיף את הפלוס לבר התחתון במקום tripmatch, ייקרא תוכן"):
       // הטאב תופס את המקום של tripmatch. עודכן: לחיצה פותחת את עמוד "תוכן" (/content) -
@@ -125,7 +127,7 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
       activeId={active}
       tone={tone}
       onChange={(id) => {
-        if (id === "ai" && elevatedOverride) elevatedOverride.onClick();
+        if (id === "tripmatch" && elevatedOverride) elevatedOverride.onClick();
       }}
     />
   );

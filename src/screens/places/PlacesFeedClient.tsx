@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import dynamic from "next/dynamic";
 import { CreatorsSection } from "@/screens/places/CreatorsSection";
 import { SuggestedPeopleCircles } from "@/screens/places/SuggestedPeopleCircles";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
@@ -26,11 +25,6 @@ import type { FeedEntryDto } from "@/services/social/collectionTypes";
 import type { PlacesFeedView } from "@/screens/places/FeedTabs";
 import type { CreatorCardDto } from "@/services/social/creatorDiscoveryService";
 import type { SuggestedTravelerDto } from "@/services/social/suggestedTravelersService";
-
-// המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח, ורק כשנכנסים ללשונית "מפה".
-const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
-  ssr: false,
-});
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -62,23 +56,10 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
   // *** הפיד מכיל פוסטים *ו*אוספים (Collections) ממוזגים לפי זמן - ר' feedPageService.ts.
   // מגיע כבר מלא מהשרת (initialEntries) - לא null - כך שאין הבהוב של שלד בטעינה הראשונה.
   const [feedItems, setFeedItems] = useState<FeedEntryDto[] | null>(initialEntries);
-  // *** "עבורך / מפה" (בקשה מפורשת) - פיד "חברים" הוחלף בלשונית המפה (בהמשך: כל ההמלצות
-  // של החברים על מפה). הפיד עצמו הוא תמיד "עבורך".
-  const feedTab: FeedTab = "for_you";
+  // *** "עבורך / חברים" (בקשה מפורשת): הפיד עבר לעמוד הבית, והמפה יצאה ממנו
+  // (היא עמוד place's עכשיו - PlacesMapClient). כל לשונית טוענת את הפיד שלה.
   const [view, setView] = useState<PlacesFeedView>("for_you");
-  // *** במפה (בקשה מפורשת - "עבורך/מפה צריך להיעלם במפה, כשהאצבע על המפה מתחת לחיפוש"):
-  // הטאבים מרחפים מעל המפה ונעלמים בזמן שנוגעים בה (כדי שהמפה תהיה נקייה ומלאה),
-  // וחוזרים ~1 שנייה אחרי שמרימים את האצבע.
-  const [mapTouching, setMapTouching] = useState(false);
-  const mapTouchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function handleMapInteracting(active: boolean) {
-    if (mapTouchTimerRef.current) clearTimeout(mapTouchTimerRef.current);
-    if (active) setMapTouching(true);
-    else mapTouchTimerRef.current = setTimeout(() => setMapTouching(false), 1100);
-  }
-  useEffect(() => {
-    if (view !== "map") setMapTouching(false);
-  }, [view]);
+  const feedTab: FeedTab = view;
   const [feedError, setFeedError] = useState<string | null>(null);
   const [feedLoadingMore, setFeedLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
@@ -101,15 +82,15 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
     const params = new URLSearchParams(window.location.search);
     if (params.get("published") === "1") {
       showComingSoon("הביקורת פורסמה 🎉");
-      router.replace("/places");
+      router.replace("/home");
     } else if (params.get("published") === "post") {
       // אחרי פרסום פוסט (/places/post/create) - הפיד נטען מחדש ממילא והפוסט מופיע בראשו.
       showComingSoon("הפוסט פורסם 🎉");
-      router.replace("/places");
+      router.replace("/home");
     } else if (params.get("create") === "1") {
       // תפריט היצירה ("מה בא לכם ליצור?") - נשאר נתמך לקישורים ישנים.
       setCreateMenuOpen(true);
-      router.replace("/places");
+      router.replace("/home");
     } else if (params.get("create") === "post") {
       // קישורים ישנים (/places?create=post) - ממשיכים לעמוד יצירת הפוסט.
       router.replace("/places/post/create");
@@ -215,7 +196,7 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
   }
 
   return (
-    <div className={`min-h-screen bg-places-bg ${view === "map" ? "pb-0" : "pb-24"}`}>
+    <div className="min-h-screen bg-places-bg pb-24">
       <HomeStatusBarTint color="#7C3AED" />
       {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
           ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
@@ -230,44 +211,11 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
       </CollapsibleTopBar>
 
 
-      {/* הטאבים "עבורך / מפה" - צמודים מתחת לבר הסגול (בקשה מפורשת: "עבורך / מפה"). */}
-      {view !== "map" && (
-        <div className="mt-3 bg-white">
-          <FeedTabs active={view} onChange={setView} />
-        </div>
-      )}
+      {/* הטאבים "עבורך / חברים" - צמודים מתחת לבר הסגול. */}
+      <div className="mt-3 bg-white">
+        <FeedTabs active={view} onChange={setView} />
+      </div>
 
-      {view === "map" ? (
-        /* *** חדש (בקשה מפורשת - "בוא נכניס את המפה לעמוד המפה, מפה מלאה בעיצוב
-           מיוחד כמו שלנו"): מפת ההמלצות של החברים, בגובה המסך שנשאר מתחת לבר
-           ולטאבים ומעל הבר התחתון. ר' PlacesFriendsMap.tsx. */
-        /* המפה ממשיכה מתחת לפינות המעוגלות של הבר (marginTop שלילי של 32px) - בלי "כתמים"
-           לבנדריים בפינות; הטאבים מרחפים מעליה. */
-        <div
-          className="relative isolate z-0"
-          style={{
-            marginTop: -32,
-            height: "max(472px, calc(100dvh - 136px + 32px - 66px - max(env(safe-area-inset-bottom), 22px)))",
-          }}
-        >
-          <PlacesFriendsMap
-            onCreate={() => setCreateMenuOpen(true)}
-            onInteractingChange={handleMapInteracting}
-            topOffsetPx={mapTouching ? 44 : 104}
-          />
-          <div
-            className="absolute inset-x-3 top-11 z-[1001] overflow-hidden rounded-2xl shadow-[0_12px_30px_-12px_rgba(40,10,110,0.55)] ring-1 ring-black/5"
-            style={{
-              transform: mapTouching ? "translateY(-140%)" : "none",
-              opacity: mapTouching ? 0 : 1,
-              pointerEvents: mapTouching ? "none" : "auto",
-              transition: "transform 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease",
-            }}
-          >
-            <FeedTabs active={view} onChange={setView} />
-          </div>
-        </div>
-      ) : (
         <>
       {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}
 
@@ -343,9 +291,8 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
       <MyDestinationsSection />
         </>
-      )}
 
-      <MainBottomNav active="places" />
+      <MainBottomNav active="home" />
 
       {createMenuOpen && (
         <CreateMenuSheet

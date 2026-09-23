@@ -216,7 +216,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
     try {
       const res = await fetch(`/api/social/collections/${collectionId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("שגיאה במחיקת האוסף");
-      router.replace("/places");
+      router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה במחיקת האוסף");
       setSubmitting(false);

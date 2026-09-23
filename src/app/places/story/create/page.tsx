@@ -142,7 +142,7 @@ export default function CreateStoryPage() {
         }),
       });
       if (!res.ok) throw new Error("שגיאה בפרסום הסטורי");
-      router.replace("/places");
+      router.replace("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
     } finally {

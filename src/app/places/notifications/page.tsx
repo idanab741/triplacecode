@@ -51,7 +51,7 @@ export default function PlacesNotificationsPage() {
 
   return (
     <div className="min-h-screen bg-white pb-10">
-      <PlacesHeader onBack={() => router.push("/places")} />
+      <PlacesHeader onBack={() => router.push("/home")} />
 
       {items === null && !error && (
         <div className="p-4">

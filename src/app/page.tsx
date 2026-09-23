@@ -16,7 +16,7 @@ import { HomeNearbyRow } from "@/screens/home/HomeNearbyRow";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
-import { TripMatchPageContent } from "@/app/tripmatch/page";
+import { TripMatchPageContent } from "@/screens/tripmatch/TripMatchPageContent";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import {
   getSessionLocation,

@@ -18,7 +18,7 @@ const PROTECTED_PATHS = [
   "/tripmatch",
 ];
 
-const GUEST_ALLOWED_PATHS = ["/home"];
+const GUEST_ALLOWED_PATHS = ["/home", "/tripmatch"];
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);

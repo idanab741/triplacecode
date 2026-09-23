@@ -86,7 +86,7 @@ function ReviewStep() {
         throw new Error(data.error ?? "שגיאה בפרסום הביקורת");
       }
       // חזרה ל-Places Feed - שם מוצגת הודעת ההצלחה והפיד נטען מחדש (הביקורת בראש).
-      router.replace("/places?published=1");
+      router.replace("/home?published=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה");
       setSubmitting(false);

@@ -54,7 +54,7 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
   async function handleDelete() {
     if (!window.confirm("למחוק את האוסף? הפעולה לא הפיכה.")) return;
     const res = await fetch(`/api/social/collections/${id}`, { method: "DELETE" });
-    if (res.ok) router.replace("/places");
+    if (res.ok) router.replace("/home");
   }
 
   return (
