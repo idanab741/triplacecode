@@ -308,8 +308,12 @@ export function TripMatchPageContent({
     left: 0,
     right: 0,
     top: 16,
+    // The card size is determined by its width/aspect-ratio only.
+    // IMPORTANT: do not cap its height by the available flex area. When the
+    // collapsible search bar opens, that area becomes shorter; capping the
+    // card here would shrink the card. The search bar must move the card down,
+    // not resize it.
     aspectRatio: "0.55",
-    maxHeight: "calc(100% - 32px)",
   };
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
@@ -1280,7 +1284,7 @@ export function TripMatchPageContent({
       )}
 
       <div
-        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "w-full min-w-0 flex-1 min-h-0" : ""}`}
+        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "flex-1 min-h-0" : ""}`}
       >
         {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
         {stage === "city" && !embedded && <TripsIntroCard />}
@@ -1627,7 +1631,7 @@ export function TripMatchPageContent({
                 (8px) + ה-16px הפנימיים = 24px, קרוב ועקבי לשאר הרווחים
                 בעמוד הזה (pt-1.5 מעל פס ההתקדמות, למשל). */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2 -translate-x-1" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1640,7 +1644,14 @@ export function TripMatchPageContent({
               // דפדפן/WebView, בלי הסתמכות על ערך CSS חדש יחסית) חותך את
               // "הכרטיסים המסובבים" שמאחור ואת אנימציית ה-fly-out בקצה
               // המסך, כך שכלום לא בורח מהעמוד/יוצר גלילה בשום כיוון.
-              style={{ paddingBottom: embedded ? 0 : 112, ...(embedded ? { overflow: "hidden" as const } : null) }}
+              style={{
+                paddingBottom: embedded ? 0 : 112,
+                // Keep horizontal overflow contained, but NEVER clip vertically.
+                // When the search bar opens the card must keep its original
+                // size and simply extend lower on the page instead of being
+                // clipped/shrunk to the reduced available flex height.
+                ...(embedded ? { overflowX: "hidden" as const, overflowY: "visible" as const } : null),
+              }}
             >
               <div
                 className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
