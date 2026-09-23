@@ -1313,8 +1313,13 @@ export function TripMatchPageContent({
         </div>
       )}
 
+      {/* *** תיקון מרכוז (Deck בורח שמאלה במסכים < 576px): עמודה עם
+          mx-auto בתוך הורה flex-col לא נמתחת (auto margins מבטלים stretch)
+          ומקבלת רוחב max-content - כלומר רוחב שורת הקטגוריות הגוללת (~544px),
+          גם כשהמסך צר יותר. ב-RTL העודף גולש שמאלה והמרכז של ה-Deck זז
+          איתו. w-full + min-w-0 נועלים את העמודה לרוחב ההורה בפועל. */}
       <div
-        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "flex-1 min-h-0" : ""}`}
+        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "w-full min-w-0 flex-1 min-h-0" : ""}`}
       >
         {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
         {stage === "city" && !embedded && <TripsIntroCard />}
