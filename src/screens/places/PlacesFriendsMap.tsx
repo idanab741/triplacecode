@@ -36,7 +36,7 @@ const USER_ICON = L.divIcon({
 });
 
 /** מרחק אנכי (px) שמזיזים את מרכז המפה כדי שהנעץ הנבחר יופיע *מעל* פס הכרטיסים שבתחתית. */
-const SELECT_OFFSET_PX = 95; // הכרטיסים גבוהים יותר עכשיו (שורת תמונות)
+const SELECT_OFFSET_PX = 60;
 
 /** רדיוס (ק"מ) של "אזור אחד" - פינים רחוקים יותר לא נכנסים לתצוגה ההתחלתית. */
 const NEAR_KM = 60;
@@ -91,7 +91,7 @@ function MapController({
       map.setView(points[0], 14, { animate: false });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 72], paddingBottomRight: [44, 220], maxZoom: 15, animate: false });
+    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 72], paddingBottomRight: [44, 150], maxZoom: 15, animate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToken]);
 
@@ -563,23 +563,6 @@ export function PlacesFriendsMap({
                     </span>
                   </span>
                 </span>
-
-                {/* *** התמונות שהמשתמשים עצמם העלו (בקשה מפורשת) - עד 4, והשאר כ-"+N". */}
-                {pin.photos.length > 0 && (
-                  <span className="mt-2 grid grid-cols-4 gap-1">
-                    {pin.photos.slice(0, 4).map((url, i) => (
-                      <span key={url} className="relative block aspect-square overflow-hidden rounded-lg bg-places-bg">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
-                        {i === 3 && pin.photos.length > 4 && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[12px] font-bold text-white">
-                            +{pin.photos.length - 4}
-                          </span>
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                )}
 
                 <span className="mt-2 flex items-center gap-1.5">
                   <AvatarStack recommenders={pin.recommenders} />

@@ -71,19 +71,20 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
     },
     {
       id: "places",
-      label: "place's",
+      // *** בקשה מפורשת: הטאב נקרא "מפה", עם אייקון מצפן - שחור רגיל, סגול כשנמצאים עליו.
+      label: "מפה",
       icon: (
         <NavIcon
           active={active === "places"}
-          activeSrc="/images/icon-globe-active.png"
-          inactiveSrc="/images/icon-globe-inactive.png"
-          alt="places"
+          activeSrc="/images/icon-map-active.png"
+          inactiveSrc="/images/icon-map-inactive.png"
+          alt="מפה"
           whiteWhenInactive={whiteWhenInactive}
         />
       ),
       href: "/places",
-      // צבע הטקסט כשהטאב פעיל - הסגול של אייקון הגלובוס (icon-globe-active.png).
-      activeColor: "#6c02a5",
+      // צבע הטקסט כשהטאב פעיל - הסגול של אייקון המצפן (icon-map-active.png).
+      activeColor: "#7F03CB",
     },
     // *** tripmatch (בקשה מפורשת): הכפתור האמצעי - לשעבר "trippy AI" - מוביל עכשיו
     // לערימת הכרטיסיות (/tripmatch). הצ'אט של trippy AI (/ai) לא מקושר מהבר בינתיים.

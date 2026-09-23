@@ -82,7 +82,27 @@ function findInSrc(needle, dir = "src", hits = []) {
   return hits;
 }
 
+/** *** הגורם האמיתי לשגיאת "Invalid dangling combinator": תו BOM בתחילת
+ *  globals.css נכנס לתחילת ה-CSS של production, והמפענח קורא אותו כחלק מ-selector.
+ *  מסירים BOM מכל קובץ CSS תחת src לפני הבנייה (עורכים ב-Windows מוסיפים אותו לפעמים). */
+function stripCssBoms(dir = "src") {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    const st = statSync(p);
+    if (st.isDirectory()) {
+      if (name !== "node_modules") stripCssBoms(p);
+    } else if (name.endsWith(".css")) {
+      const raw = readFileSync(p);
+      if (raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf) {
+        writeFileSync(p, raw.subarray(3));
+        console.log(`[css-guard] removed BOM from ${p}`);
+      }
+    }
+  }
+}
+
 function main() {
+  stripCssBoms();
   const lightning = loadLightning();
   if (!lightning) {
     console.log("[css-guard] lightningcss not found - skipping");
@@ -109,7 +129,6 @@ function main() {
       console.log(`[css-guard] excluding class "${candidate}" (found in: ${where.join(", ") || "unknown"})`);
       excluded.push(candidate);
       const raw = readFileSync(CSS_FILE);
-      const hasBom = raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf;
       const text = raw.toString("utf8").replace(/^\uFEFF/, "");
       const directive = `@source not inline(${JSON.stringify(candidate)});`;
       const lines = text.split(/(\r?\n)/);
@@ -125,7 +144,7 @@ function main() {
         }
       }
       const next = inserted ? lines.join("") : `${text}\n${directive}\n`;
-      writeFileSync(CSS_FILE, (hasBom ? "\uFEFF" : "") + next);
+      writeFileSync(CSS_FILE, next);
     }
   }
   console.log("[css-guard] too many invalid classes - giving up");
