@@ -154,8 +154,17 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד חישוב JS - centerBox
       // הוא עכשיו CSS style object טהור (CARD_BOX_STYLE, עם aspect-ratio)
       // שמוחלת כמו שהיא, בלי לפרק/להרכיב מחדש left/top/width/height.
-      className="absolute overflow-hidden rounded-[28px] border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]"
-      style={centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }}
+      className={`absolute overflow-hidden ${centerBox ? "rounded-[28px]" : "rounded-t-[28px] rounded-b-none"} border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]`}
+      style={{
+        ...(centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }),
+        // The bottom-center cutout is part of the card itself.
+        // It exposes only the center navigation orb while keeping both
+        // bottom side edges perfectly straight.
+        WebkitMaskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+        maskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+      }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
         {images[safeIndex] ? (
@@ -264,6 +273,7 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
           </div>
         )}
       </div>
+
     </div>
   );
 }

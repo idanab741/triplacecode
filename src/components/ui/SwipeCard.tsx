@@ -183,7 +183,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className="h-full select-none"
+        className="h-full w-full select-none"
         // *** תוקן (Bug מפורש - "ההחלקה לא עובדת ימינה ושמאלה בטלפון"):
         // touch-action נקבע עכשיו ב-inline style, לא רק במחלקת Tailwind
         // (touch-pan-y/touch-none) - מאותה סיבה בדיוק שכבר תוקנה במקומות

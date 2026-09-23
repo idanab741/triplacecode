@@ -84,12 +84,6 @@ export default function HomePage() {
   // יעד/תוצאות) - ר' onCardsVisibleChange. משמש להגביל את גובה אזור
   // הכרטיס בדיוק לשטח הפנוי מעל ה-BottomNav, רק כשזה רלוונטי.
   const [cardsVisible, setCardsVisible] = useState(false);
-  // *** הגובה הפנוי האמיתי מעל ה-BottomNav, נמדד ישירות מה-DOM (לא
-  // calc() עם מספרים מנוחשים - ר' useLayoutEffect למטה) - כדי שיתאים
-  // בדיוק לכל מכשיר/safe-area, לא רק לערכים משוערים. null = עוד לא
-  // נמדד (לפני שה-BottomNav בכלל ברנדר) - במצב הזה לא מגבילים גובה
-  // בכלל (עדיף גלילה רגילה על פני מספר שגוי).
-  const [foldHeight, setFoldHeight] = useState<number | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const autoRanRef = useRef(false);
@@ -179,69 +173,6 @@ export default function HomePage() {
     setEmbeddedKey((k) => k + 1);
   }
 
-  // *** מודד את הגובה הפנוי האמיתי מעל ה-BottomNav (ר' foldHeight למעלה) -
-  // רק כש-cardsVisible, כי זו הפעם היחידה שבה זה בכלל בשימוש. נמדד מחדש
-  // בכל שינוי גודל/סיבוב מסך (resize) וגם דרך visualViewport אם קיים
-  // (מדויק יותר בנייד - כולל למשל כשה-safe-area משתנה). ה-BottomNav עצמו
-  // הוא fixed (לא זז עם גלילה) אז אין צורך למדוד אותו שוב בגלילה.
-  // *** תוקן (Bug מפורש - "עכשיו הכל גולש - הכרטיסייה, הבר העליון, הבר
-  // התחתון"): מדידה חד-פעמית (measure() אחת, מיד) הייתה חשופה ל-race
-  // condition - אם ה-BottomNav (fixed) עוד לא סיים להתייצב בדפדפן באותו
-  // רגע (למשל טעינת פונט/תמונה שעדיין מזיזה לייאאוט, גם אם ה-DOM node
-  // כבר קיים), getBoundingClientRect() יכול להחזיר גובה שגוי (למשל 0
-  // אם עוד לא צויר בכלל) - ואז foldHeight מחושב שגוי *לצמיתות* (אין עוד
-  // trigger למדידה חוזרת חוץ מ-resize, שלא בהכרח קורה). זה בדיוק מסביר
-  // איך תקלה במדידה *אחת* גורמת לכל השרשרת (header/כרטיס/BottomNav)
-  // להיראות "שבורה" ביחד - כולם תלויים באותו foldHeight שגוי.
-  // התיקון: (1) double-rAF - מודדים שוב בפריים הבא, אחרי שהדפדפן בטוח
-  // סיים layout; (2) ResizeObserver על ה-BottomNav עצמו - תופס כל שינוי
-  // בגודל שלו (לא רק resize של החלון), כולל שינויים מאוחרים; (3) בדיקת
-  // תקינות - navHeight חייב להיות בין 40 ל-200px (טווח סביר לבר תחתון
-  // אמיתי) אחרת המדידה נחשבת לא-אמינה ולא מיושמת (עדיף גלילה רגילה על
-  // פני מספר שגוי שמפרק את כל העמוד).
-  useLayoutEffect(() => {
-    if (!cardsVisible) return;
-
-    let raf1 = 0;
-    let raf2 = 0;
-
-    function measure() {
-      const nav = document.querySelector<HTMLElement>("[data-main-bottom-nav]");
-      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-      const navHeight = nav?.getBoundingClientRect().height ?? 0;
-      // טווח סביר לבר תחתון אמיתי (כולל safe-area) - מחוץ לטווח = מדידה
-      // לא אמינה (למשל 0 כי עוד לא צויר), לא מיישמים אותה.
-      if (navHeight < 40 || navHeight > 200) return;
-      // *** תוספת (בקשה מפורשת - "אסור שהכרטיס ייגע/יסתיר את ה-bottom
-      // navigation, צריך מרווח ברור"): לפני זה foldHeight היה בדיוק
-      // viewport פחות ה-BottomNav - אפס מרווח מכוון, הכרטיס יכול להגיע
-      // *בדיוק* לקצה העליון של הבר. 16px נוספים כאן משאירים רווח נשימה
-      // אמיתי וברור מתחת לכרטיס, לפני הבר התחתון.
-      const bottomBreathingRoom = 16;
-      setFoldHeight(Math.max(0, viewportHeight - navHeight - bottomBreathingRoom));
-    }
-
-    measure();
-    // double-rAF: מודדים שוב אחרי שהדפדפן בטוח סיים layout+paint לפריים
-    // הזה - תופס מקרים שבהם המדידה הראשונה (מיד ב-mount) הייתה מוקדמת מדי.
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(measure);
-    });
-
-    const nav = document.querySelector<HTMLElement>("[data-main-bottom-nav]");
-    const resizeObserver = nav ? new ResizeObserver(measure) : null;
-    resizeObserver?.observe(nav!);
-
-    window.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("resize", measure);
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("resize", measure);
-    };
-  }, [cardsVisible]);
 
   useEffect(() => {
     if (loading || profileLoading || !user) return;
@@ -276,7 +207,7 @@ export default function HomePage() {
     >
       <HomeStatusBarTint />
       <SearchIntroOverlay open={introOpen} onClose={handleCloseIntro} />
-      <div className="relative mx-auto flex max-w-xl flex-col">
+      <div className="relative mx-auto flex min-h-screen max-w-xl flex-1 flex-col">
         {/* *** חדש (בקשה מפורשת - "הכרטיסייה תתארך עד קצה העמוד, ללא
             גלילה, והכפתורים בתוך הקצה התחתון שלה"): כש-cardsVisible
             (מסך ההחלקה בפועל, לא בחירת יעד/תוצאות) - התיבה הזו מקבלת
@@ -292,14 +223,7 @@ export default function HomePage() {
             "מועבר הלאה" ל-TripMatchPageContent (שהוא רק flex ITEM כלפי
             ההורה שלו אם ההורה עצמו הוא flex container). זה בדיוק הבאג
             שקרה בפעם הקודמת שבנינו את זה. */}
-        <div
-          className="flex flex-col"
-          style={
-            cardsVisible && destinationQuery && foldHeight != null
-              ? { height: `${foldHeight}px`, minHeight: 0 }
-              : undefined
-          }
-        >
+        <div className="flex min-h-0 flex-1 flex-col">
           {/* *** בקשה מפורשת - "הרקע של החלק עד שורת החיפוש כולל בצבע כחול
               כמו האייקון שלנו, עם קצוות מעוגלים": ההדר + שורת החיפוש יושבים
               על רקע גרדיאנט תכלת→כחול (צבעים דגומים מאייקון האפליקציה), עם
@@ -353,14 +277,17 @@ export default function HomePage() {
               נצמד לבר התכלת. */}
           <div className={`${destinationQuery ? "mt-3" : "mt-2"} flex min-h-0 flex-1 flex-col`}>
             {destinationQuery ? (
-              <TripMatchPageContent
-                key={embeddedKey}
-                embedded
-                initialCityQuery={destinationQuery}
-                onExitEmbedded={handleExitEmbedded}
-                onCardsVisibleChange={setCardsVisible}
-                onAddPlaceClick={() => setAddPlaceOpen(true)}
-              />
+              <div className="home-embedded-tripmatch relative w-full min-w-0">
+                <TripMatchPageContent
+                  key={embeddedKey}
+                  embedded
+                  initialCityQuery={destinationQuery}
+                  onExitEmbedded={handleExitEmbedded}
+                  onCardsVisibleChange={setCardsVisible}
+                  onAddPlaceClick={() => setAddPlaceOpen(true)}
+                />
+
+              </div>
             ) : (
               // *** תוקן (בקשה מפורשת - "לא מופיע עכשיו כלום, ביקשתי
               // שיהיה את הכרטיסייה הריקה עם הוספת מקומות ברגע שאין שום
@@ -413,6 +340,20 @@ export default function HomePage() {
           <HomeNearbyRow />
         </div>
       </div>
+
+      {/* Home-only: the embedded TripMatch column never scrolls sideways.
+          The deck itself is centered structurally inside TripMatchPageContent
+          (DECK_STYLE: width:100% + max-width + margin-inline:auto), so no
+          width/offset overrides are needed here. overflow-x:clip (not hidden)
+          does not create a scroll container, so the deck can't be shifted. */}
+      <style>{`
+        .home-embedded-tripmatch {
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          overflow-x: clip;
+        }
+      `}</style>
 
       {/* *** הוסר (בקשה מפורשת - "הכפתור (+) אפשר להעיף מהעמוד הזה - לא
           רלוונטי"): כפתור ה-"+" הצף להוספת מקום. ה-AddPlaceModal עצמו

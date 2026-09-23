@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from "react";
 import Image from "next/image";
@@ -95,6 +95,21 @@ export default function TripMatchPage() {
   );
 }
 
+/** מידות ה-Deck המוטמע (Home). הכרטיס לעולם לא רחב מ-MAX, ותמיד נשארים
+ *  GUTTER px משני צדי ה-viewport - מספיק גם לבליטת הסיבוב של הכרטיסים
+ *  מאחור (~sin(1.2°) × גובה הכרטיס ≈ 11px). */
+const DECK_MAX_CARD_WIDTH = 340;
+const DECK_SIDE_GUTTER = 24;
+const DECK_CARD_ASPECT = 0.66;
+/** אותו חצי-עיגול תחתון כמו ב-TripMatchCard - מוחל גם על הכרטיסים מאחור
+ *  כדי שהחצי-עיגול יישאר לבן ונקי (בלי שתמונת הכרטיס שמאחור תציץ דרכו). */
+const DECK_NOTCH_MASK = {
+  WebkitMaskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+  maskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+  WebkitMaskRepeat: "no-repeat",
+  maskRepeat: "no-repeat",
+} as const;
+
 /** הכרטיסים המציצים מאחורי הכרטיס הקדמי - [0] = הקרוב (depth 1) ... [3] =
  *  הרחוק (depth 4). rot = זווית (מעלות, סביב תחתית הכרטיס), y = הזזה אנכית
  *  בפיקסלים (שלילי = כלפי מעלה). ערכי embedded קטנים כדי להישאר בתוך
@@ -109,7 +124,7 @@ const BACK_CARDS = [
   // גבוה מאוד (~800px). standalone (עמוד /tripmatch העצמאי, כרטיס נמוך
   // בהרבה) לא השתנה.
   { embedded: { rot: 1.2, y: 0 }, standalone: { rot: 4, y: 0 } },
-  { embedded: { rot: -1.3, y: 0 }, standalone: { rot: -5, y: 0 } },
+  { embedded: { rot: -1.2, y: 0 }, standalone: { rot: -5, y: 0 } },
   { embedded: { rot: 0.8, y: -10 }, standalone: { rot: 2.5, y: -6 } },
   { embedded: { rot: -0.8, y: -16 }, standalone: { rot: -2.5, y: -10 } },
 ] as const;
@@ -303,17 +318,32 @@ export function TripMatchPageContent({
   // שוליים כמו שורת ההתקדמות/הקטגוריות שמעליו, px-8 גם הן) - הכרטיס
   // ממלא בדיוק את הרוחב הפנוי הזה, בלי כיווץ נוסף, ולכן גם ממורכז
   // בצורה עקבית ביחס לשאר האלמנטים בעמוד.
-  const CARD_BOX_STYLE = {
+  // *** Deck מבני (בקשה מפורשת - "המרכוז חייב להיות מבני"):
+  // DECK_STYLE = ה-Deck Container היחיד: width:100% + max-width +
+  // margin-inline:auto + padding-inline (השוליים). רוחב הכרטיס נגזר מזה
+  // אוטומטית: CARD_WIDTH = min(MAX_CARD_WIDTH, AVAILABLE_WIDTH - 2*GUTTER).
+  // DECK_STAGE_STYLE = תיבת הכרטיס (בזרימה רגילה, aspect-ratio קובע גובה).
+  // כל שכבה (כרטיסים מאחור, כרטיס קדמי, כפתורים) = DECK_LAYER_STYLE
+  // (absolute; inset:0) - אותה תיבה בדיוק, אותו Center X, בלי left:50%,
+  // בלי translateX ובלי margins שליליים. כרטיסים מאחור מקבלים רק
+  // rotate/translateY סביב תחתית המרכז.
+  const DECK_STYLE = {
+    position: "relative" as const,
+    width: "100%",
+    maxWidth: DECK_MAX_CARD_WIDTH + DECK_SIDE_GUTTER * 2,
+    marginInline: "auto",
+    paddingInline: DECK_SIDE_GUTTER,
+    paddingTop: 16,
+    boxSizing: "border-box" as const,
+  };
+  const DECK_STAGE_STYLE = {
+    position: "relative" as const,
+    width: "100%",
+    aspectRatio: String(DECK_CARD_ASPECT),
+  };
+  const DECK_LAYER_STYLE = {
     position: "absolute" as const,
-    left: 0,
-    right: 0,
-    top: 16,
-    // The card size is determined by its width/aspect-ratio only.
-    // IMPORTANT: do not cap its height by the available flex area. When the
-    // collapsible search bar opens, that area becomes shorter; capping the
-    // card here would shrink the card. The search bar must move the card down,
-    // not resize it.
-    aspectRatio: "0.55",
+    inset: 0,
   };
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
@@ -1239,7 +1269,7 @@ export function TripMatchPageContent({
     <Screen
       withBottomNavSpacing={!embedded}
       fullHeight={!embedded}
-      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""} ${embedded ? "flex flex-1 min-h-0 flex-col" : ""}`}
+      className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""} ${embedded ? "flex flex-1 min-h-0 w-full min-w-0 max-w-full flex-col overflow-x-clip" : ""}`}
     >
       {!embedded && stage !== "swiping" && (
         <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
@@ -1555,7 +1585,7 @@ export function TripMatchPageContent({
           // overflow-x-hidden - זו התנהגות CSS תקנית, לא סתירה. זו רשת
           // ביטחון קשיחה: מה שלא "אמור" לחרוג (הכרטיס, הכרטיסים מאחור)
           // עכשיו פיזית לא יכול לצאת מהעמודה הזו, לא משנה מאיזה חישוב.
-          <div className={embedded ? "flex flex-1 min-h-0 flex-col overflow-x-hidden" : "h-viewport-safe flex flex-col"}>
+          <div className={embedded ? "flex flex-1 min-h-0 flex-col" : "h-viewport-safe flex flex-col"}>
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}
@@ -1578,8 +1608,9 @@ export function TripMatchPageContent({
                 כבר מוצגים למעלה מ"הכל" לפני שנוגעים בעיגול אחד. בחירה
                 מרובה (OR) מסננת בצד הלקוח בלבד, בלי קריאת שרת נוספת. */}
             {candidates.length > 0 && (
-              <HomeQuickCategories
-                selected={activeCategoryFilters}
+              <div className="w-full min-w-0 max-w-full shrink-0">
+                <HomeQuickCategories
+                  selected={activeCategoryFilters}
                 onToggle={toggleCategoryFilter}
                 // בקשה מפורשת - "הפילטרים בשורה של הסוגים, הראשונים
                 // מימין": במצב מוטמע (בלי הבר העליון עם כפתור הפילטר) הכפתור
@@ -1590,7 +1621,8 @@ export function TripMatchPageContent({
                     <FilterCircleButton onClick={() => setFiltersOpen(true)} activeFilterCount={countActiveFilters(filters)} />
                   ) : undefined
                 }
-              />
+                />
+              </div>
             )}
 
             {/* *** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת
@@ -1631,7 +1663,7 @@ export function TripMatchPageContent({
                 (8px) + ה-16px הפנימיים = 24px, קרוב ועקבי לשאר הרווחים
                 בעמוד הזה (pt-1.5 מעל פס ההתקדמות, למשל). */}
             <div
-              className={embedded ? "flex flex-1 min-h-0 flex-col px-8 pt-2 -translate-x-1" : "flex min-h-0 flex-1 flex-col pt-1.5"}
+              className={embedded ? "flex flex-1 min-h-0 w-full min-w-0 flex-col pt-2" : "flex min-h-0 flex-1 flex-col pt-1.5"}
               // *** תיקון (בקשה מפורשת - "צריך לתת שוליים לכרטיסיות של
               // ההחלקות בשביל שלא יצא מהעמוד"): במצב מוטמע הכרטיס כבר לא
               // צמוד לשני קצוות המסך - px-8 (32px; עוד שוליים לפי בקשה
@@ -1650,13 +1682,20 @@ export function TripMatchPageContent({
                 // When the search bar opens the card must keep its original
                 // size and simply extend lower on the page instead of being
                 // clipped/shrunk to the reduced available flex height.
-                ...(embedded ? { overflowX: "hidden" as const, overflowY: "visible" as const } : null),
+                // overflow-x:clip (לא hidden) - חותך את אנימציית ה-fly-out
+                // בלי להפוך את האזור ל-scroll container (hidden+visible
+                // הופך בפועל ל-auto, ואז הדפדפן יכול "לגלול" את ה-Deck הצידה).
+                ...(embedded ? { overflowX: "clip" as const } : null),
               }}
             >
               <div
-                className={embedded ? "tripmatch-embedded-card-area relative w-full" : "relative w-full"}
-                style={embedded ? undefined : { height: "75%" }}
+                className={embedded ? "tripmatch-deck" : "relative w-full"}
+                style={embedded ? DECK_STYLE : { height: "75%" }}
               >
+                <div
+                  className={embedded ? "tripmatch-deck-stage" : "contents"}
+                  style={embedded ? DECK_STAGE_STYLE : undefined}
+                >
                 {!currentCandidate ? (
                   // *** חדש (בקשה מפורשת - "גם אם יגמרו ההחלקות, תמיד תהיה
                   // כרטיסייה - עם רקע לבן, כרטיסיות פיקטיביות מאחורה, ושכתוב
@@ -1673,7 +1712,7 @@ export function TripMatchPageContent({
                         className="pointer-events-none absolute overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
                         style={
                           embedded
-                            ? { ...CARD_BOX_STYLE, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            ? { ...DECK_LAYER_STYLE, ...DECK_NOTCH_MASK, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                             : { top: 0, height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                         }
                       />
@@ -1682,7 +1721,7 @@ export function TripMatchPageContent({
                       type="button"
                       onClick={handleAddPlaceClick}
                       className="absolute flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
-                      style={embedded ? CARD_BOX_STYLE : { top: 0, height: "100%", left: 0, right: 0 }}
+                      style={embedded ? DECK_LAYER_STYLE : { top: 0, height: "100%", left: 0, right: 0 }}
                     >
                       <span
                         className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
@@ -1735,6 +1774,7 @@ export function TripMatchPageContent({
                     return (
                       <div
                         key={backCandidate.id}
+                        data-tripmatch-back-card=""
                         aria-hidden="true"
                         className="pointer-events-none absolute overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary shadow-[0_8px_24px_rgba(16,24,40,0.10)]"
                         // *** תוקן שוב (בקשה מפורשת - "זה שוב בורח"): לא עוד
@@ -1746,7 +1786,7 @@ export function TripMatchPageContent({
                         // ל-inset-x-0 (מלא רוחב ה-container, כמו קודם).
                         style={
                           embedded
-                            ? { ...CARD_BOX_STYLE, transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`, transformOrigin: "50% 100%" }
+                            ? { ...DECK_LAYER_STYLE, ...DECK_NOTCH_MASK, transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`, transformOrigin: "50% 100%" }
                             : {
                                 top: 0,
                                 height: "100%",
@@ -1768,26 +1808,58 @@ export function TripMatchPageContent({
                       </div>
                     );
                   })}
-                  <SwipeCard
-                    ref={swipeCardRef}
-                    key={`${currentCandidate.id}-${swipeResetTick}`}
-                    onSwipeLeft={() => handleDecision(false)}
-                    onSwipeRight={() => handleDecision(true)}
-                    onTap={handleCardTap}
-                    allowVerticalScroll
-                    disabled={busy}
-                  >
-                    {() => (
-                      <TripMatchCard
-                        candidate={currentCandidate}
-                        imageIndex={currentPhotoIndex}
-                        matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
-                        matchTotal={totalDecisions + visibleCandidates.length}
-                        cityLabel={selectedCityLabel || selectedCity || ""}
-                        centerBox={embedded ? CARD_BOX_STYLE : null}
-                      />
-                    )}
-                  </SwipeCard>
+                  {embedded ? (
+                    // The swipe surface itself is the card box. Keeping the
+                    // gesture wrapper at the exact same width/position as the
+                    // visual card prevents the wrapper from collapsing to the
+                    // content width and shifting the whole deck left.
+                    <div
+                      data-tripmatch-front-surface=""
+                      style={DECK_LAYER_STYLE}
+                    >
+                      <SwipeCard
+                        ref={swipeCardRef}
+                        key={`${currentCandidate.id}-${swipeResetTick}`}
+                        onSwipeLeft={() => handleDecision(false)}
+                        onSwipeRight={() => handleDecision(true)}
+                        onTap={handleCardTap}
+                        allowVerticalScroll
+                        disabled={busy}
+                      >
+                        {() => (
+                          <TripMatchCard
+                            candidate={currentCandidate}
+                            imageIndex={currentPhotoIndex}
+                            matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
+                            matchTotal={totalDecisions + visibleCandidates.length}
+                            cityLabel={selectedCityLabel || selectedCity || ""}
+                            centerBox={{ top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", aspectRatio: "auto" }}
+                          />
+                        )}
+                      </SwipeCard>
+                    </div>
+                  ) : (
+                    <SwipeCard
+                      ref={swipeCardRef}
+                      key={`${currentCandidate.id}-${swipeResetTick}`}
+                      onSwipeLeft={() => handleDecision(false)}
+                      onSwipeRight={() => handleDecision(true)}
+                      onTap={handleCardTap}
+                      allowVerticalScroll
+                      disabled={busy}
+                    >
+                      {() => (
+                        <TripMatchCard
+                          candidate={currentCandidate}
+                          imageIndex={currentPhotoIndex}
+                          matchIndex={Math.min(totalDecisions + 1, totalDecisions + visibleCandidates.length)}
+                          matchTotal={totalDecisions + visibleCandidates.length}
+                          cityLabel={selectedCityLabel || selectedCity || ""}
+                          centerBox={null}
+                        />
+                      )}
+                    </SwipeCard>
+                  )}
 
                   {/* *** כפתורי הפעולה - קבועים לגמרי (בקשה מפורשת - "לא
                       זזים ברגע שמחליקים"): siblings של ה-SwipeCard, לא
@@ -1815,7 +1887,7 @@ export function TripMatchPageContent({
                     // ממוקמת ב-bottom:ZONE *יחסית לעטיפה* (לא לקונטיינר החיצוני)
                     // - כלומר תמיד קרוב לתחתית *הכרטיס עצמו*, לא משנה מה הגובה
                     // המחושב שלו בפועל.
-                    style={embedded ? { ...CARD_BOX_STYLE, pointerEvents: "none" as const } : { top: 0, height: "100%", left: 0, right: 0 }}
+                    style={embedded ? { ...DECK_LAYER_STYLE, pointerEvents: "none" as const } : { top: 0, height: "100%", left: 0, right: 0 }}
                   >
                     <div
                       dir="ltr"
@@ -1868,6 +1940,7 @@ export function TripMatchPageContent({
                   )}
                 </>
               )}
+                </div>
             </div>
           </div>
         </div>
