@@ -24,6 +24,8 @@ interface CollapsibleTopBarProps {
   /** מרים את הבר מעל שכבת ההסבר (SearchIntroOverlay), כדי שיישאר מוגדר
    *  וחד בזמן שכל שאר העמוד מעומעם. */
   raised?: boolean;
+  /** פתיחה חד-פעמית של שורת החיפוש מתוך הסבר "צור טיול". */
+  forceReveal?: boolean;
 }
 
 const BAR_GRADIENT = "linear-gradient(150deg, #3FCBFD 0%, #0AA9FD 35%, #008EFD 70%, #007CFE 100%)";
@@ -74,6 +76,7 @@ export function CollapsibleTopBar({
   menuHref,
   children,
   raised = false,
+  forceReveal = false,
 }: CollapsibleTopBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
@@ -91,7 +94,9 @@ export function CollapsibleTopBar({
     let naturalHeight = content.offsetHeight;
     // true = גלויה (בעקבות משיכה למטה בראש הדף). false = מוסתרת (ברירת
     // המחדל - גם בטעינה הראשונה, לפני כל אינטראקציה).
-    let revealed = false;
+    // כאשר נפתח ההסבר מתוך "צור טיול", שורת החיפוש חייבת להיות גלויה
+    // מיד. זה override חד-פעמי לפתיחה בלבד; סגירה בגלילה נשארת כרגיל.
+    let revealed = forceReveal;
     // מיקום ה-touch ההתחלתי, רק אם המשיכה התחילה בראש הדף ממש
     // (scrollY<=0) - אחרת null, ואין מעקב אחרי המחווה הזו בכלל.
     let touchStartY: number | null = null;
@@ -135,8 +140,12 @@ export function CollapsibleTopBar({
 
     function onScroll() {
       const scrollY = Math.max(0, window.scrollY);
-      // גלילה אמיתית של הדף (לא רק "בראש") סוגרת שוב שורה שנחשפה -
-      // "נשארת גלויה עד שמתחילים לגלול/להחליק כלפי מעלה לתוך הכרטיסים".
+      // בזמן הסבר "צור טיול" שורת החיפוש חייבת להישאר פתוחה.
+      // ה-smooth scroll לראש והנעילה של ה-overlay יכולים לייצר אירועי
+      // scroll אחרי שה-forceReveal הופעל; אסור לאירועים האלה לסגור אותה.
+      if (forceReveal) return;
+
+      // במצב הרגיל: גלילה אמיתית של הדף סוגרת שוב שורה שנחשפה.
       if (revealed && scrollY > 4) {
         revealed = false;
         if (!raf) raf = requestAnimationFrame(apply);
@@ -165,7 +174,7 @@ export function CollapsibleTopBar({
       window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [collapsible]);
+  }, [collapsible, forceReveal]);
 
   return (
     <div

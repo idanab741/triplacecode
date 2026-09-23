@@ -1280,7 +1280,7 @@ export function TripMatchPageContent({
       )}
 
       <div
-        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "flex-1 min-h-0" : ""}`}
+        className={`mx-auto flex max-w-xl flex-col ${stage === "swiping" ? "" : stage === "results" ? "gap-3 px-5 pb-4 pt-5" : "gap-4 px-5 pb-10 pt-5"} ${embedded ? "w-full min-w-0 flex-1 min-h-0" : ""}`}
       >
         {/* "מה זה טריפים?" - כרטיס הסבר קטן ואנימטיבי בתוך העמוד (לא פופאפ), רק במסך הראשון של TripMatch */}
         {stage === "city" && !embedded && <TripsIntroCard />}
@@ -1542,7 +1542,16 @@ export function TripMatchPageContent({
           // בגובה מפורש - ר' .tripmatch-embedded-card-area ב-globals.css),
           // והכפתורים נשארים צמודים לתחתית ההורה. עמוד /tripmatch העצמאי
           // (embedded=false) לא השתנה.
-          <div className={embedded ? "flex flex-1 min-h-0 flex-col" : "h-viewport-safe flex flex-col"}>
+          // *** תוספת (בקשה מפורשת - "הדבר היחיד שגולש זה סוגי הטיול"):
+          // overflow-x-hidden כאן, ממוקד רק לאזור המוטמע הזה (לא על
+          // Screen.tsx באופן גורף - זה מה ששבר בעבר את ההחלקה בשורת
+          // הקטגוריות, ר' ההיסטוריה). עכשיו, אחרי שהוסר ה-touch-action:
+          // pan-x הבעייתי מ-HomeQuickCategories, גלילה אופקית פנימית
+          // (overflow-x-auto) ממשיכה לעבוד כרגיל גם בתוך אב עם
+          // overflow-x-hidden - זו התנהגות CSS תקנית, לא סתירה. זו רשת
+          // ביטחון קשיחה: מה שלא "אמור" לחרוג (הכרטיס, הכרטיסים מאחור)
+          // עכשיו פיזית לא יכול לצאת מהעמודה הזו, לא משנה מאיזה חישוב.
+          <div className={embedded ? "flex flex-1 min-h-0 flex-col overflow-x-hidden" : "h-viewport-safe flex flex-col"}>
             {currentCandidate && (
               <SwipeHeader
                 city={selectedCityLabel || selectedCity || ""}

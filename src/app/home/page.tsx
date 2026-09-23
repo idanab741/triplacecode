@@ -266,12 +266,12 @@ export default function HomePage() {
     // בדיוק גובה ה-MainBottomNav (≈66px תוכן + max(safe-area, 22px)) +
     // 12px אוויר - במקום pb-28 (112px) הקבוע. במצב הפתיחה (בלי כרטיסים)
     // נשאר pb-28 כמו קודם.
-    // *** תוסף (בקשה מפורשת - "הדף לא יזלוג החוצה"): overflow-x-hidden
-    // ברמת ה-div הזה (לא html/body - ר' Screen.tsx לאותו הסבר) - רשת
-    // ביטחון ממוקדת לעמוד הבית עצמו, בלי לפגוע בגלילה האופקית
-    // הפנימית הלגיטימית של שורת הקטגוריות.
+    // *** הוסר שוב (Bug חוזר - "אי אפשר להחליק ימינה ושמאלה בשורת סוגי
+    // הטיול"): אותו overflow-x-hidden שהתווסף כאן שבר את הגלילה
+    // האופקית של שורת הקטגוריות (HomeQuickCategories) - ר' הסבר מלא
+    // ב-Screen.tsx. הוסר; הזליגה עצמה כבר מטופלת ב-CARD_BOX_STYLE.
     <div
-      className={`min-h-screen overflow-x-hidden bg-bg ${destinationQuery ? "" : "pb-28"}`}
+      className={`min-h-screen bg-bg ${destinationQuery ? "" : "pb-28"}`}
       style={destinationQuery ? { paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" } : undefined}
     >
       <HomeStatusBarTint />
@@ -311,7 +311,7 @@ export default function HomePage() {
               שנדבק לראש המסך ומכווץ את שורת החיפוש בהתאם לגלילה. שורת החיפוש
               עצמה (כולל כפתור "קרוב אלי" בתוכה) נשארה בדיוק אותו דבר - היא
               ה-children שנעלמים. */}
-          <CollapsibleTopBar loading={loading || profileLoading}>
+          <CollapsibleTopBar loading={loading || profileLoading} forceReveal={introOpen}>
             <div data-home-search="">
             <SearchBarLink
               destinationMode
@@ -361,11 +361,44 @@ export default function HomePage() {
                 onCardsVisibleChange={setCardsVisible}
                 onAddPlaceClick={() => setAddPlaceOpen(true)}
               />
-            ) : // *** הוסר (בקשה מפורשת - "להעיף את כל עיצובי הטעינה, שזה ישר יקבל את
-            // המיקום של המשתמש"): אין יותר מסך המתנה (איור/טקסט) בעמוד הבית.
-            // איתור המיקום מתחיל מיד בטעינת העמוד (ה-useEffect של
-            // handleUseNearMe למעלה), והכרטיסים מופיעים ברגע שיש יעד.
-            null}
+            ) : (
+              // *** תוקן (בקשה מפורשת - "לא מופיע עכשיו כלום, ביקשתי
+              // שיהיה את הכרטיסייה הריקה עם הוספת מקומות ברגע שאין שום
+              // דבר"): כל עוד destinationQuery עדיין null (המיקום עדיין
+              // מתברר, או שאיתור המיקום נכשל בלי יעד חלופי) - לפני זה
+              // לא הוצג כלום כאן (null ממש, ר' למעלה) עד שה-embedded
+              // TripMatch עולה. עכשיו מוצגת אותה כרטיסייה ריקה בדיוק
+              // (עיצוב, "+", "להוספת מקומות לחצו כאן") כמו זו שמופיעה
+              // בתוך ה-TripMatch המוטמע כשאין מועמדים - כדי שלעולם לא
+              // יהיה מסך לבן ריק, גם במצב הזה. לחיצה עליה פותחת את אותו
+              // AddPlaceModal כמו בכל מקום אחר באפליקציה.
+              <div className="flex flex-1 flex-col px-8 pt-2">
+                <div className="relative w-full" style={{ aspectRatio: "0.55", maxHeight: "calc(100% - 32px)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setAddPlaceOpen(true)}
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
+                  >
+                    {locating ? (
+                      <span className="h-10 w-10 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
+                    ) : (
+                      <span
+                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
+                        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                      >
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                      </span>
+                    )}
+                    <span className="px-8 text-center text-[16px] font-bold text-ink">להוספת מקומות לחצו כאן</span>
+                    <span className="px-10 text-center text-[13px] text-ink-secondary">
+                      {locating ? "מאתרים את המיקום שלך…" : locateError || "בחרו יעד למעלה כדי להתחיל לגלות מקומות"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -21,16 +21,16 @@ export function Screen({
   ...props
 }: ScreenProps) {
   return (
-    // *** תוסף (בקשה מפורשת - "הדף לא יזלוג החוצה"): overflow-x-hidden
-    // כאן ברמת ה-div (לא ב-html/body - ר' globals.css, שם זה הוסר
-    // בכוונה כי זה שבר גלילה אופקית פנימית ב-iOS Safari) הוא רשת
-    // ביטחון ממוקדת: כל עמוד שמשתמש ב-Screen (88+ מקומות) מוגן
-    // מחריגה אופקית של תוכן פנימי, בלי לגעת ברכיב הגלילה הראשי של
-    // המסמך - כך שגלילה אופקית לגיטימית בתוך קונטיינר מקונן (למשל
-    // שורת הקטגוריות, שיש לה overflow-x-auto + touch-action:pan-x
-    // מפורשים משלה) ממשיכה לעבוד כרגיל.
+    // *** הוסר שוב (Bug חוזר - "אי אפשר להחליק ימינה ושמאלה בשורת סוגי
+    // הטיול"): overflow-x-hidden שנוסף כאן ברמת ה-div (בניסיון ליצור
+    // רשת ביטחון נגד זליגה אופקית) שבר בפועל את הגלילה האופקית
+    // הלגיטימית של שורת הקטגוריות (HomeQuickCategories) - בדיוק אותה
+    // תופעה שכבר תועדה ב-globals.css לגבי overflow-x:hidden על html,
+    // רק שכאן זה קרה גם ברמת container רגיל (לא רק html/body). הוסר -
+    // התיקון האמיתי לזליגה נשאר רק ב-CARD_BOX_STYLE (tripmatch/page.tsx),
+    // בלי overflow-x-hidden גורף שפוגע בגלילה תקינה.
     <div
-      className={`${fullHeight ? "min-h-screen" : ""} overflow-x-hidden bg-bg-secondary px-5 pt-8 ${
+      className={`${fullHeight ? "min-h-screen" : ""} bg-bg-secondary px-5 pt-8 ${
         withBottomNavSpacing ? "pb-28" : "pb-8"
       } ${className}`}
       {...props}

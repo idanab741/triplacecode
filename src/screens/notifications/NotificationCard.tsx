@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import type { ActivityItem } from "@/services/notifications/notificationsService";
 
@@ -29,7 +30,15 @@ export function NotificationCard({ item, onOpen }: NotificationCardProps) {
       }}
     >
       <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-bg-secondary text-xl">
-        {item.imageUrl ? (
+        {item.id === "pref_reminder" ? (
+          <Image
+            src="/images/onboarding-fab.png"
+            alt=""
+            width={48}
+            height={48}
+            className="h-full w-full object-contain"
+          />
+        ) : item.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
         ) : (

@@ -85,6 +85,8 @@ body {
 .tripmatch-embedded-card-area {
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* *** תוספת (בקשת המשתמש - בועת תצוגה מקדימה עם תמונה בלחיצה על פין

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Rubik } from "next/font/google";
 import { AuthProvider } from "@/providers/AuthProvider";
-import { OnboardingFloatingButton } from "@/components/OnboardingFloatingButton";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -28,7 +27,6 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-bg-secondary">
         <AuthProvider>
           {children}
-          <OnboardingFloatingButton />
         </AuthProvider>
       </body>
     </html>
