@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { AnimatedHeaderBackdrop } from "@/screens/home/AnimatedHeaderBackdrop";
 import { HomeHeader } from "@/screens/home/HomeHeader";
 
 interface CollapsibleTopBarProps {
@@ -18,6 +19,10 @@ interface CollapsibleTopBarProps {
   onBack?: () => void;
   /** עמוד הפרופיל שלי: תפריט שלוש-הפסים (קישור) במקום הפעמון. */
   menuHref?: string;
+  /** *** "transparent" (ברירת מחדל) - הבר החדש: שקוף, לוגו צבעוני.
+   *  "colored" - הבר הצבעוני הקודם (gradient + פינות מעוגלות + הילות),
+   *  לעמוד הבית ול-place's (בקשה מפורשת - "places על רקע כחול"). */
+  variant?: "transparent" | "colored";
   /** התוכן שנעלם בגלילה (שורת החיפוש). בלי children - בר קבוע פשוט. */
   children?: ReactNode;
   /** מרים את הבר מעל שכבת ההסבר (SearchIntroOverlay), כדי שיישאר מוגדר
@@ -68,11 +73,11 @@ const BAR_SHADOW = "0 12px 30px -14px rgba(0, 124, 254, 0.6)";
 export function CollapsibleTopBar({
   loading = false,
   headerRow,
-  // gradient/shadow/tone נשארים ב-API לתאימות לאחור (כל העמודים מעבירים
-  // אותם), אבל הבר עכשיו שקוף - הם לא מוחלים יותר.
-  gradient: _gradient = BAR_GRADIENT,
-  shadow: _shadow = BAR_SHADOW,
-  tone: _tone = "blue",
+  // gradient/shadow/tone מוחלים רק ב-variant="colored".
+  gradient = BAR_GRADIENT,
+  shadow = BAR_SHADOW,
+  tone = "blue",
+  variant = "transparent",
   onBack,
   menuHref,
   children,
@@ -183,6 +188,7 @@ export function CollapsibleTopBar({
   // כשהוא חוזר מעל תוכן (באמצע הדף) הוא מקבל רקע לבן-שקוף עדין עם טשטוש,
   // כדי שהלוגו והכפתורים לא יתערבבו עם התוכן שמתחתיו. מעודכן ישירות על
   // ה-DOM (לא state) - בלי רינדור בכל פריים.
+  const colored = variant === "colored";
   useEffect(() => {
     const bar = barRef.current;
     if (!bar) return;
@@ -207,6 +213,11 @@ export function CollapsibleTopBar({
         hidden = false;
         lastY = y;
       }
+      if (colored) {
+        // בר צבעוני: הרקע תמיד הגרדיאנט - רק ההסתרה/חשיפה בגלילה.
+        bar.style.transform = hidden ? "translateY(-100%)" : "";
+        return;
+      }
       const floating = !hidden && y > 4;
       bar.style.transform = hidden ? "translateY(-100%)" : "";
       bar.style.backgroundColor = floating ? "rgba(255, 255, 255, 0.82)" : "transparent";
@@ -225,19 +236,20 @@ export function CollapsibleTopBar({
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [raised, forceReveal]);
+  }, [raised, forceReveal, colored]);
 
   return (
     <div
       ref={barRef}
       data-home-top-bar=""
-      className={`sticky top-0 pb-3 ${raised ? "z-[65]" : "z-30"}`}
+      className={`sticky top-0 ${colored ? "rounded-b-[32px] pb-5" : "pb-3"} ${raised ? "z-[65]" : "z-30"}`}
       style={{
-        backgroundColor: "transparent",
+        ...(colored ? { background: gradient, boxShadow: shadow } : { backgroundColor: "transparent" }),
         transition: "transform 240ms cubic-bezier(0.22, 1, 0.36, 1), background-color 200ms ease, box-shadow 200ms ease",
         willChange: "transform",
       }}
     >
+      {colored && <AnimatedHeaderBackdrop tone={tone} />}
       {headerRow ?? <HomeHeader loading={loading} onBack={onBack} menuHref={menuHref} />}
 
       {collapsible && (

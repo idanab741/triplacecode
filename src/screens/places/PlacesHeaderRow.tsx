@@ -22,7 +22,16 @@ const WHITE_CIRCLE =
  * הפעמון והצ'אט - אלה הקיימים של place's (התראות חברתיות + צ'אט place's).
  * עם onBack: כפתור החזרה של האפליקציה מחליף את הצ'אט.
  */
-export function PlacesHeaderRow({ onBack, menuHref }: { onBack?: () => void; menuHref?: string }) {
+export function PlacesHeaderRow({
+  onBack,
+  menuHref,
+  logoTone = "brand",
+}: {
+  onBack?: () => void;
+  menuHref?: string;
+  /** "white" - לוגו לבן על הבר הצבעוני (בית / place's). ברירת מחדל: סגול (בר שקוף). */
+  logoTone?: "brand" | "white";
+}) {
   return (
     <header className="relative z-10 grid h-[52px] grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
       {onBack ? (
@@ -47,7 +56,7 @@ export function PlacesHeaderRow({ onBack, menuHref }: { onBack?: () => void; men
           aria-label="place's"
           className="block h-[39px] w-[128px] select-none"
           style={{
-            backgroundColor: "var(--color-places-purple)",
+            backgroundColor: logoTone === "white" ? "#ffffff" : "var(--color-places-purple)",
             WebkitMaskImage: "url(/images/places-logo.png)",
             maskImage: "url(/images/places-logo.png)",
             WebkitMaskSize: "contain",

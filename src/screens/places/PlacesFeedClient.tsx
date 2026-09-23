@@ -15,7 +15,7 @@ import { PostCard } from "@/screens/places/PostCard";
 import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
 import { TripFeedCard } from "@/screens/trips/TripFeedCard";
 import { CreateReviewSheet } from "@/screens/places/CreateReviewSheet";
-import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
+import { PlacesHeaderRow } from "@/screens/places/PlacesHeaderRow";
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
@@ -197,16 +197,12 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
 
   return (
     <div className="min-h-screen bg-places-bg pb-24">
-      <HomeStatusBarTint color="#7C3AED" />
+      <HomeStatusBarTint color="#1FB3FD" />
       {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
           ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
           נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
-      <CollapsibleTopBar
-        headerRow={<PlacesHeaderRow />}
-        gradient={PLACES_BAR_GRADIENT}
-        shadow={PLACES_BAR_SHADOW}
-        tone="purple"
-      >
+      {/* *** בקשה מפורשת - "places על רקע כחול": הבר הצבעוני (כחול) עם לוגו places לבן. */}
+      <CollapsibleTopBar variant="colored" tone="blue" headerRow={<PlacesHeaderRow logoTone="white" />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 

@@ -13,6 +13,8 @@ interface HomeHeaderProps {
   onBack?: () => void;
   /** כשמועבר (עמוד הפרופיל שלי): תפריט שלוש-הפסים מחליף את הפעמון, באותו עיגול לבן ובאותו מקום. */
   menuHref?: string;
+  /** "white" - לוגו לבן, לבר הצבעוני (עמודים עם תמונה). ברירת מחדל: תכלת (בר שקוף). */
+  logoTone?: "brand" | "white";
 }
 
 /**
@@ -37,7 +39,7 @@ interface HomeHeaderProps {
  * המקומות. גם ההתראה הקבועה ("השלימו את ההתאמות האישיות") וגם שורת
  * "לכל ההתראות" חיות שם - מתקבלות כאן "בחינם".
  */
-export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
+export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: HomeHeaderProps) {
   // *** גובה קבוע (52px = pt-3 + כפתורים 40px) - זהה בדיוק לשורה של הבר הסגול של place's
   // (PlacesHeaderRow), כך ששני הבארים תמיד באותו גובה, בלי תלות בתוכן.
   return (
@@ -89,7 +91,7 @@ export function HomeHeader({ loading, onBack, menuHref }: HomeHeaderProps) {
           aria-label="TRIPLACE"
           className="block h-[46px] w-[150px] select-none"
           style={{
-            backgroundColor: "#0AA9FD",
+            backgroundColor: logoTone === "white" ? "#ffffff" : "#0AA9FD",
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",
             maskImage: "url(/images/triplace-logo-black.png)",
             WebkitMaskSize: "contain",

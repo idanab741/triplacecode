@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
-import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "@/screens/places/PlacesHeaderRow";
+import { PlacesHeaderRow } from "@/screens/places/PlacesHeaderRow";
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
 
@@ -34,16 +34,17 @@ export function PlacesMapClient() {
 
   return (
     <div className="min-h-screen bg-places-bg pb-0">
-      <HomeStatusBarTint color="#7C3AED" />
-      <CollapsibleTopBar headerRow={<PlacesHeaderRow />} gradient={PLACES_BAR_GRADIENT} shadow={PLACES_BAR_SHADOW} tone="purple">
+      <HomeStatusBarTint color="#1FB3FD" />
+      <CollapsibleTopBar variant="colored" tone="blue" headerRow={<PlacesHeaderRow logoTone="white" />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
-      {/* הבר שקוף עכשיו - המפה מתחילה ישר מתחתיו (בלי marginTop שלילי). */}
+      {/* הבר הכחול עם פינות מעוגלות - המפה ממשיכה מתחתיהן (marginTop שלילי של 32px). */}
       <div
         className="relative isolate z-0"
         style={{
-          height: "max(472px, calc(100dvh - 64px - 66px - max(env(safe-area-inset-bottom), 22px)))",
+          marginTop: -32,
+          height: "max(472px, calc(100dvh - 40px - 66px - max(env(safe-area-inset-bottom), 22px)))",
         }}
       >
         <PlacesFriendsMap
