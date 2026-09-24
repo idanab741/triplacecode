@@ -204,16 +204,12 @@ export async function createPlaceFromUser(input: CreatePlaceFromUserInput): Prom
       website: input.website ?? null,
       image_urls: [],
     };
-  // *** created_by (מיגרציה 0095). אם המיגרציה עוד לא הורצה - העמודה לא קיימת; במקרה כזה
-  // מנסים שוב בלי השדה, כדי שהוספת מקום לעולם לא תישבר בגלל זה.
-  let { data, error } = await supabase
-    .from("places")
-    .insert(input.createdBy ? { ...row, created_by: input.createdBy } : row)
-    .select("id, name")
-    .single();
-  if (error && input.createdBy && /created_by/.test(error.message)) {
-    ({ data, error } = await supabase.from("places").insert(row).select("id, name").single());
-  }
+  // *** created_by (מיגרציה 0095 - כבר רצה במסד).
+  // *** תיקון build (TypeScript): Supabase בודק "שדות עודפים" מול הטיפוס של האובייקט, ו-created_by
+  // לא הופיע בטיפוס של row. בונים את השורה כאובייקט כללי אחד ומוסיפים את created_by אליו.
+  const payload: Record<string, unknown> = { ...row };
+  if (input.createdBy) payload.created_by = input.createdBy;
+  const { data, error } = await supabase.from("places").insert(payload).select("id, name").single();
   if (error || !data) throw new Error(error?.message ?? "יצירת המקום נכשלה");
 
   await enrichPlaceFromGoogle(data.id as string);

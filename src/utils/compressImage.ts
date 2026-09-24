@@ -37,7 +37,7 @@ export async function compressImageFile(file: File, maxDimension = 2048, quality
 /** createImageBitmap מכבד את כיוון התמונה (EXIF) - בלי זה צילומי טלפון יוצאים מסובבים. */
 async function loadImage(file: File): Promise<{ source: CanvasImageSource; width: number; height: number; close: () => void }> {
   if (typeof createImageBitmap === "function") {
-    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" } as ImageBitmapOptions);
     return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close() };
   }
   const url = URL.createObjectURL(file);
