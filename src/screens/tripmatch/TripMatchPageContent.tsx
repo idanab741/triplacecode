@@ -311,15 +311,31 @@ export function TripMatchPageContent({
       const h = Math.round(navTop - stageDocTop);
       // רצפה: הכרטיס לא יהיה "שטוח" מדי במסכים נמוכים מאוד (אז הוא פשוט
       // ממשיך מתחת לבר וגוללים). 1.15 = גובה מינימלי ביחס לרוחב.
-      setDeckStageHeight(width > 0 ? Math.max(h, Math.round(width * 1.15)) : null);
+      const next = width > 0 ? Math.max(h, Math.round(width * 1.15)) : null;
+      setDeckStageHeight((prev) => (prev === next ? prev : next));
     };
     measure();
     let cancelled = false;
     document.fonts?.ready.then(() => { if (!cancelled) measure(); }).catch(() => {});
     window.addEventListener("resize", measure);
     window.addEventListener("orientationchange", measure);
+    // *** תיקון (בקשה מפורשת - "תסדר מה שצריך"): כפתורי ה-X/לב נחתכו מאחורי הבר התחתון - המדידה רצה
+    // רק ב-mount/resize/פונטים, ואם תוכן מעל הכרטיס השתנה *אחרי* זה (שורת סוגי הטיול נטענת, שגיאת
+    // מיקום, תמונות) הכרטיס נדחף למטה אל מתחת לבר. עכשיו כל שינוי גובה בעמוד מפעיל מדידה מחדש.
+    // בטוח מלולאה: המדידה תלויה רק בראש תיבת הכרטיס (לא בגובה שלה), כך שעדכון הגובה לא משנה אותה.
+    let frame = 0;
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(measure);
+          })
+        : null;
+    observer?.observe(document.body);
     return () => {
       cancelled = true;
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
       window.removeEventListener("resize", measure);
       window.removeEventListener("orientationchange", measure);
     };
@@ -1535,8 +1551,8 @@ export function TripMatchPageContent({
               type="button"
               disabled={nearMeOtherTags.length === 0 || busy}
               onClick={handleConfirmNearMeOther}
-              className="rounded-pill py-3 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              className="h-12 rounded-xl text-[15.5px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              style={{ background: "#0A6DFE" }}
             >
               המשך לחיפוש{nearMeOtherTags.length > 0 ? ` (${nearMeOtherTags.length})` : ""}
             </button>
@@ -1595,8 +1611,8 @@ export function TripMatchPageContent({
               type="button"
               disabled={otherTags.length === 0 || busy}
               onClick={handleStartOther}
-              className="rounded-pill py-3 text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+              className="h-12 rounded-xl text-[15.5px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              style={{ background: "#0A6DFE" }}
             >
               המשך לחיפוש{otherTags.length > 0 ? ` (${otherTags.length})` : ""}
             </button>
@@ -1767,8 +1783,8 @@ export function TripMatchPageContent({
                       style={embedded ? DECK_LAYER_STYLE : { top: 0, height: "100%", left: 0, right: 0 }}
                     >
                       <span
-                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
-                        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_8px_20px_rgba(10,109,254,0.4)]"
+                        style={{ background: "#0A6DFE" }}
                       >
                         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
                           <path d="M12 5v14M5 12h14" />
@@ -1944,7 +1960,13 @@ export function TripMatchPageContent({
                       aria-label="דלג"
                       className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
-                      <Image src="/images/tripmatch/action-nope-btn.png" alt="" width={98} height={98} className="h-full w-full object-contain" />
+                      {/* *** שדרוג (בקשה מפורשת - "להתאים לעיצוב שלנו"): כפתורים וקטוריים חדים במקום תמונות
+                          PNG - עיגול לבן מלא, צל ברור, אייקון בצבע מלא. אותו גודל ואותו מיקום בדיוק. */}
+                      <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-white text-[#F0304E] shadow-[0_10px_28px_rgba(0,0,0,0.35)]">
+                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" aria-hidden="true">
+                          <path d="M6 6l12 12M18 6 6 18" />
+                        </svg>
+                      </span>
                     </button>
 
                     <button
@@ -1957,7 +1979,12 @@ export function TripMatchPageContent({
                       // מעל החצי-עיגול (רדיוס 57px), כך שהוא לא "חצי בחוץ".
                       className="pointer-events-auto flex h-[54px] w-[54px] self-start items-center justify-center transition active:scale-90 disabled:opacity-40"
                     >
-                      <Image src="/images/tripmatch/action-rewind-btn.png" alt="" width={54} height={54} className="h-full w-full object-contain" />
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#5b6472] shadow-[0_8px_20px_rgba(0,0,0,0.3)]">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M9 14 4 9l5-5" />
+                          <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                        </svg>
+                      </span>
                     </button>
 
                     <button
@@ -1967,7 +1994,11 @@ export function TripMatchPageContent({
                       aria-label="אהבתי"
                       className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
                     >
-                      <Image src="/images/tripmatch/action-like-btn.png" alt="" width={98} height={98} className="h-full w-full object-contain" />
+                      <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-[#0A6DFE] text-white shadow-[0_10px_28px_rgba(10,109,254,0.5)]">
+                        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                          <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" />
+                        </svg>
+                      </span>
                     </button>
                     </div>
                   </div>
@@ -2004,8 +2035,10 @@ export function TripMatchPageContent({
                     התוצאות (day-trip/nature-trip וכו') - לא בבר העליון,
                     שם נשארים רק כפתורי ניווט/שיתוף/שמירה. */}
                 <div className="flex flex-col gap-1">
-                  <h1 className="text-xl font-bold text-ink">{selectedCityLabel || selectedCity}</h1>
-                  <p className="text-sm text-ink-secondary">{sessionLikedPlaces.length} מקומות שאהבתם</p>
+                  <h1 className="text-[24px] font-bold leading-tight tracking-tight text-ink">{selectedCityLabel || selectedCity}</h1>
+                  <p className="text-[14px] text-ink-secondary">
+                    {sessionLikedPlaces.length === 1 ? "מקום אחד שאהבתם" : `${sessionLikedPlaces.length} מקומות שאהבתם`} · נשמרו ב&quot;הבחירות שלי&quot;
+                  </p>
                 </div>
 
                 {/* מפה עובדת - מיקום כל האטרקציות שאהבתם, בדיוק כמו במסכי
@@ -2027,19 +2060,19 @@ export function TripMatchPageContent({
                       <button
                         type="button"
                         onClick={() => router.push(`/place/${place.id}`)}
-                        className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
+                        className="flex w-full items-center gap-3.5 overflow-hidden rounded-2xl bg-white p-1 text-right transition-colors active:bg-black/[0.04]"
                       >
                         {place.imageUrls[0] ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={place.imageUrls[0]} alt="" className="h-20 w-24 shrink-0 rounded-xl object-cover" />
+                          <img src={place.imageUrls[0]} alt="" className="h-[76px] w-[76px] shrink-0 rounded-xl object-cover" />
                         ) : (
-                          <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
+                          <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-xl bg-[#F1F2F5] text-2xl">📍</div>
                         )}
                         {/* *** תיקון: השם לא נחתך יותר (בלי truncate) - מוצג
                             במלואו, ומקסימום יורד לשורה שנייה (line-clamp-2). */}
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-[15px] font-bold leading-snug text-ink">{place.name}</p>
-                          <p className="mt-0.5 text-xs text-ink-secondary">
+                          <p className="line-clamp-2 text-[15.5px] font-semibold leading-snug text-ink">{place.name}</p>
+                          <p className="mt-0.5 text-[13px] text-ink-secondary">
                             {getCategoryLabel(place.category)}
                             {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
                           </p>
@@ -2059,8 +2092,8 @@ export function TripMatchPageContent({
                     <button
                       type="button"
                       onClick={handleContinueToNextCategory}
-                      className="rounded-pill py-3 text-sm font-semibold text-white"
-                      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                      className="h-12 rounded-xl text-[15.5px] font-semibold text-white transition active:scale-[0.98]"
+                      style={{ background: "#0A6DFE" }}
                     >
                       המשך לקטגוריה הבאה - {nextContinueCategory.label}
                     </button>
@@ -2072,7 +2105,7 @@ export function TripMatchPageContent({
                     // (לא במצב "קרוב אליי" למשל, ששם categoryValue תמיד
                     // "attractions" גם ל"הכל").
                     completedCategories.length > 0 && (
-                      <p className="rounded-pill bg-bg-secondary py-3 text-center text-sm font-medium text-ink-secondary">
+                      <p className="flex h-12 items-center justify-center rounded-xl bg-[#F4F5F7] text-center text-[14.5px] font-medium text-ink-secondary">
                         סרקתם את כל הקטגוריות ליעד הזה 🎉
                       </p>
                     )
@@ -2102,7 +2135,7 @@ export function TripMatchPageContent({
                       setTripRecordId(null);
     clearPersistedResultsState();
                     }}
-                    className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink"
+                    className="h-12 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98]"
                   >
                     טיול חדש
                   </button>
@@ -2135,7 +2168,7 @@ export function TripMatchPageContent({
                   setTripRecordId(null);
     clearPersistedResultsState();
                 }}
-                className="rounded-pill border border-ink-secondary/25 bg-white py-3 text-sm font-semibold text-ink"
+                className="h-12 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98]"
               >
                 טיול חדש
               </button>

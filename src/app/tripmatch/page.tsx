@@ -313,11 +313,11 @@ export default function TripMatchHomePage() {
                     className="absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
                   >
                     {locating ? (
-                      <span className="h-10 w-10 animate-spin rounded-full border-4 border-bg-secondary border-t-accent" />
+                      <span className="h-10 w-10 animate-spin rounded-full border-4 border-[#E9ECF1] border-t-[#0A6DFE]" />
                     ) : (
                       <span
-                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(24,119,242,0.35)]"
-                        style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
+                        className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_8px_20px_rgba(10,109,254,0.4)]"
+                        style={{ background: "#0A6DFE" }}
                       >
                         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
                           <path d="M12 5v14M5 12h14" />

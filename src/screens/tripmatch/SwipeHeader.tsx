@@ -38,10 +38,10 @@ interface SwipeHeaderProps {
 export function SwipeProgressBar({ currentIndex, total, className = "" }: { currentIndex: number; total: number; className?: string }) {
   const progressPct = total > 0 ? Math.min(100, (currentIndex / total) * 100) : 0;
   return (
-    <div className={`h-1.5 w-full overflow-hidden rounded-pill bg-bg-secondary ${className}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-[#E9ECF1] ${className}`}>
       <div
-        className="h-full rounded-pill bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] transition-all duration-300"
-        style={{ width: `${progressPct}%` }}
+        className="h-full rounded-full transition-all duration-300"
+        style={{ width: `${progressPct}%`, background: "#0A6DFE" }}
       />
     </div>
   );

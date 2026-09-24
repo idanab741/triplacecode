@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
@@ -207,12 +207,12 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       {/* Pill: אינדקס - קבוע פיזית בצד שמאל (לא start-/end- הלוגיים -
           אלה מתהפכים תחת dir="rtl" הגלובלי של האפליקציה). top-[26px] -
           מתחת לפסי הסטוריז. */}
-      <div className="absolute left-4 top-[26px] rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
+      <div className="absolute left-4 top-[26px] rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-bold text-white tabular-nums backdrop-blur-md">
         {matchIndex}/{matchTotal}
       </div>
 
       {/* Pill: מיקום - קבוע פיזית בצד ימין */}
-      <div className="absolute right-4 top-[26px] flex items-center gap-1 rounded-pill bg-black/40 px-3 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm">
+      <div className="absolute right-4 top-[26px] flex items-center gap-1 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-bold text-white backdrop-blur-md">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
           <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
         </svg>
@@ -231,42 +231,64 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
             editorialSummary, ר' tripAddEnrichmentService.ts), ולפחות 3 תגיות אמיתיות (candidate.tags,
             ר' tripMatchService.ts) - הכל ממקורות אמיתיים, שום דבר לא מומצא. שדה חסר לגמרי (למשל תיאור
             שעוד לא הושלם) פשוט לא מוצג, לא מוחלף בפלייסהולדר מזויף. */}
-        <h2 className="text-[26px] font-extrabold leading-tight">{candidate.name}</h2>
+        <h2 className="text-[26px] font-extrabold leading-tight tracking-tight drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)]">{candidate.name}</h2>
 
         {candidate.shortDescription && (
           <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">{candidate.shortDescription}</p>
         )}
 
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] font-semibold">
-          {candidate.rating != null && (
-            <span className="flex items-center gap-1">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
-                <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
-              </svg>
-              triplace {candidate.rating.toFixed(1)}
-              {candidate.ratingCount != null && ` (${candidate.ratingCount})`}
-            </span>
-          )}
-          {candidate.googleRating != null && (
-            <>
-              {candidate.rating != null && <span className="opacity-60">|</span>}
-              <span className="flex items-center gap-1">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
-                  <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
-                </svg>
-                Google {candidate.googleRating.toFixed(1)}
-                {candidate.googleRatingCount != null && ` (${candidate.googleRatingCount.toLocaleString()})`}
-              </span>
-            </>
-          )}
-          {(candidate.rating != null || candidate.googleRating != null) && candidate.distanceKm > 0 && <span className="opacity-60">|</span>}
-          <DistanceBadge candidate={candidate} />
-        </div>
+        {/* *** שדרוג (בקשה מפורשת - "להתאים לעיצוב שלנו"): שורת המידע נקייה - כל פריט (triplace / Google /
+            מרחק) עם אייקון משלו, מופרדים בנקודה עדינה. קודם הופיעו קווים "|" יתומים בתחילת/סוף השורה
+            כשהיא נשברה לשתי שורות. */}
+        {(() => {
+          const star = (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
+              <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
+            </svg>
+          );
+          const items: { key: string; node: ReactNode }[] = [];
+          if (candidate.rating != null)
+            items.push({
+              key: "triplace",
+              node: (
+                <>
+                  {star}
+                  <span className="tabular-nums">{candidate.rating.toFixed(1)}</span>
+                  <span className="font-medium text-white/80">triplace{candidate.ratingCount != null ? ` (${candidate.ratingCount})` : ""}</span>
+                </>
+              ),
+            });
+          if (candidate.googleRating != null)
+            items.push({
+              key: "google",
+              node: (
+                <>
+                  {star}
+                  <span className="tabular-nums">{candidate.googleRating.toFixed(1)}</span>
+                  <span className="font-medium text-white/80">
+                    Google{candidate.googleRatingCount != null ? ` (${candidate.googleRatingCount.toLocaleString()})` : ""}
+                  </span>
+                </>
+              ),
+            });
+          if (candidate.distanceKm > 0) items.push({ key: "distance", node: <DistanceBadge candidate={candidate} /> });
+          if (items.length === 0) return null;
+          return (
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold">
+              {items.map((item, i) => (
+                <span key={item.key} className="flex items-center gap-1 whitespace-nowrap">
+                  {i > 0 && <span aria-hidden="true" className="me-1 h-1 w-1 rounded-full bg-white/60" />}
+                  {item.node}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
         {tags.length > 0 && (
           <div className="mt-1 flex max-h-16 flex-wrap gap-1.5 overflow-hidden">
             {tags.map((tag) => (
-              <span key={tag} className="h-fit shrink-0 rounded-pill bg-white/16 px-3 py-1 text-[11.5px] font-semibold text-white backdrop-blur-[2px]">
+              <span key={tag} className="h-fit shrink-0 rounded-full bg-white/20 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
                 {tag}
               </span>
             ))}
