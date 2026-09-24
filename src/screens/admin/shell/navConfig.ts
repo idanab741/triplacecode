@@ -20,6 +20,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/dashboard", label: "מרכז שליטה", icon: "dashboard", keywords: "dashboard דשבורד ראשי" },
       { href: "/admin/health", label: "בריאות המערכת", icon: "health", keywords: "health בעיות תקלות איכות נתונים" },
+      { href: "/admin/reports", label: "דוחות וייצוא", icon: "download", keywords: "reports export excel csv ייצוא דוח אקסל" },
     ],
   },
   {
