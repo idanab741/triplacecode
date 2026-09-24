@@ -120,7 +120,7 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
         style={{
           width: "calc(100% - 24px)",
           maxWidth: 460,
-          marginBottom: "calc(max(env(safe-area-inset-bottom), 22px) - 8px)",
+          marginBottom: "calc(max(env(safe-area-inset-bottom), 22px) + 2px)",
         }}
       >
         {/* הגלולה הפעילה - מחליקה בין הטאבים */}

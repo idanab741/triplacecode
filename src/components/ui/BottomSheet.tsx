@@ -64,7 +64,7 @@ export function BottomSheet({ onClose, children, zIndex = 40, footer, dark = fal
   return (
     <div className="fixed inset-0 flex items-end justify-center bg-black/50" style={{ zIndex }} onClick={handleBackdropClick}>
       <div
-        className={`mb-[88px] flex max-h-[calc(90dvh-88px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card ${dark ? "bg-[#141416]" : "bg-bg"}`}
+        className={`mb-[98px] flex max-h-[calc(90dvh-98px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card ${dark ? "bg-[#141416]" : "bg-bg"}`}
         style={{ transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.2s ease-out" }}
       >
         <div
