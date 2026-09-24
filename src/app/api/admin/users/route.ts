@@ -72,6 +72,7 @@ export async function GET(request: Request) {
     supabase.from("token_transactions").select("user_id,created_at").in("user_id", userIds),
   ]);
   const { data: favorites } = userIds.length ? await supabase.from("favorites").select("user_id,status,created_at").in("user_id", userIds) : { data: [] };
+  const { data: tripMatchRows } = userIds.length ? await supabase.from("tripmatch_sessions").select("user_id,created_at,updated_at").in("user_id", userIds) : { data: [] };
 
   interface ProfileRow {
     id: string;
@@ -80,6 +81,7 @@ export async function GET(request: Request) {
     country: string | null;
     avatar_url: string | null;
     birth_date: string | null;
+    last_seen: string | null;
   }
   interface PrefsRow {
     id: string;
@@ -116,12 +118,17 @@ export async function GET(request: Request) {
   for (const s of sessions ?? []) bumpActivity(s.user_id, s.created_at);
   for (const r of (trippyResults ?? []) as { user_id: string; created_at: string }[]) bumpActivity(r.user_id, r.created_at);
   for (const t of (tokenTx ?? []) as { user_id: string; created_at: string }[]) bumpActivity(t.user_id, t.created_at);
+  const tripMatchByUser = new Map<string, number>();
+  for (const r of (tripMatchRows ?? []) as { user_id: string; created_at: string; updated_at: string | null }[]) {
+    tripMatchByUser.set(r.user_id, (tripMatchByUser.get(r.user_id) ?? 0) + 1);
+    bumpActivity(r.user_id, r.updated_at ?? r.created_at);
+  }
 
   let users = scopedUsers.map((u) => {
     const profile = profileById.get(u.id);
     const prefs = prefsById.get(u.id);
     const trips = tripsByUser.get(u.id) ?? { built: 0, saved: 0, types: [] };
-    const lastActivity = lastActivityByUser.get(u.id) ?? u.last_sign_in_at ?? null;
+    const lastActivity = [lastActivityByUser.get(u.id), profile?.last_seen, u.last_sign_in_at].filter((x): x is string => Boolean(x)).sort().pop() ?? null;
     return {
       id: u.id,
       email: u.email ?? "",
@@ -137,6 +144,8 @@ export async function GET(request: Request) {
       lastActivity,
       tripsBuilt: trips.built,
       tripsSaved: trips.saved,
+      tripMatchSessions: tripMatchByUser.get(u.id) ?? 0,
+      provider: u.is_anonymous ? "guest" : ((u.app_metadata?.provider as string | undefined) ?? "email"),
       favoriteTripTypes: Array.from(new Set(trips.types)).slice(0, 3),
       likes: likesByUser.get(u.id) ?? 0,
       saves: savesByUser.get(u.id) ?? 0,

@@ -1,107 +1,138 @@
 /* ==========================================================================
-   TRIPLACE Admin — Design Tokens
-   שפה עיצובית נפרדת לגמרי מהאפליקציה (מובייל, RTL, גרדיאנטים כחולים) -
-   כאן זה Desktop-first, enterprise SaaS: אפור ניטרלי, גבולות דקים, טיפוגרפיה
-   דחוסה לנתונים, מצב כהה מלא. בהשראת Vercel / Stripe / Supabase Dashboard.
-   כל צבעי המותג (הכחול של TRIPLACE) משמשים כאן רק כאקצנט יחיד ומדוד.
+   TRIPLACE Admin — Design Tokens (v2)
+   שפה עיצובית של "מרכז שליטה": משטחים שקטים, סיידבר כהה, טיפוגרפיה
+   דחוסה לנתונים ופלטת גרפים מאומתת לעיוורון צבעים. אותם שמות משתנים
+   כמו בגרסה הקודמת - כל המסכים הקיימים מקבלים את העיצוב החדש אוטומטית.
    ========================================================================== */
 
 :root {
-  --admin-radius-sm: 6px;
-  --admin-radius-md: 8px;
-  --admin-radius-lg: 12px;
-  --admin-font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --admin-radius-sm: 8px;
+  --admin-radius-md: 10px;
+  --admin-radius-lg: 14px;
+  --admin-radius-xl: 20px;
+  --admin-font-sans: var(--font-rubik), "Rubik", "Segoe UI", system-ui, -apple-system, sans-serif;
   --admin-font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
 
-  /* Light (ברירת מחדל) */
-  --admin-bg: #f7f7f8;
+  /* Light */
+  --admin-bg: #f4f6f9;
   --admin-bg-surface: #ffffff;
-  --admin-bg-surface-hover: #fafafa;
-  --admin-bg-sunken: #f0f0f2;
-  --admin-border: #e4e4e7;
-  --admin-border-strong: #d4d4d8;
-  --admin-ink: #18181b;
-  --admin-ink-secondary: #71717a;
-  --admin-ink-faint: #a1a1aa;
-  --admin-accent: #1877f2;
-  --admin-accent-hover: #1666d6;
-  --admin-accent-soft: #eaf2ff;
-  --admin-success: #16a34a;
-  --admin-success-soft: #e9f9ef;
-  --admin-warning: #d97706;
-  --admin-warning-soft: #fef6e7;
-  --admin-danger: #dc2626;
+  --admin-bg-surface-hover: #f8fafc;
+  --admin-bg-sunken: #eef1f5;
+  --admin-border: #e3e8ef;
+  --admin-border-strong: #cfd6e0;
+  --admin-ink: #0f1729;
+  --admin-ink-secondary: #5b6474;
+  --admin-ink-faint: #8f98a8;
+  --admin-accent: #1f6fe5;
+  --admin-accent-hover: #185dc4;
+  --admin-accent-soft: #e8f0fd;
+  --admin-accent-ink: #ffffff;
+  --admin-success: #15803d;
+  --admin-success-soft: #e7f6ec;
+  --admin-warning: #b45309;
+  --admin-warning-soft: #fdf3e2;
+  --admin-danger: #c62828;
   --admin-danger-soft: #fdecec;
-  --admin-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --admin-shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --admin-shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.14), 0 4px 8px -4px rgba(0, 0, 0, 0.06);
-  --admin-chart-1: #1877f2;
-  --admin-chart-2: #8b5cf6;
-  --admin-chart-3: #16a34a;
-  --admin-chart-4: #f59e0b;
-  --admin-chart-5: #ec4899;
+  --admin-info: #5b6474;
+  --admin-info-soft: #eef1f5;
+  --admin-shadow-sm: 0 1px 2px rgba(15, 23, 41, 0.05);
+  --admin-shadow-md: 0 6px 16px -6px rgba(15, 23, 41, 0.12), 0 2px 4px -2px rgba(15, 23, 41, 0.05);
+  --admin-shadow-lg: 0 24px 48px -12px rgba(15, 23, 41, 0.22);
+  --admin-grid: #edf0f4;
+
+  /* Sidebar - כהה בשני המצבים */
+  --admin-side-bg: #0c1322;
+  --admin-side-bg-hover: #16203a;
+  --admin-side-active: #1c2a4a;
+  --admin-side-ink: #c9d2e3;
+  --admin-side-ink-faint: #6f7c95;
+  --admin-side-border: #1a2438;
+
+  /* פלטה קטגורית מאומתת (סדר קבוע, לא מחזורי) */
+  --admin-chart-1: #2a78d6;
+  --admin-chart-2: #eb6834;
+  --admin-chart-3: #1baf7a;
+  --admin-chart-4: #eda100;
+  --admin-chart-5: #e87ba4;
+  /* רמפה רציפה (כחול) למפות חום */
+  --admin-seq-0: #eef1f5;
+  --admin-seq-1: #cde2fb;
+  --admin-seq-2: #9ec5f4;
+  --admin-seq-3: #6da7ec;
+  --admin-seq-4: #3987e5;
+  --admin-seq-5: #256abf;
+  --admin-seq-6: #184f95;
 }
 
 .admin-dark {
-  --admin-bg: #0a0a0c;
-  --admin-bg-surface: #131316;
-  --admin-bg-surface-hover: #1a1a1e;
-  --admin-bg-sunken: #08080a;
-  --admin-border: #232327;
-  --admin-border-strong: #323238;
-  --admin-ink: #f4f4f5;
-  --admin-ink-secondary: #a1a1aa;
-  --admin-ink-faint: #6b6b70;
-  --admin-accent: #4a9eff;
-  --admin-accent-hover: #6bb0ff;
-  --admin-accent-soft: #10233d;
-  --admin-success: #34d67a;
-  --admin-success-soft: #0f2818;
-  --admin-warning: #f2a93c;
-  --admin-warning-soft: #2c2007;
-  --admin-danger: #f2555b;
-  --admin-danger-soft: #2c1112;
-  --admin-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --admin-shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.5);
-  --admin-shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
-  --admin-chart-1: #4a9eff;
-  --admin-chart-2: #a78bfa;
-  --admin-chart-3: #34d67a;
-  --admin-chart-4: #f2a93c;
-  --admin-chart-5: #f472b6;
+  --admin-bg: #0a0d14;
+  --admin-bg-surface: #12151c;
+  --admin-bg-surface-hover: #181c25;
+  --admin-bg-sunken: #0d1017;
+  --admin-border: #222734;
+  --admin-border-strong: #2f3646;
+  --admin-ink: #eef1f6;
+  --admin-ink-secondary: #a3acbd;
+  --admin-ink-faint: #6c7589;
+  --admin-accent: #4d8ff0;
+  --admin-accent-hover: #6aa2f3;
+  --admin-accent-soft: #152540;
+  --admin-accent-ink: #ffffff;
+  --admin-success: #3ccf7c;
+  --admin-success-soft: #0f2a1b;
+  --admin-warning: #f0ad45;
+  --admin-warning-soft: #2e2210;
+  --admin-danger: #f06b6b;
+  --admin-danger-soft: #2f1417;
+  --admin-info: #a3acbd;
+  --admin-info-soft: #1a1f2a;
+  --admin-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --admin-shadow-md: 0 8px 20px -6px rgba(0, 0, 0, 0.6);
+  --admin-shadow-lg: 0 24px 60px -12px rgba(0, 0, 0, 0.75);
+  --admin-grid: #1b1f29;
+
+  --admin-side-bg: #080b11;
+  --admin-side-bg-hover: #121826;
+  --admin-side-active: #17223a;
+  --admin-side-border: #151b28;
+
+  --admin-chart-1: #3987e5;
+  --admin-chart-2: #d95926;
+  --admin-chart-3: #199e70;
+  --admin-chart-4: #c98500;
+  --admin-chart-5: #d55181;
+  --admin-seq-0: #161a23;
+  --admin-seq-1: #104281;
+  --admin-seq-2: #184f95;
+  --admin-seq-3: #1c5cab;
+  --admin-seq-4: #2a78d6;
+  --admin-seq-5: #5598e7;
+  --admin-seq-6: #9ec5f4;
 }
 
 .admin-root {
   font-family: var(--admin-font-sans);
   background: var(--admin-bg);
   color: var(--admin-ink);
-  direction: ltr;
-  font-feature-settings: "tnum" 1;
+  direction: rtl;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+.admin-root.admin-dark {
+  color-scheme: dark;
 }
 
-/* ==========================================================================
-   ברירת מחדל RTL לתוכן טקסטואלי בתוך שלד LTR
-   השלד (sidebar, מבנה כללי, Drawer שנפתח מהצד) נשאר LTR בכוונה (enterprise
-   SaaS), אבל כל התוכן בפועל הוא עברית - אז טקסט קריא (כותרות, תוויות,
-   כפתורים, טבלאות, שדות קלט) חייב להיות מיושר לימין ובכיוון RTL, אחרת הוא
-   "נדבק" לשמאל וקשה לקרוא. שדות שמכילים בכוונה ערכים טכניים באנגלית
-   (מפתחות שדה, סלאגים) מסומנים עם admin-ltr-value כדי להישאר LTR.
-   ========================================================================== */
+/* טקסט עברי מיושר לימין גם בתוך רכיבים ישנים שנבנו כ-LTR */
 .admin-root h1, .admin-root h2, .admin-root h3, .admin-root h4,
-.admin-root p, .admin-root label, .admin-root span, .admin-root a,
-.admin-root button, .admin-root th, .admin-root td, .admin-root li {
+.admin-root p, .admin-root label, .admin-root th, .admin-root td, .admin-root li {
   text-align: right;
 }
 .admin-root input, .admin-root select, .admin-root textarea {
   text-align: right;
   direction: rtl;
 }
-.admin-root input::placeholder, .admin-root textarea::placeholder {
-  text-align: right;
-}
 
-/* שימוש: <div className="admin-ltr-value"> סביב שדה שמכיל ערך טכני
-   באנגלית (מפתח שדה, slug וכו') - נשאר LTR ומיושר לשמאל בכוונה. */
+/* ערכים טכניים באנגלית (מפתחות, slugs) - נשארים LTR */
 .admin-ltr-value,
 .admin-ltr-value input,
 .admin-ltr-value textarea {
@@ -113,13 +144,15 @@
   text-align: left !important;
 }
 
-
 .admin-root ::selection {
   background: var(--admin-accent-soft);
 }
 
 .admin-mono {
   font-family: var(--admin-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.admin-num {
   font-variant-numeric: tabular-nums;
 }
 
@@ -131,11 +164,25 @@
 .admin-scrollbar::-webkit-scrollbar-thumb { background: var(--admin-border-strong); border-radius: 8px; }
 .admin-scrollbar::-webkit-scrollbar-track { background: transparent; }
 
+.admin-side-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--admin-side-border) transparent;
+}
+
+.admin-focus:focus-visible,
+.admin-root button:focus-visible,
+.admin-root a:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
 @keyframes admin-fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.admin-fade-in { animation: admin-fade-in 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+/* backwards (לא both) - כדי שלא יישאר transform אחרי האנימציה; transform קבוע
+   הופך את הכרטיס ל-containing block ו"כולא" בתוכו מודאלים עם position: fixed */
+.admin-fade-in { animation: admin-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 @keyframes admin-skeleton-pulse {
   0%, 100% { opacity: 0.55; }
@@ -145,4 +192,21 @@
   background: var(--admin-bg-sunken);
   border-radius: var(--admin-radius-sm);
   animation: admin-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes admin-pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(60, 207, 124, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(60, 207, 124, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(60, 207, 124, 0); }
+}
+.admin-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #3ccf7c;
+  animation: admin-pulse-dot 2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-fade-in, .admin-skeleton, .admin-live-dot { animation: none; }
 }

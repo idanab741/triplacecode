@@ -1,67 +1,70 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ADMIN_NAV_FLAT } from "./navConfig";
+import { findNavItem } from "./navConfig";
 import { useAdminSecret } from "./AdminAuthContext";
+import { Icon } from "@/screens/admin/kit/Icon";
 
-export function AdminHeader({ dark, onToggleDark }: { dark: boolean; onToggleDark: () => void }) {
+export function AdminHeader({ dark, onToggleDark, onOpenSearch, onOpenMenu }: { dark: boolean; onToggleDark: () => void; onOpenSearch: () => void; onOpenMenu: () => void }) {
   const pathname = usePathname();
-  const current = ADMIN_NAV_FLAT.find((i) => pathname === i.href || pathname?.startsWith(i.href + "/"));
+  const current = findNavItem(pathname);
   const { clearSecret } = useAdminSecret();
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+
+  const iconBtn = "flex h-9 w-9 items-center justify-center rounded-[var(--admin-radius-sm)] border transition hover:opacity-80";
+  const iconBtnStyle = { color: "var(--admin-ink-secondary)", background: "var(--admin-bg-surface)", borderColor: "var(--admin-border)" };
 
   return (
     <header
-      className="flex h-14 shrink-0 items-center justify-between border-b px-6"
-      style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}
+      className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-3 border-b px-4 backdrop-blur md:px-6"
+      style={{ borderColor: "var(--admin-border)", background: "color-mix(in srgb, var(--admin-bg) 85%, transparent)" }}
     >
-      <div className="flex items-center gap-2 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-        <span>Admin</span>
-        <span style={{ color: "var(--admin-ink-faint)" }}>/</span>
-        <span className="font-medium" style={{ color: "var(--admin-ink)" }}>
-          {current?.label ?? ""}
-        </span>
+      <div className="flex min-w-0 items-center gap-3">
+        <button type="button" onClick={onOpenMenu} className={`${iconBtn} lg:hidden`} style={iconBtnStyle} aria-label="פתח תפריט">
+          <Icon name="menu" size={17} />
+        </button>
+        <div className="flex min-w-0 items-center gap-2 text-[13px]" style={{ color: "var(--admin-ink-secondary)" }}>
+          <span className="hidden sm:inline">{current?.group ?? "אדמין"}</span>
+          <Icon name="chevronLeft" size={13} className="hidden sm:block" style={{ color: "var(--admin-ink-faint)" }} />
+          <span className="truncate font-semibold" style={{ color: "var(--admin-ink)" }}>
+            {current?.label ?? ""}
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative hidden sm:block">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: "var(--admin-ink-faint)" }}>
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            placeholder="חיפוש גלובלי... (⌘K)"
-            className="w-64 rounded-[var(--admin-radius-sm)] border py-1.5 pr-9 pl-3 text-[13px] outline-none"
-            style={{ background: "var(--admin-bg-sunken)", borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
-          />
-        </div>
-
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={onToggleDark}
-          aria-label="החלף מצב כהה"
-          className="flex h-8 w-8 items-center justify-center rounded-[var(--admin-radius-sm)] text-[14px] transition"
-          style={{ color: "var(--admin-ink-secondary)", background: "var(--admin-bg-sunken)" }}
+          onClick={onOpenSearch}
+          className="hidden h-9 w-72 items-center justify-between gap-2 whitespace-nowrap rounded-[var(--admin-radius-sm)] border px-3 text-[13px] transition hover:opacity-90 md:flex"
+          style={{ background: "var(--admin-bg-surface)", borderColor: "var(--admin-border)", color: "var(--admin-ink-faint)" }}
         >
-          {dark ? "☀" : "☾"}
+          <span className="flex items-center gap-2">
+            <Icon name="search" size={15} />
+            חיפוש בכל המערכת...
+          </span>
+          <kbd className="admin-num whitespace-nowrap rounded border px-1.5 text-[11px]" style={{ borderColor: "var(--admin-border)" }} dir="ltr">
+            {isMac ? "⌘K" : "Ctrl K"}
+          </kbd>
         </button>
-
+        <button type="button" onClick={onOpenSearch} className={`${iconBtn} md:hidden`} style={iconBtnStyle} aria-label="חיפוש">
+          <Icon name="search" size={16} />
+        </button>
+        <button type="button" onClick={onToggleDark} className={iconBtn} style={iconBtnStyle} aria-label={dark ? "מצב בהיר" : "מצב כהה"} title={dark ? "מצב בהיר" : "מצב כהה"}>
+          <Icon name={dark ? "sun" : "moon"} size={16} />
+        </button>
         <button
           type="button"
           onClick={() => {
-            if (confirm("להתנתק? תצטרך להזין שוב את סיסמת האדמין.")) clearSecret();
+            if (confirm("להתנתק מהאדמין? תצטרכו להזין שוב את הסיסמה.")) clearSecret();
           }}
-          className="rounded-[var(--admin-radius-sm)] px-2.5 py-1.5 text-[12.5px] font-medium transition"
-          style={{ color: "var(--admin-ink-secondary)", background: "var(--admin-bg-sunken)" }}
+          className={iconBtn}
+          style={iconBtnStyle}
+          aria-label="התנתקות"
+          title="התנתקות"
         >
-          התנתק
+          <Icon name="logout" size={16} />
         </button>
-
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-semibold text-white"
-          style={{ background: "linear-gradient(135deg, #4a9eff, #1877f2)" }}
-        >
-          A
-        </div>
       </div>
     </header>
   );

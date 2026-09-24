@@ -1,315 +1,231 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useState } from "react";
-import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
-import { StatCard, EmptyState } from "@/screens/admin/shared/Primitives";
-import { LineChart, HorizontalBarChart } from "@/screens/admin/shared/Charts";
-import { formatRelativeTimeHe } from "@/utils/relativeTime";
+import Link from "next/link";
+import { useState } from "react";
+import type { OverviewData } from "@/services/admin/insights/overview";
+import { useAdminData, useStoredRange } from "@/screens/admin/kit/useAdminData";
+import { RANGE_OPTIONS, type RangeValue, fmt, fmtPct, timeAgo } from "@/screens/admin/kit/format";
+import { PageHeader, Card, CardHeader, Segmented, StatTile, MiniStat, Avatar, LoadingGrid, ErrorBanner, UpdatedAt, Empty, Pill } from "@/screens/admin/kit/ui";
+import { TrendChart, BarList, Funnel, Heatmap, CohortTable, StackedBar, SERIES_COLORS } from "@/screens/admin/kit/charts";
+import { Icon, type IconName } from "@/screens/admin/kit/Icon";
 
-const ADMIN_SECRET_HEADER = "x-admin-secret";
-
-type RangeKey = "today" | "7d" | "30d" | "3mo" | "1y";
-type MetricKey = "users" | "active" | "routes" | "tripmatch" | "trippy";
-
-const RANGE_OPTIONS: { value: RangeKey; label: string }[] = [
-  { value: "today", label: "היום" },
-  { value: "7d", label: "7 ימים" },
-  { value: "30d", label: "30 ימים" },
-  { value: "3mo", label: "3 חודשים" },
-  { value: "1y", label: "שנה" },
-];
-
-const METRIC_OPTIONS: { value: MetricKey; label: string; color: string }[] = [
-  { value: "users", label: "משתמשים חדשים", color: "var(--admin-chart-1)" },
-  { value: "active", label: "משתמשים פעילים", color: "var(--admin-chart-2)" },
-  { value: "routes", label: "מסלולים שנבנו", color: "var(--admin-chart-3)" },
-  { value: "tripmatch", label: "TripMatch", color: "var(--admin-chart-4)" },
-  { value: "trippy", label: "Trippy AI", color: "var(--admin-chart-5)" },
-];
-
-interface KpiValue {
-  value: number;
-  deltaPct: number | null;
-}
-
-interface DashboardData {
-  range: RangeKey;
-  kpis: {
-    totalUsers: KpiValue;
-    activeUsers: KpiValue;
-    routesBuilt: KpiValue;
-    tripMatchActivity: KpiValue;
-    trippyAiUsage: KpiValue;
-    tokensConsumed: KpiValue;
-  };
-  chart: {
-    labels: string[];
-    series: Record<MetricKey, number[]>;
-  };
-  needsAttention: { id: string; label: string; description: string; count: number; href: string }[];
-  products: {
-    tripMatch: { likes: number; matches: number; matchRatePct: number | null; popularDestinations: { label: string; value: number }[] };
-    trippyAi: { usages: number; activeUsers: number; tokensConsumed: number };
-  };
-  recentActivity: { id: string; type: string; title: string; subtitle: string; timestamp: string; href: string }[];
-}
-
-const RECENT_ICON: Record<string, string> = {
-  user: "👤",
-  trip: "🧳",
-  match: "❤️",
-  trippy: "✨",
-  support: "💬",
+const KPI_ICONS: Record<string, IconName> = { signups: "users", active: "pulse", trips: "route", tripmatch: "heart", social: "community", tokens: "coins" };
+const FEED_ICONS: Record<string, IconName> = {
+  signup: "users",
+  trip: "route",
+  trippy: "sparkles",
+  tripmatch: "heart",
+  post: "community",
+  comment: "community",
+  review: "star",
+  story: "image",
+  favorite: "heart",
+  like: "heart",
+  dm: "community",
+  follow: "users",
 };
 
-/**
- * Dashboard מרכזי של TRIPLACE Admin - עמוד סיכום בלבד (לא משכפל טבלאות/
- * עמודים קיימים). כל הנתונים אמיתיים (ר' /api/admin/dashboard-stats) -
- * Supabase Auth, trippy_ai_results, tripmatch_sessions,
- * token_transactions ("Tricks"="טריפים"), support_conversations,
- * discovery_jobs. *** בכוונה בלי Trip Builder הקלאסי (הוסר לפי בקשה
- * מפורשת - "לא רלוונטי"). אין Sidebar/ניווט חדש - רק תוכן העמוד עצמו.
- */
 export default function DashboardPage() {
-  const { secret: adminSecret } = useAdminSecret();
-  const [range, setRange] = useState<RangeKey>("30d");
-  const [metric, setMetric] = useState<MetricKey>("users");
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!adminSecret) return;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/admin/dashboard-stats?range=${range}`, { headers: { [ADMIN_SECRET_HEADER]: adminSecret } })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "שגיאה בטעינת נתונים");
-        setData(json);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "שגיאה לא ידועה"))
-      .finally(() => setLoading(false));
-  }, [adminSecret, range]);
-
-  const activeMetric = METRIC_OPTIONS.find((m) => m.value === metric)!;
+  const [range, setRange] = useStoredRange<RangeValue>("triplace_admin_range", "30d");
+  const { data, error, loading, reload, updatedAt } = useAdminData<OverviewData>(`/api/admin/insights/overview?range=${range}`, { refreshMs: 120000 });
+  const [metric, setMetric] = useState("active");
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* 1. HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-            Dashboard
-          </h1>
-          <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-            סקירה כללית של פעילות TRIPLACE
-          </p>
-        </div>
-        <SegmentedControl options={RANGE_OPTIONS} value={range} onChange={setRange} />
-      </div>
-
-      {!adminSecret && (
-        <div className="rounded-[var(--admin-radius-lg)] border border-dashed p-10 text-center" style={{ borderColor: "var(--admin-border)" }}>
-          <p className="text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-            הזן סיסמת אדמין כדי לטעון נתונים אמיתיים
-          </p>
-        </div>
-      )}
+    <div>
+      <PageHeader
+        icon="dashboard"
+        title="מרכז שליטה"
+        subtitle="תמונת מצב חיה של TRIPLACE - משתמשים, שימוש, קהילה ובעיות שדורשות טיפול"
+        actions={
+          <>
+            <UpdatedAt at={updatedAt} loading={loading} onRefresh={reload} />
+            <Segmented value={range} onChange={setRange} options={RANGE_OPTIONS} />
+          </>
+        }
+      />
 
       {error && (
-        <div className="rounded-[var(--admin-radius-sm)] px-4 py-2.5 text-[13px]" style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}>
-          {error}
+        <div className="mb-4">
+          <ErrorBanner message={error} onRetry={reload} />
         </div>
       )}
-
-      {loading && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="admin-skeleton h-28 rounded-[var(--admin-radius-lg)]" />
-          ))}
-        </div>
-      )}
+      {!data && loading && <LoadingGrid tiles={6} />}
 
       {data && (
-        <>
-          {/* 2. שורת KPI ראשית */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-            <StatCard label="סך המשתמשים" value={data.kpis.totalUsers.value.toLocaleString()} delta={data.kpis.totalUsers.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0" />} />
-            <StatCard label="משתמשים פעילים" value={data.kpis.activeUsers.value.toLocaleString()} delta={data.kpis.activeUsers.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />} />
-            <StatCard label="מסלולים שנבנו" value={data.kpis.routesBuilt.value.toLocaleString()} delta={data.kpis.routesBuilt.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M9 20 3 17V4l6 3m0 13 6-3m-6 3V7m6 10 6 3V7l-6-3m0 13V4m0 3-6-3" />} />
-            <StatCard label="פעילות TripMatch" value={data.kpis.tripMatchActivity.value.toLocaleString()} delta={data.kpis.tripMatchActivity.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />} />
-            <StatCard label="שימוש ב-Trippy AI" value={data.kpis.trippyAiUsage.value.toLocaleString()} delta={data.kpis.trippyAiUsage.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M12 3v3m0 12v3m9-9h-3M6 12H3m14.5-6.5-2 2m-9 9-2 2m0-13 2 2m9 9 2 2" />} />
-            <StatCard label="שימוש בטריפים" value={data.kpis.tokensConsumed.value.toLocaleString()} delta={data.kpis.tokensConsumed.deltaPct ?? undefined} deltaLabel="מהתקופה הקודמת" icon={<Icon path="M12 2 2 7l10 5 10-5-10-5ZM2 17l10 5 10-5M2 12l10 5 10-5" />} />
-          </div>
-
-          {/* 3. גרף פעילות מרכזי */}
-          <ChartCard title="פעילות TRIPLACE" subtitle="מסלולים שנבנו = Trippy AI + TripMatch בלבד">
-            <div className="mb-4">
-              <SegmentedControl options={METRIC_OPTIONS.map((m) => ({ value: m.value, label: m.label }))} value={metric} onChange={setMetric} />
-            </div>
-            <LineChart labels={data.chart.labels} series={[{ label: activeMetric.label, color: activeMetric.color, values: data.chart.series[metric] }]} height={160} />
-          </ChartCard>
-
-          {/* 4. "דורש את תשומת לבך" */}
-          <ChartCard title="דורש את תשומת לבך" subtitle="פריטים שממתינים לטיפול שלכם כרגע">
-            {data.needsAttention.length === 0 ? (
-              <EmptyState icon={<span>✅</span>} title="הכל תחת שליטה" description="אין כרגע שום דבר שדורש את תשומת לבכם." />
-            ) : (
-              <div className="flex flex-col gap-2">
-                {data.needsAttention.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    className="flex items-center justify-between rounded-[var(--admin-radius-sm)] border px-4 py-3 transition"
-                    style={{ borderColor: "var(--admin-border)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--admin-bg-surface-hover)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+        <div className="flex flex-col gap-4">
+          {data.attention.length > 0 && (
+            <Card style={{ padding: 14 }}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="ml-2 flex items-center gap-2 text-[13px] font-semibold" style={{ color: "var(--admin-ink)" }}>
+                  <Icon name="alert" size={16} style={{ color: "var(--admin-warning)" }} />
+                  דורש טיפול
+                </span>
+                {data.attention.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={a.href}
+                    className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] transition hover:opacity-80"
+                    style={{ borderColor: "var(--admin-border)", color: "var(--admin-ink)" }}
                   >
-                    <div>
-                      <p className="text-[13.5px] font-medium" style={{ color: "var(--admin-ink)" }}>
-                        {item.label}
-                      </p>
-                      <p className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-                        {item.description}
-                      </p>
-                    </div>
                     <span
-                      className="admin-mono flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[12.5px] font-semibold"
-                      style={{ background: "var(--admin-danger-soft)", color: "var(--admin-danger)" }}
+                      className="admin-num rounded-full px-1.5 text-[11.5px] font-semibold"
+                      style={{
+                        background: a.tone === "danger" ? "var(--admin-danger-soft)" : a.tone === "warning" ? "var(--admin-warning-soft)" : "var(--admin-bg-sunken)",
+                        color: a.tone === "danger" ? "var(--admin-danger)" : a.tone === "warning" ? "var(--admin-warning)" : "var(--admin-ink-secondary)",
+                      }}
                     >
-                      {item.count}
+                      {a.count}
                     </span>
-                  </a>
+                    {a.label}
+                  </Link>
                 ))}
               </div>
-            )}
-          </ChartCard>
+            </Card>
+          )}
 
-          {/* 5. אזור פעילות מוצר */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <ChartCard title="TripMatch" subtitle="בטווח שנבחר">
-              <div className="flex flex-col gap-3">
-                <MiniStat label="לייקים" value={data.products.tripMatch.likes} />
-                <MiniStat label="Matches" value={data.products.tripMatch.matches} />
-                <MiniStat label="שיעור Match" value={data.products.tripMatch.matchRatePct != null ? `${data.products.tripMatch.matchRatePct}%` : "—"} />
-              </div>
-              {data.products.tripMatch.popularDestinations.length > 0 && (
-                <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--admin-border)" }}>
-                  <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--admin-ink-faint)" }}>
-                    יעדים פופולריים (לפי Likes)
-                  </p>
-                  <HorizontalBarChart data={data.products.tripMatch.popularDestinations} color="var(--admin-chart-4)" />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+            <Card className="flex flex-col justify-between gap-5 xl:col-span-1" style={{ background: "linear-gradient(160deg, var(--admin-bg-surface) 0%, var(--admin-accent-soft) 140%)" }}>
+              <div>
+                <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: "var(--admin-ink-secondary)" }}>
+                  <Icon name="users" size={15} />
+                  משתמשים רשומים
                 </div>
-              )}
-            </ChartCard>
-            <ChartCard title="Trippy AI" subtitle="בטווח שנבחר">
-              <div className="flex flex-col gap-3">
-                <MiniStat label="שימושים" value={data.products.trippyAi.usages} />
-                <MiniStat label="משתמשים פעילים" value={data.products.trippyAi.activeUsers} />
-                <MiniStat label="טריפים שנצרכו" value={data.products.trippyAi.tokensConsumed} />
+                <div className="admin-num mt-3 text-[52px] font-semibold leading-none tracking-tight">{fmt(data.totals.registered)}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[12.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                  <Pill tone="success" icon="arrowUp">
+                    {fmt(data.totals.newThisPeriod)} בתקופה
+                  </Pill>
+                  <span>+ {fmt(data.totals.guests)} אורחים</span>
+                </div>
               </div>
-            </ChartCard>
+              <div>
+                <div className="mb-2 text-[12px] font-semibold" style={{ color: "var(--admin-ink-faint)" }}>
+                  מעורבות (Stickiness)
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MiniStat label="יומי" value={fmt(data.stickiness.dau)} />
+                  <MiniStat label="שבועי" value={fmt(data.stickiness.wau)} />
+                  <MiniStat label="חודשי" value={fmt(data.stickiness.mau)} />
+                </div>
+                <p className="mt-2 text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
+                  יחס יומי/חודשי: <b className="admin-num">{fmtPct(data.stickiness.dauMauPct, 1)}</b>
+                  <span style={{ color: "var(--admin-ink-faint)" }}> · מעל 20% נחשב טוב</span>
+                </p>
+              </div>
+            </Card>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:col-span-3 xl:grid-cols-3">
+              {data.kpis.map((k) => (
+                <StatTile key={k.key} label={k.label} value={k.value} delta={k.deltaPct} spark={k.spark} icon={KPI_ICONS[k.key]} hint={k.hint} />
+              ))}
+            </div>
           </div>
 
-          {/* 6. פעילות אחרונה */}
-          <ChartCard title="פעילות אחרונה" subtitle="האירועים האחרונים במערכת">
-            {data.recentActivity.length === 0 ? (
-              <p className="py-6 text-center text-[13px]" style={{ color: "var(--admin-ink-faint)" }}>
-                אין עדיין פעילות
-              </p>
-            ) : (
-              <div className="flex flex-col">
-                {data.recentActivity.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.href}
-                    className="flex items-center gap-3 border-b py-2.5 transition last:border-b-0"
-                    style={{ borderColor: "var(--admin-border)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--admin-bg-surface-hover)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px]" style={{ background: "var(--admin-bg-sunken)" }}>
-                      {RECENT_ICON[item.type] ?? "•"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium" style={{ color: "var(--admin-ink)" }}>
-                        {item.title}
-                      </p>
-                      {item.subtitle && (
-                        <p className="truncate text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-                          {item.subtitle}
-                        </p>
-                      )}
-                    </div>
-                    <span className="admin-mono shrink-0 text-[11.5px]" style={{ color: "var(--admin-ink-faint)" }}>
-                      {formatRelativeTimeHe(item.timestamp)}
-                    </span>
-                  </a>
-                ))}
+          <Card>
+            <CardHeader
+              title="פעילות לאורך זמן"
+              subtitle={`חלוקה ${data.chart.granularity === "day" ? "יומית" : data.chart.granularity === "week" ? "שבועית" : "חודשית"} · שעון ישראל`}
+              action={<Segmented size="sm" value={metric} onChange={setMetric} options={data.chart.series.map((s) => ({ value: s.key, label: s.label }))} />}
+            />
+            {(() => {
+              const idx = data.chart.series.findIndex((s) => s.key === metric);
+              const s = data.chart.series[Math.max(0, idx)];
+              return <TrendChart labels={data.chart.labels} series={[{ ...s, color: SERIES_COLORS[Math.max(0, idx)] }]} height={280} />;
+            })()}
+          </Card>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Card>
+              <CardHeader title="משפך הפעלה" subtitle="כל המשתמשים הרשומים, מאז ההשקה" icon="zap" />
+              <Funnel steps={data.funnel} />
+            </Card>
+            <Card>
+              <CardHeader title="מה בונים" subtitle="טיולים שנפתחו בתקופה לפי סוג" icon="route" />
+              <BarList items={data.productMix} />
+            </Card>
+            <Card>
+              <CardHeader title="ערים מבוקשות" subtitle="TripMatch + Trippy AI" icon="place" />
+              <BarList items={data.topCities} color="var(--admin-chart-3)" />
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader title="מתי המשתמשים פעילים" subtitle="פעולות לפי יום ושעה בתקופה" icon="clock" />
+              <Heatmap grid={data.heatmap} />
+            </Card>
+            <Card>
+              <CardHeader title="איך נרשמים" subtitle="כל החשבונות לפי ספק" icon="users" />
+              <StackedBar parts={data.providers} />
+              <div className="mt-6">
+                <div className="mb-3 text-[12px] font-semibold" style={{ color: "var(--admin-ink-faint)" }}>
+                  פעולות לפי סוג (בתקופה)
+                </div>
+                <BarList items={data.byKind.slice(0, 7)} color="var(--admin-chart-2)" />
               </div>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Card className="xl:col-span-2">
+              <CardHeader title="שימור לפי קוהורטות" subtitle="אחוז מכל שבוע הרשמה שחזר ופעל בשבועות הבאים" icon="refresh" />
+              <CohortTable cohorts={data.cohorts} />
+            </Card>
+            <Card>
+              <CardHeader title="המשתמשים הפעילים ביותר" subtitle="מספר פעולות בתקופה" icon="star" />
+              {data.topUsers.length === 0 ? (
+                <Empty text="אין פעילות בתקופה" />
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {data.topUsers.map((u, i) => (
+                    <li key={u.id}>
+                      <Link href={`/admin/users?user=${u.id}`} className="flex items-center gap-3 rounded-[var(--admin-radius-sm)] px-2 py-1.5 transition hover:bg-[var(--admin-bg-surface-hover)]">
+                        <span className="admin-num w-4 text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
+                          {i + 1}
+                        </span>
+                        <Avatar name={u.name} url={u.avatarUrl} />
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{u.name}</span>
+                        <span className="admin-num text-[13px] font-semibold">{fmt(u.value)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader title="פיד פעילות חי" subtitle="מתעדכן אוטומטית כל 2 דקות" icon="pulse" action={<span className="admin-live-dot" />} />
+            {data.feed.length === 0 ? (
+              <Empty text="אין פעילות עדיין" />
+            ) : (
+              <ul className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+                {data.feed.map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 border-b py-2.5 last:border-b-0" style={{ borderColor: "var(--admin-border)" }}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "var(--admin-bg-sunken)", color: "var(--admin-ink-secondary)" }}>
+                      <Icon name={FEED_ICONS[e.kind] ?? "pulse"} size={14} />
+                    </span>
+                    <div className="min-w-0 flex-1 text-[13px]">
+                      <Link href={`/admin/users?user=${e.userId}`} className="font-semibold hover:underline">
+                        {e.userName}
+                      </Link>{" "}
+                      <span style={{ color: "var(--admin-ink-secondary)" }}>· {e.label}</span>
+                    </div>
+                    <span className="shrink-0 text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
+                      {timeAgo(e.at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </ChartCard>
-        </>
+          </Card>
+
+          {data.warnings.length > 0 && (
+            <p className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
+              חלק ממקורות הנתונים לא נטענו: {data.warnings.join(" · ")}
+            </p>
+          )}
+        </div>
       )}
     </div>
-  );
-}
-
-function SegmentedControl<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
-  return (
-    <div className="inline-flex flex-wrap gap-1 rounded-[var(--admin-radius-sm)] border p-1" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-      {options.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className="rounded-[var(--admin-radius-sm)] px-3 py-1.5 text-[12.5px] font-medium transition"
-            style={{ background: active ? "var(--admin-accent)" : "transparent", color: active ? "#fff" : "var(--admin-ink-secondary)" }}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[13px]" style={{ color: "var(--admin-ink-secondary)" }}>
-        {label}
-      </span>
-      <span className="admin-mono text-[15px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-        {typeof value === "number" ? value.toLocaleString() : value}
-      </span>
-    </div>
-  );
-}
-
-function ChartCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <div className="admin-fade-in flex flex-col gap-4 rounded-[var(--admin-radius-lg)] border p-5" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-      <div>
-        <h3 className="text-[14px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-          {title}
-        </h3>
-        <p className="text-[12px]" style={{ color: "var(--admin-ink-faint)" }}>
-          {subtitle}
-        </p>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Icon({ path }: { path: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d={path} />
-    </svg>
   );
 }
