@@ -96,8 +96,8 @@ const DECK_CARD_ASPECT = 0.66;
 /** אותו חצי-עיגול תחתון כמו ב-TripMatchCard - מוחל גם על הכרטיסים מאחור
  *  כדי שהחצי-עיגול יישאר לבן ונקי (בלי שתמונת הכרטיס שמאחור תציץ דרכו). */
 const DECK_NOTCH_MASK = {
-  WebkitMaskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
-  maskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+  WebkitMaskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
+  maskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
   WebkitMaskRepeat: "no-repeat",
   maskRepeat: "no-repeat",
 } as const;
@@ -308,7 +308,8 @@ export function TripMatchPageContent({
       const stageDocTop = el.getBoundingClientRect().top + window.scrollY;
       const navTop = nav.getBoundingClientRect().top; // fixed - קבוע ביחס ל-viewport
       const width = el.getBoundingClientRect().width;
-      const h = Math.round(navTop - stageDocTop);
+      // 12px אוויר מעל הבר הצף - כדי שהכרטיס לא ייגע בגלולה.
+      const h = Math.round(navTop - stageDocTop - 12);
       // רצפה: הכרטיס לא יהיה "שטוח" מדי במסכים נמוכים מאוד (אז הוא פשוט
       // ממשיך מתחת לבר וגוללים). 1.15 = גובה מינימלי ביחס לרוחב.
       const next = width > 0 ? Math.max(h, Math.round(width * 1.15)) : null;

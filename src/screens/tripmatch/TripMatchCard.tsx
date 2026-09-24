@@ -157,11 +157,11 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       className={`absolute overflow-hidden ${centerBox ? "rounded-[28px]" : "rounded-t-[28px] rounded-b-none"} border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]`}
       style={{
         ...(centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }),
-        // The bottom-center cutout is part of the card itself.
-        // It exposes only the center navigation orb while keeping both
-        // bottom side edges perfectly straight.
-        WebkitMaskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
-        maskImage: "radial-gradient(circle 58px at 50% 100%, transparent 0 56px, #000 57px)",
+        // חצי-עיגול בתחתית הכרטיס שעוטף את גלובוס ה-tripmatch שבולט מעל הבר הצף. הגאומטריה תואמת ל-
+        // BottomNav (גלובוס 64px שמרכזו ~12px מתחת לראש הבר) ולמרווח של 12px בין הכרטיס לבר
+        // (TripMatchPageContent) - מרכז העיגול 24px מתחת לתחתית הכרטיס, רדיוס 38px (6px אוויר סביב).
+        WebkitMaskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
+        maskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
         WebkitMaskRepeat: "no-repeat",
         maskRepeat: "no-repeat",
       }}

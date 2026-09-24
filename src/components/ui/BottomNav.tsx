@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AiGlobeIcon } from "./AiGlobeIcon";
 
@@ -9,13 +9,11 @@ export interface BottomNavItem {
   label: string;
   icon: ReactNode;
   href?: string;
+  /** הפריט המרכזי (tripmatch) - מוצג עם הגלובוס המסתובב במקום אייקון רגיל. */
   elevated?: boolean;
-  /** רק לפריט elevated: מחליף את AiGlobeIcon בברירת המחדל בתוכן חופשי.
-   *  כשלא מועבר (undefined בכל מקום קיים באפליקציה), ההתנהגות המקורית
-   *  של Trippy AI נשארת בדיוק כפי שהייתה - זה שדה תוסף בלבד. */
+  /** רק לפריט elevated: מחליף את AiGlobeIcon בתוכן חופשי. */
   elevatedIcon?: ReactNode;
-  /** צבע הטקסט של הפריט כשהוא פעיל. כשלא מועבר - ברירת המחדל
-   *  (--color-primary-start) נשארת בדיוק כמו שהייתה. */
+  /** צבע הטקסט (והגוון של "הגלולה" מאחוריו) כשהפריט פעיל. */
   activeColor?: string;
 }
 
@@ -23,135 +21,278 @@ interface BottomNavProps {
   items: BottomNavItem[];
   activeId: string;
   onChange?: (id: string) => void;
-  /** "dark" = בר שחור עם תוויות לבנות (עמוד "תוכן"). ברירת מחדל "light" - כל שאר האפליקציה
-   *  נשארת בדיוק כמו שהייתה. את צבע האייקונים הלא-פעילים קובע המרכיב (MainBottomNav). */
+  /** "dark" = זכוכית כהה עם תוויות לבנות (עמוד "תוכן"). */
   tone?: "light" | "dark";
 }
 
+/**
+ * *** בנוי מחדש (בקשה מפורשת - "שהבר התחתון יצוף כמו בסגנון החדש של אפל, עם תזוזה אנימטיבית של
+ * האייקונים כמו בפייסבוק"): אותן אפשרויות בדיוק, בעיצוב של iOS החדש (Liquid Glass):
+ *  - גלולה צפה עם שוליים מהצדדים ומלמטה, זכוכית חלבית שקופה-למחצה (backdrop-filter) - התוכן נראה
+ *    מאחוריה בעדינות.
+ *  - "גלולה" פנימית מאחורי הטאב הפעיל, שמחליקה בקפיצה רכה (spring) מהטאב הקודם לחדש, ומתמתחת
+ *    לרגע בזמן התנועה - כמו טיפת נוזל.
+ *  - האייקון "קופץ" בלחיצה (מתכווץ ואז עולה מעט מעבר לגודלו וחוזר) - כמו בפייסבוק.
+ *
+ * כל עמוד מרנדר את הבר מחדש, לכן הטאב האחרון נשמר ברמת המודול (lastActiveId) - כך שבכניסה לעמוד
+ * חדש הגלולה מתחילה מהטאב הקודם ומחליקה לחדש, במקום "לקפוץ" אליו.
+ *
+ * גאומטריה: הבר תופס בדיוק את אותו גובה כמו הבר הקודם (לא יותר) - כל הריווחים הקיימים באפליקציה
+ * (BottomSheet mb-[88px], גובה המפה, ריווח עמוד tripmatch) נשארים נכונים בלי לגעת בהם.
+ */
+
+let lastActiveId: string | null = null;
+
+const EASE_SPRING = "cubic-bezier(0.34, 1.36, 0.5, 1)";
+
 export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomNavProps) {
   const dark = tone === "dark";
-  const inactiveLabelColor = dark ? "#fff" : "var(--color-ink-secondary, #8a94a6)";
-  return (
-    <nav data-main-bottom-nav="" className="fixed inset-x-0 bottom-0 z-50">
-<div
-        className={`relative flex items-end justify-around px-2 pb-[max(env(safe-area-inset-bottom),22px)] pt-1.5 ${
-          dark ? "border-t border-white/10 bg-black" : "bg-white shadow-[0_-2px_16px_rgba(16,24,40,0.08)]"
-        }`}
-      >        {items.map((item) => {
-          const isActive = item.id === activeId;
+  const count = items.length;
+  const activeIndex = Math.max(0, items.findIndex((i) => i.id === activeId));
 
-          if (item.elevated) {
-            const content = item.elevatedIcon ? (
-              // *** place's בלבד: כפתור "+" מוחלף כאן, לא AiGlobeIcon.
-              // בלי ה-glow/ring הכחול של Trippy AI - עיצוב נפרד לגמרי,
-              // בלי לגעת ב-branch המקורי למטה (else) שנשאר זהה ב-100%
-              // לכל שאר האפליקציה כשלא מועבר elevatedIcon.
-              <span className="relative -mt-9 flex h-[70px] w-[70px] items-center justify-center">
-                <span className="relative z-10 flex h-[58px] w-[58px] items-center justify-center overflow-hidden rounded-full">
-                  {item.elevatedIcon}
-                </span>
+  // מיקום הגלולה: מתחילים מהטאב הקודם (אם הגענו מעמוד אחר) ומחליקים לנוכחי בפריים הבא.
+  const [indicatorIndex, setIndicatorIndex] = useState(() => {
+    const prev = lastActiveId ? items.findIndex((i) => i.id === lastActiveId) : -1;
+    return prev >= 0 ? prev : activeIndex;
+  });
+  const [animateIndicator, setAnimateIndicator] = useState(false);
+  const [stretchKey, setStretchKey] = useState(0);
+  /** *** שונה (בקשה מפורשת - "לא אוהב את הקפיצה של הלוגו; מה שצריך לקפוץ זה השורה עצמה של הבר"):
+   *  במקום שהאייקון יקפוץ - כל הבר מגיב כיחידה אחת: מתכווץ קלות בלחיצה וחוזר בתנועה אלסטית. */
+  const [bounceKey, setBounceKey] = useState(0);
+  const mountedRef = useRef(false);
+  const barRef = useRef<HTMLDivElement | null>(null);
+
+  // מפעיל מחדש את אנימציית הבר בלי לרנדר אותו מחדש (כדי לא לאפס את הגלובוס המסתובב ואת תנועת הגלולה).
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el || bounceKey === 0) return;
+    el.classList.remove("tab-bar-bounce");
+    void el.offsetWidth; // reflow - מאפשר להפעיל את אותה אנימציה שוב
+    el.classList.add("tab-bar-bounce");
+    // רק סוף האנימציה של הבר עצמו - animationend מבועבע גם מהגלולה/הגלובוס שבתוכו.
+    const done = (e: AnimationEvent) => {
+      if (e.target === el && e.animationName === "tab-bar-bounce") el.classList.remove("tab-bar-bounce");
+    };
+    el.addEventListener("animationend", done);
+    return () => el.removeEventListener("animationend", done);
+  }, [bounceKey]);
+
+  useLayoutEffect(() => {
+    const cameFromOtherTab = !mountedRef.current && indicatorIndex !== activeIndex;
+    mountedRef.current = true;
+    lastActiveId = activeId;
+    if (indicatorIndex === activeIndex) return;
+    // פריים אחד במיקום הקודם (בלי מעבר), ואז מעבר קפיצי למיקום החדש.
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        setAnimateIndicator(true);
+        setIndicatorIndex(activeIndex);
+        setStretchKey((k) => k + 1);
+        // כל עמוד מרנדר את הבר מחדש - לכן הבר החדש הוא זה שמגיב כשמגיעים מטאב אחר.
+        if (cameFromOtherTab) setBounceKey((k) => k + 1);
+      })
+    );
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, activeId]);
+
+  function handleTap(item: BottomNavItem) {
+    setBounceKey((k) => k + 1);
+    if (item.id !== activeId) lastActiveId = activeId;
+    onChange?.(item.id);
+  }
+
+  const activeItem = items[indicatorIndex] ?? items[activeIndex];
+  const tint = dark
+    ? "rgba(255,255,255,0.16)"
+    : activeItem?.activeColor
+      ? `color-mix(in srgb, ${activeItem.activeColor} 13%, transparent)`
+      : "rgba(15,20,25,0.07)";
+  const inactiveLabel = dark ? "rgba(255,255,255,0.92)" : "rgba(15,20,25,0.82)";
+
+  return (
+    <nav aria-label="ניווט ראשי" className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
+      <div
+        data-main-bottom-nav=""
+        dir="rtl"
+        ref={barRef}
+        className={`tab-glass pointer-events-auto relative mx-auto flex h-16 items-stretch rounded-[32px] p-1.5 ${dark ? "tab-glass--dark" : ""}`}
+        style={{
+          width: "calc(100% - 24px)",
+          maxWidth: 460,
+          marginBottom: "calc(max(env(safe-area-inset-bottom), 22px) - 8px)",
+        }}
+      >
+        {/* הגלולה הפעילה - מחליקה בין הטאבים */}
+        <span
+          aria-hidden="true"
+          className="tab-indicator pointer-events-none absolute bottom-1.5 top-1.5"
+          style={{
+            right: 6,
+            width: `calc((100% - 12px) / ${count})`,
+            transform: `translateX(${-indicatorIndex * 100}%)`,
+            transition: animateIndicator ? `transform 560ms ${EASE_SPRING}` : "none",
+          }}
+        >
+          <span
+            key={stretchKey}
+            className={`block h-full w-full rounded-[26px] ${stretchKey > 0 ? "tab-indicator-stretch" : ""}`}
+            style={{ background: tint, transition: "background-color 300ms ease" }}
+          />
+        </span>
+
+        {items.map((item) => {
+          const isActive = item.id === activeId;
+          const labelColor = isActive ? (dark ? "#fff" : (item.activeColor ?? "#0A6DFE")) : inactiveLabel;
+
+          // *** תוקן (בקשה מפורשת - "האייקון של tripmatch באיכות לא טובה, שיהיה כמו מקודם וגדול יותר"):
+          // הגלובוס מצויר מנקודות - ב-34px הנקודות התמזגו לכתם. חזר לגודל המקורי (56px) עם הטבעת
+          // המסתובבת וההילה, ובולט מעל הגלולה באמצע הבר - בדיוק כמו בבר הקודם.
+          const icon = item.elevated ? (
+            <span className="relative -mt-[26px] flex h-[64px] w-[64px] items-center justify-center">
+              {item.elevatedIcon ? (
+                <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full">{item.elevatedIcon}</span>
+              ) : (
+                <>
+                  <span className="tab-ai-glow absolute -inset-1 rounded-full" style={isActive ? undefined : { opacity: 0 }} />
+                  <span
+                    className="tab-ai-ring absolute inset-0 rounded-full"
+                    style={isActive ? undefined : { background: "conic-gradient(from 0deg, transparent 0%, #0f1522 30%, #3a4150 50%, transparent 70%)" }}
+                  />
+                  <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
+                    <AiGlobeIcon active={isActive} size={56} />
+                  </span>
+                </>
+              )}
+            </span>
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
+          );
+
+          const inner = (
+            <>
+              <span className={`flex items-end justify-center ${item.elevated ? "h-[38px]" : "h-[34px]"}`}>
+                {icon}
               </span>
-            ) : (
-              <span className="relative -mt-9 flex h-[70px] w-[70px] items-center justify-center">
-                  <span className="ai-glow absolute inset-0 rounded-full" style={isActive ? undefined : { opacity: 0 }} />
-                <span
-                  className="ai-ring absolute inset-[3px] rounded-full"
-                  style={!isActive ? { background: "conic-gradient(from 0deg, transparent 0%, #0f1522 30%, #3a4150 50%, transparent 70%)" } : undefined}
-                />
-                <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_6px_18px_rgba(24,119,242,0.4)]">
-                  <AiGlobeIcon active={isActive} size={56} />
-                </span>
-              </span>
-            );
-          const elevatedLabel = item.label ? (
               <span
-                className="w-full truncate whitespace-nowrap text-center text-[10.5px] font-medium"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
+                className="w-full truncate whitespace-nowrap text-center text-[10.5px] leading-[13px] transition-colors duration-300"
+                style={{ color: labelColor, fontWeight: isActive ? 700 : 600 }}
               >
                 {item.label}
               </span>
-            ) : null;
+            </>
+          );
 
-            return item.href ? (
-          <Link key={item.id} href={item.href} className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-px px-0.5 py-1">
-                {content}
-                {elevatedLabel}
-              </Link>
-            ) : (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onChange?.(item.id)}
-                className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-px px-0.5 py-1"
-              >
-                {content}
-                {elevatedLabel}
-              </button>
-            );
-          }
-
-          // *** min-w-0 הכרחי כדי ש-5 הפריטים יתחלקו בדיוק שווה (ראו הסבר
-          // ב-min-w-0 למעלה), אבל זה מצמצם את הרוחב הזמין לכל פריט -
-          // "tripmatch"/"trippy AI" כבר לא נכנסים בפונט/padding הקודמים
-          // ונחתכים ("...match"). מקטינים padding אופקי ופונט התווית כדי
-          // שהתוויות הארוכות ביותר ייכנסו בנוחות במסכי טלפון רגילים,
-          // בלי לוותר על min-w-0 (truncate נשאר כרשת ביטחון בלבד).
-          const itemClasses = "flex min-w-0 flex-1 flex-col items-center gap-px px-0.5 py-1 text-[10.5px] font-medium transition-colors";
+          const cls =
+            "tab-item relative z-10 flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[26px] outline-none focus-visible:ring-2 focus-visible:ring-[#0A6DFE]/60";
 
           return item.href ? (
-            <Link key={item.id} href={item.href} className={itemClasses}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
-                <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
-              </span>
-              <span
-                className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
-              >
-                {item.label}
-              </span>
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={isActive ? "page" : undefined}
+              onClick={() => handleTap(item)}
+              className={cls}
+            >
+              {inner}
             </Link>
           ) : (
-            <button key={item.id} type="button" onClick={() => onChange?.(item.id)} className={itemClasses}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full leading-none">
-                <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
-              </span>
-              <span
-                className="w-full truncate whitespace-nowrap text-center"
-                style={isActive ? { color: item.activeColor ?? "var(--color-primary-start)" } : { color: inactiveLabelColor }}
-              >
-                {item.label}
-              </span>
+            <button key={item.id} type="button" aria-pressed={isActive} onClick={() => handleTap(item)} className={cls}>
+              {inner}
             </button>
           );
         })}
       </div>
 
       <style jsx global>{`
-        .ai-glow {
+        .tab-glass {
+          background: rgba(255, 255, 255, 0.74);
+          -webkit-backdrop-filter: blur(24px) saturate(185%);
+          backdrop-filter: blur(24px) saturate(185%);
+          box-shadow:
+            0 12px 32px rgba(15, 20, 25, 0.16),
+            0 2px 6px rgba(15, 20, 25, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+            0 0 0 0.5px rgba(15, 20, 25, 0.08);
+        }
+        .tab-glass--dark {
+          background: rgba(28, 28, 30, 0.72);
+          box-shadow:
+            0 12px 32px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        }
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+          .tab-glass {
+            background: rgba(255, 255, 255, 0.97);
+          }
+          .tab-glass--dark {
+            background: rgba(28, 28, 30, 0.97);
+          }
+        }
+        /* לחיצה: כל הבר מתכווץ קלות כל עוד האצבע על אחד הטאבים */
+        .tab-glass {
+          transform-origin: 50% 100%;
+          transition: transform 180ms cubic-bezier(0.3, 0.7, 0.4, 1);
+        }
+        .tab-glass:has(.tab-item:active) {
+          transform: scale(0.975);
+        }
+        /* שחרור: הבר חוזר בתנועה אלסטית עדינה - מתמתח מעט לרוחב ומתייצב */
+        .tab-bar-bounce {
+          animation: tab-bar-bounce 620ms cubic-bezier(0.25, 1, 0.4, 1);
+        }
+        @keyframes tab-bar-bounce {
+          0% { transform: scale(0.975, 0.975); }
+          30% { transform: scale(1.018, 0.985); }
+          55% { transform: scale(0.995, 1.008); }
+          78% { transform: scale(1.004, 0.999); }
+          100% { transform: scale(1, 1); }
+        }
+        /* הגלולה מתמתחת לרגע בזמן שהיא נוסעת - תחושת "טיפה" */
+        .tab-indicator-stretch {
+          animation: tab-indicator-stretch 560ms cubic-bezier(0.3, 1.2, 0.5, 1);
+        }
+        @keyframes tab-indicator-stretch {
+          0% { transform: scale(1, 1); }
+          35% { transform: scale(1.14, 0.9); }
+          70% { transform: scale(0.97, 1.03); }
+          100% { transform: scale(1, 1); }
+        }
+        .tab-ai-glow {
           background: radial-gradient(circle, rgba(24, 119, 242, 0.35), transparent 70%);
           filter: blur(6px);
-          animation: ai-glow-pulse 2.6s ease-in-out infinite;
+          animation: tab-ai-glow-pulse 2.6s ease-in-out infinite;
         }
-        @keyframes ai-glow-pulse {
+        @keyframes tab-ai-glow-pulse {
           0%, 100% { opacity: 0.6; transform: scale(1); }
           50% { opacity: 1; transform: scale(1.08); }
         }
-        .ai-ring {
-          background: conic-gradient(
-            from 0deg,
-            transparent 0%,
-            var(--color-primary-start) 30%,
-            var(--color-primary-end) 50%,
-            transparent 70%
-          );
+        .tab-ai-ring {
+          background: conic-gradient(from 0deg, transparent 0%, var(--color-primary-start) 30%, var(--color-primary-end) 50%, transparent 70%);
           padding: 3px;
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
-          animation: ai-ring-spin 2.2s linear infinite;
+          animation: tab-ai-ring-spin 2.2s linear infinite;
         }
-        @keyframes ai-ring-spin {
+        @keyframes tab-ai-ring-spin {
           to { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .tab-indicator,
+          .tab-glass {
+            transition: none !important;
+            transform: none !important;
+          }
+          .tab-bar-bounce,
+          .tab-indicator-stretch,
+          .tab-ai-glow,
+          .tab-ai-ring {
+            animation: none !important;
+          }
         }
       `}</style>
     </nav>
