@@ -13,6 +13,8 @@ export interface RealUser {
   lastActivity: string | null;
   tripsBuilt: number;
   tripsSaved: number;
+  tripMatchSessions: number;
+  provider: string;
   favoriteTripTypes: string[];
   likes: number;
   saves: number;

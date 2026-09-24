@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useAdminSecret } from "@/screens/admin/shell/AdminAuthContext";
@@ -7,6 +7,9 @@ import { Badge } from "@/screens/admin/shared/Primitives";
 import type { RealUser, UserFilters } from "@/screens/admin/users/types";
 import { EMPTY_FILTERS } from "@/screens/admin/users/types";
 import { UserDetailDrawer } from "@/screens/admin/users/UserDetailDrawer";
+import { PageHeader, StatTile, Segmented, Button } from "@/screens/admin/kit/ui";
+import { timeAgo, pctOf } from "@/screens/admin/kit/format";
+import { PROVIDER_LABELS } from "@/services/admin/insights/labels";
 
 const ADMIN_SECRET_HEADER = "x-admin-secret";
 const PAGE_SIZE = 25;
@@ -22,6 +25,15 @@ export default function UsersPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loadedAt, setLoadedAt] = useState(0);
+
+  // קישור ישיר מהחיפוש/הפיד/בריאות המערכת: /admin/users?user=<id> פותח את כרטיס המשתמש
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("user");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fromUrl) setActiveUserId(fromUrl);
+  }, []);
 
   // debounce לחיפוש/עריכת פילטרים חופשיים (destination), כדי לא לירות
   // בקשה על כל תו - שאר הפילטרים (select/tab) יורים מיד.
@@ -56,12 +68,24 @@ export default function UsersPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error ?? "שגיאה בטעינת משתמשים");
         setUsers(json.users ?? []);
+        setLoadedAt(Date.now());
         setCounts(json.counts ?? { registered: 0, guest: 0 });
         setPage(1);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "שגיאה לא ידועה"))
       .finally(() => setLoading(false));
-  }, [adminSecret, tab, debouncedSearch, filters.account, filters.registration, filters.activity, filters.trips, debouncedDestination, filters.interest, filters.ageMin, filters.ageMax]);
+  }, [reloadKey, adminSecret, tab, debouncedSearch, filters.account, filters.registration, filters.activity, filters.trips, debouncedDestination, filters.interest, filters.ageMin, filters.ageMax]);
+
+  const summary = useMemo(() => {
+    const day = 86400000;
+    const recent = (iso: string | null, days: number) => Boolean(iso && loadedAt - Date.parse(iso) < days * day);
+    return {
+      active7: users.filter((u) => recent(u.lastActivity, 7)).length,
+      onboarded: users.filter((u) => u.onboardingCompleted).length,
+      creators: users.filter((u) => u.tripsBuilt > 0 || u.tripMatchSessions > 0).length,
+      dormant: users.filter((u) => !recent(u.lastActivity, 30)).length,
+    };
+  }, [users, loadedAt]);
 
   const activeFilterCount = Object.entries(filters).filter(([k, v]) => k !== "search" && v).length;
 
@@ -92,6 +116,8 @@ export default function UsersPage() {
       sortValue: (u) => (u.onboardingCompleted ? 1 : 0),
       render: (u) => <Badge tone={u.onboardingCompleted ? "success" : "warning"}>{u.onboardingCompleted ? "הושלם" : "לא הושלם"}</Badge>,
     },
+    { key: "provider", header: "הרשמה דרך", sortValue: (u) => u.provider, render: (u) => <span className="text-[12.5px]">{PROVIDER_LABELS[u.provider] ?? u.provider}</span> },
+    { key: "tripmatch", header: "TripMatch", sortValue: (u) => u.tripMatchSessions, render: (u) => <span className="admin-mono">{u.tripMatchSessions}</span>, align: "center" },
     { key: "trips", header: "מסלולים", sortValue: (u) => u.tripsBuilt, render: (u) => <span className="admin-mono">{u.tripsBuilt}</span>, align: "center" },
     { key: "likes", header: "Likes", sortValue: (u) => u.likes, render: (u) => <span className="admin-mono">{u.likes}</span>, align: "center" },
     { key: "saves", header: "Saves", sortValue: (u) => u.saves, render: (u) => <span className="admin-mono">{u.saves}</span>, align: "center" },
@@ -99,23 +125,32 @@ export default function UsersPage() {
       key: "lastActivity",
       header: "פעילות אחרונה",
       sortValue: (u) => u.lastActivity ?? "",
-      render: (u) => <span className="admin-mono text-[12.5px]">{u.lastActivity ? new Date(u.lastActivity).toLocaleDateString("he-IL") : "—"}</span>,
+      render: (u) => (
+        <span className="text-[12.5px]" title={u.lastActivity ? new Date(u.lastActivity).toLocaleString("he-IL") : undefined}>
+          {timeAgo(u.lastActivity)}
+        </span>
+      ),
     },
     { key: "signup", header: "נרשם ב-", sortValue: (u) => u.signupDate, render: (u) => <span className="admin-mono text-[12.5px]">{new Date(u.signupDate).toLocaleDateString("he-IL")}</span> },
   ];
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[22px] font-semibold" style={{ color: "var(--admin-ink)" }}>
-            משתמשים
-          </h1>
-          <p className="mt-1 text-[13.5px]" style={{ color: "var(--admin-ink-secondary)" }}>
-            {adminSecret ? `${users.length.toLocaleString()} תוצאות` : "נתונים אמיתיים מ-Supabase Auth"}
-          </p>
+      <PageHeader
+        icon="users"
+        title="משתמשים"
+        subtitle={`${users.length.toLocaleString("he-IL")} תוצאות · לחצו על שורה לכרטיס 360° מלא`}
+        actions={<Button icon="refresh" onClick={() => setReloadKey((k) => k + 1)}>רענון</Button>}
+      />
+
+      {users.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <StatTile label="פעילים ב-7 ימים" value={summary.active7} icon="pulse" hint={`${pctOf(summary.active7, users.length) ?? 0}% מהרשימה`} />
+          <StatTile label="השלימו אונבורדינג" value={summary.onboarded} icon="checkCircle" hint={`${pctOf(summary.onboarded, users.length) ?? 0}% מהרשימה`} />
+          <StatTile label="יצרו טיול / TripMatch" value={summary.creators} icon="route" hint={`${pctOf(summary.creators, users.length) ?? 0}% מהרשימה`} />
+          <StatTile label="רדומים (30+ ימים)" value={summary.dormant} icon="clock" hint="מועמדים לקמפיין החזרה" />
         </div>
-      </div>
+      )}
 
       {!adminSecret && (
         <div className="rounded-[var(--admin-radius-lg)] border border-dashed p-10 text-center" style={{ borderColor: "var(--admin-border)" }}>
@@ -134,24 +169,14 @@ export default function UsersPage() {
       {adminSecret && (
         <>
           {/* 1. USERS VS GUESTS - ברירת מחדל: רשומים בלבד, לא מעורבבים */}
-          <div className="inline-flex w-fit gap-1 rounded-[var(--admin-radius-sm)] border p-1" style={{ borderColor: "var(--admin-border)", background: "var(--admin-bg-surface)" }}>
-            <button
-              type="button"
-              onClick={() => setTab("registered")}
-              className="rounded-[var(--admin-radius-sm)] px-3.5 py-1.5 text-[13px] font-medium transition"
-              style={{ background: tab === "registered" ? "var(--admin-accent)" : "transparent", color: tab === "registered" ? "#fff" : "var(--admin-ink-secondary)" }}
-            >
-              משתמשים <span className="admin-mono">{counts.registered}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("guest")}
-              className="rounded-[var(--admin-radius-sm)] px-3.5 py-1.5 text-[13px] font-medium transition"
-              style={{ background: tab === "guest" ? "var(--admin-accent)" : "transparent", color: tab === "guest" ? "#fff" : "var(--admin-ink-secondary)" }}
-            >
-              אורחים <span className="admin-mono">{counts.guest}</span>
-            </button>
-          </div>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "registered", label: `רשומים · ${counts.registered}` },
+              { value: "guest", label: `אורחים · ${counts.guest}` },
+            ]}
+          />
 
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput value={filters.search} onChange={(v) => setFilters((f) => ({ ...f, search: v }))} placeholder="חיפוש לפי שם, email, User ID, עיר..." />
