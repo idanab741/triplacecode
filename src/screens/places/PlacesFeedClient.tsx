@@ -11,6 +11,7 @@ import { CreatorsSection } from "@/screens/places/CreatorsSection";
 import { SuggestedPeopleCircles } from "@/screens/places/SuggestedPeopleCircles";
 import { MyDestinationsSection } from "@/screens/places/MyDestinationsSection";
 import { FeedTabs } from "@/screens/places/FeedTabs";
+import { FeedPromoStrip } from "@/screens/places/FeedPromoStrip";
 import { PostCard } from "@/screens/places/PostCard";
 import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
 import { TripFeedCard } from "@/screens/trips/TripFeedCard";
@@ -223,6 +224,9 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
       <div className="mt-3">
         <FeedTabs active={view} onChange={setView} />
       </div>
+
+      {/* *** בקשה מפורשת - פס באנרים נגלל (כמו ה"is live" של X): "תפתיעו אותי" + RunTrippy. */}
+      <FeedPromoStrip />
 
         <>
       {suggestedTravelers !== null && <SuggestedPeopleCircles people={suggestedTravelers} />}

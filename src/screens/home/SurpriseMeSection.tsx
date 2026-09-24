@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
-import { getSessionLocation } from "@/utils/sessionLocation";
+import { useSurpriseMe } from "@/hooks/useSurpriseMe";
 
 interface SurpriseMeSectionProps {
   /** תיקון Product מפורש ("אפשר שהחלק הזה יופיע ב'גלה עוד'?"): כשמוטמע
@@ -42,32 +39,8 @@ interface SurpriseMeSectionProps {
  *   ר' variant="embedded" למעלה.
  */
 export function SurpriseMeSection({ variant = "standalone" }: SurpriseMeSectionProps) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleSurpriseMe() {
-    if (loading) return;
-    setLoading(true);
-    try {
-      // המיקום כבר נשמר בעמוד הבית (utils/sessionLocation.ts) - משתמשים בו מיד,
-      // בלי GPS חדש בכל לחיצה. נופלים ל-GPS רק אם אין מיקום שמור.
-      const saved = getSessionLocation();
-      const coords = saved ? { lat: saved.lat, lng: saved.lng } : await getCurrentPositionSafe();
-      const res = await fetch(`/api/discovery/day-trip?category=hot&lat=${coords.lat}&lng=${coords.lng}&limit=15`);
-      const data = await res.json();
-      const places: { id: string }[] = data.places ?? [];
-      if (places.length === 0) {
-        router.push("/tripmatch");
-        return;
-      }
-      const pick = places[Math.floor(Math.random() * places.length)];
-      router.push(`/place/${pick.id}`);
-    } catch {
-      router.push("/tripmatch");
-    } finally {
-      setLoading(false);
-    }
-  }
+  // הלוגיקה עצמה משותפת עם הבאנר בפס הקידום של הפיד (FeedPromoStrip).
+  const { surprise: handleSurpriseMe, loading } = useSurpriseMe();
 
   const isEmbedded = variant === "embedded";
 
