@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { CREATE_INK } from "@/screens/create/CreateUi";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { CollectionForm } from "@/screens/collections/CollectionForm";
 import type { CollectionType } from "@/services/social/collectionTypes";
@@ -36,11 +37,14 @@ function CreateCollectionContent() {
 
   if (authLoading || !user || !type) {
     return (
-      <div className="min-h-screen bg-white">
-        <PlacesHeader variant="purple" onBack={() => router.back()} />
-        <div className="px-5 pt-6">
-          <Skeleton className="mb-4 h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+      <div className="min-h-screen bg-white" style={CREATE_INK}>
+        <HomeStatusBarTint />
+        <CollapsibleTopBar onBack={() => router.back()} />
+        <div className="mx-auto max-w-xl px-5 pt-4">
+          <Skeleton className="mb-2 h-8 w-44" />
+          <Skeleton className="mb-6 h-4 w-64" />
+          <Skeleton className="mb-6 h-12 w-full" />
+          <Skeleton className="aspect-[16/9] w-full" />
         </div>
         <MainBottomNav active="content" />
       </div>
@@ -48,9 +52,10 @@ function CreateCollectionContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={() => router.back()} />
+    <div className="min-h-screen bg-white" style={CREATE_INK}>
+      {/* *** עיצוב מחדש: הבר העליון של triplace (עם חזור) במקום הבר הסגול של place's. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.back()} />
       <div className="pb-24">
         <CollectionForm mode="create" type={type} dark={dark} />
       </div>

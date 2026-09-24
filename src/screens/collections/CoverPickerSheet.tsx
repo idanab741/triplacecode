@@ -5,6 +5,7 @@ import { BottomSheet } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { uploadSocialMedia } from "@/services/social/mediaUploadService";
+import { ActionRow, CREATE_BLUE, CheckIcon, ErrorBox, ImageIcon, SparkleIcon } from "@/screens/create/CreateUi";
 
 interface CoverPickerSheetProps {
   /** ה-Cover הנוכחי. null = אוטומטי. */
@@ -43,49 +44,71 @@ export function CoverPickerSheet({ coverUrl, imageUrls, autoLabel = "קאבר א
     }
   }
 
+  const autoSelected = coverUrl === null;
+
   return (
     <BottomSheet onClose={onClose}>
       <div className="max-h-[75vh] overflow-y-auto px-5 pb-4">
-        <h2 className="mb-3 text-[17px] font-bold text-ink">{heading}</h2>
+        <h2 className="mb-3 text-[20px] font-bold tracking-tight text-ink">{heading}</h2>
+
+        {/* אוטומטי - כרטיס בחירה עם סימון ברור */}
         <button
           type="button"
           onClick={() => onSelect(null)}
-          className="mb-2 flex w-full items-center justify-between rounded-card px-3 py-3 text-start text-[14px] font-semibold text-ink hover:bg-bg-secondary"
+          aria-pressed={autoSelected}
+          className={`flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-start transition active:scale-[0.99] ${
+            autoSelected ? "bg-[#0A6DFE]/[0.08] ring-2 ring-[#0A6DFE]" : "bg-[#F7F8FA]"
+          }`}
         >
-          {autoLabel}
-          {coverUrl === null && <span style={{ color: "var(--color-places-purple)" }}>✓</span>}
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(10,109,254,0.1)", color: CREATE_BLUE }}>
+            <SparkleIcon />
+          </span>
+          <span className="min-w-0 flex-1 text-[15px] font-semibold text-ink">{autoLabel}</span>
+          {autoSelected && (
+            <span style={{ color: CREATE_BLUE }}>
+              <CheckIcon />
+            </span>
+          )}
         </button>
 
         {imageUrls.length > 0 && (
           <>
-            <p className="mb-2 mt-3 text-[12.5px] font-semibold text-ink-secondary">מתוך התמונות שנוספו</p>
-            <div className="mb-3 grid grid-cols-3 gap-2">
-              {[...new Set(imageUrls)].map((url) => (
-                <button
-                  key={url}
-                  type="button"
-                  onClick={() => onSelect(url)}
-                  className={`relative aspect-square overflow-hidden rounded-card ring-2 ${coverUrl === url ? "ring-[var(--color-places-purple)]" : "ring-transparent"}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="h-full w-full object-cover" />
-                </button>
-              ))}
+            <p className="mb-2 mt-5 text-[14px] font-semibold text-ink">מתוך התמונות שנוספו</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[...new Set(imageUrls)].map((url) => {
+                const selected = coverUrl === url;
+                return (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => onSelect(url)}
+                    aria-pressed={selected}
+                    className={`relative aspect-square overflow-hidden rounded-[14px] transition active:scale-95 ${selected ? "ring-[3px] ring-[#0A6DFE] ring-offset-2" : ""}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    {selected && (
+                      <span className="absolute end-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: CREATE_BLUE }}>
+                        <CheckIcon size={14} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
 
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() => fileInputRef.current?.click()}
-          className="h-12 rounded-xl text-[15.5px] font-semibold w-full border disabled:opacity-50"
-          style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
-        >
-          {uploading ? "מעלה..." : "העלאת תמונה מהמכשיר"}
-        </button>
-        {error && <p className="mt-2 text-center text-[12.5px] text-red-500">{error}</p>}
+        <div className="mt-5">
+          <ActionRow
+            icon={<ImageIcon />}
+            title={uploading ? "מעלה..." : "העלאת תמונה מהמכשיר"}
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          />
+        </div>
+        {error && <ErrorBox>{error}</ErrorBox>}
       </div>
     </BottomSheet>
   );

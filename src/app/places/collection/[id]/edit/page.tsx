@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { CREATE_INK } from "@/screens/create/CreateUi";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { CollectionForm, type CollectionFormInitial } from "@/screens/collections/CollectionForm";
 import { formItemFromDto } from "@/screens/collections/collectionFormTypes";
@@ -44,15 +45,18 @@ export default function EditCollectionPage({ params }: { params: Promise<{ id: s
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={() => router.back()} />
+    <div className="min-h-screen bg-white" style={CREATE_INK}>
+      {/* *** עיצוב מחדש: הבר העליון של triplace (עם חזור), כמו בעמוד יצירת החוויה. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.back()} />
       {error ? (
         <PlacesEmptyState title={error} />
       ) : !collection || !initial ? (
-        <div className="px-5 pt-6">
-          <Skeleton className="mb-4 h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+        <div className="mx-auto max-w-xl px-5 pt-4">
+          <Skeleton className="mb-2 h-8 w-44" />
+          <Skeleton className="mb-6 h-4 w-64" />
+          <Skeleton className="mb-6 h-12 w-full" />
+          <Skeleton className="aspect-[16/9] w-full" />
         </div>
       ) : (
         <CollectionForm mode="edit" type={collection.type} collectionId={collection.id} initial={initial} />

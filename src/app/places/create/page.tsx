@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Input, ImageOptionRow, Skeleton } from "@/components/ui";
+import { Button, ImageOptionRow, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
-import { PlacesCameraIcon, PlacesGlobeIcon, PlacesLocationIcon, PlacesSearchIcon } from "@/screens/places/PlacesIcons";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { searchPlaces, dedupePlaceResults, type PlaceSearchResult } from "@/services/places/searchService";
 import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social/mediaUploadService";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
@@ -16,8 +15,14 @@ import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/hom
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
 import type { PlaceSubmissionCategory } from "@/services/social/placeSubmissionService";
 
-const PURPLE_GRADIENT = "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))";
+/* *** עיצוב מחדש (בקשה מפורשת - "נתאים לעיצוב של האפליקציה"): כמו עמוד יצירת הפוסט - הבר העליון של
+ * triplace (עם חזור), רקע לבן, טקסט חד, כחול האפליקציה לפעולות ומשטחים אפורים-בהירים במקום מסגרות.
+ * הזרימה (חיפוש -> הוספה -> ביקורת) וכל הלוגיקה/ה-API לא השתנו. */
+const BLUE = "#0A6DFE";
+const INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties;
 const MAX_MEDIA = 4;
+/** מה אומר כל דירוג - מוצג מתחת לכוכבים. */
+const RATING_LABELS = ["", "לא משהו", "סביר", "טוב", "טוב מאוד", "מושלם!"];
 
 /** סוגי המקומות - הטקסונומיה החדשה (אותם אייקונים ותוויות כמו בעמוד הבית), לא הסט הישן.
  *  id = הערך שנשמר בשרת (PlaceSubmissionCategory), home = המזהה בטקסונומיה החדשה. */
@@ -37,7 +42,7 @@ const CSS = `
 `;
 
 const FIELD_CLASS =
-  "w-full rounded-pill border border-ink-secondary/25 bg-bg py-3 text-[15px] text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/30";
+  "h-12 w-full rounded-full bg-[#F1F2F5] text-[15px] text-ink placeholder:text-[#9aa1ad] focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/30";
 
 interface AutocompleteSuggestion {
   placeId: string;
@@ -63,20 +68,134 @@ interface SelectedPlace {
   imageUrl: string | null;
 }
 
-function StarIcon() {
+/* ───────────── אייקונים (קו, currentColor) ───────────── */
+
+function Svg({ children, size = 18 }: { children: ReactNode; size?: number }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="#F5B301" aria-hidden="true">
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
     </svg>
   );
 }
-
+const STAR_PATH = "M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.08 6.33L12 17.31l-5.68 2.99 1.08-6.33-4.6-4.49 6.36-.92L12 2.8z";
+function StarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="#F5B301" aria-hidden="true">
+      <path d={STAR_PATH} />
+    </svg>
+  );
+}
 function CheckIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-places-purple)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <path d="m8 12.5 2.8 2.8L16 9.5" />
-    </svg>
+    <Svg size={18}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </Svg>
+  );
+}
+function SearchIcon() {
+  return (
+    <Svg size={18}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </Svg>
+  );
+}
+function PinIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path d="M12 21s-6.5-5.8-6.5-11a6.5 6.5 0 0 1 13 0c0 5.2-6.5 11-6.5 11Z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </Svg>
+  );
+}
+function PlusIcon() {
+  return (
+    <Svg size={20}>
+      <path d="M12 5v14M5 12h14" />
+    </Svg>
+  );
+}
+function GlobeIcon() {
+  return (
+    <Svg size={18}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+    </Svg>
+  );
+}
+function ImageIcon() {
+  return (
+    <Svg size={20}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="3" />
+      <circle cx="9" cy="10" r="1.8" />
+      <path d="m20.5 15.5-4.5-4.5L6 19.5" />
+    </Svg>
+  );
+}
+function CloseIcon() {
+  return (
+    <Svg size={14}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Svg>
+  );
+}
+function ChevronIcon() {
+  return (
+    <Svg size={16}>
+      <path d="m15 6-6 6 6 6" />
+    </Svg>
+  );
+}
+
+/* ───────────── חלקים קטנים ───────────── */
+
+function ActionIcon({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(10,109,254,0.1)", color: BLUE }}>
+      {children}
+    </span>
+  );
+}
+
+/** שורת פעולה בכרטיס אפור-בהיר - אותה שורה כמו ב"הוספה לפוסט". */
+function ActionRow({ icon, title, subtitle, onClick, disabled }: { icon: ReactNode; title: string; subtitle?: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-3 rounded-[20px] bg-[#F7F8FA] px-4 py-3 text-start transition active:bg-[#EFF1F4] disabled:opacity-45"
+    >
+      <ActionIcon>{icon}</ActionIcon>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold text-ink">{title}</span>
+        {subtitle && <span className="block text-[12.5px] text-ink-secondary">{subtitle}</span>}
+      </span>
+      <span className="text-[#b3b9c3]">
+        <ChevronIcon />
+      </span>
+    </button>
+  );
+}
+
+/** הכפתור הראשי הקבוע של האפליקציה (components/ui/Button) - לא עיצוב נפרד לעמוד הזה. */
+function PrimaryButton({ children, onClick, disabled, className = "" }: { children: ReactNode; onClick: () => void; disabled?: boolean; className?: string }) {
+  return (
+    <Button type="button" fullWidth onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </Button>
+  );
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <label className="mb-1.5 block text-[14px] font-semibold text-ink">{children}</label>;
+}
+
+function ErrorBox({ children }: { children: ReactNode }) {
+  return (
+    <p role="alert" className="mt-3 rounded-[14px] bg-[#FDECEC] px-3.5 py-2.5 text-[13px] font-medium text-[#C8373C]">
+      {children}
+    </p>
   );
 }
 
@@ -449,12 +568,13 @@ export function CreatePlacePageContent() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-white">
-        <HomeStatusBarTint color="#7C3AED" />
-        <PlacesHeader variant="purple" onBack={() => router.back()} />
-        <div className="px-5 pt-6">
-          <Skeleton className="mb-4 h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+      <div className="min-h-screen bg-white" style={INK}>
+        <HomeStatusBarTint />
+        <CollapsibleTopBar onBack={() => router.back()} />
+        <div className="mx-auto max-w-xl px-5 pt-4">
+          <Skeleton className="mb-2 h-8 w-64" />
+          <Skeleton className="mb-6 h-4 w-48" />
+          <Skeleton className="h-12 w-full" />
         </div>
         <MainBottomNav active="content" />
       </div>
@@ -462,140 +582,182 @@ export function CreatePlacePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-32">
+    <div className="min-h-screen bg-white pb-32" style={INK}>
       <style>{CSS}</style>
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={handleBack} />
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={handleBack} />
 
-      <div className="px-5 pt-6">
-        <h1 className="mb-4 text-[22px] font-extrabold leading-tight text-ink">על איזה מקום בא לכם לספר?</h1>
+      <div className="mx-auto max-w-xl px-5 pt-4">
+        <header className="mb-5">
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">על איזה מקום בא לכם לספר?</h1>
+          <p className="mt-1 text-[14px] text-ink-secondary">{selected ? "דרגו וספרו איך היה" : addOpen ? "הוסיפו מקום חדש ל-triplace" : "חפשו את המקום, דרגו ושתפו"}</p>
+        </header>
 
         {/* ───── שלב 1: חיפוש ───── */}
         {!selected && !addOpen && (
           <section className="pc-reveal">
-            <div className="relative mb-4">
-              <span className="pointer-events-none absolute inset-y-0 start-4 flex items-center">
-                <PlacesSearchIcon />
-              </span>
+            <label className="flex h-12 items-center gap-2.5 rounded-full bg-[#F1F2F5] px-4 text-ink-secondary focus-within:ring-2 focus-within:ring-[#0A6DFE]/30">
+              <SearchIcon />
               <input
                 autoFocus
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 placeholder="חפשו מקום..."
-                className={`${FIELD_CLASS} ps-11 pe-4`}
-                style={{ borderColor: query ? "var(--color-places-purple)" : undefined }}
+                className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-[#9aa1ad] focus:outline-none"
               />
-            </div>
+            </label>
 
-            {searching && (
-              <div>
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="mb-2 h-16 w-full" />
+            <div className="-mx-2 mt-3">
+              {searching &&
+                [0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-2 py-2.5">
+                    <span className="h-14 w-14 shrink-0 animate-pulse rounded-[16px] bg-[#EFF1F4]" />
+                    <span className="flex flex-1 flex-col gap-2">
+                      <span className="h-3.5 w-2/3 animate-pulse rounded bg-[#EFF1F4]" />
+                      <span className="h-3 w-1/3 animate-pulse rounded bg-[#F4F5F7]" />
+                    </span>
+                  </div>
                 ))}
-              </div>
-            )}
 
-            {!searching &&
-              results?.map((place) => (
-                <button
-                  key={place.id}
-                  type="button"
-                  onClick={() => selectFromSearch(place)}
-                  className="flex w-full items-center gap-3 rounded-card px-1 py-2.5 text-start hover:bg-bg-secondary"
-                >
-                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {place.image_urls?.[0] && <img src={place.image_urls[0]} alt="" className="h-full w-full object-cover" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-bold text-ink">{place.name}</span>
-                    <span className="block truncate text-[12.5px] text-ink-secondary">
-                      {[getPlaceCategoryLabel(place.category), place.city].filter(Boolean).join(" · ")}
+              {!searching &&
+                results?.map((place) => (
+                  <button
+                    key={place.id}
+                    type="button"
+                    onClick={() => selectFromSearch(place)}
+                    className="flex w-full items-center gap-3 rounded-[18px] px-2 py-2.5 text-start transition active:bg-[#F1F2F5]"
+                  >
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-[#EFF1F4] text-[#9aa1ad]">
+                      {place.image_urls?.[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={place.image_urls[0]} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <PinIcon />
+                      )}
                     </span>
-                  </span>
-                  {place.rating != null && (
-                    <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-ink">
-                      <StarIcon />
-                      {place.rating.toFixed(1)}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-ink">{place.name}</span>
+                      <span className="block truncate text-[12.5px] text-ink-secondary">
+                        {[getPlaceCategoryLabel(place.category), place.city].filter(Boolean).join(" · ")}
+                      </span>
                     </span>
-                  )}
-                </button>
-              ))}
+                    {place.rating != null && (
+                      <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-ink">
+                        <StarIcon />
+                        {place.rating.toFixed(1)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+            </div>
 
             {results !== null && !searching && results.length === 0 && (
               <p className="py-4 text-center text-[14px] text-ink-secondary">לא מצאנו מקום בשם הזה</p>
             )}
 
-            <button type="button" onClick={openAdd} className="mt-5 w-full text-center text-[13.5px]">
-              <span className="text-ink-secondary">לא מצאתם את המקום? </span>
-              <span className="font-bold" style={{ color: "var(--color-places-purple)" }}>
-                לחצו כאן
-              </span>
-            </button>
+            <div className="mt-4">
+              <ActionRow icon={<PlusIcon />} title="לא מצאתם את המקום?" subtitle="הוסיפו אותו ל-triplace" onClick={openAdd} />
+            </div>
           </section>
         )}
 
         {/* ───── שלב 2: הוספת מקום (נחשף בלחיצה) ───── */}
         {!selected && addOpen && (
           <section ref={addRef} className="pc-reveal scroll-mt-28">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-[18px] font-extrabold text-ink">הוסיפו מקום</h2>
-              <button type="button" onClick={() => setAddOpen(false)} className="text-[13px] font-semibold" style={{ color: "var(--color-places-purple)" }}>
-                חזרה לחיפוש
-              </button>
-            </div>
-
-            <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">מה שם המקום?</label>
+            <FieldLabel>מה שם המקום?</FieldLabel>
             <div className="relative mb-1">
-              <Input value={nameQuery} onChange={(e) => handleNameChange(e.target.value)} placeholder="לדוגמה: קפה השעון" />
+              <input
+                value={nameQuery}
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="לדוגמה: קפה השעון"
+                className={`${FIELD_CLASS} px-4`}
+              />
               {(suggesting || suggestions) && (
-                <div className="absolute inset-x-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-card bg-white shadow-soft ring-1 ring-black/5">
-                  {suggesting && <p className="p-3 text-center text-[12.5px] text-ink-secondary">מחפש...</p>}
+                <div className="absolute inset-x-0 top-full z-10 mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-[18px] bg-white p-1.5 shadow-[0_12px_32px_-8px_rgba(15,20,25,0.22)] ring-1 ring-black/[0.06]">
+                  {suggesting && <p className="p-3 text-center text-[13px] text-ink-secondary">מחפש...</p>}
                   {!suggesting &&
                     suggestions?.map((s) => (
-                      <button key={s.placeId} type="button" onClick={() => handleSelectSuggestion(s)} className="block w-full px-3 py-2.5 text-start hover:bg-bg-secondary">
-                        <span className="block text-[13.5px] font-semibold text-ink">{s.mainText}</span>
-                        <span className="block text-[11.5px] text-ink-secondary">{s.secondaryText}</span>
+                      <button
+                        key={s.placeId}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(s)}
+                        className="flex w-full items-center gap-3 rounded-[12px] px-2.5 py-2 text-start active:bg-[#F1F2F5]"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-ink-secondary">
+                          <PinIcon size={16} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] font-semibold text-ink">{s.mainText}</span>
+                          <span className="block truncate text-[12px] text-ink-secondary">{s.secondaryText}</span>
+                        </span>
                       </button>
                     ))}
-                  {!suggesting && suggestions?.length === 0 && <p className="p-3 text-center text-[12.5px] text-ink-secondary">לא נמצאו תוצאות</p>}
+                  {!suggesting && suggestions?.length === 0 && (
+                    <p className="px-3 pb-1 pt-2.5 text-center text-[13px] text-ink-secondary">לא מצאנו את המקום בגוגל</p>
+                  )}
+                  {/* *** בקשה מפורשת - "אם המקום לא ברשימה, אפשרות להוספה ידנית כחלק מהגלילה": שורה
+                      אחרונה בתוך הרשימה עצמה (לא קישור מתחתיה, שהרשימה מסתירה). פותחת את הכתובת הידנית. */}
+                  {!suggesting && suggestions && (
+                    <>
+                      {suggestions.length > 0 && <span className="mx-2.5 my-1 block h-px bg-black/[0.06]" />}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSuggestions(null);
+                          setManualMode(true);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-[12px] px-2.5 py-2 text-start active:bg-[#F1F2F5]"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(10,109,254,0.1)", color: BLUE }}>
+                          <PlusIcon />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[14px] font-semibold" style={{ color: BLUE }}>
+                            לא ברשימה? הוסיפו ידנית
+                          </span>
+                          <span className="block truncate text-[12px] text-ink-secondary">
+                            נוסיף את &quot;{nameQuery.trim()}&quot; לפי כתובת שתזינו
+                          </span>
+                        </span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
-            {checkingDuplicate && <p className="mb-2 text-[12px] text-ink-secondary">בודקים אם המקום כבר קיים...</p>}
+            {checkingDuplicate && <p className="mb-2 mt-2 text-[13px] text-ink-secondary">בודקים אם המקום כבר קיים...</p>}
 
             {/* *** תוספת (בקשה מפורשת - הוספה ידנית כשהמקום לא נמצא בגוגל). */}
             {!googlePlace && !duplicateOf && nameQuery.trim().length >= 3 && (
-              <div className="mb-3">
+              <div className="mb-3 mt-2">
                 {!manualMode ? (
-                  <button type="button" onClick={() => setManualMode(true)} className="text-[13px]">
+                  <button type="button" onClick={() => setManualMode(true)} className="py-1 text-[13.5px]">
                     <span className="text-ink-secondary">לא מצאתם את זה ברשימה? </span>
-                    <span className="font-bold" style={{ color: "var(--color-places-purple)" }}>
+                    <span className="font-semibold" style={{ color: BLUE }}>
                       הוסיפו כתובת ידנית
                     </span>
                   </button>
                 ) : (
-                  <div className="pc-reveal rounded-card bg-bg-secondary p-3">
-                    <label className="mb-1 block text-[12.5px] font-semibold text-ink-secondary">מה הכתובת?</label>
+                  <div className="pc-reveal rounded-[20px] bg-[#F7F8FA] p-3.5">
+                    <FieldLabel>מה הכתובת?</FieldLabel>
                     <div className="flex gap-2">
                       <input
                         value={manualAddress}
                         onChange={(e) => setManualAddress(e.target.value)}
                         placeholder="רחוב, עיר, מדינה"
-                        className={`${FIELD_CLASS} flex-1 px-4`}
+                        className={`${FIELD_CLASS} flex-1 !bg-white px-4`}
                       />
                       <button
                         type="button"
                         disabled={manualLocating}
                         onClick={handleManualLocate}
-                        className="shrink-0 rounded-pill px-4 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-                        style={{ background: PURPLE_GRADIENT }}
+                        className="h-12 shrink-0 rounded-xl bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] px-5 text-[15px] font-semibold text-white shadow-soft transition-opacity disabled:opacity-50"
                       >
                         {manualLocating ? "מאתר..." : "אתרו"}
                       </button>
                     </div>
-                    {manualError && <p className="mt-2 text-[12px] text-red-500">{manualError}</p>}
+                    {manualError && <ErrorBox>{manualError}</ErrorBox>}
                   </div>
                 )}
               </div>
@@ -603,79 +765,87 @@ export function CreatePlacePageContent() {
 
             {/* המערכת מחליטה מאחורי הקלעים: אם המקום כבר קיים - ממשיכים לביקורת, בלי להסביר. */}
             {duplicateOf && (
-              <div className="mb-3 mt-2 rounded-card bg-bg-secondary p-3">
-                <p className="text-[13px] text-ink">מצאנו את &quot;{duplicateOf.name}&quot; - הוא כבר אצלנו</p>
+              <div className="pc-reveal mb-3 mt-2 rounded-[20px] bg-[#F7F8FA] p-3.5">
+                <div className="flex items-center gap-3">
+                  <ActionIcon>
+                    <PinIcon />
+                  </ActionIcon>
+                  <p className="min-w-0 flex-1 text-[14px] text-ink">
+                    <span className="font-semibold">{duplicateOf.name}</span> כבר נמצא ב-triplace
+                  </p>
+                </div>
                 {duplicateOf.type === "place" && (
-                  <button
-                    type="button"
-                    onClick={() => selectById(duplicateOf.id, duplicateOf.name, false)}
-                    className="h-12 rounded-xl text-[15.5px] font-semibold mt-2 w-full text-white"
-                    style={{ background: PURPLE_GRADIENT }}
-                  >
+                  <PrimaryButton className="mt-3" onClick={() => selectById(duplicateOf.id, duplicateOf.name, false)}>
                     כתיבת ביקורת
-                  </button>
+                  </PrimaryButton>
                 )}
               </div>
             )}
 
             {googlePlace && (
-              <div className="pc-reveal mb-3 mt-2 flex items-center gap-2.5 rounded-card bg-bg-secondary px-3 py-2.5">
+              <div className="pc-reveal mb-3 mt-2 flex items-center gap-3 rounded-[20px] bg-[#F7F8FA] px-3.5 py-3">
                 {googlePlace.imageUrl ? (
-                  <span className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-bg-secondary ring-1 ring-black/5">
+                  <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#EFF1F4]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={googlePlace.imageUrl} alt="" className="h-full w-full object-cover" />
                   </span>
                 ) : (
-                  <PlacesLocationIcon size={32} />
+                  <ActionIcon>
+                    <PinIcon />
+                  </ActionIcon>
                 )}
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] text-ink-secondary">איפה הוא נמצא?</span>
-                  <span className="block truncate text-[13px] font-semibold text-ink">{googlePlace.address}</span>
+                  <span className="block truncate text-[14px] font-semibold text-ink">{googlePlace.address}</span>
+                </span>
+                <span style={{ color: BLUE }}>
+                  <CheckIcon />
                 </span>
               </div>
             )}
 
-            <label className="mb-2 mt-4 block text-[13px] font-semibold text-ink-secondary">מה סוג המקום?</label>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {CATEGORY_OPTIONS.map((c) => (
-                <ImageOptionRow
-                  key={c.id}
-                  selected={category === c.id}
-                  onClick={() => setCategory(c.id)}
-                  label={HOME_QUICK_CATEGORY_LABELS[c.home]}
-                  imageSrc={HOME_QUICK_CATEGORIES.find((h) => h.id === c.home)?.imageSrc}
-                  selectedGradient={PURPLE_GRADIENT}
+            <div className="mt-5">
+              <FieldLabel>מה סוג המקום?</FieldLabel>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_OPTIONS.map((c) => (
+                  <ImageOptionRow
+                    key={c.id}
+                    selected={category === c.id}
+                    onClick={() => setCategory(c.id)}
+                    label={HOME_QUICK_CATEGORY_LABELS[c.home]}
+                    imageSrc={HOME_QUICK_CATEGORIES.find((h) => h.id === c.home)?.imageSrc}
+                    selectedGradient={BLUE}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <FieldLabel>
+                רשת חברתית / אתר <span className="font-normal text-ink-secondary">(לא חובה)</span>
+              </FieldLabel>
+              <label className="flex h-12 items-center gap-2.5 rounded-full bg-[#F1F2F5] px-4 text-ink-secondary focus-within:ring-2 focus-within:ring-[#0A6DFE]/30">
+                <GlobeIcon />
+                {/* dir=ltr + יישור לימין: הכתובת נכתבת ונקראת נכון (https://), ליד האייקון. */}
+                <input
+                  type="text"
+                  inputMode="url"
+                  dir="ltr"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://"
+                  className="h-full min-w-0 flex-1 bg-transparent text-right text-[15px] text-ink placeholder:text-[#9aa1ad] focus:outline-none"
                 />
-              ))}
+              </label>
             </div>
 
-            <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">רשת חברתית / אתר אינטרנט (אופציונלי)</label>
-            <div className="relative">
-              <span className="pointer-events-none absolute inset-y-0 start-4 flex items-center">
-                <PlacesGlobeIcon />
-              </span>
-              {/* dir=ltr + יישור לימין: הכתובת נכתבת ונקראת נכון (https://), ליד האייקון. */}
-              <input
-                type="text"
-                inputMode="url"
-                dir="ltr"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://"
-                className={`${FIELD_CLASS} pl-4 pr-11 text-right`}
-              />
-            </div>
+            {addError && <ErrorBox>{addError}</ErrorBox>}
 
-            {addError && <p className="mt-3 text-[12.5px] text-red-500">{addError}</p>}
-
-            <button
-              type="button"
-              disabled={adding || checkingDuplicate || !!duplicateOf}
-              onClick={handleAddPlace}
-              className="h-12 rounded-xl text-[15.5px] font-semibold mt-6 w-full text-white disabled:opacity-50"
-              style={{ background: PURPLE_GRADIENT }}
-            >
+            <PrimaryButton className="mt-6" disabled={adding || checkingDuplicate || !!duplicateOf} onClick={handleAddPlace}>
               {adding ? "מוסיפים..." : "הוספת מקום"}
+            </PrimaryButton>
+            <button type="button" onClick={() => setAddOpen(false)} className="mt-2 h-11 w-full text-[14px] font-semibold text-ink-secondary">
+              חזרה לחיפוש
             </button>
           </section>
         )}
@@ -684,54 +854,71 @@ export function CreatePlacePageContent() {
         {selected && (
           <section ref={reviewRef} className="pc-reveal scroll-mt-28">
             {justAdded && (
-              <div className="mb-4 flex items-center gap-2 rounded-card px-3 py-2.5 text-[13.5px] font-semibold" style={{ background: "rgba(124,58,237,0.08)", color: "var(--color-places-purple-dark)" }}>
+              <div className="mb-4 flex items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-[13.5px] font-semibold" style={{ background: "rgba(10,109,254,0.08)", color: BLUE }}>
                 <CheckIcon />
                 הוספנו את המקום! רוצים לספר איך היה לכם?
               </div>
             )}
 
             {/* Place Preview קטן - בלי לחזור על כל פרטי המקום. */}
-            <div className="mb-6 flex items-center gap-3">
-              <span className="h-14 w-14 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {selected.imageUrl && <img src={selected.imageUrl} alt="" className="h-full w-full object-cover" />}
+            <div className="flex items-center gap-3 rounded-[20px] bg-[#F7F8FA] p-3">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-[#EFF1F4] text-[#9aa1ad]">
+                {selected.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selected.imageUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <PinIcon />
+                )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-bold text-ink">{selected.name}</span>
+                <span className="block truncate text-[16px] font-semibold text-ink">{selected.name}</span>
                 <span className="block truncate text-[12.5px] text-ink-secondary">{[selected.city, selected.categoryLabel].filter(Boolean).join(" · ")}</span>
               </span>
-              <button type="button" onClick={handleBack} className="shrink-0 text-[13px] font-semibold" style={{ color: "var(--color-places-purple)" }}>
+              <button type="button" onClick={handleBack} className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[13px] font-semibold text-ink shadow-[0_1px_3px_rgba(15,20,25,0.12)] active:scale-95">
                 שינוי
               </button>
             </div>
 
-            <h2 className="mb-3 text-[20px] font-extrabold text-ink">איך היה לכם?</h2>
-            <div className="mb-6 flex justify-center gap-2" dir="ltr">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} type="button" onClick={() => setRating(star)} aria-label={`${star} כוכבים`}>
-                  <svg width="44" height="44" viewBox="0 0 24 24" fill={star <= rating ? "var(--color-places-purple)" : "none"} stroke="var(--color-places-purple)" strokeWidth="1.5">
-                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" strokeLinejoin="round" />
-                  </svg>
-                </button>
-              ))}
+            <h2 className="mt-7 text-center text-[20px] font-bold tracking-tight text-ink">איך היה לכם?</h2>
+            <div className="mt-3 flex justify-center gap-1.5" dir="ltr">
+              {[1, 2, 3, 4, 5].map((star) => {
+                const on = star <= rating;
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRating(star)}
+                    aria-label={`${star} כוכבים`}
+                    aria-pressed={on}
+                    className="p-0.5 transition active:scale-90"
+                  >
+                    <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d={STAR_PATH} fill={on ? "#F5B301" : "#E6E8EC"} stroke={on ? "#F5B301" : "#E6E8EC"} strokeWidth="1.2" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                );
+              })}
             </div>
+            <p className="mt-1.5 h-5 text-center text-[14px] font-semibold text-ink-secondary" aria-live="polite">
+              {RATING_LABELS[rating]}
+            </p>
 
             {/* נחשף אחרי שנבחר דירוג */}
             {rating > 0 && (
-              <div className="pc-reveal">
-                <label className="mb-1.5 block text-[14px] font-semibold text-ink">ספרו קצת יותר...</label>
+              <div className="pc-reveal mt-5">
+                <FieldLabel>ספרו קצת יותר</FieldLabel>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="מה אהבתם? מה כדאי לדעת לפני שמגיעים?"
                   rows={4}
-                  className="w-full resize-none rounded-card border border-ink-secondary/15 p-3 text-[16px] text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-[color:var(--color-places-purple)]/40"
+                  className="w-full resize-none rounded-[20px] bg-[#F1F2F5] p-4 text-[16px] leading-relaxed text-ink placeholder:text-[#9aa1ad] focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/30"
                 />
 
                 {media.length > 0 && (
-                  <div className="mt-3 grid grid-cols-4 gap-2">
+                  <div className="mt-3 grid grid-cols-4 gap-1.5">
                     {media.map((m) => (
-                      <div key={m.id} className="relative aspect-square overflow-hidden rounded-card bg-bg-secondary">
+                      <div key={m.id} className="relative aspect-square overflow-hidden rounded-[14px] bg-[#EFF1F4]">
                         {m.type === "video" ? (
                           <video src={m.previewUrl} className="h-full w-full object-cover" muted />
                         ) : (
@@ -742,9 +929,9 @@ export function CreatePlacePageContent() {
                           type="button"
                           onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
                           aria-label="הסר"
-                          className="absolute end-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[11px] text-white"
+                          className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm active:scale-90"
                         >
-                          ✕
+                          <CloseIcon />
                         </button>
                       </div>
                     ))}
@@ -752,28 +939,21 @@ export function CreatePlacePageContent() {
                 )}
 
                 <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
-                <button
-                  type="button"
-                  disabled={uploading || media.length >= MAX_MEDIA}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-3 flex items-center gap-2 rounded-pill border px-3.5 py-2 text-[13px] font-semibold disabled:opacity-40"
-                  style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
-                >
-                  <PlacesCameraIcon />
-                  {uploading ? "מעלה..." : "הוסיפו תמונות"}
-                </button>
+                <div className="mt-3">
+                  <ActionRow
+                    icon={<ImageIcon />}
+                    title={uploading ? "מעלה..." : "הוסיפו תמונות"}
+                    subtitle={media.length > 0 ? `${media.length} מתוך ${MAX_MEDIA}` : `עד ${MAX_MEDIA} תמונות או סרטונים`}
+                    disabled={uploading || media.length >= MAX_MEDIA}
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                </div>
 
-                {reviewError && <p className="mt-3 text-[12.5px] text-red-500">{reviewError}</p>}
+                {reviewError && <ErrorBox>{reviewError}</ErrorBox>}
 
-                <button
-                  type="button"
-                  disabled={publishing || uploading}
-                  onClick={handlePublish}
-                  className="h-12 rounded-xl text-[15.5px] font-semibold mt-6 w-full text-white disabled:opacity-40"
-                  style={{ background: PURPLE_GRADIENT }}
-                >
+                <PrimaryButton className="mt-6" disabled={publishing || uploading} onClick={handlePublish}>
                   {publishing ? "מפרסמים..." : "פרסום ביקורת"}
-                </button>
+                </PrimaryButton>
               </div>
             )}
           </section>

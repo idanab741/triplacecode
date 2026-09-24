@@ -17,6 +17,8 @@ interface BottomSheetProps {
 }
 
 const DRAG_CLOSE_THRESHOLD_PX = 100;
+/** גובה האזור שהבר התחתון (MainBottomNav) תופס בתחתית המסך. */
+const BOTTOM_NAV_SPACE_PX = 98;
 
 /**
  * תיקון (בקשה מפורשת - "שיהיה בר תחתון בכל העמודים שבהם מופיע חלון
@@ -28,6 +30,12 @@ const DRAG_CLOSE_THRESHOLD_PX = 100;
  * עכשיו זו ברירת המחדל בשביל כולם, לא חריג בודד. mb (על כרטיס ה-Sheet
  * עצמו, לא על ה-backdrop) משאיר רווח בגובה הבר התחתון כדי שהכרטיס
  * הלבן לא "יתלבש" ויכסה את הבר שעכשיו גלוי מתחתיו.
+ *
+ * *** תיקון (בקשה מפורשת - "הרווח הזה למטה בין הבר התחתון לחלון הקופץ נראה לא טוב"): ה-mb
+ * הזה השאיר פס של ה-backdrop הכהה בין תחתית החלון לבר. עכשיו הכרטיס יורד עד תחתית המסך
+ * ממש (בלי mb), הבר התחתון ממשיך לצוף מעליו (z-50 מעל z-40 של ה-Sheet) - ובמקום ה-mb יש
+ * padding תחתון באותו גובה בתוך הכרטיס, כך שהתוכן והכפתורים של החלון תמיד נגמרים מעל הבר
+ * ולא מוסתרים מאחוריו. הבר נשאר גלוי, ורקע החלון ממלא את כל מה שמסביבו - בלי רווח.
  */
 export function BottomSheet({ onClose, children, zIndex = 40, footer, dark = false }: BottomSheetProps) {
   const [dragY, setDragY] = useState(0);
@@ -64,8 +72,12 @@ export function BottomSheet({ onClose, children, zIndex = 40, footer, dark = fal
   return (
     <div className="fixed inset-0 flex items-end justify-center bg-black/50" style={{ zIndex }} onClick={handleBackdropClick}>
       <div
-        className={`mb-[98px] flex max-h-[calc(90dvh-98px)] w-full max-w-xl flex-col overflow-hidden rounded-t-card ${dark ? "bg-[#141416]" : "bg-bg"}`}
-        style={{ transform: `translateY(${dragY}px)`, transition: dragging ? "none" : "transform 0.2s ease-out" }}
+        className={`flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-card ${dark ? "bg-[#141416]" : "bg-bg"}`}
+        style={{
+          paddingBottom: BOTTOM_NAV_SPACE_PX,
+          transform: `translateY(${dragY}px)`,
+          transition: dragging ? "none" : "transform 0.2s ease-out",
+        }}
       >
         <div
           onPointerDown={handleHandlePointerDown}

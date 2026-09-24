@@ -125,7 +125,8 @@ export default function ContentPage() {
         {/* *** בקשה מפורשת: בעמוד הזה בלבד (רקע כהה) - הלוגו triplace בלבן. */}
         <CollapsibleTopBar logoTone="white" />
 
-        <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-1">
+        {/* *** בקשה מפורשת - "שיהיה רווח קצת בין הבר העליון לכותרת": pt-1 -> pt-7. */}
+        <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-7">
           <div className="mx-auto w-full max-w-sm">
             {/* *** תיקון: הכותרת נשברה באמצע ("triplace" בשורה אחת, "creator's" בשורה הבאה) כי עברית ואנגלית
                 מעורבבות. עכשיו "triplace creator's" הוא יחידה אחת LTR שלא נשברת - תמיד בשורה משלה. */}

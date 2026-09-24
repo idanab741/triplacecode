@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BottomSheet } from "@/components/ui";
+import { BottomSheet, Button } from "@/components/ui";
+import { ActionRow, CheckIcon, PinIcon, PlaneIcon, PlusIcon, RowSkeletons, SearchField } from "@/screens/create/CreateUi";
 import { searchPlaces, type PlaceSearchResult } from "@/services/places/searchService";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
 import type { CollectionType } from "@/services/social/collectionTypes";
@@ -36,27 +37,39 @@ interface TripOption {
 }
 
 function rowClass(added: boolean, dark: boolean) {
-  const hover = dark ? "hover:bg-white/10" : "hover:bg-bg-secondary";
-  return `flex w-full items-center gap-3 rounded-card px-2 py-2.5 text-start ${added ? "opacity-60" : hover}`;
+  const press = dark ? "active:bg-white/10" : "active:bg-[#F1F2F5]";
+  return `flex w-full items-center gap-3 rounded-[16px] px-2 py-2.5 text-start transition ${added ? "" : press}`;
 }
 
-function Thumb({ url, dark }: { url: string | null; dark: boolean }) {
+function Thumb({ url, dark, kind }: { url: string | null; dark: boolean; kind: "place" | "trip" }) {
   return (
-    <span className={`h-12 w-12 shrink-0 overflow-hidden rounded-card ${dark ? "bg-white/10" : "bg-bg-secondary"}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {url && <img src={url} alt="" className="h-full w-full object-cover" />}
+    <span
+      className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] ${
+        dark ? "bg-white/10 text-white/40" : "bg-[#EFF1F4] text-[#9aa1ad]"
+      }`}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : kind === "trip" ? (
+        <PlaneIcon />
+      ) : (
+        <PinIcon />
+      )}
     </span>
   );
 }
 
+/** "+" בעיגול כחול בהיר / "נוסף" עם ✓ - ברור בלי להסתמך על צבע בלבד. */
 function AddedMark({ added }: { added: boolean }) {
   return added ? (
-    <span className="shrink-0 text-[12px] font-bold" style={{ color: "var(--color-places-purple)" }}>
-      ✓ נוסף
+    <span className="flex h-8 shrink-0 items-center gap-1 rounded-full bg-[#0A6DFE] px-2.5 text-[12.5px] font-semibold text-white">
+      <CheckIcon size={14} />
+      נוסף
     </span>
   ) : (
-    <span className="shrink-0 text-[20px] font-bold leading-none" style={{ color: "var(--color-places-purple)" }}>
-      +
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "rgba(10,109,254,0.1)", color: "#0A6DFE" }}>
+      <PlusIcon size={18} />
     </span>
   );
 }
@@ -158,20 +171,23 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
   return (
     <BottomSheet onClose={onClose} dark={dark}>
       <div className="max-h-[80vh] overflow-y-auto px-5 pb-4">
-        <h2 className={`mb-3 text-[17px] font-bold ${textMain}`}>{heading ?? "מה תרצו להוסיף?"}</h2>
-        <input
-          autoFocus
-          value={query}
-          onChange={(e) => (type === "places" ? handlePlaceQuery(e.target.value) : setQuery(e.target.value))}
-          placeholder={placeholder ?? (type === "places" ? "חפשו מקום..." : "חפשו טיול...")}
-          className={`mb-3 w-full rounded-pill border px-4 py-2.5 text-[14px] focus:outline-none ${
-            dark ? "border-white/15 bg-white/10 text-white placeholder:text-white/40" : "border-ink-secondary/20"
-          }`}
-        />
+        <h2 className={`mb-3 text-[20px] font-bold tracking-tight ${textMain}`}>{heading ?? "מה תרצו להוסיף?"}</h2>
+        <div className="mb-2">
+          <SearchField
+            autoFocus
+            dark={dark}
+            value={query}
+            onChange={(value) => (type === "places" ? handlePlaceQuery(value) : setQuery(value))}
+            placeholder={placeholder ?? (type === "places" ? "חפשו מקום..." : "חפשו טיול...")}
+          />
+        </div>
 
         {type === "places" && (
           <>
-            {searching && <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>מחפש...</p>}
+            {placeResults === null && !searching && (
+              <p className={`py-3 text-center text-[13px] ${textSecondary}`}>הקלידו לפחות 2 אותיות כדי לחפש</p>
+            )}
+            {searching && <RowSkeletons dark={dark} />}
             {!searching &&
               placeResults?.map((place) => {
                 const key = formItemKey("place", place.id);
@@ -194,7 +210,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                     }
                     className={rowClass(added, dark)}
                   >
-                    <Thumb url={place.image_urls?.[0] ?? null} dark={dark} />
+                    <Thumb url={place.image_urls?.[0] ?? null} dark={dark} kind="place" />
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{place.name}</span>
                       <span className={`block truncate text-[12px] ${textSecondary}`}>
@@ -206,31 +222,26 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                 );
               })}
             {placeResults !== null && !searching && placeResults.length === 0 && (
-              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>לא מצאנו מקום כזה</p>
+              <p className={`py-4 text-center text-[13px] ${textSecondary}`}>לא מצאנו מקום כזה</p>
             )}
             {onGoAddPlace && (
-              <button
-                type="button"
-                onClick={onGoAddPlace}
-                className="h-12 rounded-xl text-[15.5px] font-semibold mt-3 w-full border"
-                style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
-              >
-                לא מוצאים את המקום? הוסיפו אותו ל־TRIPLACE
-              </button>
+              <div className="mt-3">
+                <ActionRow dark={dark} icon={<PlusIcon />} title="לא מצאתם את המקום?" subtitle="הוסיפו אותו ל-triplace" onClick={onGoAddPlace} />
+              </div>
             )}
           </>
         )}
 
         {type === "trips" && (
           <>
-            {trips === null && <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>טוען את הטיולים שלכם...</p>}
+            {trips === null && <RowSkeletons dark={dark} />}
             {trips !== null && trips.length === 0 && (
-              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>
+              <p className={`py-4 text-center text-[13px] leading-relaxed ${textSecondary}`}>
                 אין עדיין טיולים להוסיף. צרו טיול, או שמרו טיול של מישהו אחר, ואז תוכלו להוסיף אותו כאן.
               </p>
             )}
             {trips !== null && trips.length > 0 && filteredTrips.length === 0 && (
-              <p className={`py-4 text-center text-[12.5px] ${textSecondary}`}>לא נמצא טיול כזה</p>
+              <p className={`py-4 text-center text-[13px] ${textSecondary}`}>לא נמצא טיול כזה</p>
             )}
             {/* *** תיקון (בקשה מפורשת - "עד 3 ברגע נתון, וכמובן גלילה למטה"): הרשימה עצמה מוגבלת
                 לגובה קבוע של 3 שורות (68px לשורה - thumb 48px + ריפוד 10px מכל צד) - לא כל הרשימה
@@ -258,7 +269,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
                       }
                       className={rowClass(added, dark)}
                     >
-                      <Thumb url={trip.imageUrl} dark={dark} />
+                      <Thumb url={trip.imageUrl} dark={dark} kind="trip" />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] font-semibold ${textMain}`}>{trip.title}</span>
                         <span className={`block text-[12px] ${textSecondary}`}>
@@ -274,9 +285,9 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
           </>
         )}
 
-        <button type="button" onClick={onClose} className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 w-full text-white" style={{ background: "var(--color-places-purple)" }}>
+        <Button type="button" fullWidth onClick={onClose} className="mt-4">
           סיום
-        </button>
+        </Button>
       </div>
     </BottomSheet>
   );

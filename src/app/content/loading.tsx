@@ -8,7 +8,7 @@ export default function ContentLoading() {
   return (
     <div className="min-h-screen bg-black pb-24">
       <CollapsibleTopBar logoTone="white" />
-      <div className="mx-auto mt-2 flex max-w-sm flex-col items-center px-6">
+      <div className="mx-auto mt-7 flex max-w-sm flex-col items-center px-6">
         <div className="h-7 w-44 animate-pulse rounded-lg bg-white/10" />
         <div className="mt-2 h-7 w-52 animate-pulse rounded-lg bg-white/10" />
         <div className="mt-3 h-4 w-60 animate-pulse rounded bg-white/[0.06]" />
