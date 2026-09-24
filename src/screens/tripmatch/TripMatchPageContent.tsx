@@ -382,6 +382,23 @@ export function TripMatchPageContent({
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // מקומות שדילגו עליהם (X) - מוסתרים לצמיתות עד שחזור מתוך חלון הסינון.
+  const [skippedCount, setSkippedCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    let cancelled = false;
+    fetch("/api/tripmatch/skipped")
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d: { count?: number }) => {
+        if (!cancelled) setSkippedCount(d.count ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setSkippedCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filtersOpen]);
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
   const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>(restoredDeck?.likedPlaces ?? []);
   const [hasSwipedAny, setHasSwipedAny] = useState(Boolean(restoredDeck && restoredDeck.decidedIds.length > 0));
@@ -693,6 +710,21 @@ export function TripMatchPageContent({
     handleSelectCity({ value: query, label: query, type: "city" }, { immediate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, initialCityQuery, selectedCity, restoredDeck]);
+
+  /** "שחזור כל המקומות ואיפוס" (בקשה מפורשת): מחזיר את כל המקומות שדילגו עליהם, מאפס סינונים
+   *  ועיגולי קטגוריה, וטוען את החפיסה מחדש ליעד הנוכחי. */
+  async function handleRestoreSkipped() {
+    const res = await fetch("/api/tripmatch/skipped", { method: "DELETE" });
+    if (!res.ok) {
+      setError("לא הצלחנו לשחזר את המקומות, נסו שוב");
+      return;
+    }
+    setSkippedCount(0);
+    setFiltersOpen(false);
+    setActiveCategoryFilters([]);
+    if (deckCacheKey) clearDeck(deckCacheKey);
+    await handleBrowseAll(selectedCity ?? undefined);
+  }
 
   function handleEditDestination() {
     // *** תיקון (Home - מוטמע): כש-embedded=true, שורת החיפוש של Home
@@ -2165,6 +2197,8 @@ export function TripMatchPageContent({
           onClose={() => setFiltersOpen(false)}
           preferredTags={[...(userPreferences?.interests ?? []), ...(userPreferences?.culinaryStyles ?? [])]}
           resultCount={visibleCandidates.length}
+          skippedCount={skippedCount}
+          onRestoreSkipped={handleRestoreSkipped}
         />
       )}
 

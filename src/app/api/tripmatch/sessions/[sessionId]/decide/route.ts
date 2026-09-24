@@ -84,6 +84,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ ses
     }
   } else {
     await recordTripMatchDecision(supabase, sessionId, placeId, liked);
+    // *** חדש (בקשה מפורשת - "מקום שהחלקתי X לא יחזור לבד, רק דרך שחזור בסינון"): הדילוג נשמר לצמיתות
+    // (favorites, status=skipped, source=tripmatch) ומוחרג מכל חפיסה עתידית עד ששוחזר. ignoreDuplicates -
+    // לעולם לא דורס לייק/שמירה קיימים של אותו מקום (יש רק שורה אחת למקום לכל משתמש).
+    const { data: tripaddRow } = await supabase.from("tripadd_submissions").select("id").eq("id", placeId).maybeSingle();
+    await supabase
+      .from("favorites")
+      .upsert(
+        { user_id: user.id, place_id: placeId, place_type: tripaddRow ? "tripadd" : "place", status: "skipped", source: "tripmatch" },
+        { onConflict: "user_id,place_id", ignoreDuplicates: true }
+      )
+      .then(() => undefined, () => undefined);
   }
 
   // *** חדש (בקשה מפורשת - "מדויק ומיידי"): הלקוח מחזיק חפיסה קבועה ולא

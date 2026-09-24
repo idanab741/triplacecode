@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import { BottomSheet } from "@/components/ui";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
@@ -65,6 +65,10 @@ interface FiltersSheetProps {
   /** כמות המקומות שמתאימים לפילטרים הנוכחיים (visibleCandidates.length
    *  מהעמוד) - מוצגת על כפתור "הצג N מקומות". לא מועבר = "הצג תוצאות". */
   resultCount?: number;
+  /** כמה מקומות מוסתרים כי המשתמש דילג עליהם (X). null = עוד נטען. */
+  skippedCount?: number | null;
+  /** שחזור כל המקומות שדילגו עליהם + איפוס החפיסה והסינונים */
+  onRestoreSkipped?: () => Promise<void> | void;
 }
 
 const PRICE_LABELS = ["חינם", "₪", "₪₪", "₪₪₪"];
@@ -76,7 +80,8 @@ const RATING_OPTIONS = [3, 4, 4.5];
  *  *** תיקון: לפני זה הרשימה מוינה רק לפי שכיחות בין המועמדים, בלי
  *  שום קשר להעדפות שהמשתמש כבר ענה עליהן באונבורדינג - עכשיו תגיות
  *  שמופיעות גם בפרופיל ההעדפות שלו קופצות ראשונות ומסומנות ⭐. */
-export function FiltersSheet({ candidates, filters, onChange, onClose, preferredTags = [], resultCount }: FiltersSheetProps) {
+export function FiltersSheet({ candidates, filters, onChange, onClose, preferredTags = [], resultCount, skippedCount, onRestoreSkipped }: FiltersSheetProps) {
+  const [restoring, setRestoring] = useState(false);
   const availableTags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of candidates) {
@@ -277,6 +282,40 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
             </div>
           </section>
         )}
+
+        {/* *** חדש (בקשה מפורשת - "שורה בסינון שמשחזרת מקומות ומאתחלת את הכל"): מקום שדילגו עליו (X)
+            לא חוזר לבד לחפיסה - רק מכאן. השחזור מחזיר את כולם, מאפס את הסינונים וטוען את החפיסה מחדש. */}
+        {onRestoreSkipped && (
+          <section className="rounded-2xl bg-bg-secondary p-4">
+            <SectionHeader
+              icon={<RestoreIcon />}
+              title="מקומות שדילגתי"
+              hint={
+                skippedCount == null
+                  ? "בודקים..."
+                  : skippedCount === 0
+                    ? "לא דילגתם על אף מקום"
+                    : `${skippedCount} ${skippedCount === 1 ? "מקום מוסתר" : "מקומות מוסתרים"} - לא יחזרו לבד`
+              }
+            />
+            <button
+              type="button"
+              disabled={restoring || !skippedCount}
+              onClick={async () => {
+                setRestoring(true);
+                try {
+                  await onRestoreSkipped();
+                } finally {
+                  setRestoring(false);
+                }
+              }}
+              className="h-11 w-full rounded-xl bg-white text-[14px] font-semibold ring-1 ring-ink-secondary/15 transition active:scale-[0.98] disabled:opacity-50"
+              style={{ color: BRAND_TEXT }}
+            >
+              {restoring ? "משחזרים..." : "שחזור כל המקומות ואיפוס"}
+            </button>
+          </section>
+        )}
       </div>
     </BottomSheet>
   );
@@ -287,6 +326,15 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
 const BRAND_GRADIENT = "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))";
 const BRAND_TEXT = "var(--color-primary-end)";
 const TINT = "#eaf3ff";
+
+function RestoreIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
 
 function SectionHeader({ icon, title, hint }: { icon: ReactNode; title: string; hint?: string }) {
   return (

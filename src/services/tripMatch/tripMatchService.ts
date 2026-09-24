@@ -207,11 +207,12 @@ async function fetchTripAddCandidates(
   const EXCLUSION_TTL_DAYS = 14;
   const exclusionCutoffIso = new Date(Date.now() - EXCLUSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const excluded = new Set([...session.liked_place_ids, ...session.rejected_place_ids]);
+  // לייק/שמירה - מוסתרים 14 יום. דילוג (X) ב-TripMatch - מוסתר עד ששוחזר ידנית ("מקומות שדילגתי" בסינון).
   const { data: pastDecisions } = await supabase
     .from("favorites")
-    .select("place_id")
+    .select("place_id, status, source, created_at")
     .eq("user_id", session.user_id)
-    .gte("created_at", exclusionCutoffIso);
+    .or(`created_at.gte."${exclusionCutoffIso}",and(status.eq.skipped,source.eq.tripmatch)`);
   for (const row of pastDecisions ?? []) excluded.add(row.place_id as string);
 
   const { data, error } = await query.order("created_at", { ascending: false }).limit(limit * 3);
