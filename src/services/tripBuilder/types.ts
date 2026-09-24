@@ -220,6 +220,12 @@ tripTypeTags: string[];
    *  Google הנפרד (tripadd_submissions.google_rating), null אם עוד לא הושלם ע"י tripAddEnrichmentService. */
   googleRating?: number | null;
   googleRatingCount?: number | null;
+  /** אחוז התאמה אישי למשתמש (TripMatch - ר' services/tripMatch/matchScore.ts) */
+  matchPercent?: number;
+  /** עד 2 סיבות קצרות בעברית למה זה מתאים ("תואם לטעם שלך: ...") */
+  matchReasons?: string[];
+  /** false כשאין עדיין מספיק מידע אישי - האחוז מבוסס רק על איכות וקרבה */
+  matchPersonalized?: boolean;
 }
 
 export interface FinalItineraryStop {

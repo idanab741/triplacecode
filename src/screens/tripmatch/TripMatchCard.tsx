@@ -5,20 +5,16 @@ import type { CSSProperties, ReactNode } from "react";
 import { getCategoryLabel, hasHebrewLabel } from "@/utils/categoryLabels";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
 
-const MAX_REASONABLE_DRIVING_KM = 400; // מעבר לזה, "X דק' נסיעה" כבר לא כנה - צריך טיסה
 
-/** גודל הכפתור הגדול (X / לב) - px. */
-export const TRIPMATCH_MAIN_BUTTON_SIZE = 98; // הוגדל ב-25% (בקשה מפורשת): 78 -> 98
+/** גודל הכפתור הגדול (לב) - px. */
+export const TRIPMATCH_MAIN_BUTTON_SIZE = 72;
 
-/** *** שונה (בקשה מפורשת - "תכניס את הכפתורים לתוך הקצה התחתון של
- *  הכרטיסייה"): לפני זה היה שטח שמור *מתחת* לכרטיס (הכפתורים רכבו
- *  חצי-חצי על הקצה התחתון שלו). עכשיו הכרטיס תופס 100% מגובה ההורה שלו
- *  (חלק מ"הכרטיסייה תתארך עד קצה העמוד") והכפתורים יושבים *לגמרי בתוך*
- *  הכרטיס, קרוב לקצה התחתון שלו - הערך הזה הוא המרחק (px) בין הקצה
- *  התחתון של שורת הכפתורים לקצה התחתון של הכרטיס. page.tsx משתמש באותו
- *  מספר בדיוק (מיובא מכאן) למיקום שורת הכפתורים - כדי שהכל יתיישר לאותו
- *  קו. */
-export const TRIPMATCH_CARD_BUTTON_ZONE = 24;
+/** *** עיצוב חדש (בקשה מפורשת - "תעצב כמו בדוגמה"): שורת הכפתורים יושבת *מתחת* לכרטיס (לא בתוכו) -
+ *  זה הגובה (px) שנשמר לה בתחתית אזור ה-Deck. הכרטיסים תופסים את כל השאר. */
+export const TRIPMATCH_BUTTON_ROW = 96;
+
+/** @deprecated נשמר לתאימות - הכפתורים כבר לא בתוך הכרטיס */
+export const TRIPMATCH_CARD_BUTTON_ZONE = 0;
 
 /** צד הכרטיס שלחיצה עליו מחליפה תמונה - כל צד תופס 30% מהרוחב, האמצע
  *  (40%) פותח את עמוד המקום. */
@@ -55,6 +51,10 @@ interface TripMatchCardProps {
    *  טהור (CARD_BOX_STYLE מ-page.tsx, עם aspect-ratio) - לא קואורדינטות
    *  מחושבות ב-JS. React.CSSProperties כדי לקבל כל מה שיש בו כמו שהוא. */
   centerBox?: CSSProperties | null;
+  /** אחוז התאמה אישי + סיבות (ר' services/tripMatch/matchScore.ts) */
+  match?: { percent: number; reasons: string[]; personalized: boolean } | null;
+  /** חצי-עיגול בתחתית סביב גלובוס ה-Bottom Nav - רק כשהכרטיס נוגע בבר (לא בעיצוב הנוכחי) */
+  notch?: boolean;
 }
 
 const TAG_LABELS: Record<string, string> = {
@@ -98,14 +98,49 @@ function deriveTags(candidate: CandidatePlace): string[] {
   return Array.from(new Set([...baseTags, ...contentTags, ...badgeTags])).slice(0, 4);
 }
 
-/** מרחק/זמן נסיעה - "🚗 X דק'" קרוב, "✈️ X ק"מ" רחוק מדי לנסיעה, כלום אם
- *  אין מרחק בכלל (למשל טרם זוהה מיקום המשתמש). */
-function DistanceBadge({ candidate }: { candidate: CandidatePlace }) {
+/** טבעת אחוז ההתאמה (בהשראת הדוגמה) - ירוק להתאמה גבוהה, כחול המותג לבינונית, צהוב לנמוכה. */
+function MatchRing({ percent, personalized }: { percent: number; personalized: boolean }) {
+  const size = 62;
+  const stroke = 5;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const color = percent >= 85 ? "#3ec28f" : percent >= 70 ? "#4a9eff" : "#ffc94d";
+  return (
+    <div
+      className="relative flex shrink-0 items-center justify-center rounded-full bg-black/35 backdrop-blur-md"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={`${percent}% התאמה ${personalized ? "אישית" : "כללית"}`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0" aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={`${(percent / 100) * c} ${c}`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div className="relative flex flex-col items-center leading-none">
+        <span className="text-[17px] font-extrabold tabular-nums text-white" dir="ltr">
+          {percent}%
+        </span>
+        <span className="mt-[3px] text-[9.5px] font-semibold text-white/85">{personalized ? "התאמה" : "כללית"}</span>
+      </div>
+    </div>
+  );
+}
+
+function formatDistance(candidate: CandidatePlace): string | null {
   if (candidate.distanceKm <= 0) return null;
-  if (candidate.distanceKm <= MAX_REASONABLE_DRIVING_KM) {
-    return <span>🚗 {candidate.etaMinutes} דק&apos;</span>;
-  }
-  return <span>✈️ {Math.round(candidate.distanceKm).toLocaleString()} ק&quot;מ</span>;
+  if (candidate.distanceKm < 1) return `${Math.round(candidate.distanceKm * 1000)} מ׳`;
+  if (candidate.distanceKm < 10) return `${candidate.distanceKm.toFixed(1)} ק״מ`;
+  return `${Math.round(candidate.distanceKm).toLocaleString()} ק״מ`;
 }
 
 /**
@@ -119,8 +154,9 @@ function DistanceBadge({ candidate }: { candidate: CandidatePlace }) {
  * ב-tripmatch/page.tsx, מעל ה-SwipeCard אבל לא בתוכו, כך שהם לא זזים
  * עם ה-transform שלו בזמן גרירה. ר' הערה שם.
  */
-export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, imageIndex = 0, centerBox = null }: TripMatchCardProps) {
-  const tags = deriveTags(candidate);
+export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, imageIndex = 0, centerBox = null, match = null, notch = false }: TripMatchCardProps) {
+  const tags = deriveTags(candidate).slice(0, 3);
+  const distance = formatDistance(candidate);
   const images = candidate.imageUrls;
   const safeIndex = Math.min(Math.max(imageIndex, 0), Math.max(images.length - 1, 0));
 
@@ -154,16 +190,18 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד חישוב JS - centerBox
       // הוא עכשיו CSS style object טהור (CARD_BOX_STYLE, עם aspect-ratio)
       // שמוחלת כמו שהיא, בלי לפרק/להרכיב מחדש left/top/width/height.
-      className={`absolute overflow-hidden ${centerBox ? "rounded-[28px]" : "rounded-t-[28px] rounded-b-none"} border-[2px] border-white shadow-[0_18px_40px_rgba(16,24,40,0.22)]`}
+      className="absolute overflow-hidden rounded-[28px] border-[3px] border-white bg-white shadow-[0_22px_48px_-12px_rgba(16,24,40,0.35)]"
       style={{
         ...(centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }),
-        // חצי-עיגול בתחתית הכרטיס שעוטף את גלובוס ה-tripmatch שבולט מעל הבר הצף. הגאומטריה תואמת ל-
-        // BottomNav (גלובוס 64px שמרכזו ~12px מתחת לראש הבר) ולמרווח של 12px בין הכרטיס לבר
-        // (TripMatchPageContent) - מרכז העיגול 24px מתחת לתחתית הכרטיס, רדיוס 38px (6px אוויר סביב).
-        WebkitMaskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
-        maskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
+        // חצי-עיגול בתחתית הכרטיס סביב גלובוס ה-tripmatch - רק כשהכרטיס נוגע בבר התחתון (notch).
+        ...(notch
+          ? {
+              WebkitMaskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
+              maskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+            }
+          : null),
       }}
     >
       <div className="absolute inset-0 bg-bg-secondary">
@@ -185,7 +223,8 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
           עולה גבוה יותר בכרטיס (התחנה בה הוא כבר שקוף לגמרי - 58% -> 78% מגובה הכרטיס) ומתחיל כהה יותר
           גם למעלה (0.2 בקצה העליון, היה 0) - כדי שפינת ה-pill של שם העיר (top-[26px]) תמיד תישאר קריאה,
           גם מעל תמונה בהירה (שמיים/חוף). */}
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(10,12,20,0.9)_0%,rgba(10,12,20,0.62)_40%,rgba(10,12,20,0.2)_68%,rgba(10,12,20,0)_78%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(8,10,18,0.88)_0%,rgba(8,10,18,0.55)_32%,rgba(8,10,18,0.12)_55%,rgba(8,10,18,0)_65%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[linear-gradient(to_bottom,rgba(8,10,18,0.35),rgba(8,10,18,0))]" />
 
       {/* *** חדש (בקשה מפורשת - גלריית תמונות בתוך הכרטיס): פסי התקדמות
           בסגנון סטוריז בראש הכרטיס - פס לכל תמונה, המוצגת כרגע מודגשת.
@@ -211,13 +250,12 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
         {matchIndex}/{matchTotal}
       </div>
 
-      {/* Pill: מיקום - קבוע פיזית בצד ימין */}
-      <div className="absolute right-4 top-[26px] flex items-center gap-1 rounded-full bg-black/45 px-3 py-1.5 text-[13px] font-bold text-white backdrop-blur-md">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
-          <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
-        </svg>
-        <span className="max-w-[120px] truncate">{cityLabel}</span>
-      </div>
+      {/* Pill: קטגוריה - קבוע פיזית בצד ימין (המיקום עבר לשורת המידע למטה, כמו בדוגמה) */}
+      {tags[0] && (
+        <div className="absolute right-4 top-[26px] max-w-[55%] truncate rounded-full bg-black/40 px-3 py-1.5 text-[12.5px] font-bold text-white backdrop-blur-md">
+          {tags[0]}
+        </div>
+      )}
 
       {/* תוכן תחתון - שם/תיאור/מטא-דאטה/תגיות, עברי-כתב לבן על התמונה.
           *** שונה (בקשה מפורשת - "תכניס את הכפתורים לתוך הקצה התחתון"):
@@ -225,77 +263,86 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
           בתוך הכרטיס עכשיו, מ-24px עד 122px מהתחתית (ZONE + SIZE).
           ה-padding גדל בהתאם (היה 60px) כדי שהטקסט/התגיות תמיד יישארו
           מעל שורת הכפתורים, לא מתחתיה. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 px-[18px] pb-[140px] text-white">
-        {/* *** שוחזר (בקשה מפורשת - "איפה הדירוג/המרחק/הקטגוריות/התיאור? אני דורש שיהיה"): שני דירוגים
-            נפרדים (triplace - ממוצע ביקורות קהילתי, ו-Google), מרחק מהמיקום הנוכחי, תיאור (Google
-            editorialSummary, ר' tripAddEnrichmentService.ts), ולפחות 3 תגיות אמיתיות (candidate.tags,
-            ר' tripMatchService.ts) - הכל ממקורות אמיתיים, שום דבר לא מומצא. שדה חסר לגמרי (למשל תיאור
-            שעוד לא הושלם) פשוט לא מוצג, לא מוחלף בפלייסהולדר מזויף. */}
-        <h2 className="text-[26px] font-extrabold leading-tight tracking-tight drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)]">{candidate.name}</h2>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end gap-3 px-[18px] pb-[18px] text-white">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {/* *** עיצוב חדש (בהשראת הדוגמה): שם גדול, מתחתיו שורת מיקום · מרחק, ואז דירוגים, סיבת ההתאמה
+              ותגיות. כל הנתונים מהמקורות האמיתיים הקודמים - שדה חסר פשוט לא מוצג. */}
+          <h2 className="text-[26px] font-extrabold leading-[1.1] tracking-tight drop-shadow-[0_1px_8px_rgba(0,0,0,0.35)]">{candidate.name}</h2>
 
-        {candidate.shortDescription && (
-          <p className="line-clamp-2 max-w-[300px] text-[13.5px] leading-relaxed text-white/92">{candidate.shortDescription}</p>
-        )}
+          {(cityLabel || distance) && (
+            <div className="flex min-w-0 items-center gap-1.5 text-[13.5px] font-semibold text-white/90">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B6B" aria-hidden="true" className="shrink-0">
+                <path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z" />
+              </svg>
+              <span className="truncate">{[cityLabel, distance].filter(Boolean).join(" • ")}</span>
+            </div>
+          )}
 
-        {/* *** שדרוג (בקשה מפורשת - "להתאים לעיצוב שלנו"): שורת המידע נקייה - כל פריט (triplace / Google /
-            מרחק) עם אייקון משלו, מופרדים בנקודה עדינה. קודם הופיעו קווים "|" יתומים בתחילת/סוף השורה
-            כשהיא נשברה לשתי שורות. */}
-        {(() => {
-          const star = (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
-              <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
-            </svg>
-          );
-          const items: { key: string; node: ReactNode }[] = [];
-          if (candidate.rating != null)
-            items.push({
-              key: "triplace",
-              node: (
-                <>
-                  {star}
-                  <span className="tabular-nums">{candidate.rating.toFixed(1)}</span>
-                  <span className="font-medium text-white/80">triplace{candidate.ratingCount != null ? ` (${candidate.ratingCount})` : ""}</span>
-                </>
-              ),
-            });
-          if (candidate.googleRating != null)
-            items.push({
-              key: "google",
-              node: (
-                <>
-                  {star}
-                  <span className="tabular-nums">{candidate.googleRating.toFixed(1)}</span>
-                  <span className="font-medium text-white/80">
-                    Google{candidate.googleRatingCount != null ? ` (${candidate.googleRatingCount.toLocaleString()})` : ""}
+          {(() => {
+            const star = (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFC94A" aria-hidden="true">
+                <path d="M12 2l2.9 6.9L22 9.6l-5.5 5 1.6 7.4L12 18.6 5.9 22l1.6-7.4L2 9.6l7.1-.7L12 2Z" />
+              </svg>
+            );
+            const items: { key: string; node: ReactNode }[] = [];
+            if (candidate.googleRating != null)
+              items.push({
+                key: "google",
+                node: (
+                  <>
+                    {star}
+                    <span className="tabular-nums">{candidate.googleRating.toFixed(1)}</span>
+                    <span className="font-medium text-white/75">Google{candidate.googleRatingCount != null ? ` (${candidate.googleRatingCount.toLocaleString()})` : ""}</span>
+                  </>
+                ),
+              });
+            if (candidate.rating != null)
+              items.push({
+                key: "triplace",
+                node: (
+                  <>
+                    {star}
+                    <span className="tabular-nums">{candidate.rating.toFixed(1)}</span>
+                    <span className="font-medium text-white/75">triplace{candidate.ratingCount != null ? ` (${candidate.ratingCount})` : ""}</span>
+                  </>
+                ),
+              });
+            if (items.length === 0) return null;
+            return (
+              <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] font-bold">
+                {items.map((item) => (
+                  <span key={item.key} className="flex items-center gap-1 whitespace-nowrap">
+                    {item.node}
                   </span>
-                </>
-              ),
-            });
-          if (candidate.distanceKm > 0) items.push({ key: "distance", node: <DistanceBadge candidate={candidate} /> });
-          if (items.length === 0) return null;
-          return (
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold">
-              {items.map((item, i) => (
-                <span key={item.key} className="flex items-center gap-1 whitespace-nowrap">
-                  {i > 0 && <span aria-hidden="true" className="me-1 h-1 w-1 rounded-full bg-white/60" />}
-                  {item.node}
+                ))}
+              </div>
+            );
+          })()}
+
+          {candidate.shortDescription && <p className="line-clamp-2 text-[13px] leading-snug text-white/88">{candidate.shortDescription}</p>}
+
+          {match && match.reasons.length > 0 && (
+            <div className="mt-0.5 flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[12px] font-bold text-white backdrop-blur-md">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#FFD66B" aria-hidden="true" className="shrink-0">
+                <path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z" />
+              </svg>
+              <span className="truncate">{match.reasons[0]}</span>
+            </div>
+          )}
+
+          {tags.length > 1 && (
+            <div className="flex max-h-7 flex-wrap gap-1.5 overflow-hidden">
+              {tags.slice(1).map((tag) => (
+                <span key={tag} className="h-fit shrink-0 rounded-full border border-white/25 px-2.5 py-0.5 text-[11.5px] font-semibold text-white/95">
+                  {tag}
                 </span>
               ))}
             </div>
-          );
-        })()}
+          )}
+        </div>
 
-        {tags.length > 0 && (
-          <div className="mt-1 flex max-h-16 flex-wrap gap-1.5 overflow-hidden">
-            {tags.map((tag) => (
-              <span key={tag} className="h-fit shrink-0 rounded-full bg-white/20 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        {match && <MatchRing percent={match.percent} personalized={match.personalized} />}
       </div>
-
     </div>
   );
 }
