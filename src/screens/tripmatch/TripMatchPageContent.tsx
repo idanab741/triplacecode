@@ -24,6 +24,7 @@ import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import dynamic from "next/dynamic";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
+import { toTripAddCategory } from "@/services/tripMatch/matchScore";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
@@ -200,27 +201,15 @@ export function TripMatchPageContent({
     setActiveCategoryFilters((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   }
   function matchesQuickCategoryFilter(candidate: CandidatePlace, id: HomeQuickCategoryId): boolean {
-    switch (id) {
-      case "attraction":
-        return candidate.category === "attractions";
-      case "food":
-        return candidate.category === "restaurants";
-      case "nightlife":
-        return candidate.category === "nightlife";
-      case "nature":
-        return candidate.category === "nature";
-      case "sleep":
-        return candidate.category === "hotels";
-      case "shopping":
-        // *** אין (עדיין) מקומות עם category="shopping" עצמו - "שופינג"
-        // קיים היום רק כתגית (trip_type_tags/tags) בשאר האפליקציה, לכן
-        // הסינון כאן לפי חפיפת תגית, לא לפי עמודת category.
-        return new Set([...candidate.tripTypeTags, ...candidate.cuisineTags, ...(candidate.tags ?? [])]).has(
-          "shopping"
-        );
-      default:
-        return false;
+    // *** תיקון (באג - "מסעדה שלא מופיעה בפילטר של מסעדות"): הכרטיסים מגיעים עם קטגוריות TripAdd
+    // (food/attraction/nature/nightlife/sleep/shopping) - בדיוק אותם מזהים כמו עיגולי הסינון. ההשוואה
+    // הישנה בדקה מול שמות המאגר הישן (restaurants/attractions/hotels) ולכן מסעדות, אטרקציות, לינה
+    // ושופינג אף פעם לא עברו את הסינון. toTripAddCategory מקבל את שני הפורמטים (גם חפיסות ישנות).
+    if (toTripAddCategory(candidate.category) === id) return true;
+    if (id === "shopping") {
+      return new Set([...candidate.tripTypeTags, ...candidate.cuisineTags, ...(candidate.tags ?? [])]).has("shopping");
     }
+    return false;
   }
 
   // "אחר" - בחירה ידנית של תתי-קטגוריות מתוך כל 19 האפשרויות (התאמות אישיות),
