@@ -201,7 +201,16 @@ export function PostMediaViewerModal({
           >
             {current.type === "video" ? (
               // eslint-disable-next-line jsx-a11y/media-has-caption
-              <video src={current.url} controls className="h-full w-full object-cover" />
+              <video
+                key={current.url}
+                src={current.url}
+                poster={current.thumbnailUrl ? optimizeImage(current.thumbnailUrl, 720) : undefined}
+                controls
+                autoPlay
+                playsInline
+                preload="metadata"
+                className="h-full w-full bg-black object-contain"
+              />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={optimizeImage(current.url, 720, { quality: 80 })} alt="" decoding="async" className="h-full w-full object-cover" draggable={false} />

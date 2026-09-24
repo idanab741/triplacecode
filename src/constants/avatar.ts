@@ -7,11 +7,13 @@ import { optimizeImage } from "@/utils/imageUrl";
  * הקובץ עצמו נמצא ב-public/avatars/default-avatar.png כדי שיוגש כנכס
  * סטטי ישירות מה-CDN/שרת ה-Next.js.
  */
-export const DEFAULT_AVATAR_URL = "/avatars/default-avatar-v2.png";
+/** *** בקשה מפורשת ("תמונת הפרופיל הריקה - מסגרת דקה, שתיראה כמו תמונה"): SVG חדש - רקע אפור-בהיר מלא,
+ *  דמות אפורה רכה ומסגרת דקה בהיקף. וקטורי, אז חד בכל גודל ושוקל פחות מ-1KB. */
+export const DEFAULT_AVATAR_URL = "/avatars/default-avatar-v3.svg";
 
 /** *** בקשה מפורשת: תמונת הפרופיל הגנרית הוחלפה (אפורה במקום הכחולה). משתמש שנשמרה אצלו
  *  במפורש הכתובת של התמונה הכחולה הישנה - מקבל גם הוא את החדשה. */
-const LEGACY_DEFAULT_AVATAR_URLS = ["/avatars/default-avatar.png"];
+const LEGACY_DEFAULT_AVATAR_URLS = ["/avatars/default-avatar.png", "/avatars/default-avatar-v2.png"];
 
 /**
  * מחזיר את כתובת התמונה בפועל להצגה: התמונה שהמשתמש העלה אם קיימת,

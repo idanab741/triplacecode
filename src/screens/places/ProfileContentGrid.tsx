@@ -50,7 +50,9 @@ async function fetchTiles(username: string, kind: ProfileContentFilter, cursor?:
 export function ProfileTile({ tile }: { tile: ProfileTileDto }) {
   const content = (
     <>
-      {tile.imageUrl ? (
+      {!tile.imageUrl && tile.videoUrl ? (
+        <video src={`${tile.videoUrl}#t=0.1`} preload="metadata" muted playsInline className="pointer-events-none h-full w-full object-cover" />
+      ) : tile.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={optimizeImage(tile.imageUrl, 160)} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
       ) : (

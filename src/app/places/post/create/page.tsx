@@ -44,6 +44,9 @@ export default function CreatePostPage() {
   const [place, setPlace] = useState<{ id: string; name: string } | null>(null);
   const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** *** מיידי (בקשה מפורשת - "העלאת סרטון לוקחת יותר מדי זמן ולא נטען בסוף"): הקבצים מוצגים מיד כשבוחרים
+   *  אותם, עם סימן העלאה - ולא רק אחרי שכל ההעלאה הסתיימה. */
+  const [pending, setPending] = useState<{ key: string; previewUrl: string; isVideo: boolean }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,18 +82,26 @@ export default function CreatePostPage() {
 
     setUploading(true);
     setError(null);
+    const previews = selected.map((file, i) => {
+      const previewUrl = URL.createObjectURL(file);
+      previewUrlsRef.current.push(previewUrl);
+      return { key: `${Date.now()}-${i}`, previewUrl, isVideo: file.type.startsWith("video/") };
+    });
+    setPending((prev) => [...prev, ...previews]);
     try {
       const supabase = createClient();
       const uploaded = await uploadMultipleSocialMedia(supabase, user.id, selected);
-      const withPreview = uploaded.map((m, i) => {
-        const previewUrl = URL.createObjectURL(selected[i]);
-        previewUrlsRef.current.push(previewUrl);
-        return { ...m, previewUrl };
-      });
-      setMedia((prev) => [...prev, ...withPreview]);
+      setMedia((prev) => [...prev, ...uploaded.map((m, i) => ({ ...m, previewUrl: previews[i].previewUrl }))]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בהעלאת המדיה");
+      const message = err instanceof Error ? err.message : "";
+      setError(
+        /size|exceeded|too large|413/i.test(message)
+          ? "הקובץ גדול מדי. נסו סרטון קצר יותר (עד דקה)."
+          : "ההעלאה נכשלה. בדקו את החיבור ונסו שוב."
+      );
     } finally {
+      const keys = new Set(previews.map((p) => p.key));
+      setPending((prev) => prev.filter((p) => !keys.has(p.key)));
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -242,15 +253,15 @@ export default function CreatePostPage() {
         />
 
         {/* MEDIA */}
-        {media.length > 0 && (
-          <div className={`mt-2 grid gap-2 ${media.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
+        {media.length + pending.length > 0 && (
+          <div className={`mt-2 grid gap-2 ${media.length + pending.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
             {media.map((m, index) => (
               <div
                 key={m.id}
-                className={`relative overflow-hidden rounded-card bg-bg-secondary ${media.length === 1 ? "aspect-[4/3]" : "aspect-square"}`}
+                className={`relative overflow-hidden rounded-card bg-bg-secondary ${media.length + pending.length === 1 ? "aspect-[4/3]" : "aspect-square"}`}
               >
                 {m.type === "video" ? (
-                  <video src={m.previewUrl} className="h-full w-full object-cover" muted playsInline />
+                  <video src={`${m.previewUrl}#t=0.1`} preload="metadata" className="h-full w-full object-cover" muted playsInline />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
@@ -286,6 +297,23 @@ export default function CreatePostPage() {
                     ←
                   </button>
                 )}
+              </div>
+            ))}
+            {pending.map((p) => (
+              <div
+                key={p.key}
+                className={`relative overflow-hidden rounded-card bg-bg-secondary ${media.length + pending.length === 1 ? "aspect-[4/3]" : "aspect-square"}`}
+              >
+                {p.isVideo ? (
+                  <video src={`${p.previewUrl}#t=0.1`} preload="metadata" className="h-full w-full object-cover" muted playsInline />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.previewUrl} alt="" className="h-full w-full object-cover" />
+                )}
+                <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/35 text-[12.5px] font-semibold text-white">
+                  <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-white/40 border-t-white" />
+                  {p.isVideo ? "מעלה סרטון..." : "מעלה..."}
+                </span>
               </div>
             ))}
           </div>

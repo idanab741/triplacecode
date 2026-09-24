@@ -7,6 +7,8 @@ import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import { getAvatarUrl } from "@/constants/avatar";
 import { PostMediaViewerModal } from "./PostMediaViewerModal";
+import { FeedVideo } from "./FeedVideo";
+import { ReelViewer } from "./ReelViewer";
 import { PostInlineComments } from "./PostInlineComments";
 import { PostLikersStrip } from "./PostLikersStrip";
 import { ShareToFriendsSheet, type ShareOption } from "./ShareToFriendsSheet";
@@ -134,12 +136,18 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   const [busy, setBusy] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  /** סרטון פתוח בתצוגה המלאה (כמו רילס) - אינדקס המדיה. */
+  const [reelIndex, setReelIndex] = useState<number | null>(null);
   const [commentsExpanded, setCommentsExpanded] = useState(defaultCommentsOpen);
   const [shareOpen, setShareOpen] = useState(false);
   /** עולה אחרי כל לייק/ביטול לייק שהשרת אישר - מרענן את עיגולי המגיבים. */
   const [likersRefresh, setLikersRefresh] = useState(0);
 
   function openViewer(index: number) {
+    if (item.media[index]?.type === "video") {
+      setReelIndex(index);
+      return;
+    }
     setViewerIndex(index);
     setViewerOpen(true);
   }
@@ -348,7 +356,17 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
         )}
 
         {/* מדיה */}
-        {media.length > 0 && (
+        {media.length === 1 && media[0].type === "video" && (
+          <FeedVideo
+            url={media[0].url}
+            thumbnailUrl={media[0].thumbnailUrl}
+            width={media[0].width}
+            height={media[0].height}
+            onOpen={() => setReelIndex(0)}
+          />
+        )}
+
+        {media.length > 0 && !(media.length === 1 && media[0].type === "video") && (
           <div
             className={`mt-2.5 grid gap-0.5 overflow-hidden rounded-2xl border border-black/[0.08] ${
               media.length === 1 ? "aspect-[4/3] grid-cols-1" : "aspect-[16/10] grid-cols-2"
@@ -364,16 +382,28 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
                   aria-label={`פתח מדיה ${i + 1}`}
                   className={`relative overflow-hidden bg-bg-secondary ${media.length === 3 && i === 0 ? "row-span-2" : ""}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    // *** ביצועים: מוקטנת בשרת לגודל המשבצת (במקום קובץ המקור של כמה MB)
-                    src={optimizeImage(m.type === "video" ? (m.thumbnailUrl ?? m.url) : m.url, media.length === 1 ? 420 : 220)}
-                    decoding="async"
-                    alt=""
-                    loading="lazy"
-                    draggable={false}
-                    className="h-full w-full object-cover"
-                  />
+                  {m.type === "video" && !m.thumbnailUrl ? (
+                    // *** סרטון בלי תמונת פתיחה (הועלה לפני שהתחלנו להפיק אותה): הדפדפן מציג את הפריים הראשון
+                    // מהסרטון עצמו. preload="metadata" מוריד רק את ההתחלה, לא את כל הקובץ.
+                    <video
+                      src={`${m.url}#t=0.1`}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="pointer-events-none h-full w-full object-cover"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      // *** ביצועים: מוקטנת בשרת לגודל המשבצת (במקום קובץ המקור של כמה MB)
+                      src={optimizeImage(m.type === "video" ? m.thumbnailUrl : m.url, media.length === 1 ? 420 : 220)}
+                      decoding="async"
+                      alt=""
+                      loading="lazy"
+                      draggable={false}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
                   {m.type === "video" && (
                     <span className="absolute inset-0 flex items-center justify-center">
                       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white">
@@ -453,6 +483,25 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
       </div>
 
       {shareOpen && <ShareToFriendsSheet options={shareOptions} onClose={() => setShareOpen(false)} onSent={(n) => setShareCount((c) => c + n)} />}
+
+      {reelIndex != null && item.media[reelIndex] && (
+        <ReelViewer
+          url={item.media[reelIndex].url}
+          posterUrl={item.media[reelIndex].thumbnailUrl}
+          authorName={authorName}
+          authorAvatarUrl={item.author.avatarUrl}
+          text={displayText}
+          liked={liked}
+          likeCount={likeCount}
+          commentCount={commentCount}
+          onLike={handleLike}
+          onComments={() => {
+            setReelIndex(null);
+            setCommentsExpanded(true);
+          }}
+          onClose={() => setReelIndex(null)}
+        />
+      )}
 
       {viewerOpen && (
         <PostMediaViewerModal

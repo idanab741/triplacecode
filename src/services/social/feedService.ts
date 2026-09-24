@@ -10,7 +10,7 @@ export interface FeedItemDto {
   createdAt: string;
   text: string | null;
   author: { id: string; username: string | null; fullName: string | null; avatarUrl: string | null; isCreator: boolean };
-  media: { id: string; type: string; url: string; thumbnailUrl: string | null }[];
+  media: { id: string; type: string; url: string; thumbnailUrl: string | null; width?: number | null; height?: number | null }[];
   place: { id: string; name: string; imageUrl: string | null } | null;
   destination: { id: string; name: string } | null;
   /** shares = כמה פעמים הפוסט נשלח בצ'אט; saves = כמה שמרו אותו (בקשה מפורשת - "מספר ליד כל כפתור"). */
@@ -111,7 +111,7 @@ export async function getFeed(
       // בשאילתת posts למעלה - רק "משלימים" מדיה לפוסטים שכבר אושרו כנראים.
       createAdminClient()
         .from("post_media")
-        .select("post_id, sort_order, media:media_assets(id, type, url, thumbnail_url)")
+        .select("post_id, sort_order, media:media_assets(id, type, url, thumbnail_url, width, height)")
         .in("post_id", postIds)
         .order("sort_order", { ascending: true }),
       supabase.from("post_likes").select("post_id, user_id, created_at").in("post_id", postIds).order("created_at", { ascending: false }),
@@ -150,12 +150,12 @@ export async function getFeed(
       return [row.id, { id: row.id, name: row.name, imageUrl: sorted[0]?.media_assets?.url ?? null }] as const;
     })
   );
-  const mediaByPost = new Map<string, { id: string; type: string; url: string; thumbnailUrl: string | null }[]>();
+  const mediaByPost = new Map<string, { id: string; type: string; url: string; thumbnailUrl: string | null; width: number | null; height: number | null }[]>();
   for (const row of mediaRes.data ?? []) {
-    const media = row.media as unknown as { id: string; type: string; url: string; thumbnail_url: string | null };
+    const media = row.media as unknown as { id: string; type: string; url: string; thumbnail_url: string | null; width: number | null; height: number | null };
     if (!media) continue;
     const list = mediaByPost.get(row.post_id) ?? [];
-    list.push({ id: media.id, type: media.type, url: media.url, thumbnailUrl: media.thumbnail_url });
+    list.push({ id: media.id, type: media.type, url: media.url, thumbnailUrl: media.thumbnail_url, width: media.width, height: media.height });
     mediaByPost.set(row.post_id, list);
   }
   const likeCountByPost = countBy(likesRes.data ?? [], "post_id");

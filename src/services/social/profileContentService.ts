@@ -101,6 +101,7 @@ async function getPostTiles(
       createdAt: post.created_at,
       imageUrl: media ? (isVideo ? media.thumb : media.url) : (place?.imageUrl ?? null),
       isVideo,
+      videoUrl: isVideo && !media?.thumb ? media?.url ?? null : null,
       title: place?.name ?? null,
       text: post.text ? post.text.slice(0, 140) : null,
       rating: isReview ? (ratingByPost.get(post.id) ?? null) : null,

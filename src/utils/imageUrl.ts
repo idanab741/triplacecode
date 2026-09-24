@@ -21,7 +21,7 @@ export interface ImageOptions {
   height?: number;
   /** 20-100. ברירת מחדל 70 - הבדל בלתי מורגש מהמקור, בחלק מהמשקל. */
   quality?: number;
-  /** "cover" (ברירת מחדל) חותך למילוי; "contain" משאיר את כל התמונה. */
+  /** ברירת מחדל: "contain" כשיש רק רוחב (כל התמונה, מוקטנת), "cover" כשיש גם גובה (חיתוך לגודל מדויק). */
   resize?: "cover" | "contain";
 }
 
@@ -36,7 +36,11 @@ export function optimizeImage(url: string | null | undefined, width: number, opt
   params.set("width", String(Math.round(width * DPR)));
   if (options.height) params.set("height", String(Math.round(options.height * DPR)));
   params.set("quality", String(options.quality ?? 70));
-  params.set("resize", options.resize ?? "cover");
+  // *** תיקון (בקשה מפורשת - "למה כל התמונות עם זום?"): כשמעבירים רק רוחב, Supabase משתמש בגובה *המקורי*
+  // של התמונה כגובה היעד. עם resize=cover זה אומר: למתוח את התמונה עד שתמלא 440px רוחב על 3,000px גובה,
+  // ולחתוך - כלומר זום עצום על מרכז התמונה. לכן: בלי גובה -> contain (הקטנה פרופורציונלית בלבד, כל
+  // התמונה נשמרת); cover רק כשמבקשים גם גובה (עיגולים וריבועים בגודל קבוע).
+  params.set("resize", options.resize ?? (options.height ? "cover" : "contain"));
 
   return `${base.replace(OBJECT_SEGMENT, RENDER_SEGMENT)}?${params.toString()}`;
 }

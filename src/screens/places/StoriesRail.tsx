@@ -19,10 +19,9 @@ interface StoriesRailProps {
 
 // url==null (אין תמונה בכלל) => תמונת ברירת המחדל (getAvatarUrl).
 function Avatar({ url }: { url: string | null }) {
-  const isDefault = !url || url.trim().length === 0;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={getAvatarUrl(url)} alt="" className={`h-full w-full object-cover ${isDefault ? "scale-150" : ""}`} draggable={false} />
+    <img src={getAvatarUrl(url)} alt="" className="h-full w-full object-cover" draggable={false} />
   );
 }
 

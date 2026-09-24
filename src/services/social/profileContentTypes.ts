@@ -15,6 +15,8 @@ export interface ProfileTileDto {
   /** תמונת האריח (מדיה קיימת בלבד). null = אריח טקסט. */
   imageUrl: string | null;
   isVideo: boolean;
+  /** סרטון בלי תמונת פתיחה - האריח מציג את הפריים הראשון מהסרטון עצמו. */
+  videoUrl?: string | null;
   /** כותרת בתחתית האריח: שם המקום (ביקורת/פוסט על מקום), כותרת האוסף/הטיול. */
   title: string | null;
   /** טקסט הפוסט (לאריח בלי תמונה). */
