@@ -15,7 +15,7 @@ const TABS: { id: ProfileContentFilter; label: string }[] = [
 ];
 
 const EMPTY_TEXT: Record<ProfileContentFilter, { self: string; other: string }> = {
-  all: { self: "עוד לא פרסמתם תוכן - לחצו על ה־+ כדי להתחיל.", other: "אין עדיין תוכן להצגה כאן." },
+  all: { self: "כל מה שתפרסמו - פוסטים, ביקורות, חוויות וטיולים - יופיע כאן.", other: "אין עדיין תוכן להצגה כאן." },
   post: { self: "עוד לא פרסמתם פוסט.", other: "אין עדיין פוסטים להצגה כאן." },
   review: { self: "עוד לא כתבתם ביקורת.", other: "אין עדיין ביקורות להצגה כאן." },
   collection: { self: "עוד לא יצרתם חוויה.", other: "אין עדיין חוויות להצגה כאן." },
@@ -154,8 +154,8 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
   }
 
   return (
-    <div className="mt-4">
-      <div role="tablist" className="flex border-t border-ink-secondary/10">
+    <div className="mt-5">
+      <div role="tablist" className="flex border-b border-black/[0.07]">
         {TABS.map((tab) => {
           const selected = active === tab.id;
           return (
@@ -165,11 +165,11 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
               role="tab"
               aria-selected={selected}
               onClick={() => setActive(tab.id)}
-              className={`relative flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2.5 text-[11px] font-bold transition-colors ${selected ? "text-ink" : "text-ink-secondary/70"}`}
+              className={`relative flex flex-1 flex-col items-center gap-1 pb-2.5 pt-3 text-[12px] transition-colors ${selected ? "font-semibold text-ink" : "font-medium text-ink-secondary"}`}
             >
-              <ContentTypeIcon kind={tab.id === "all" ? "all" : tab.id} size={21} />
+              <ContentTypeIcon kind={tab.id === "all" ? "all" : tab.id} size={22} />
               {tab.label}
-              {selected && <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-ink" />}
+              {selected && <span className="absolute inset-x-4 -bottom-px h-[2px] rounded-full bg-ink" />}
             </button>
           );
         })}
@@ -184,7 +184,17 @@ export function ProfileContentGrid({ username, isSelf, refreshKey = 0, initialAl
       )}
 
       {bucket?.loaded && bucket.tiles.length === 0 && (
-        <p className="px-6 py-12 text-center text-[13px] text-ink-secondary">{isSelf ? EMPTY_TEXT[active].self : EMPTY_TEXT[active].other}</p>
+        <div className="flex flex-col items-center px-8 py-12 text-center">
+          <p className="max-w-[280px] text-[14.5px] leading-relaxed text-ink-secondary">{isSelf ? EMPTY_TEXT[active].self : EMPTY_TEXT[active].other}</p>
+          {isSelf && (
+            <Link
+              href="/content"
+              className="mt-4 flex h-10 items-center rounded-xl bg-[#EFF1F4] px-5 text-[14px] font-semibold text-ink transition active:scale-[0.98]"
+            >
+              יצירת תוכן
+            </Link>
+          )}
+        </div>
       )}
 
       {bucket?.loaded && bucket.tiles.length > 0 && (

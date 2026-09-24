@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
@@ -15,8 +15,10 @@ import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { SocialPlatform } from "@/services/social/socialLinks";
 import type { ProfileTileDto } from "@/services/social/profileContentTypes";
 
-const BLUE_GRADIENT = "linear-gradient(150deg, #22B8FD, #007CFE)";
 const BLUE = "#0A6DFE";
+
+/** טקסט חד יותר - אותם גוונים כמו בעמוד הבית (HOME_INK ב-PlacesFeedClient). */
+const PROFILE_INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties;
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -101,7 +103,7 @@ export default function ProfileView({
   );
 
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen bg-white pb-24" style={PROFILE_INK}>
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => router.back()} menuHref={isSelf ? "/profile" : undefined} />
 
@@ -151,47 +153,76 @@ export default function ProfileView({
 
       </div>
 
-      <div className="px-4">
-        {/* שם + שם משתמש, ממורכזים מתחת לקאבר. -mt-5 מושך אותם לתוך הרצפה הלבנה של המסגרת (רווח קטן מהטבעת);
+      {/* *** עיצוב מחדש מתחת ל-HERO (בקשה מפורשת - "כמו שעשינו בעמוד הבית, ב-HERO לא לגעת"):
+          סדר כמו באינסטגרם - שם, סטטיסטיקה, ביו, קישורים, כפתורים. בלי מסגרות מקווקוות ובלי קווי
+          מסגרת סביב הסטטיסטיקה; כפתורים אפורים-שטוחים; טקסט חד (PROFILE_INK). ה-HERO עצמו לא השתנה. */}
+      <div className="px-5">
+        {/* שם + שם משתמש, ממורכזים מתחת לקאבר. -mt-5 מושך אותם לתוך הרצפה הלבנה של המסגרת;
             relative - כדי שיצבעו מעל תיבת הקאבר. */}
         <div className="relative -mt-5 flex justify-center">
-          <div className="flex min-w-0 flex-col items-center gap-0.5 pb-1 text-center">
-            <h2 className="flex items-baseline justify-center gap-1 truncate text-[17px] font-bold text-ink">
+          <div className="flex min-w-0 flex-col items-center text-center">
+            <h2 className="flex items-center justify-center gap-1 truncate text-[20px] font-bold leading-tight text-ink">
               {profile.fullName}
               {profile.isCreator && (
-                <span className="ms-1" style={{ color: BLUE }}>
-                  ✓
-                </span>
+                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0" aria-label="יוצר תוכן">
+                  <circle cx="12" cy="12" r="10" fill={BLUE} />
+                  <path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               )}
             </h2>
-            {profile.username && <span className="truncate text-[13px] text-ink-secondary">@{profile.username}</span>}
+            {profile.username && (
+              <span dir="ltr" className="mt-0.5 truncate text-[14px] text-ink-secondary">
+                @{profile.username}
+              </span>
+            )}
           </div>
         </div>
 
-        {profile.bio && <p className="mt-2 text-center text-[13.5px] text-ink">{profile.bio}</p>}
+        {/* סטטיסטיקה - מספר גדול, תווית קטנה, בלי מסגרות (כמו באינסטגרם/X) */}
+        <div className="mx-auto mt-4 flex max-w-[320px] text-center">
+          <div className="flex-1 py-1">
+            <div className="text-[18px] font-bold leading-tight text-ink tabular-nums">{profile.counts.media}</div>
+            <div className="text-[13px] text-ink-secondary">מדיה</div>
+          </div>
+          <Link
+            href={`/places/profile/${encodeURIComponent(username)}/followers`}
+            className="flex-1 rounded-xl py-1 transition-colors active:bg-black/[0.04]"
+          >
+            <div className="text-[18px] font-bold leading-tight text-ink tabular-nums">{profile.counts.followers}</div>
+            <div className="text-[13px] text-ink-secondary">עוקבים</div>
+          </Link>
+          <Link
+            href={`/places/profile/${encodeURIComponent(username)}/following`}
+            className="flex-1 rounded-xl py-1 transition-colors active:bg-black/[0.04]"
+          >
+            <div className="text-[18px] font-bold leading-tight text-ink tabular-nums">{profile.counts.following}</div>
+            <div className="text-[13px] text-ink-secondary">במעקב</div>
+          </Link>
+        </div>
 
-        {/* אינסטגרם / טיקטוק: בפרופיל שלי - "הוסף ... +" (פיל מקווקו); אצל אחרים - רק מה שהוגדר */}
+        {profile.bio && <p className="mx-auto mt-3 max-w-[340px] whitespace-pre-line text-center text-[14.5px] leading-relaxed text-ink">{profile.bio}</p>}
+
+        {/* אינסטגרם / טיקטוק */}
         <ProfileSocialLinks instagram={profile.instagram} tiktok={profile.tiktok} isSelf={isSelf} onEdit={setSocialSheet} />
 
-        {/* *** בקשה מפורשת - "בעמודים של החברים (לא של המשתמש) בצבע כחול - עקוב - הודעה":
-            כפתור "עקוב" (כחול מלא; אחרי עקיבה - "עוקב" בקו כחול) + "הודעה" (כחול בהיר). "עקוב" = מערכת follows הקיימת.
-            *** "הודעה" מוביל ל-/places/chat - מסך הצ'אט עדיין לא נבנה (הוא מציג זאת בכנות), הפרמטר ?with= מוכן לעתיד. */}
+        {/* כפתורים: אצל אחרים - עקוב (כחול מלא) + הודעה (אפור); אצלי - ערוך פרופיל (אפור). שטוחים, בלי גרדיאנט ומסגרות. */}
         {!isSelf && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-4 flex gap-2">
             <button
               type="button"
               disabled={busy}
               onClick={handleFollowToggle}
-              className="flex-1 rounded-pill py-2.5 text-[13.5px] font-bold disabled:opacity-60"
-              style={following ? { border: `1.5px solid ${BLUE}`, color: BLUE, background: "#fff" } : { background: BLUE_GRADIENT, color: "#fff" }}
+              className={`h-10 flex-1 rounded-xl text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-60 ${
+                following ? "bg-[#EFF1F4] text-ink" : "text-white"
+              }`}
+              style={following ? undefined : { background: BLUE }}
             >
               {following ? "עוקב" : "עקוב"}
             </button>
             <button
               type="button"
               onClick={() => router.push(`/places/chat?with=${encodeURIComponent(profile.username ?? profile.id)}`)}
-              className="flex-1 rounded-pill py-2.5 text-[13.5px] font-bold"
-              style={{ background: "#EAF3FF", color: BLUE, border: "1.5px solid #CFE2FF" }}
+              className="h-10 flex-1 rounded-xl bg-[#EFF1F4] text-[14px] font-semibold text-ink transition active:scale-[0.98]"
             >
               הודעה
             </button>
@@ -201,27 +232,11 @@ export default function ProfileView({
         {isSelf && (
           <Link
             href="/places/profile/edit"
-            className="mt-3 block w-full rounded-pill border border-ink-secondary/20 py-2 text-center text-[13px] font-bold text-ink"
+            className="mt-4 flex h-10 w-full items-center justify-center rounded-xl bg-[#EFF1F4] text-[14px] font-semibold text-ink transition active:scale-[0.99]"
           >
-            ערוך פרופיל
+            עריכת פרופיל
           </Link>
         )}
-
-        {/* סטטיסטיקה: מדיה (כל התוכן שבגריד: פוסטים, ביקורות, אוספים וטיולים) · עוקבים · במעקב */}
-        <div className="mt-4 flex gap-5 border-y border-ink-secondary/10 py-3 text-center">
-          <div className="flex-1">
-            <div className="text-[15px] font-bold text-ink">{profile.counts.media}</div>
-            <div className="text-[11.5px] text-ink-secondary">מדיה</div>
-          </div>
-          <Link href={`/places/profile/${encodeURIComponent(username)}/followers`} className="flex-1 transition active:opacity-60">
-            <div className="text-[15px] font-bold text-ink">{profile.counts.followers}</div>
-            <div className="text-[11.5px] text-ink-secondary">עוקבים</div>
-          </Link>
-          <Link href={`/places/profile/${encodeURIComponent(username)}/following`} className="flex-1 transition active:opacity-60">
-            <div className="text-[15px] font-bold text-ink">{profile.counts.following}</div>
-            <div className="text-[11.5px] text-ink-secondary">במעקב</div>
-          </Link>
-        </div>
       </div>
 
       {/* התוכן: טאבים עם אייקון + Grid ללא שוליים (פוסטים, ביקורות, אוספים, טיולים - לכל סוג אייקון משלו) */}

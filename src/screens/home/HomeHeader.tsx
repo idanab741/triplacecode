@@ -39,7 +39,15 @@ interface HomeHeaderProps {
  * המקומות. גם ההתראה הקבועה ("השלימו את ההתאמות האישיות") וגם שורת
  * "לכל ההתראות" חיות שם - מתקבלות כאן "בחינם".
  */
+/** *** בקשה מפורשת ("לסדר בשאר עמודי triplace את מה שעשינו בבר העליון"): כמו בעמוד הבית -
+ *  אייקונים נקיים בלי עיגול לבן וצל. ב-logoTone="white" (עמודים כהים) העיגולים נשארים,
+ *  כי שם האייקונים השחורים צריכים רקע לבן כדי להיראות. */
+const PLAIN_ICON = "flex h-10 w-10 items-center justify-center rounded-full transition-colors active:bg-black/[0.05]";
+const WHITE_CIRCLE = "flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_1px_2px_rgba(15,20,25,0.10),0_6px_16px_-6px_rgba(15,20,25,0.22)]";
+
 export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: HomeHeaderProps) {
+  const plain = logoTone !== "white";
+  const iconBox = plain ? PLAIN_ICON : WHITE_CIRCLE;
   // *** גובה קבוע (52px = pt-3 + כפתורים 40px) - זהה בדיוק לשורה של הבר הסגול של place's
   // (PlacesHeaderRow), כך ששני הבארים תמיד באותו גובה, בלי תלות בתוכן.
   return (
@@ -55,19 +63,19 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
       {onBack ? (
         // כפתור "חזור" (BackButton של האפליקציה) במקום הצ'אט - באותו עיגול לבן
         // ובאותו מקום בדיוק, כדי שהבר לא "יקפוץ" בין העמודים.
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]">
+        <div className={iconBox}>
           <BackButton onBack={onBack} />
         </div>
       ) : (
         <Link
           href="/places/chat"
           aria-label="צ'אטים"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
+          className={iconBox}
         >
           {loading ? (
             <Skeleton className="h-full w-full rounded-full" />
           ) : (
-            <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
+            <Image src="/images/places-chat-icon.png" alt="" width={24} height={22} className={plain ? "h-[22px] w-6 object-contain" : "object-contain"} />
           )}
         </Link>
       )}
@@ -93,7 +101,9 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
           aria-label="TRIPLACE"
           className="block h-[53px] w-[174px] shrink-0 select-none"
           style={{
-            backgroundColor: logoTone === "white" ? "#ffffff" : "#000000", // *** בקשה מפורשת: triplace בשחור (על הבר השקוף)
+            // *** בקשה מפורשת: triplace בשחור בכל עמודי triplace (סגול רק בעמוד הבית - PlacesHeaderRow);
+            // לבן בעמודים כהים.
+            backgroundColor: logoTone === "white" ? "#ffffff" : "#000000",
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",
             maskImage: "url(/images/triplace-logo-black.png)",
             WebkitMaskSize: "contain",
@@ -110,7 +120,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
         <Link
           href={menuHref}
           aria-label="תפריט"
-          className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(0,50,120,0.35)]"
+          className={`${iconBox} justify-self-end`}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16" />
@@ -118,7 +128,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
         </Link>
       ) : (
         <div className="justify-self-end">
-          <PlacesNotificationBell solid />
+          <PlacesNotificationBell solid plain={plain} badgeTone="purple" />
         </div>
       )}
     </header>

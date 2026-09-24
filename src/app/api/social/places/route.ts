@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   try {
     const place = await createPlaceFromUser({
       name,
+      createdBy: user.id,
       category: body.category,
       googlePlaceId: typeof body.googlePlaceId === "string" ? body.googlePlaceId : undefined,
       address: typeof body.address === "string" ? body.address : undefined,

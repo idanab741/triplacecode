@@ -41,9 +41,89 @@ interface MapTilerBaseLayerProps {
    *  מלא וקריא (כבישים/שמות בולטים). ברירת המחדל "dataviz" - בדיוק כמו קודם, כדי לא
    *  לשנות את שאר המפות באפליקציה. */
   variant?: "dataviz" | "streets";
+  /** *** חדש (מפת place's - בקשה מפורשת: "המפה נראית חיוורת ומרושלת"): צובע מחדש את
+   *  סגנון DATAVIZ (הדהוי מטבעו) לפלטה חדה ונקייה - יבשה בהירה-חמימה, ים כחול ברור, פארקים
+   *  ירוקים, כבישים לבנים ותוויות כהות עם הילה לבנה - ומסתיר גבולות מנהליים (הקווים המקווקווים
+   *  הורודים) ו-POI. ברירת מחדל false - שאר המפות באפליקציה לא משתנות. */
+  refined?: boolean;
 }
 
-export function MapTilerBaseLayer({ variant = "dataviz" }: MapTilerBaseLayerProps = {}) {
+/** פלטת המפה של place's (refined). */
+const PALETTE = {
+  land: "#F2F0EB",
+  water: "#9DCBF0",
+  park: "#D3EAC4",
+  sand: "#EFE7D4",
+  building: "#E3E0D8",
+  road: "#FFFFFF",
+  roadCasing: "#DCD8CF",
+  label: "#3A3F4B",
+  labelMinor: "#6B7080",
+  halo: "#FFFFFF",
+};
+
+type AnyLayer = { id: string; type: string; "source-layer"?: string };
+type MLMap = {
+  setPaintProperty: (id: string, prop: string, value: unknown) => void;
+  setLayoutProperty: (id: string, prop: string, value: unknown) => void;
+};
+
+/** צביעה מחדש בטוחה - כל קריאה עטופה, כי שמות/סוגי שכבות משתנים בין גרסאות סגנון. */
+function paint(map: MLMap, id: string, prop: string, value: unknown) {
+  try {
+    map.setPaintProperty(id, prop, value);
+  } catch {
+    /* שכבה בלי המאפיין הזה - מדלגים */
+  }
+}
+
+function applyRefinedPalette(map: MLMap, layers: AnyLayer[]) {
+  for (const layer of layers) {
+    const id = layer.id.toLowerCase();
+    const src = (layer["source-layer"] ?? "").toLowerCase();
+    const key = `${id} ${src}`;
+
+    // גבולות מנהליים, קווי מעבורות, POI ותוויות תחבורה - רעש. מוסתרים.
+    if (
+      (layer.type === "line" && /(border|boundary|admin|disputed|ferry)/.test(key)) ||
+      (layer.type === "symbol" && /(poi|transit|station|aeroway|airport|housenumber|oneway|shield)/.test(key))
+    ) {
+      try {
+        map.setLayoutProperty(layer.id, "visibility", "none");
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
+
+    if (layer.type === "background") {
+      paint(map, layer.id, "background-color", PALETTE.land);
+    } else if (layer.type === "fill") {
+      if (/water|ocean|sea|lake|river/.test(key)) paint(map, layer.id, "fill-color", PALETTE.water);
+      else if (/sand|beach/.test(key)) paint(map, layer.id, "fill-color", PALETTE.sand);
+      else if (/park|wood|forest|grass|scrub|vegetation|nature|golf|garden/.test(key)) {
+        paint(map, layer.id, "fill-color", PALETTE.park);
+        paint(map, layer.id, "fill-opacity", 0.85);
+      } else if (/building/.test(key)) paint(map, layer.id, "fill-color", PALETTE.building);
+      else if (/landuse|residential|industrial|commercial|landcover/.test(key)) {
+        paint(map, layer.id, "fill-color", PALETTE.land);
+      }
+    } else if (layer.type === "line") {
+      if (/water|river|stream|canal|waterway/.test(key)) paint(map, layer.id, "line-color", PALETTE.water);
+      else if (/road|highway|street|motorway|trunk|primary|secondary|tertiary|minor|path|transportation|bridge|tunnel/.test(key)) {
+        paint(map, layer.id, "line-color", /casing|outline/.test(key) ? PALETTE.roadCasing : PALETTE.road);
+      } else if (/rail/.test(key)) paint(map, layer.id, "line-color", PALETTE.roadCasing);
+    } else if (layer.type === "symbol") {
+      const major = /(country|state|city|capital|place)/.test(key) && !/(village|hamlet|suburb|neighbourhood|neighborhood)/.test(key);
+      paint(map, layer.id, "text-color", major ? PALETTE.label : PALETTE.labelMinor);
+      paint(map, layer.id, "text-halo-color", PALETTE.halo);
+      paint(map, layer.id, "text-halo-width", 1.6);
+      paint(map, layer.id, "text-halo-blur", 0.2);
+    }
+  }
+}
+
+export function MapTilerBaseLayer({ variant = "dataviz", refined = false }: MapTilerBaseLayerProps = {}) {
   const map = useMap();
 
   useEffect(() => {
@@ -66,6 +146,9 @@ export function MapTilerBaseLayer({ variant = "dataviz" }: MapTilerBaseLayerProp
     layer.on("ready", () => {
       const maplibreMap = layer.getMaptilerSDKMap();
       const style = maplibreMap.getStyle();
+      if (refined && style?.layers) {
+        applyRefinedPalette(maplibreMap as unknown as MLMap, style.layers as unknown as AnyLayer[]);
+      }
       style?.layers?.forEach((styleLayer) => {
         const id = styleLayer.id.toLowerCase();
         if (id.includes("disputed") || id.includes("boundary")) {
@@ -95,7 +178,7 @@ export function MapTilerBaseLayer({ variant = "dataviz" }: MapTilerBaseLayerProp
       map.removeLayer(layer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, variant]);
+  }, [map, variant, refined]);
 
   return null;
 }

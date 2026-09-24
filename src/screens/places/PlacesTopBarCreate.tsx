@@ -77,7 +77,7 @@ export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder
         className={
           flat
             ? "flex h-11 items-center gap-2.5 rounded-full bg-[#f0f1f4] px-4 text-[15px] text-ink transition-colors focus-within:bg-white focus-within:ring-1 focus-within:ring-[var(--color-places-purple)]"
-            : "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(50,10,120,0.28)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[var(--color-places-purple)]/40"
+            : "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_1px_2px_rgba(15,20,25,0.10),0_6px_16px_-6px_rgba(15,20,25,0.22)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[var(--color-places-purple)]/40"
         }
       >
         <svg

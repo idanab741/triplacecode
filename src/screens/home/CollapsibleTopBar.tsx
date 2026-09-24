@@ -257,7 +257,8 @@ export function CollapsibleTopBar({
       bar.style.transform = hidden ? "translateY(-100%)" : "";
       // על רקע כהה (לוגו לבן) - רקע כהה-שקוף במקום לבן, כדי שהלוגו הלבן יישאר קריא.
       bar.style.backgroundColor = floating ? (logoTone === "white" ? "rgba(10, 12, 20, 0.72)" : "#ffffff") : "transparent";
-      bar.style.boxShadow = floating ? "0 8px 24px -16px rgba(16, 24, 40, 0.35)" : "none";
+      // *** בקשה מפורשת ("מלא צל"): קו דק אחד מתחת לבר הצף במקום צל רך - כמו ב-X.
+      bar.style.boxShadow = floating ? "0 1px 0 rgba(15, 20, 25, 0.07)" : "none";
     }
 
     function onScroll() {

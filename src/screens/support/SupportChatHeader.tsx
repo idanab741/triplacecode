@@ -1,6 +1,6 @@
 ﻿"use client";
+import { TRIPLACE_LOGO_STYLE } from "@/components/ui/triplaceLogo";
 
-import Image from "next/image";
 import { BackButton } from "@/components/ui";
 
 interface SupportChatHeaderProps {
@@ -32,10 +32,15 @@ function SupportAvatar() {
  */
 export function SupportChatHeader({ onBack }: SupportChatHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
       <div className="relative h-16">
         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          <Image src="/images/triplace-logo-black.png" alt="" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
+          <span
+            role="img"
+            aria-label="TRIPLACE"
+            className="-my-[7px] block h-[53px] w-[174px] shrink-0 select-none"
+            style={TRIPLACE_LOGO_STYLE}
+          />
           <BackButton onBack={onBack} />
         </div>
 

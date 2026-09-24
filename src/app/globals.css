@@ -337,8 +337,16 @@ body {
    ומאפשרים ירידת שורה, בלי להסתיר אותה (נדרשת ע"י הספקים). */
 .places-friends-map .leaflet-control-attribution {
   max-width: 78%;
-  font-size: 9px;
+  font-size: 8.5px;
   line-height: 1.3;
   white-space: normal;
-  background: rgba(255, 255, 255, 0.75);
+  /* *** בקשה מפורשת ("מרושל"): בלי הקופסה הלבנה - טקסט עדין עם הילה, כמו ב-Apple Maps. */
+  background: transparent;
+  color: rgba(15, 20, 25, 0.45);
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff;
+  margin: 0 6px 2px 0 !important;
+  padding: 0;
+}
+.places-friends-map .leaflet-control-attribution a {
+  color: inherit;
 }

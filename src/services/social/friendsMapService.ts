@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/services/supabase/admin";
+import { getFriendIds } from "./friendIds";
 
 export interface FriendsMapRecommender {
   id: string;
@@ -62,6 +63,7 @@ const TRIP_LIMIT = 500;
 const COLLECTION_LIMIT = 500;
 const SUBMISSION_LIMIT = 1000;
 const REVIEW_LIMIT = 1500;
+const CREATED_PLACE_LIMIT = 1000;
 const TEXT_SNIPPET_CHARS = 140;
 const MAX_CONTRIBUTIONS_PER_PIN = 40;
 const MAX_PHOTOS_PER_CONTRIBUTION = 10;
@@ -169,19 +171,12 @@ export async function getFriendsMapPins(
 ): Promise<{ pins: FriendsMapPin[]; friendsCount: number }> {
   const admin = createAdminClient();
 
-  const { data: friendships, error: friendshipsError } = await supabase
-    .from("friendships")
-    .select("requester_id, addressee_id")
-    .or(`requester_id.eq.${viewerId},addressee_id.eq.${viewerId}`)
-    .eq("status", "accepted");
-  // כשל שקט כאן = "חברים" ריק בלי שום סימן - לפחות משאירים עקבות בלוג השרת.
-  if (friendshipsError) console.error("[friendsMap] friendships query failed:", friendshipsError.message);
-  const friendIds = new Set(
-    (friendships ?? []).map((row) => (row.requester_id === viewerId ? row.addressee_id : row.requester_id) as string)
-  );
+  // *** "חברים" = מי שאני עוקב אחריו + חברויות מאושרות (ר' friendIds.ts). קודם זה היה
+  // friendships בלבד - שאין באפליקציה דרך ליצור - ולכן "חברים" במפה היה תמיד ריק.
+  const friendIds = await getFriendIds(supabase, viewerId);
 
   // ---------- 1. תוכן גולמי ----------
-  const [postsRes, submissionsRes, tripsRes, collectionsRes] = await Promise.all([
+  const [postsRes, submissionsRes, tripsRes, collectionsRes, createdPlacesRes] = await Promise.all([
     supabase
       .from("posts")
       .select("id, author_id, text, post_type, place_id, tripadd_submission_id, created_at")
@@ -204,11 +199,21 @@ export async function getFriendsMapPins(
       .select("id, author_id, collection_type, title, created_at")
       .order("created_at", { ascending: false })
       .limit(COLLECTION_LIMIT),
+    // *** מקומות שמשתמשים הוסיפו ("הוסף מקום") - גם בלי ביקורת. places.created_by (מיגרציה 0095);
+    // אם המיגרציה עוד לא הורצה, השאילתה נכשלת בשקט ופשוט לא מוסיפה כלום.
+    supabase
+      .from("places")
+      .select("id, created_by, created_at")
+      .not("created_by", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(CREATED_PLACE_LIMIT),
   ]);
   if (postsRes.error) throw postsRes.error;
   if (submissionsRes.error) console.error("[friendsMap] tripadd_submissions query failed:", submissionsRes.error.message);
   if (tripsRes.error) console.error("[friendsMap] trips query failed:", tripsRes.error.message);
   if (collectionsRes.error) console.error("[friendsMap] collections query failed:", collectionsRes.error.message);
+  if (createdPlacesRes.error) console.error("[friendsMap] places.created_by query failed:", createdPlacesRes.error.message);
+  const createdPlaces = (createdPlacesRes.error ? [] : (createdPlacesRes.data ?? [])) as Row[];
 
   const posts = (postsRes.data ?? []) as Row[];
   const submissions = (submissionsRes.data ?? []) as Row[];
@@ -263,7 +268,7 @@ export async function getFriendsMapPins(
   const containerPlaceIds = new Set<string>();
   for (const list of placesByTrip.values()) for (const id of list) containerPlaceIds.add(id);
   for (const row of collectionItemRows) if (row.place_id) containerPlaceIds.add(row.place_id as string);
-  const allPlaceIds = [...new Set([...postPlaceIds, ...containerPlaceIds])];
+  const allPlaceIds = [...new Set([...postPlaceIds, ...containerPlaceIds, ...createdPlaces.map((p) => p.id as string)])];
 
   // ---------- 2. השלמות: מקומות, מדיה, דירוגים ----------
   const [placesRows, postMediaRows, submissionMediaRows, tripAddReviewRows, placeReviewRows] = await Promise.all([
@@ -427,6 +432,7 @@ export async function getFriendsMapPins(
   for (const r of placeReviewRows) userIds.add(r.user_id as string);
   for (const t of trips) userIds.add(t.author_id as string);
   for (const c of collections) userIds.add(c.author_id as string);
+  for (const p of createdPlaces) userIds.add(p.created_by as string);
   const profileRows = await selectIn([...userIds], (chunk) =>
     supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", chunk)
   );
@@ -542,6 +548,15 @@ export async function getFriendsMapPins(
         [],
         r.created_at as string
       )
+    );
+  }
+
+  // מקומות שמשתמש הוסיף (places.created_by). אם הוא גם כתב עליהם ביקורת - ההוספה נבלעת
+  // בפוסט שלו (mergeSameUser), כך שאין כפילות.
+  for (const p of createdPlaces) {
+    push(
+      `place:${p.id}`,
+      makeContribution(`added_place:${p.id}`, "added", p.created_by as string, null, null, [], (p.created_at as string) ?? new Date(0).toISOString())
     );
   }
 

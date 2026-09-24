@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MapContainer, TileLayer, AttributionControl, Marker, useMap } from "react-leaflet";
@@ -28,6 +29,13 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "friends", label: "חברים" },
   { id: "mine", label: "שלי" },
 ];
+
+/** צל "צף" אחיד ועדין לכל מה שיושב מעל המפה - ניטרלי (לא סגלגל) וצמוד, במקום ההילות הכבדות.
+ *  (בקשה מפורשת - "המפה נראית חיוורת ומרושלת"). */
+const FLOAT = "shadow-[0_1px_2px_rgba(15,20,25,0.10),0_6px_16px_-6px_rgba(15,20,25,0.22)]";
+
+/** טקסט חד יותר בתוך המפה - כמו בעמוד הבית (ר' HOME_INK ב-PlacesFeedClient). */
+const MAP_INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as React.CSSProperties;
 
 const USER_ICON = L.divIcon({
   className: "",
@@ -214,8 +222,7 @@ function PlaceContributionsSheet({
           <button
             type="button"
             onClick={onOpenPlace}
-            className="shrink-0 rounded-full px-3.5 py-2 text-[12.5px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(124,58,237,0.9)] transition active:scale-95"
-            style={{ background: "linear-gradient(135deg, var(--color-places-violet), var(--color-places-purple))" }}
+            className="shrink-0 rounded-full bg-places-purple px-4 py-2 text-[13px] font-semibold text-white transition active:scale-95"
           >
             לעמוד המקום
           </button>
@@ -409,7 +416,8 @@ export function PlacesFriendsMap({
     // ברור וקריא, בלי הפילטר שעימעם. הגוון של place's בא ממעטפת סגולה עדינה מעל האריחים
     // (רק 7% - לא פוגעת בקריאות), מהנעצים, מהכרטיסים ומהבקרים.
     <div
-      className={`places-friends-map relative isolate z-0 h-full w-full overflow-hidden bg-[#EEF0F4] ${
+      style={MAP_INK}
+      className={`places-friends-map relative isolate z-0 h-full w-full overflow-hidden bg-[#F2F0EB] ${
         IS_USING_FALLBACK_TILES ? "map-branded" : ""
       }`}
       onPointerDownCapture={() => onInteractingChange?.(true)}
@@ -417,7 +425,7 @@ export function PlacesFriendsMap({
       onPointerCancelCapture={() => onInteractingChange?.(false)}
     >
       {pins === null ? (
-        <div className="absolute inset-0 animate-pulse bg-[#EEF0F4]" />
+        <div className="absolute inset-0 animate-pulse bg-[#F2F0EB]" />
       ) : (
         <MapContainer center={initialCenter} zoom={13} zoomControl={false} scrollWheelZoom={false} className="h-full w-full" attributionControl={false}>
           <AttributionControl position="bottomright" prefix={false} />
@@ -429,7 +437,7 @@ export function PlacesFriendsMap({
               maxZoom={FALLBACK_TILE_MAX_ZOOM}
             />
           ) : (
-            <MapTilerBaseLayer />
+            <MapTilerBaseLayer refined />
           )}
 
           {filtered.map((pin) => (
@@ -451,15 +459,22 @@ export function PlacesFriendsMap({
         </MapContainer>
       )}
 
-      {/* מעטפת סגולה עדינה - הגוון של place's על המפה (מעל האריחים והנעצים, מתחת לבקרים) */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[500] bg-[rgba(124,58,237,0.07)]" />
-
-      {/* סינון + מיקום שלי */}
+      {/* *** הוסר: המעטפת הסגולה (7%) שישבה מעל כל המפה *וגם מעל הנעצים* - היא זו שנתנה את
+          המראה החיוור. הגוון של place's מגיע עכשיו מהנעצים והבקרים בלבד. במקומה: דעיכה לבנה
+          עדינה רק בראש המפה, כדי שהלוגו והכפתורים יהיו קריאים בלי עיגולים וצללים כבדים. */}
       <div
-        className="absolute inset-x-3 z-[1000] flex items-center justify-between"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-36"
+        style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0) 100%)" }}
+      />
+
+      {/* סינון + מיקום שלי. inset-x-5 (20px) = בדיוק ה-px-5 של שורת הכותרת (PlacesHeaderRow):
+          כפתור המיקום (40px) יושב בקו ישר מתחת לפעמון, ושורת הסינון מיושרת לקצה של כפתור הצ'אט. */}
+      <div
+        className="absolute inset-x-5 z-[1000] flex items-center justify-between"
         style={{ top: topOffsetPx, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
       >
-        <div className="flex rounded-full bg-white/95 p-1 shadow-[0_8px_22px_-10px_rgba(60,20,140,0.55)] ring-1 ring-black/5 backdrop-blur-md" role="tablist" aria-label="סינון המלצות">
+        <div className={`flex rounded-full bg-white p-1 ring-1 ring-black/[0.06] ${FLOAT}`} role="tablist" aria-label="סינון המלצות">
           {FILTERS.map((f) => {
             const selected = filter === f.id;
             return (
@@ -469,10 +484,9 @@ export function PlacesFriendsMap({
                 role="tab"
                 aria-selected={selected}
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-bold transition-colors ${
-                  selected ? "text-white" : "text-ink-secondary"
+                className={`rounded-full px-4 py-1.5 text-[13px] transition-colors ${
+                  selected ? "bg-places-purple font-semibold text-white" : "font-medium text-ink active:bg-black/[0.05]"
                 }`}
-                style={selected ? { background: "linear-gradient(135deg, var(--color-places-violet), var(--color-places-purple))" } : undefined}
               >
                 {f.label}
               </button>
@@ -484,19 +498,18 @@ export function PlacesFriendsMap({
           type="button"
           onClick={handleLocate}
           aria-label="המיקום שלי"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-places-purple shadow-[0_8px_22px_-10px_rgba(60,20,140,0.55)] ring-1 ring-black/5 backdrop-blur-md transition active:scale-95"
+          className={`flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink ring-1 ring-black/[0.06] transition active:scale-95 ${FLOAT}`}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3.2" />
-            <path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2" />
-            <circle cx="12" cy="12" r="7.6" />
+          {/* חץ ניווט - הסמל המוכר של "המיקום שלי" (Apple/Google Maps) */}
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" style={{ transform: "translate(-1px, 1px)" }}>
+            <path d="M20.5 3.5 3.8 10.4c-.8.3-.7 1.4.1 1.6l6.6 1.5 1.5 6.6c.2.8 1.3.9 1.6.1Z" />
           </svg>
         </button>
       </div>
 
       {/* מצב ריק / שגיאה */}
       {isEmpty && (
-        <div className="absolute inset-x-6 top-1/2 z-[1000] -translate-y-[60%] rounded-3xl bg-white/95 p-6 text-center shadow-[0_24px_60px_-20px_rgba(60,20,140,0.6)] ring-1 ring-black/5 backdrop-blur-md">
+        <div className={`absolute inset-x-6 top-1/2 z-[1000] -translate-y-[60%] rounded-3xl bg-white p-6 text-center ring-1 ring-black/[0.06] ${FLOAT}`}>
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-places-bg text-places-purple">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
@@ -515,8 +528,7 @@ export function PlacesFriendsMap({
             <button
               type="button"
               onClick={onCreate}
-              className="mt-4 rounded-full px-6 py-2.5 text-[13.5px] font-bold text-white shadow-[0_10px_22px_-10px_rgba(124,58,237,0.9)] transition active:scale-95"
-              style={{ background: "linear-gradient(135deg, var(--color-places-violet), var(--color-places-purple))" }}
+              className="mt-4 rounded-full bg-places-purple px-6 py-2.5 text-[14px] font-semibold text-white transition active:scale-95"
             >
               צור פוסט על מקום
             </button>
@@ -531,7 +543,7 @@ export function PlacesFriendsMap({
         <div
           ref={scrollerRef}
           onScroll={handleCardsScroll}
-          className="stories-rail-track absolute inset-x-0 bottom-4 z-[1000] flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
+          className="stories-rail-track absolute inset-x-0 bottom-3 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
           style={{ scrollbarWidth: "none" }}
         >
           {filtered.map((pin) => {
@@ -548,20 +560,25 @@ export function PlacesFriendsMap({
                   selectByUser(pin.key);
                   setSheetKey(pin.key);
                 }}
-                className={`w-[68%] max-w-[260px] shrink-0 snap-center rounded-2xl bg-white p-2.5 text-start shadow-[0_12px_28px_-12px_rgba(20,10,60,0.55)] transition-all duration-300 ${
-                  selected ? "ring-2 ring-places-purple" : "opacity-95 ring-1 ring-black/5"
+                className={`w-[72%] max-w-[280px] shrink-0 snap-center rounded-[18px] bg-white p-2.5 text-start transition-shadow duration-200 ${FLOAT} ${
+                  selected ? "ring-2 ring-places-purple" : "ring-1 ring-black/[0.06]"
                 }`}
               >
                 <span className="flex items-center gap-2.5">
                   {pin.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pin.imageUrl} alt="" draggable={false} className="h-[50px] w-[50px] shrink-0 rounded-xl object-cover" />
+                    <img src={pin.imageUrl} alt="" draggable={false} className="h-14 w-14 shrink-0 rounded-[12px] object-cover" />
                   ) : (
-                    <span className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-xl bg-places-bg text-xl">📍</span>
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-places-bg text-places-purple">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                    </span>
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-extrabold leading-tight text-ink">{pin.name}</span>
-                    <span className="mt-0.5 flex items-center gap-1 truncate text-[12px] text-ink-secondary">
+                    <span className="block truncate text-[15px] font-bold leading-tight text-ink">{pin.name}</span>
+                    <span className="mt-1 flex items-center gap-1 truncate text-[13px] text-ink-secondary">
                       {(pin.userRatingAvg ?? pin.rating) != null && (
                         <>
                           <span className="text-[#F59E0B]">★</span>
@@ -574,9 +591,9 @@ export function PlacesFriendsMap({
                   </span>
                 </span>
 
-                <span className="mt-2 flex items-center gap-1.5">
+                <span className="mt-2 flex items-center gap-1.5 border-t border-black/[0.06] pt-2">
                   <AvatarStack recommenders={pin.recommenders} />
-                  <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-places-purple">{recommendersLabel(pin)}</span>
+                  <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink-secondary">{recommendersLabel(pin)}</span>
                 </span>
               </button>
             );

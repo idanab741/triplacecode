@@ -1,6 +1,7 @@
 "use client";
 
-import Image from "next/image";
+import { TRIPLACE_LOGO_STYLE } from "@/components/ui/triplaceLogo";
+
 
 /**
  * Header של עמוד TripWorld החדש (סעיף 3 בפרומפט - "לוגו TRIPLACE +
@@ -11,9 +12,14 @@ import Image from "next/image";
  */
 export function TripWorldHeader() {
   return (
-    <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
       <div className="flex h-16 items-center justify-center gap-2 px-5">
-        <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
+        <span
+            role="img"
+            aria-label="TRIPLACE"
+            className="-my-[7px] block h-[53px] w-[174px] shrink-0 select-none"
+            style={TRIPLACE_LOGO_STYLE}
+          />
         <span className="h-5 w-px bg-ink-secondary/20" />
         <h1 className="text-lg font-bold text-ink">TripWorld</h1>
       </div>

@@ -31,7 +31,7 @@ export function PlacesMapClient() {
       {/* *** בקשה מפורשת: בר שקוף, לוגו places בסגול - "מרחף" מעל המפה. */}
       {/* *** בקשה מפורשת: שורת החיפוש מופיעה רק במשיכה למטה (כמו בבית). המשיכה נקלטת רק על הבר
           עצמו - גרירה על המפה/הכרטיסים לא פותחת אותה. */}
-      <CollapsibleTopBar pullFromBarOnly onRevealChange={setSearchOpen} headerRow={<PlacesHeaderRow badgeTone="purple" />}>
+      <CollapsibleTopBar pullFromBarOnly onRevealChange={setSearchOpen} headerRow={<PlacesHeaderRow badgeTone="purple" plain />}>
         <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 

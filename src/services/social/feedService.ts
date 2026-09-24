@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getFriendIds } from "./friendIds";
 import { createAdminClient } from "@/services/supabase/admin";
 
 export type FeedTab = "for_you" | "friends" | "following";
@@ -37,12 +38,8 @@ export async function getFeed(
   let authorFilterIds: string[] | null = null;
 
   if (tab === "friends") {
-    const { data } = await supabase
-      .from("friendships")
-      .select("requester_id, addressee_id")
-      .or(`requester_id.eq.${viewerId},addressee_id.eq.${viewerId}`)
-      .eq("status", "accepted");
-    authorFilterIds = (data ?? []).map((row) => (row.requester_id === viewerId ? row.addressee_id : row.requester_id));
+    // *** "חברים" = מי שאני עוקב אחריו + חברויות מאושרות - אותה הגדרה כמו במפה (friendIds.ts).
+    authorFilterIds = [...(await getFriendIds(supabase, viewerId))];
     if (authorFilterIds.length === 0) return { items: [], nextCursor: null };
   } else if (tab === "following") {
     const { data } = await supabase.from("follows").select("following_id").eq("follower_id", viewerId);

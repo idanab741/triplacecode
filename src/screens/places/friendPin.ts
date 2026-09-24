@@ -25,43 +25,47 @@ interface FriendPinOptions {
   selected: boolean;
 }
 
-const WIDTH = 32;
-const HEIGHT = 42;
+const WIDTH = 40;
+const HEIGHT = 48;
 
+/**
+ * *** עיצוב מחדש (בקשה מפורשת - "המפה נראית חיוורת ומרושלת"): הטיפה הסגולה המלאה הוחלפה
+ * בבועת תמונה עגולה - התמונה היא הגיבור (כמו בנעצי תמונות של Apple Maps / Airbnb):
+ *  - רגיל: עיגול תמונה 36px עם מסגרת לבנה עבה + זנב קטן לבן שמצביע על הנקודה.
+ *  - נבחר: המסגרת והזנב הופכים סגולים, והנעץ מוגדל - ברור מיד מה נבחר.
+ *  - צל אחד צמוד וחד (לא הילה מטושטשת), כדי שהנעץ "יישב" על המפה ולא ירחף.
+ *  - מונה ממליצים: עיגול סגול מלא עם מספר לבן, בפינה העליונה.
+ */
 export function getFriendPinIcon({ photoUrl, count, selected }: FriendPinOptions): L.DivIcon {
-  const key = `${photoUrl ?? ""}|${count}|${selected ? 1 : 0}`;
+  const key = `v2|${photoUrl ?? ""}|${count}|${selected ? 1 : 0}`;
   const cached = cache.get(key);
   if (cached) return cached;
 
   const clipId = `fpc${clipCounter++}`;
   const safePhoto = photoUrl?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const body = selected ? PURPLE_DARK : PURPLE;
+  const frame = selected ? PURPLE : "#FFFFFF";
 
-  // viewBox 40x52: טיפה עם קצה בתחתית (20,51), עיגול תמונה במרכז העליון (20,20).
+  // viewBox 40x48: עיגול במרכז (20,19) ברדיוס 18, זנב עד (20,47).
   const inner = safePhoto
-    ? `<circle cx="20" cy="20" r="14" fill="#fff"/>
-       <image href="${safePhoto}" x="7.5" y="7.5" width="25" height="25" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`
-    : `<circle cx="20" cy="20" r="14" fill="#fff"/><circle cx="20" cy="20" r="6" fill="${body}"/>`;
+    ? `<image href="${safePhoto}" x="4.5" y="3.5" width="31" height="31" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`
+    : `<circle cx="20" cy="19" r="15.5" fill="#F3EEFF"/><circle cx="20" cy="19" r="5" fill="${PURPLE}"/>`;
 
   const counter =
     count > 1
-      ? `<div style="position:absolute;top:-4px;right:-6px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:#fff;color:${PURPLE};font:800 9px/13px system-ui,sans-serif;text-align:center;border:1.5px solid ${PURPLE};box-sizing:border-box;">${count}</div>`
+      ? `<div style="position:absolute;top:-3px;left:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:${PURPLE_DARK};color:#fff;font:700 10.5px/18px var(--font-sans),system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;box-sizing:border-box;">${count}</div>`
       : "";
 
-  const shadow = selected
-    ? "drop-shadow(0 0 6px rgba(124,58,237,0.6)) drop-shadow(0 3px 5px rgba(16,24,40,0.4))"
-    : "drop-shadow(0 2px 3px rgba(16,24,40,0.38))";
-
-  const html = `<div style="position:relative;width:${WIDTH}px;height:${HEIGHT}px;transform:${selected ? "scale(1.25)" : "scale(1)"};transform-origin:50% 100%;transition:transform .18s ease;filter:${shadow};">
-    <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
-      <defs><clipPath id="${clipId}"><circle cx="20" cy="20" r="12.5"/></clipPath></defs>
-      <path d="M20 51C20 51 3.5 33.5 3.5 20a16.5 16.5 0 1 1 33 0C36.5 33.5 20 51 20 51Z" fill="${body}" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>
+  const html = `<div style="position:relative;width:${WIDTH}px;height:${HEIGHT}px;transform:scale(${selected ? 1.18 : 1});transform-origin:50% 100%;transition:transform .2s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 1px 1.5px rgba(15,20,25,.28)) drop-shadow(0 4px 8px rgba(15,20,25,.14));">
+    <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
+      <defs><clipPath id="${clipId}"><circle cx="20" cy="19" r="15.5"/></clipPath></defs>
+      <path d="M14.5 34.2 20 46.5l5.5-12.3Z" fill="${frame}"/>
+      <circle cx="20" cy="19" r="18.2" fill="${frame}"/>
       ${inner}
     </svg>
     ${counter}
   </div>`;
 
-  const icon = L.divIcon({ className: "", html, iconSize: [WIDTH, HEIGHT], iconAnchor: [WIDTH / 2, HEIGHT] });
+  const icon = L.divIcon({ className: "", html, iconSize: [WIDTH, HEIGHT], iconAnchor: [WIDTH / 2, HEIGHT - 1] });
   cache.set(key, icon);
   return icon;
 }

@@ -150,6 +150,8 @@ export async function enrichPlaceFromGoogle(placeId: string): Promise<void> {
 
 export interface CreatePlaceFromUserInput {
   name: string;
+  /** מי הוסיף את המקום - נשמר ב-places.created_by (מיגרציה 0095), כדי שיופיע אצלו ב"שלי" במפה. */
+  createdBy?: string;
   category: UserPlaceCategory;
   googlePlaceId?: string;
   address?: string;
@@ -185,9 +187,7 @@ export async function createPlaceFromUser(input: CreatePlaceFromUserInput): Prom
   const { city, country } = raw ? extractCityAndCountry(raw) : { city: null, country: null };
   const placeCategory = CATEGORY_TO_PLACE_CATEGORY[input.category];
 
-  const { data, error } = await supabase
-    .from("places")
-    .insert({
+  const row = {
       name: input.name,
       category: placeCategory,
       trip_type_tags: [placeCategory],
@@ -201,9 +201,17 @@ export async function createPlaceFromUser(input: CreatePlaceFromUserInput): Prom
       country: country ?? null,
       website: input.website ?? null,
       image_urls: [],
-    })
+    };
+  // *** created_by (מיגרציה 0095). אם המיגרציה עוד לא הורצה - העמודה לא קיימת; במקרה כזה
+  // מנסים שוב בלי השדה, כדי שהוספת מקום לעולם לא תישבר בגלל זה.
+  let { data, error } = await supabase
+    .from("places")
+    .insert(input.createdBy ? { ...row, created_by: input.createdBy } : row)
     .select("id, name")
     .single();
+  if (error && input.createdBy && /created_by/.test(error.message)) {
+    ({ data, error } = await supabase.from("places").insert(row).select("id, name").single());
+  }
   if (error || !data) throw new Error(error?.message ?? "יצירת המקום נכשלה");
 
   await enrichPlaceFromGoogle(data.id as string);
