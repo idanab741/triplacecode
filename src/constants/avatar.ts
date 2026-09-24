@@ -1,3 +1,5 @@
+import { optimizeImage } from "@/utils/imageUrl";
+
 /**
  * תמונת פרופיל ברירת מחדל - מוצגת לכל משתמש שלא העלה תמונת פרופיל משלו
  * (גם ברשימות, סטוריז, פוסטים, תגובות וכו').
@@ -16,9 +18,11 @@ const LEGACY_DEFAULT_AVATAR_URLS = ["/avatars/default-avatar.png"];
  * אחרת תמונת ברירת המחדל. יש להשתמש בפונקציה הזו בכל מקום שמציג avatar,
  * במקום לבדוק avatarUrl ולהציג ראשי תיבות/אימוג'י כ-fallback.
  */
-export function getAvatarUrl(avatarUrl?: string | null): string {
+/** *** ביצועים: size = גודל העיגול בפיקסלי CSS. ברירת מחדל 64 - מספיק לכל אווטאר ברשימות/פיד/תגובות
+ *  (התמונה מוקטנת בשרת ל-128px ב-WebP במקום להוריד את קובץ המקור). בעמוד הפרופיל מעבירים גודל גדול. */
+export function getAvatarUrl(avatarUrl?: string | null, size = 64): string {
   const url = avatarUrl?.trim();
   if (!url) return DEFAULT_AVATAR_URL;
   if (LEGACY_DEFAULT_AVATAR_URLS.some((legacy) => url === legacy || url.endsWith(legacy))) return DEFAULT_AVATAR_URL;
-  return url;
+  return optimizeImage(url, size, { height: size, quality: 75 });
 }

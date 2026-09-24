@@ -7,7 +7,7 @@ import { PlaceRatingCard, type PlaceRatingCardReview } from "./PlaceRatingCard";
 interface ReviewsSummary {
   averageRating: number | null;
   reviewCount: number;
-  reviews: PlaceRatingCardReview[];
+  reviews: (PlaceRatingCardReview & { userId: string; userName: string | null; username: string | null; avatarUrl: string | null })[];
   myReview: { rating: number; comment: string | null } | null;
 }
 
@@ -51,7 +51,10 @@ export function TripLaceRatingSection({ placeId }: { placeId: string }) {
     <PlaceRatingCard
       averageRating={summary?.averageRating ?? null}
       reviewCount={summary?.reviewCount ?? 0}
-      reviews={summary?.reviews ?? []}
+      reviews={(summary?.reviews ?? []).map((r) => ({
+        ...r,
+        author: { id: r.userId, name: r.userName, username: r.username, avatarUrl: r.avatarUrl },
+      }))}
       myReview={summary?.myReview ?? null}
       canRate={!!user}
       submitting={submitting}

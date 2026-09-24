@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { optimizeImage } from "@/utils/imageUrl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
@@ -98,7 +99,7 @@ export default function ProfileView({
       style={{ background: BLUE }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={getAvatarUrl(profile.avatarUrl)} alt="" className="h-full w-full object-cover" />
+      <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
     </span>
   );
 
@@ -125,7 +126,7 @@ export default function ProfileView({
             />
             <span className="absolute left-1/2 top-[39.2%] aspect-square w-[70%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+              <img src={optimizeImage(coverUrl, 320, { height: 320 })} alt="" className="h-full w-full object-cover" />
             </span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

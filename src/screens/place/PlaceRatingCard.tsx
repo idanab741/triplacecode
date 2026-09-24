@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import Link from "next/link";
+import { getAvatarUrl } from "@/constants/avatar";
 
 export interface PlaceRatingCardReview {
   id: string;
   rating: number | null;
   comment: string | null;
   createdAt: string;
+  /** *** המדרג - תמונה + שם, ולחיצה מובילה לפרופיל שלו (בקשה מפורשת). */
+  author?: { id: string; name: string | null; username: string | null; avatarUrl: string | null } | null;
 }
 
 interface PlaceRatingCardProps {
@@ -70,19 +73,16 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
   const [draftComment, setDraftComment] = useState(myReview?.comment ?? "");
 
   return (
-    <div className="flex flex-col gap-3 rounded-card border border-ink-secondary/10 bg-white p-4">
-      <div className="flex items-center gap-2.5">
-        <Image src="/images/triplace-logo-black.png" alt="TripLace" width={128} height={39} className="h-[30px] w-auto object-contain" />
-      </div>
+    <div className="flex flex-col gap-3">
 
       {reviewCount > 0 ? (
         <div className="flex items-center gap-2">
           <StarRow rating={averageRating ?? 0} />
-          <span className="text-sm font-bold text-ink">{averageRating?.toFixed(1)}</span>
-          <span className="text-xs text-ink-secondary">({reviewCount} דירוגים)</span>
+          <span className="text-[15px] font-bold text-ink">{averageRating?.toFixed(1)}</span>
+          <span className="text-[13px] text-ink-secondary">({reviewCount} דירוגים)</span>
         </div>
       ) : (
-        <p className="text-sm text-ink-secondary">עדיין אין דירוגי TripLace למקום הזה - היו הראשונים!</p>
+        <p className="text-[15px] text-ink-secondary">עוד אין דירוגים של משתמשי triplace למקום הזה.</p>
       )}
 
       {canRate && (
@@ -91,7 +91,7 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className="self-start rounded-pill border border-ink-secondary/25 bg-white px-4 py-2 text-sm font-semibold text-ink"
+              className="flex h-11 w-full items-center justify-center rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
             >
               {myReview ? "עריכת הדירוג שלי" : "דרגו את המקום הזה"}
             </button>
@@ -103,7 +103,7 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
                 onChange={(e) => setDraftComment(e.target.value)}
                 placeholder="ספרו בקצרה איך היה (לא חובה)"
                 rows={3}
-                className="w-full rounded-card border border-ink-secondary/25 bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40"
+                className="w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-secondary focus:border-ink focus:outline-none"
               />
               {error && <p className="text-xs text-danger">{error}</p>}
               <div className="flex gap-2">
@@ -111,15 +111,14 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
                   type="button"
                   disabled={submitting || draftRating < 1}
                   onClick={() => onSubmit(draftRating, draftComment)}
-                  className="rounded-pill py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))", flex: 1 }}
+                  className="h-11 flex-1 rounded-xl bg-ink text-[15px] font-semibold text-white disabled:opacity-40"
                 >
                   {submitting ? "שולח..." : "שליחת דירוג"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="rounded-pill border border-ink-secondary/25 bg-white px-4 py-2.5 text-sm font-semibold text-ink"
+                  className="h-11 rounded-xl bg-[#EFF1F4] px-5 text-[15px] font-semibold text-ink"
                 >
                   ביטול
                 </button>
@@ -130,14 +129,39 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
       )}
 
       {reviews.length > 0 && (
-        <div className="flex flex-col gap-3 border-t border-ink-secondary/10 pt-3">
-          {reviews.slice(0, 5).map((review) => (
-            <div key={review.id} className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                {review.rating != null && <StarRow rating={review.rating} size={13} />}
-                <span className="text-xs text-ink-secondary">מטייל/ת ב-TripLace</span>
+        <div className="flex flex-col">
+          {reviews.slice(0, 10).map((review) => (
+            <div key={review.id} className="flex flex-col gap-2 border-t border-black/[0.06] py-3.5">
+              <div className="flex items-center gap-3">
+                {review.author ? (
+                  <Link
+                    href={`/places/profile/${encodeURIComponent(review.author.username ?? review.author.id)}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 transition-opacity active:opacity-70"
+                  >
+                    <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#EFF1F4]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={getAvatarUrl(review.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[15px] font-semibold text-ink">{review.author.name ?? "מטייל/ת"}</span>
+                      <span className="flex items-center gap-1.5">
+                        {review.rating != null && <StarRow rating={review.rating} size={13} />}
+                        <span className="text-[13px] text-ink-secondary">
+                          {new Date(review.createdAt).toLocaleDateString("he-IL", { month: "long", year: "numeric" })}
+                        </span>
+                      </span>
+                    </span>
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {review.rating != null && <StarRow rating={review.rating} size={13} />}
+                    <span className="text-[13px] text-ink-secondary">
+                      {new Date(review.createdAt).toLocaleDateString("he-IL", { month: "long", year: "numeric" })}
+                    </span>
+                  </span>
+                )}
               </div>
-              {review.comment && <p className="text-sm text-ink-secondary">{review.comment}</p>}
+              {review.comment && <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{review.comment}</p>}
             </div>
           ))}
         </div>

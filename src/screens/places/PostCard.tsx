@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { optimizeImage } from "@/utils/imageUrl";
 import Link from "next/link";
 import type { FeedItemDto } from "@/services/social/feedService";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
@@ -92,7 +93,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="group -mx-2 flex items-center gap-1.5 rounded-full px-2 py-1.5 transition-colors hover:bg-black/[0.04] active:scale-95"
+      className="group flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2 transition-colors active:scale-95 active:bg-black/[0.05] [@media(hover:hover)]:hover:bg-black/[0.04]"
       style={{ color: color ?? "var(--color-ink-secondary, #8a94a6)" }}
     >
       <span key={popKey} className={color && popKey ? "pc-pop" : ""}>
@@ -118,6 +119,10 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   const [liked, setLiked] = useState(item.viewerState.liked);
   const [saved, setSaved] = useState(item.viewerState.saved);
   const [likeCount, setLikeCount] = useState(item.stats.likes);
+  /** *** בקשה מפורשת ("ברגע שלוחצים על כפתור - המספר צריך לעלות"): לכל כפתור מונה משלו שמתעדכן מיד. */
+  const [commentCount, setCommentCount] = useState(item.stats.comments);
+  const [shareCount, setShareCount] = useState(item.stats.shares ?? 0);
+  const [saveCount, setSaveCount] = useState(item.stats.saves ?? 0);
   const [likePop, setLikePop] = useState(0);
   const [savePop, setSavePop] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -185,11 +190,17 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   async function handleSave() {
     const next = !saved;
     setSaved(next);
+    setSaveCount((c) => Math.max(0, c + (next ? 1 : -1)));
     if (next) setSavePop((n) => n + 1);
     try {
-      setSaved(await onSaveToggle(item.id));
+      const confirmed = await onSaveToggle(item.id);
+      if (confirmed !== next) {
+        setSaved(confirmed);
+        setSaveCount((c) => Math.max(0, c + (confirmed ? 1 : -1)));
+      }
     } catch {
       setSaved(!next);
+      setSaveCount((c) => Math.max(0, c + (next ? -1 : 1)));
     }
   }
 
@@ -355,7 +366,9 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={m.type === "video" ? (m.thumbnailUrl ?? m.url) : m.url}
+                    // *** ביצועים: מוקטנת בשרת לגודל המשבצת (במקום קובץ המקור של כמה MB)
+                    src={optimizeImage(m.type === "video" ? (m.thumbnailUrl ?? m.url) : m.url, media.length === 1 ? 420 : 220)}
+                    decoding="async"
                     alt=""
                     loading="lazy"
                     draggable={false}
@@ -389,7 +402,7 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
               {placeChipImageUrl ? (
                 <span className="block h-6 w-6 shrink-0 overflow-hidden rounded-full bg-bg-secondary">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={placeChipImageUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={optimizeImage(placeChipImageUrl, 24, { height: 24 })} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </span>
               ) : (
                 <svg width="16" height="16" viewBox="0 0 24 24" {...ICON} className="shrink-0 text-ink-secondary">
@@ -416,28 +429,30 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
         )}
 
         {/* מי עשה לייק - עיגולי תמונות פרופיל מעל שורת הפעולות */}
-        <PostLikersStrip postId={item.id} likeCount={likeCount} refreshKey={likersRefresh} />
+        <PostLikersStrip postId={item.id} likeCount={likeCount} refreshKey={likersRefresh} initialLikers={item.likers} />
 
-        {/* פעולות */}
-        <div className="mt-2 flex items-center justify-between pe-1">
-          <ActionButton label="תגובות" count={item.stats.comments} color={commentsExpanded ? "var(--color-places-purple)" : undefined} onClick={() => setCommentsExpanded((v) => !v)}>
-            <CommentIcon />
-          </ActionButton>
+        {/* פעולות - *** סידור חדש (בקשה מפורשת - "כפתור השליחה בצד מדי"): כמו באינסטגרם - לייק, תגובה
+            ושליחה צמודים יחד בתחילת השורה, ושמירה לבד בקצה. לכל אחד מספר שעולה מיד בלחיצה. */}
+        <div className="-ms-2 mt-1.5 flex items-center">
           <ActionButton label="אהבתי" count={likeCount} color={liked ? LIKE_COLOR : undefined} onClick={handleLike} popKey={likePop}>
             <HeartIcon filled={liked} />
           </ActionButton>
-          <ActionButton label="שיתוף" onClick={() => setShareOpen(true)}>
+          <ActionButton label="תגובות" count={commentCount} color={commentsExpanded ? "var(--color-places-purple)" : undefined} onClick={() => setCommentsExpanded((v) => !v)}>
+            <CommentIcon />
+          </ActionButton>
+          <ActionButton label="שליחה" count={shareCount} onClick={() => setShareOpen(true)}>
             <ShareIcon />
           </ActionButton>
-          <ActionButton label={saved ? "נשמר" : "שמירה"} color={saved ? "var(--color-places-purple)" : undefined} onClick={handleSave} popKey={savePop}>
+          <span className="flex-1" />
+          <ActionButton label={saved ? "נשמר" : "שמירה"} count={saveCount} color={saved ? "var(--color-places-purple)" : undefined} onClick={handleSave} popKey={savePop}>
             <BookmarkIcon filled={saved} />
           </ActionButton>
         </div>
 
-        {commentsExpanded && <PostInlineComments postId={item.id} />}
+        {commentsExpanded && <PostInlineComments postId={item.id} onCountChange={(d) => setCommentCount((c) => Math.max(0, c + d))} />}
       </div>
 
-      {shareOpen && <ShareToFriendsSheet options={shareOptions} onClose={() => setShareOpen(false)} />}
+      {shareOpen && <ShareToFriendsSheet options={shareOptions} onClose={() => setShareOpen(false)} onSent={(n) => setShareCount((c) => c + n)} />}
 
       {viewerOpen && (
         <PostMediaViewerModal

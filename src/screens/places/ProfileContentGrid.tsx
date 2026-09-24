@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { optimizeImage } from "@/utils/imageUrl";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui";
 import type { ProfileContentFilter, ProfileTileDto } from "@/services/social/profileContentTypes";
@@ -51,7 +52,7 @@ export function ProfileTile({ tile }: { tile: ProfileTileDto }) {
     <>
       {tile.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={tile.imageUrl} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+        <img src={optimizeImage(tile.imageUrl, 160)} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
       ) : (
         <span className="flex h-full w-full items-center justify-center px-2 text-center" style={{ background: TEXT_TILE_BG[tile.kind] }}>
           <span className="line-clamp-5 text-[12.5px] font-bold leading-snug text-white">{tile.text ?? tile.title ?? ""}</span>

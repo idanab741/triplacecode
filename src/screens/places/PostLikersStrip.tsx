@@ -18,11 +18,24 @@ const MAX_VISIBLE = 5;
  * לחיצה על עיגול מובילה לפרופיל של המשתמש. `refreshKey` משתנה אחרי לייק/ביטול לייק
  * של הצופה כדי לרענן את הרשימה.
  */
-export function PostLikersStrip({ postId, likeCount, refreshKey }: { postId: string; likeCount: number; refreshKey: number }) {
-  const [likers, setLikers] = useState<Liker[]>([]);
-  const [total, setTotal] = useState(0);
+export function PostLikersStrip({
+  postId,
+  likeCount,
+  refreshKey,
+  initialLikers,
+}: {
+  postId: string;
+  likeCount: number;
+  refreshKey: number;
+  /** *** ביצועים: הרשימה מגיעה כבר עם הפיד - אז בטעינה לא נשלחת בקשה נפרדת לכל פוסט. בקשה נשלחת רק
+   *  אחרי שהצופה עצמו עשה/ביטל לייק (refreshKey > 0). */
+  initialLikers?: Liker[];
+}) {
+  const [likers, setLikers] = useState<Liker[]>(initialLikers ?? []);
+  const [total, setTotal] = useState(initialLikers ? likeCount : 0);
 
   useEffect(() => {
+    if (initialLikers && refreshKey === 0) return;
     if (likeCount <= 0) {
       setLikers([]);
       setTotal(0);
@@ -47,7 +60,7 @@ export function PostLikersStrip({ postId, likeCount, refreshKey }: { postId: str
   if (likeCount <= 0 || likers.length === 0) return null;
 
   const visible = likers.slice(0, MAX_VISIBLE);
-  const extra = Math.max(0, total - visible.length);
+  const extra = Math.max(0, (initialLikers && refreshKey === 0 ? likeCount : total) - visible.length);
 
   return (
     <div className="mt-2 flex items-center" aria-label="מי עשה לייק">

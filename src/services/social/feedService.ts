@@ -13,7 +13,10 @@ export interface FeedItemDto {
   media: { id: string; type: string; url: string; thumbnailUrl: string | null }[];
   place: { id: string; name: string; imageUrl: string | null } | null;
   destination: { id: string; name: string } | null;
-  stats: { likes: number; comments: number };
+  /** shares = כמה פעמים הפוסט נשלח בצ'אט; saves = כמה שמרו אותו (בקשה מפורשת - "מספר ליד כל כפתור"). */
+  stats: { likes: number; comments: number; shares?: number; saves?: number };
+  /** *** ביצועים: עד 5 האחרונים שעשו לייק - מגיעים יחד עם הפיד, במקום בקשה נפרדת לכל פוסט. */
+  likers?: { id: string; username: string | null; fullName: string | null; avatarUrl: string | null }[];
   viewerState: { liked: boolean; saved: boolean; following: boolean; isSelf: boolean };
   nextCursor: string | null;
 }
@@ -80,7 +83,7 @@ export async function getFeed(
   // נפרד לגמרי מ-place_id הישן, ר' AddPlaceModal.tsx.
   const tripAddIds = [...new Set(posts.map((p) => p.tripadd_submission_id).filter(Boolean))] as string[];
 
-  const [authorsRes, placesRes, destinationsRes, tripAddRes, mediaRes, likesRes, commentsRes, viewerLikesRes, viewerSavesRes, followingRes] =
+  const [authorsRes, placesRes, destinationsRes, tripAddRes, mediaRes, likesRes, commentsRes, viewerLikesRes, viewerSavesRes, followingRes, sharesRes, savesRes] =
     await Promise.all([
       supabase.from("profiles").select("id, username, full_name, avatar_url, is_creator").in("id", authorIds),
       placeIds.length ? supabase.from("places").select("id, name, image_urls").in("id", placeIds) : Promise.resolve({ data: [] }),
@@ -111,7 +114,7 @@ export async function getFeed(
         .select("post_id, sort_order, media:media_assets(id, type, url, thumbnail_url)")
         .in("post_id", postIds)
         .order("sort_order", { ascending: true }),
-      supabase.from("post_likes").select("post_id").in("post_id", postIds),
+      supabase.from("post_likes").select("post_id, user_id, created_at").in("post_id", postIds).order("created_at", { ascending: false }),
       // *** תיקון (בקשה מפורשת - "לכל תמונה תגובות משלה"): הספירה כאן
       // היא רק לתגובות הכלליות על הפוסט (media_id IS NULL) - בדיוק
       // מה שנפתח inline מתחת לשורה. תגובות על תמונות ספציפיות נספרות
@@ -120,6 +123,10 @@ export async function getFeed(
       supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", viewerId),
       supabase.from("social_saves").select("target_id").in("target_id", postIds).eq("user_id", viewerId).eq("target_type", "post"),
       supabase.from("follows").select("following_id").eq("follower_id", viewerId).in("following_id", authorIds),
+      // *** ספירות שיתופים ושמירות - admin client: ה-RLS של dm_messages / social_saves מאפשר לכל משתמש
+      // לראות רק את השורות שלו, וכאן צריך את הסכום הכללי (רק מספר - בלי תוכן ההודעות או מי שמר).
+      createAdminClient().from("dm_messages").select("post_id").in("post_id", postIds).eq("kind", "post"),
+      createAdminClient().from("social_saves").select("target_id").in("target_id", postIds).eq("target_type", "post"),
     ]);
 
   const authorsById = new Map((authorsRes.data ?? []).map((a) => [a.id, a]));
@@ -152,7 +159,22 @@ export async function getFeed(
     mediaByPost.set(row.post_id, list);
   }
   const likeCountByPost = countBy(likesRes.data ?? [], "post_id");
+
+  // עד 5 מי-שעשו-לייק לכל פוסט (הכי עדכניים) + שאילתת פרופילים אחת לכולם.
+  const likerIdsByPost = new Map<string, string[]>();
+  for (const row of (likesRes.data ?? []) as { post_id: string; user_id: string }[]) {
+    const list = likerIdsByPost.get(row.post_id) ?? [];
+    if (list.length < 5 && !list.includes(row.user_id)) list.push(row.user_id);
+    likerIdsByPost.set(row.post_id, list);
+  }
+  const likerIds = [...new Set([...likerIdsByPost.values()].flat())];
+  const { data: likerProfiles } = likerIds.length
+    ? await supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", likerIds)
+    : { data: [] as { id: string; username: string | null; full_name: string | null; avatar_url: string | null }[] };
+  const likerById = new Map((likerProfiles ?? []).map((p) => [p.id as string, p]));
   const commentCountByPost = countBy(commentsRes.data ?? [], "post_id");
+  const shareCountByPost = countBy((sharesRes.data ?? []) as { post_id: string }[], "post_id");
+  const saveCountByPost = countBy((savesRes.data ?? []) as { target_id: string }[], "target_id");
   const viewerLikedSet = new Set((viewerLikesRes.data ?? []).map((r) => r.post_id));
   const viewerSavedSet = new Set((viewerSavesRes.data ?? []).map((r) => r.target_id));
   const followingSet = new Set((followingRes.data ?? []).map((r) => r.following_id));
@@ -185,7 +207,21 @@ export async function getFeed(
           ? placesById.get(post.place_id) ?? null
           : null,
       destination: post.destination_id ? destinationsById.get(post.destination_id) ?? null : null,
-      stats: { likes: likeCountByPost.get(post.id) ?? 0, comments: commentCountByPost.get(post.id) ?? 0 },
+      likers: (likerIdsByPost.get(post.id) ?? [])
+        .map((uid) => likerById.get(uid))
+        .filter((p): p is NonNullable<typeof p> => !!p)
+        .map((p) => ({
+          id: p.id as string,
+          username: (p.username as string | null) ?? null,
+          fullName: (p.full_name as string | null) ?? null,
+          avatarUrl: (p.avatar_url as string | null) ?? null,
+        })),
+      stats: {
+        likes: likeCountByPost.get(post.id) ?? 0,
+        comments: commentCountByPost.get(post.id) ?? 0,
+        shares: shareCountByPost.get(post.id) ?? 0,
+        saves: saveCountByPost.get(post.id) ?? 0,
+      },
       viewerState: {
         liked: viewerLikedSet.has(post.id),
         saved: viewerSavedSet.has(post.id),

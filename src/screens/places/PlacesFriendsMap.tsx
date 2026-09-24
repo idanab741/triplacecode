@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { optimizeImage } from "@/utils/imageUrl";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -266,7 +267,7 @@ function PlaceContributionsSheet({
                       className="h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-places-bg transition active:scale-[0.97]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      <img src={optimizeImage(url, 112, { height: 112 })} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -284,7 +285,7 @@ function PlaceContributionsSheet({
           className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 p-4"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={viewer} alt="" className="max-h-full max-w-full rounded-xl object-contain" />
+          <img src={optimizeImage(viewer, 720, { quality: 80, resize: "contain" })} alt="" className="max-h-full max-w-full rounded-xl object-contain" />
         </button>
       )}
     </div>
@@ -567,7 +568,7 @@ export function PlacesFriendsMap({
                 <span className="flex items-center gap-2.5">
                   {pin.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={pin.imageUrl} alt="" draggable={false} className="h-14 w-14 shrink-0 rounded-[12px] object-cover" />
+                    <img src={optimizeImage(pin.imageUrl, 56, { height: 56 })} alt="" loading="lazy" decoding="async" draggable={false} className="h-14 w-14 shrink-0 rounded-[12px] object-cover" />
                   ) : (
                     <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-places-bg text-places-purple">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

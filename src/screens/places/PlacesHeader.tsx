@@ -1,11 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
-import { BackButton } from "@/components/ui";
-import { PlacesNotificationBell } from "./PlacesNotificationBell";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
-import { PlacesHeaderRow, PLACES_BAR_GRADIENT, PLACES_BAR_SHADOW } from "./PlacesHeaderRow";
 
 interface PlacesHeaderProps {
   /** אם לא מועבר - זהו עמוד הבית: מוצג רק כפתור חזרה בצד שמאל בעמודי
@@ -56,78 +51,11 @@ interface PlacesHeaderProps {
  *  ההורה שמעביר transparent=true חייב לפצות עם ריווח עליון מקביל
  *  לגובה הבר (h-16) על שאר התוכן - חוץ מהקאבר עצמו, שאמור להתחיל
  *  מ-y=0 כדי שהבר יצוף מעליו ולא מעל רווח לבן. */
-export function PlacesHeader({ onBack, transparent = false, overlay = false, menuHref, variant = "default" }: PlacesHeaderProps) {
-  if (variant === "purple") {
-    return (
-      <CollapsibleTopBar
-        headerRow={<PlacesHeaderRow onBack={onBack} menuHref={menuHref} />}
-        gradient={PLACES_BAR_GRADIENT}
-        shadow={PLACES_BAR_SHADOW}
-        tone="purple"
-      />
-    );
-  }
-
-  return (
-    <header
-      className={`left-0 right-0 top-0 z-30 w-full transition-colors ${overlay ? "fixed" : "sticky"} ${
-        transparent ? "bg-transparent" : "bg-white shadow-[0_1px_0_rgba(16,24,40,0.06)]"
-      }`}
-    >
-      <div className="relative h-16 px-5">
-        {/* *** תיקון (בקשה מפורשת - "תוריד מעט את הלוגו למטה ותקטין
-            אותו ב-10%"): 130x42 -> 117x38 (מוכפל ב-0.9, מעוגל).
-            top-1/2 היה ממורכז מדויק - top-[57%] מזיז אותו מעט מטה
-            בתוך ה-header (h-16=64px), במקום להזיז את כל שאר הפריטים
-            בשורה גם כן. */}
-        <span className="absolute left-1/2 top-[57%] -translate-x-1/2 -translate-y-1/2 select-none">
-          <Image
-            src="/images/places-logo.png"
-            alt="place's"
-            width={117}
-            height={38}
-            className="h-[38px] w-[117px] object-contain"
-            priority
-          />
-        </span>
-
-        {onBack ? (
-          <div className="absolute left-5 top-1/2 -translate-y-1/2">
-            <BackButton onBack={onBack} />
-          </div>
-        ) : (
-          <div className="absolute left-5 top-1/2 -translate-y-1/2">
-            <PlacesNotificationBell />
-          </div>
-        )}
-
-        <div className="absolute right-3.5 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          {/* *** תוספת (בקשה מפורשת - "שלוש פסים בצד שני, שמעביר
-              לעמוד הפרופיל של דף הבית"): כשמועבר menuHref, מחליף
-              לגמרי את כפתור הצ'אט הרגיל - לא מוסיף עליו. ברירת מחדל
-              (לא מועבר) - כל שאר עמודי place's ממשיכים לראות צ'אט,
-              בלי שינוי. */}
-          {menuHref ? (
-            <Link
-              href={menuHref}
-              aria-label="תפריט"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
-            </Link>
-          ) : (
-            <Link
-              href="/places/chat"
-              aria-label="צ'אט"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
-            >
-              <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
-  );
+export function PlacesHeader({ onBack, menuHref }: PlacesHeaderProps) {
+  // *** אחידות (בקשה מפורשת - "הבר העליון בעמוד הפוסט לא תקין"): כל עמודי המשנה של place's (פוסט,
+  // אוסף, טיול, יצירה, הגדרות, חיפוש ועוד) מקבלים עכשיו את אותו בר עליון בדיוק כמו שאר האפליקציה -
+  // שקוף, לוגו triplace בשחור, חזרה ופעמון נקיים בלי עיגולים וצל, ומקבל רקע לבן רק כשגוללים.
+  // קודם היו כאן שני עיצובים אחרים (לבן עם צל ועיגולים ממוסגרים / "סגול" עם עיגולים לבנים).
+  // המאפיינים transparent / overlay / variant נשארו בממשק רק כדי לא לשבור קוד שמעביר אותם.
+  return <CollapsibleTopBar onBack={onBack} menuHref={menuHref} />;
 }

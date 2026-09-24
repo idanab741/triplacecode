@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { compressImageFile } from "@/utils/compressImage";
 
 export interface UploadedMedia {
   id: string;
@@ -12,9 +13,11 @@ export interface UploadedMedia {
 export async function uploadSocialMedia(
   supabase: SupabaseClient,
   userId: string,
-  file: File
+  originalFile: File
 ): Promise<UploadedMedia> {
-  const isVideo = file.type.startsWith("video/");
+  const isVideo = originalFile.type.startsWith("video/");
+  // *** ביצועים: תמונות מוקטנות בדפדפן לפני ההעלאה (ר' compressImage.ts).
+  const file = isVideo ? originalFile : await compressImageFile(originalFile);
   const ext = file.name.split(".").pop() ?? (isVideo ? "mp4" : "jpg");
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 

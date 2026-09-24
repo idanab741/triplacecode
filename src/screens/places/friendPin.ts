@@ -1,4 +1,5 @@
 import L from "leaflet";
+import { optimizeImage } from "@/utils/imageUrl";
 
 /**
  * נעץ למפת place's: טיפה סגולה קטנה עם עיגול-תמונת המקום בפנים.
@@ -42,7 +43,8 @@ export function getFriendPinIcon({ photoUrl, count, selected }: FriendPinOptions
   if (cached) return cached;
 
   const clipId = `fpc${clipCounter++}`;
-  const safePhoto = photoUrl?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  // *** ביצועים: הנעץ מציג עיגול של 31px - מורידים תמונה בגודל הזה, לא את קובץ המקור (כמה MB לכל נעץ).
+  const safePhoto = (photoUrl ? optimizeImage(photoUrl, 36, { height: 36 }) : null)?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const frame = selected ? PURPLE : "#FFFFFF";
 
   // viewBox 40x48: עיגול במרכז (20,19) ברדיוס 18, זנב עד (20,47).

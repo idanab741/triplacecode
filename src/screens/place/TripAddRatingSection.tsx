@@ -28,6 +28,7 @@ export function TripAddRatingSection({ place }: TripAddRatingSectionProps) {
     rating: r.rating,
     comment: r.description,
     createdAt: r.createdAt,
+    author: r.userId ? { id: r.userId, name: r.userName, username: r.username, avatarUrl: r.avatarUrl } : null,
   }));
 
   async function handleSubmit(rating: number, comment: string) {

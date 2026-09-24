@@ -72,11 +72,22 @@ export default function ChatsInboxPage() {
      onlinePresenceService.getOnlineFriends. ה-heartbeat כאן מעדכן את ה-
      last_seen של המשתמש הנוכחי גם כשהוא לא ביקר בעמוד Places בכלל. */
   useEffect(() => {
-    fetch("/api/social/presence/online-friends")
-      .then((res) => res.json())
-      .then((data) => setOnlineFriends(data.friends ?? []))
-      .catch(() => setOnlineFriends([]));
+    // *** מתרענן כל 45 שניות (וכשחוזרים לעמוד) - כדי שירוק/צהוב ישקפו את המצב הנוכחי ולא רק את
+    // הרגע שבו העמוד נפתח. ה-heartbeat של המשתמש עצמו רץ עכשיו גלובלית (MainBottomNav).
+    function loadOnline() {
+      fetch("/api/social/presence/online-friends")
+        .then((res) => res.json())
+        .then((data) => setOnlineFriends(data.friends ?? []))
+        .catch(() => {});
+    }
+    loadOnline();
     fetch("/api/social/presence/heartbeat", { method: "POST" }).catch(() => {});
+    const timer = setInterval(loadOnline, 45_000);
+    window.addEventListener("focus", loadOnline);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", loadOnline);
+    };
   }, []);
 
   useEffect(() => {
@@ -159,7 +170,7 @@ export default function ChatsInboxPage() {
           חיפוש אנשים ולא מוצג כשאין חברים מחוברים (OnlineFriendsSection מחזיר null במקרה הזה). */}
       {!query.trim() && (
         <div className="pt-5">
-          <OnlineFriendsSection friends={onlineFriends} title="מחוברים עכשיו" hideCount />
+          <OnlineFriendsSection friends={onlineFriends} onSelect={openChatWith} busyId={openingUserId} />
         </div>
       )}
 

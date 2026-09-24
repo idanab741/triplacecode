@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getFriendIds } from "./friendIds";
 
 export type OnlineStatus = "online" | "recently_active" | "offline";
 
@@ -29,35 +30,38 @@ export interface OnlineFriendDto {
   status: OnlineStatus;
 }
 
-/** "מחוברים עכשיו" - כל מי שיש עמו עקיבה הדדית (Mutual Follow): גם אני עוקב
- *  אחריו וגם הוא עוקב אחריי (טבלת follows, לא friendships). מוחזרים *כולם*,
- *  מחוברים ולא-מחוברים כאחד - הצבע (ירוק/צהוב) ב-UI הוא מה שמבדיל ביניהם. */
+/**
+ * *** "מי מחובר" בעמוד הצ'אטים (בקשה מפורשת - "מי מחובר ומי לא מכל החברים שלך"):
+ * קודם רק עקיבה הדדית - ואין אף זוג כזה באפליקציה, אז הפס לא הופיע בכלל. עכשיו: כל החברים לפי
+ * ההגדרה האחידה (מי שאני עוקב אחריו + חברויות מאושרות, ר' friendIds.ts) וגם כל מי שיש איתו שיחה.
+ * כולם מוחזרים - מחוברים ראשונים, אחר כך לפי מי שהיה פעיל לאחרונה. הצבע ב-UI מבדיל ביניהם.
+ */
 export async function getOnlineFriends(supabase: SupabaseClient, userId: string): Promise<OnlineFriendDto[]> {
-  const [{ data: following, error: followingError }, { data: followers, error: followersError }] = await Promise.all([
-    supabase.from("follows").select("following_id").eq("follower_id", userId),
-    supabase.from("follows").select("follower_id").eq("following_id", userId),
+  const [friendIds, { data: conversations }] = await Promise.all([
+    getFriendIds(supabase, userId),
+    supabase.from("dm_conversations").select("user_a_id, user_b_id").or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`),
   ]);
-  if (followingError) throw followingError;
-  if (followersError) throw followersError;
+  const ids = new Set(friendIds);
+  for (const c of conversations ?? []) ids.add((c.user_a_id === userId ? c.user_b_id : c.user_a_id) as string);
+  ids.delete(userId);
+  if (ids.size === 0) return [];
 
-  const followingIds = new Set((following ?? []).map((row) => row.following_id as string));
-  const mutualIds = (followers ?? [])
-    .map((row) => row.follower_id as string)
-    .filter((id) => followingIds.has(id));
-
-  if (mutualIds.length === 0) return [];
-
-  const { data: profiles, error: profilesError } = await supabase
+  const { data: profiles, error } = await supabase
     .from("profiles")
     .select("id, username, full_name, avatar_url, last_seen")
-    .in("id", mutualIds);
-  if (profilesError) throw profilesError;
+    .in("id", [...ids].slice(0, 150));
+  if (error) throw error;
 
-  return (profiles ?? []).map((profile) => ({
-    id: profile.id,
-    username: profile.username,
-    fullName: profile.full_name,
-    avatarUrl: profile.avatar_url,
-    status: computeOnlineStatus(profile.last_seen),
-  }));
+  const rank: Record<OnlineStatus, number> = { online: 0, recently_active: 1, offline: 2 };
+  return (profiles ?? [])
+    .map((profile) => ({
+      id: profile.id as string,
+      username: profile.username as string | null,
+      fullName: profile.full_name as string | null,
+      avatarUrl: profile.avatar_url as string | null,
+      status: computeOnlineStatus(profile.last_seen as string | null),
+      lastSeen: (profile.last_seen as string | null) ?? null,
+    }))
+    .sort((a, b) => rank[a.status] - rank[b.status] || (b.lastSeen ?? "").localeCompare(a.lastSeen ?? ""))
+    .map((f) => ({ id: f.id, username: f.username, fullName: f.fullName, avatarUrl: f.avatarUrl, status: f.status }));
 }

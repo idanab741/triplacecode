@@ -64,13 +64,13 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
   }
 
   return (
-    <div className="flex gap-2 px-5 pt-3">
+    <div className="flex gap-2.5 px-5 pt-4">
       {user && (
         <button
           type="button"
           onClick={handleSave}
           disabled={busy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-3 text-sm font-bold text-ink disabled:opacity-60"
+          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60"
         >
           <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={18} height={18} />
           {saved ? "נשמר" : "שמירה"}
@@ -79,7 +79,7 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
       <button
         type="button"
         onClick={handleShare}
-        className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-3 text-sm font-bold text-ink"
+        className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
       >
         <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={20} height={20} />
         {justShared ? "הועתק!" : "שיתוף"}

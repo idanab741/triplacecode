@@ -6,6 +6,10 @@ export interface TripAddReview {
   rating: number | null;
   description: string | null;
   createdAt: string;
+  userId: string | null;
+  userName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
 }
 
 export interface TripAddPlace {
@@ -70,7 +74,7 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
       .maybeSingle(),
     supabase
       .from("tripadd_reviews")
-      .select("id, rating, description, created_at")
+      .select("id, user_id, rating, description, created_at")
       .eq("submission_id", id)
       .order("created_at", { ascending: false }),
   ]);
@@ -84,12 +88,25 @@ export async function getTripAddPlaceById(id: string): Promise<TripAddPlace | nu
     .sort((a, b) => a.sort_order - b.sort_order);
   const photoUrls = (media ?? []).map((m) => m.media_assets!.url);
 
-  const reviews: TripAddReview[] = (reviewRows ?? []).map((r) => ({
-    id: r.id,
-    rating: r.rating,
-    description: r.description,
-    createdAt: r.created_at,
-  }));
+  const reviewerIds = [...new Set((reviewRows ?? []).map((r) => r.user_id as string).filter(Boolean))];
+  const { data: reviewerProfiles } = reviewerIds.length
+    ? await supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", reviewerIds)
+    : { data: [] as { id: string; username: string | null; full_name: string | null; avatar_url: string | null }[] };
+  const reviewers = new Map((reviewerProfiles ?? []).map((p) => [p.id as string, p]));
+
+  const reviews: TripAddReview[] = (reviewRows ?? []).map((r) => {
+    const profile = reviewers.get(r.user_id as string);
+    return {
+      id: r.id,
+      rating: r.rating,
+      description: r.description,
+      createdAt: r.created_at,
+      userId: (r.user_id as string | null) ?? null,
+      userName: (profile?.full_name as string | null) ?? (profile?.username as string | null) ?? null,
+      username: (profile?.username as string | null) ?? null,
+      avatarUrl: (profile?.avatar_url as string | null) ?? null,
+    };
+  });
   const ratedReviews = reviews.filter((r) => r.rating != null);
   const averageRating =
     ratedReviews.length > 0 ? ratedReviews.reduce((sum, r) => sum + (r.rating ?? 0), 0) / ratedReviews.length : null;

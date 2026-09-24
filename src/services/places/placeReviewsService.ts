@@ -7,6 +7,9 @@ export interface PlaceReview {
   comment: string | null;
   createdAt: string;
   userName: string | null;
+  /** *** לתמונת הפרופיל והקישור לפרופיל של המדרג (בקשה מפורשת). */
+  username: string | null;
+  avatarUrl: string | null;
 }
 
 export interface PlaceReviewsSummary {
@@ -31,16 +34,23 @@ export async function getPlaceReviewsSummary(
     .order("created_at", { ascending: false })
     .limit(50);
 
+  // *** פרטי המדרגים (שם + תמונה + username לקישור לפרופיל) - בקשה מפורשת: "למה אין את התמונה של
+  // המשתמש שדירג, כולל אפשרות להיכנס לעמוד שלו". profiles קריא לכל משתמש מחובר.
+  const userIds = [...new Set((rows ?? []).map((r) => r.user_id as string))];
+  const { data: profileRows } = userIds.length
+    ? await supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", userIds)
+    : { data: [] as { id: string; username: string | null; full_name: string | null; avatar_url: string | null }[] };
+  const profiles = new Map((profileRows ?? []).map((p) => [p.id as string, p]));
+
   const reviews: PlaceReview[] = (rows ?? []).map((r) => ({
     id: r.id as string,
     userId: r.user_id as string,
     rating: r.rating as number,
     comment: r.comment as string | null,
     createdAt: r.created_at as string,
-    // *** שם משתמש אמיתי (לא רק "משתמש") ידרוש join לטבלת פרופילים -
-    // לא קיימת עדיין תשתית לזה כאן, אז מוצג "מטייל/ת ב-TripLace" גנרי
-    // בינתיים בצד ה-UI. משאירים null במפורש כדי שהכוונה תהיה ברורה.
-    userName: null,
+    userName: (profiles.get(r.user_id as string)?.full_name as string | null) ?? (profiles.get(r.user_id as string)?.username as string | null) ?? null,
+    username: (profiles.get(r.user_id as string)?.username as string | null) ?? null,
+    avatarUrl: (profiles.get(r.user_id as string)?.avatar_url as string | null) ?? null,
   }));
 
   const { count } = await supabase

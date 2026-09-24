@@ -1,4 +1,5 @@
 import type { CollectionType } from "@/services/social/collectionTypes";
+import { optimizeImage } from "@/utils/imageUrl";
 
 interface CollectionCoverProps {
   /** Cover שהיוצר בחר. אם קיים - מוצג לבדו. */
@@ -21,7 +22,7 @@ export function CollectionCover({ coverUrl, collageUrls, type, className = "aspe
     return (
       <div className={wrapper}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverUrl} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+        <img src={optimizeImage(coverUrl, 420)} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
       </div>
     );
   }
@@ -39,7 +40,7 @@ export function CollectionCover({ coverUrl, collageUrls, type, className = "aspe
       {urls.map((url, i) => (
         <div key={`${url}-${i}`} className={`relative overflow-hidden ${urls.length === 3 && i === 0 ? "row-span-2" : ""}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" loading="lazy" draggable={false} className="h-full w-full object-cover" />
+          <img src={optimizeImage(url, 220)} alt="" loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
         </div>
       ))}
     </div>

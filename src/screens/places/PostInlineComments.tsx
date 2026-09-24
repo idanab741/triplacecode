@@ -18,6 +18,8 @@ interface PostInlineCommentsProps {
   /** ברירת מחדל: /api/social/posts/{postId}. אוספים (Collections) משתמשים באותו רכיב בדיוק
    *  עם basePath="/api/social/collections/{id}" - אותה טבלת comments, אותו UI. */
   basePath?: string;
+  /** נקרא אחרי הוספה (+1) או מחיקה (-N, כולל תשובות) - כדי שהמספר ליד כפתור התגובות יתעדכן מיד. */
+  onCountChange?: (delta: number) => void;
 }
 
 /**
@@ -28,7 +30,7 @@ interface PostInlineCommentsProps {
  * תמונה ספציפית). כאן - בלי `mediaId` - מביא תמיד רק את התגובות
  * הכלליות על הפוסט (media_id IS NULL בשרת, ר' postService.ts).
  */
-export function PostInlineComments({ postId, basePath }: PostInlineCommentsProps) {
+export function PostInlineComments({ postId, basePath, onCountChange }: PostInlineCommentsProps) {
   const { user } = useAuth();
   const base = basePath ?? `/api/social/posts/${postId}`;
   const [comments, setComments] = useState<CommentRow[] | null>(null);
@@ -144,6 +146,7 @@ export function PostInlineComments({ postId, basePath }: PostInlineCommentsProps
         body: JSON.stringify({ text: text.trim(), ...(rootId ? { parentCommentId: rootId } : {}) }),
       });
       if (!res.ok) return;
+      onCountChange?.(1);
       if (rootId) setOpenThreads((prev) => new Set(prev).add(rootId));
       setText("");
       setReplyTo(null);
@@ -156,6 +159,8 @@ export function PostInlineComments({ postId, basePath }: PostInlineCommentsProps
   // *** תוספת (בקשה מפורשת - "למה אי אפשר למחוק תגובה?") - מחיקה
   // אופטימית מהתצוגה, עם נפילה-חזרה לרענון אם הבקשה נכשלת בפועל.
   async function handleDelete(commentId: string) {
+    const removed = (comments ?? []).filter((c) => c.id === commentId || c.parent_comment_id === commentId).length;
+    if (removed) onCountChange?.(-removed);
     setComments((prev) => prev?.filter((c) => c.id !== commentId && c.parent_comment_id !== commentId) ?? prev);
     try {
       await fetch(`${base}/comments/${commentId}`, { method: "DELETE" });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { optimizeImage } from "@/utils/imageUrl";
 import { useAuth } from "@/hooks/useAuth";
 import { formatRelativeTimeHe } from "@/utils/relativeTime";
 import { getAvatarUrl } from "@/constants/avatar";
@@ -203,7 +204,7 @@ export function PostMediaViewerModal({
               <video src={current.url} controls className="h-full w-full object-cover" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={current.url} alt="" className="h-full w-full object-cover" draggable={false} />
+              <img src={optimizeImage(current.url, 720, { quality: 80 })} alt="" decoding="async" className="h-full w-full object-cover" draggable={false} />
             )}
             {media.length > 1 && (
               <span className="absolute end-2 top-2 rounded-pill bg-black/45 px-2 py-0.5 text-[11px] font-semibold text-white">

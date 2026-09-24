@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/services/supabase/admin";
+import { ensurePlaceCategories } from "./placeCategories";
 import {
   matchGooglePlaceByLocation,
   searchCityPlace,
@@ -173,6 +174,7 @@ export async function createPlaceFromUser(input: CreatePlaceFromUserInput): Prom
       .maybeSingle();
     if (existing) {
       await enrichPlaceFromGoogle(existing.id);
+      await ensurePlaceCategories(existing.id as string).catch(() => 0);
       return { id: existing.id as string, name: existing.name as string, existed: true };
     }
   }
@@ -215,5 +217,7 @@ export async function createPlaceFromUser(input: CreatePlaceFromUserInput): Prom
   if (error || !data) throw new Error(error?.message ?? "יצירת המקום נכשלה");
 
   await enrichPlaceFromGoogle(data.id as string);
+  // *** חובה 3 קטגוריות לכל אטרקציה (AI) - אחרי ההעשרה מ-Google, כדי שיהיה לו את סוג המקום.
+  await ensurePlaceCategories(data.id as string).catch(() => 0);
   return { id: data.id as string, name: data.name as string, existed: false };
 }

@@ -13,15 +13,10 @@ type TileId = "post" | "place" | "collection" | "trip";
 
 /* ───────────── אייקוני קו דקים, בגרדיאנט של האקסנט של כל ריבוע ───────────── */
 
-function Icon({ id, children }: { id: string; children: ReactNode }) {
+/** *** עיצוב מחדש: קו אחיד בצבע האקסנט של הריבוע (בלי גרדיאנט), עבה מעט יותר כדי להיות חד על שחור. */
+function Icon({ children }: { id: string; children: ReactNode }) {
   return (
-    <svg viewBox="0 0 48 48" fill="none" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" stroke={`url(#${id})`} className="h-full w-full" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-          <stop offset="0" style={{ stopColor: "var(--a)" }} />
-          <stop offset="1" style={{ stopColor: "var(--b)" }} />
-        </linearGradient>
-      </defs>
+    <svg viewBox="0 0 48 48" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" stroke="var(--a)" className="h-full w-full" aria-hidden="true">
       {children}
     </svg>
   );
@@ -68,35 +63,30 @@ interface Tile {
 }
 
 const TILES: Tile[] = [
-  { id: "post", title: "פוסט", sub: "שתפו רגע מהדרך", a: "#FF7AB6", b: "#FFA96B" },
-  { id: "place", title: "מקום", sub: "המלצה על מקום שאהבתם", a: "#A78BFA", b: "#5EC8FF" },
-  { id: "collection", title: "חוויות", sub: "מקומות וטיולים תחת רעיון אחד", a: "#4ADE9C", b: "#38D6E8" },
-  { id: "trip", title: "טיול", sub: "מסלול תחנות מוכן לדרך", a: "#FCC24A", b: "#FF7F8E" },
+  { id: "post", title: "פוסט", sub: "שתפו רגע מהדרך", a: "#FF8FB8", b: "#FFA96B" },
+  { id: "place", title: "מקום", sub: "המלצה על מקום שאהבתם", a: "#B69CFF", b: "#5EC8FF" },
+  { id: "collection", title: "חוויות", sub: "מקומות וטיולים תחת רעיון אחד", a: "#5BE3A8", b: "#38D6E8" },
+  { id: "trip", title: "טיול", sub: "מסלול תחנות מוכן לדרך", a: "#FFCB5C", b: "#FF7F8E" },
 ];
 
 const CSS = `
 .cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
-/* זוהר יחיד ושקט בראש העמוד - בלי תנועה */
-.cx-glow { position:absolute; inset-inline:0; top:0; height:26rem; pointer-events:none;
-  background:radial-gradient(ellipse 80% 100% at 50% 0%, rgba(0,124,254,.20), transparent 72%); }
-.cx-hero { animation:cx-hero-in .8s cubic-bezier(.2,.8,.2,1) .05s backwards; }
-@keyframes cx-hero-in { from{opacity:0; transform:translateY(22px)} to{opacity:1; transform:none} }
+/* זוהר יחיד ושקט בראש העמוד, מאחורי הדמות - בלי תנועה */
+.cx-glow { position:absolute; inset-inline:0; top:0; height:30rem; pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 50% 38%, rgba(0,124,254,.16), transparent 70%); }
+/* רגע כניסה אחד בלבד - הדמות. הריבועים לא "קופצים" אחד-אחד. */
+.cx-hero { animation:cx-hero-in .7s cubic-bezier(.2,.8,.2,1) .05s backwards; }
+@keyframes cx-hero-in { from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none} }
 
-.cx-tile { position:relative; isolation:isolate; overflow:hidden; border-radius:26px; text-align:start;
-  background:#0c0c0e; box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
-  -webkit-tap-highlight-color:transparent; transition:transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .3s;
-  animation:cx-in .6s cubic-bezier(.2,.8,.2,1) backwards; }
-/* הילה עדינה בצבע הריבוע, מאחורי האייקון */
-.cx-tile::before { content:""; position:absolute; z-index:-1; width:9rem; height:9rem; top:-3.2rem; inset-inline-start:-3rem;
-  background:radial-gradient(circle, var(--a), transparent 68%); opacity:.16; transition:opacity .35s; }
-.cx-tile:active { transform:scale(.97); }
-@media (hover:hover) {
-  .cx-tile:hover { box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
-  .cx-tile:hover::before { opacity:.3; }
-}
+/* *** עיצוב מחדש (בקשה מפורשת - "לסדר את העמוד"): ריבועים שקטים - משטח אפור-כהה אחיד, בלי מסגרת,
+   בלי הילה צבעונית ובלי אנימציית כניסה. הצבע של כל סוג מופיע רק באייקון ובמשטח העדין שמאחוריו. */
+.cx-tile { position:relative; border-radius:22px; text-align:start; background:#141416;
+  -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.2,.8,.2,1), background-color .2s; }
+.cx-tile:active { transform:scale(.97); background:#1b1b1e; }
+@media (hover:hover) { .cx-tile:hover { background:#1b1b1e; } }
 .cx-tile:focus-visible { outline:2px solid var(--a); outline-offset:3px; }
-@keyframes cx-in { from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
-@media (prefers-reduced-motion: reduce) { .cx-tile, .cx-hero { animation:none !important; } }
+.cx-icon { background:color-mix(in srgb, var(--a) 14%, transparent); }
+@media (prefers-reduced-motion: reduce) { .cx-hero { animation:none !important; } }
 `;
 
 /**
@@ -137,8 +127,16 @@ export default function ContentPage() {
 
         <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-1">
           <div className="mx-auto w-full max-w-sm">
-            <h1 className="text-center text-[23px] font-extrabold leading-tight tracking-tight">הצטרפו לקהילת triplace creator&apos;s</h1>
-            <p className="mx-auto mb-6 mt-1.5 max-w-[19rem] text-balance text-center text-[14px] leading-snug text-white/55">שתפו את המקומות, הטיולים והרעיונות שלכם</p>
+            {/* *** תיקון: הכותרת נשברה באמצע ("triplace" בשורה אחת, "creator's" בשורה הבאה) כי עברית ואנגלית
+                מעורבבות. עכשיו "triplace creator's" הוא יחידה אחת LTR שלא נשברת - תמיד בשורה משלה. */}
+            <h1 className="text-center text-[24px] font-bold leading-[1.25] tracking-tight">
+              הצטרפו לקהילת
+              <br />
+              <bdi dir="ltr" className="whitespace-nowrap">
+                triplace creator&apos;s
+              </bdi>
+            </h1>
+            <p className="mx-auto mb-5 mt-2 max-w-[19rem] text-balance text-center text-[15px] leading-snug text-white/60">שתפו את המקומות, הטיולים והרעיונות שלכם</p>
 
             {/* ה-HERO: הדמות "מציצה" מעל קצה הכרטיסיות ומצביעה עליהן. החלק שמתחת לקצה התמונה (האצבע, ~6.6% מרוחב המכולה)
                 יורד אל תוך הכרטיסיות - לכן margin שלילי, ו-pointer-events-none כדי לא לחסום לחיצה על הכרטיס. */}
@@ -156,20 +154,22 @@ export default function ContentPage() {
             </div>
 
             <section aria-label="בחירת סוג תוכן ליצירה">
-              <div className="grid w-full grid-cols-2 gap-3">
-                {TILES.map((tile, i) => (
+              <div className="grid w-full grid-cols-2 gap-2.5">
+                {TILES.map((tile) => (
                   <button
                     key={tile.id}
                     type="button"
                     onClick={() => handleSelect(tile.id)}
                     aria-label={`יצירת ${tile.title}: ${tile.sub}`}
-                    className="cx-tile flex aspect-square flex-col justify-between p-4"
-                    style={{ "--a": tile.a, "--b": tile.b, animationDelay: `${0.05 + i * 0.07}s` } as CSSProperties}
+                    className="cx-tile flex min-h-[150px] flex-col justify-between p-4"
+                    style={{ "--a": tile.a, "--b": tile.b } as CSSProperties}
                   >
-                    <span className="block h-11 w-11">{ART[tile.id]}</span>
-                    <span className="block">
-                      <span className="block text-[20px] font-bold leading-none text-white">{tile.title}</span>
-                      <span className="mt-2 block min-h-[2.75em] text-balance text-[12px] leading-snug text-white/45">{tile.sub}</span>
+                    <span className="cx-icon flex h-11 w-11 items-center justify-center rounded-[14px]">
+                      <span className="block h-6 w-6">{ART[tile.id]}</span>
+                    </span>
+                    <span className="mt-6 block">
+                      <span className="block text-[18px] font-semibold leading-tight text-white">{tile.title}</span>
+                      <span className="mt-1 block text-balance text-[13px] leading-snug text-white/55">{tile.sub}</span>
                     </span>
                   </button>
                 ))}

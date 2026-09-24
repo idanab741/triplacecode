@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { BottomNav, type BottomNavItem } from "@/components/ui";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 
 /** אייקון ניווט שמתחלף בין גרסה פעילה ולא-פעילה, לפי הטאב הנבחר.
  *  scale אופציונלי — פיצוי זמני על אייקונים שנשמרו עם שוליים לא אחידים בקובץ. */
@@ -53,6 +54,8 @@ interface MainBottomNavProps {
 /** בר הניווט התחתון האמיתי של האפליקציה, לשימוש בכל מסכי הטאבים הראשיים
  *  - כולל place's (עם elevatedOverride) - זהו אותו בר בדיוק, לא עותק. */
 export function MainBottomNav({ active, elevatedOverride, tone = "light" }: MainBottomNavProps) {
+  // הבר התחתון מופיע בכל עמודי האפליקציה - לכן כאן מתעדכן "מחובר עכשיו" של המשתמש.
+  usePresenceHeartbeat();
   const whiteWhenInactive = tone === "dark";
   const items: BottomNavItem[] = [
     {

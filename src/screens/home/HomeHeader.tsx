@@ -43,11 +43,14 @@ interface HomeHeaderProps {
  *  אייקונים נקיים בלי עיגול לבן וצל. ב-logoTone="white" (עמודים כהים) העיגולים נשארים,
  *  כי שם האייקונים השחורים צריכים רקע לבן כדי להיראות. */
 const PLAIN_ICON = "flex h-10 w-10 items-center justify-center rounded-full transition-colors active:bg-black/[0.05]";
-const WHITE_CIRCLE = "flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_1px_2px_rgba(15,20,25,0.10),0_6px_16px_-6px_rgba(15,20,25,0.22)]";
+/** *** עמודים כהים (logoTone="white", עמוד "תוכן"): גם כאן בלי עיגולים לבנים - האייקונים עצמם הופכים
+ *  ללבנים (בקשה מפורשת - "לסדר את עמוד התוכן"). */
+const PLAIN_ICON_DARK = "flex h-10 w-10 items-center justify-center rounded-full transition-colors active:bg-white/10 [&_svg]:stroke-white";
 
 export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: HomeHeaderProps) {
-  const plain = logoTone !== "white";
-  const iconBox = plain ? PLAIN_ICON : WHITE_CIRCLE;
+  const dark = logoTone === "white";
+  const plain = true;
+  const iconBox = dark ? PLAIN_ICON_DARK : PLAIN_ICON;
   // *** גובה קבוע (52px = pt-3 + כפתורים 40px) - זהה בדיוק לשורה של הבר הסגול של place's
   // (PlacesHeaderRow), כך ששני הבארים תמיד באותו גובה, בלי תלות בתוכן.
   return (
@@ -75,7 +78,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
           {loading ? (
             <Skeleton className="h-full w-full rounded-full" />
           ) : (
-            <Image src="/images/places-chat-icon.png" alt="" width={24} height={22} className={plain ? "h-[22px] w-6 object-contain" : "object-contain"} />
+            <Image src="/images/places-chat-icon.png" alt="" width={24} height={22} className={`h-[22px] w-6 object-contain ${dark ? "brightness-0 invert" : ""}`} />
           )}
         </Link>
       )}
@@ -128,7 +131,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
         </Link>
       ) : (
         <div className="justify-self-end">
-          <PlacesNotificationBell solid plain={plain} badgeTone="purple" />
+          <PlacesNotificationBell solid plain={plain} inverted={dark} badgeTone="purple" />
         </div>
       )}
     </header>
