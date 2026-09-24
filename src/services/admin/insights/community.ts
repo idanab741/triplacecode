@@ -105,40 +105,21 @@ export async function buildCommunity(db: Db, range: RangeKey) {
     .slice(0, 8);
 
   // --- תור מודרציה ---
-  const [recentPostsRes, lowReviewsRes, placeSubsRes, tripaddRes] = await Promise.all([
+  const [recentPostsRes, lowReviewsRes] = await Promise.all([
     db.from("posts").select("id,author_id,text,post_type,visibility,created_at,post_media(media_id)").is("deleted_at", null).order("created_at", { ascending: false }).limit(15),
     db.from("place_reviews").select("id,user_id,place_id,rating,comment,created_at,places(name,city)").lte("rating", 2).order("created_at", { ascending: false }).limit(10),
-    db.from("place_submissions").select("id,submitted_by,name,category,city,address,description,google_photo_url,rating,created_at").eq("status", "pending").order("created_at"),
-    db.from("tripadd_submissions").select("id,submitted_by,name,category,city,address,description,google_photo_url,rating,google_match_status,created_at").eq("status", "pending").order("created_at"),
   ]);
 
   type PostRow = { id: string; author_id: string; text: string | null; post_type: string; visibility: string; created_at: string; post_media: { media_id: string }[] | null };
   type ReviewRow = { id: string; user_id: string; place_id: string; rating: number; comment: string | null; created_at: string; places: { name: string; city: string | null } | null };
-  type SubRow = {
-    id: string;
-    submitted_by: string;
-    name: string;
-    category: string;
-    city: string | null;
-    address: string | null;
-    description: string | null;
-    google_photo_url: string | null;
-    rating: number | null;
-    google_match_status?: string | null;
-    created_at: string;
-  };
   const recentPosts = (recentPostsRes.data ?? []) as unknown as PostRow[];
   const lowReviews = (lowReviewsRes.data ?? []) as unknown as ReviewRow[];
-  const placeSubs = (placeSubsRes.data ?? []) as SubRow[];
-  const tripaddSubs = (tripaddRes.data ?? []) as SubRow[];
-  for (const r of [recentPostsRes, lowReviewsRes, placeSubsRes, tripaddRes]) if (r.error) errors.push(r.error.message);
+  for (const r of [recentPostsRes, lowReviewsRes]) if (r.error) errors.push(r.error.message);
 
   const names = await namesFor(db, [
     ...topCreatorIds.map(([id]) => id),
     ...recentPosts.map((x) => x.author_id),
     ...lowReviews.map((x) => x.user_id),
-    ...placeSubs.map((x) => x.submitted_by),
-    ...tripaddSubs.map((x) => x.submitted_by),
   ]);
 
   return {
@@ -170,25 +151,6 @@ export async function buildCommunity(db: Db, range: RangeKey) {
       comment: x.comment,
       at: x.created_at,
     })),
-    submissions: [
-      ...placeSubs.map((x) => ({ ...x, kind: "place" as const })),
-      ...tripaddSubs.map((x) => ({ ...x, kind: "tripadd" as const })),
-    ]
-      .sort((a, c) => a.created_at.localeCompare(c.created_at))
-      .map((x) => ({
-        id: x.id,
-        kind: x.kind,
-        name: x.name,
-        category: x.category,
-        city: x.city,
-        address: x.address,
-        description: x.description,
-        photoUrl: x.google_photo_url,
-        rating: x.rating,
-        googleMatch: x.google_match_status ?? null,
-        submittedBy: nameOf(names, x.submitted_by),
-        at: x.created_at,
-      })),
     warnings: errors,
   };
 }
@@ -208,8 +170,9 @@ export async function moderate(db: Db, input: ModerationAction): Promise<void> {
       input.action === "approve_submission"
         ? { status: "approved", reviewed_at: now, rejection_reason: null }
         : { status: "rejected", reviewed_at: now, rejection_reason: input.reason?.trim() || null };
-    const { error } = await db.from(table).update(update).eq("id", input.id).eq("status", "pending");
+    const { data, error } = await db.from(table).update(update).eq("id", input.id).select("id");
     if (error) throw new Error(error.message);
+    if (!data || data.length === 0) throw new Error("ההצעה לא נמצאה");
     return;
   }
   if (input.action === "hide_post") {

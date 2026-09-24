@@ -7,18 +7,7 @@ import { useAdminData, useAdminFetch, useStoredRange } from "@/screens/admin/kit
 import { RANGE_OPTIONS, type RangeValue, fmt, timeAgo } from "@/screens/admin/kit/format";
 import { PageHeader, Card, CardHeader, Segmented, Button, Pill, Avatar, LoadingGrid, ErrorBanner, UpdatedAt, Empty, Delta, SectionLabel } from "@/screens/admin/kit/ui";
 import { BarList, ColumnChart, Sparkline, StackedBar } from "@/screens/admin/kit/charts";
-import { Icon } from "@/screens/admin/kit/Icon";
-
-const CATEGORY_HE: Record<string, string> = {
-  restaurant: "מסעדה",
-  attraction: "אטרקציה",
-  nature: "טבע",
-  nightlife: "חיי לילה",
-  hotel: "מלון",
-  shopping: "קניות",
-  food: "אוכל",
-  sleep: "לינה",
-};
+import { SubmissionsPanel } from "@/screens/admin/community/SubmissionsPanel";
 
 export default function CommunityPage() {
   const [range, setRange] = useStoredRange<RangeValue>("triplace_admin_range", "30d");
@@ -85,79 +74,7 @@ export default function CommunityPage() {
             ))}
           </div>
 
-          <Card id="submissions">
-            <CardHeader
-              title="ממתין לאישור"
-              subtitle="הצעות מקומות ו-TripAdd שמשתמשים שלחו. אישור/דחייה מעדכנים את הסטטוס שהמשתמש רואה."
-              icon="checkCircle"
-              action={<Pill tone={data.submissions.length ? "warning" : "success"}>{data.submissions.length} פתוחים</Pill>}
-            />
-            {data.submissions.length === 0 ? (
-              <Empty icon="checkCircle" text="אין תוכן שממתין לאישור" />
-            ) : (
-              <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {data.submissions.map((s) => {
-                  const handled = done[s.id];
-                  return (
-                    <li key={s.id} className="flex gap-3 rounded-[var(--admin-radius-md)] border p-3" style={{ borderColor: "var(--admin-border)", opacity: handled ? 0.55 : 1 }}>
-                      {s.photoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.photoUrl} alt="" className="h-16 w-16 shrink-0 rounded-[8px] object-cover" />
-                      ) : (
-                        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[8px]" style={{ background: "var(--admin-bg-sunken)", color: "var(--admin-ink-faint)" }}>
-                          <Icon name="place" size={20} />
-                        </span>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[14px] font-semibold">{s.name}</span>
-                          <Pill tone="accent">{s.kind === "tripadd" ? "TripAdd" : "הצעת מקום"}</Pill>
-                          <Pill>{CATEGORY_HE[s.category] ?? s.category}</Pill>
-                          {s.googleMatch && <Pill tone={s.googleMatch === "matched" ? "success" : "warning"}>{s.googleMatch === "matched" ? "תואם Google" : "לא תואם Google"}</Pill>}
-                        </div>
-                        <div className="mt-1 text-[12px]" style={{ color: "var(--admin-ink-secondary)" }}>
-                          {[s.city, s.address].filter(Boolean).join(" · ") || "ללא כתובת"}
-                          {s.rating ? ` · ${s.rating}★` : ""}
-                        </div>
-                        {s.description && (
-                          <p className="mt-1 line-clamp-2 text-[12.5px]" style={{ color: "var(--admin-ink)" }}>
-                            {s.description}
-                          </p>
-                        )}
-                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[11.5px]" style={{ color: "var(--admin-ink-faint)" }}>
-                            {s.submittedBy} · {timeAgo(s.at)}
-                          </span>
-                          {handled ? (
-                            <Pill tone={handled === "אושר" ? "success" : "danger"}>{handled}</Pill>
-                          ) : (
-                            <span className="flex gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                icon="x"
-                                disabled={busyId === s.id}
-                                onClick={() => {
-                                  const reason = prompt("סיבת דחייה (תוצג למשתמש, אופציונלי):");
-                                  if (reason === null) return;
-                                  void act(s.id, { action: "reject_submission", kind: s.kind, reason }, "נדחה");
-                                }}
-                              >
-                                דחה
-                              </Button>
-                              <Button size="sm" variant="primary" icon="check" disabled={busyId === s.id} onClick={() => act(s.id, { action: "approve_submission", kind: s.kind }, "אושר")}>
-                                אשר
-                              </Button>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+          <SubmissionsPanel />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Card>

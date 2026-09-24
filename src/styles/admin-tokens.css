@@ -180,7 +180,9 @@
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.admin-fade-in { animation: admin-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+/* backwards (לא both) - כדי שלא יישאר transform אחרי האנימציה; transform קבוע
+   הופך את הכרטיס ל-containing block ו"כולא" בתוכו מודאלים עם position: fixed */
+.admin-fade-in { animation: admin-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
 @keyframes admin-skeleton-pulse {
   0%, 100% { opacity: 0.55; }
