@@ -13,6 +13,7 @@ import { PostInlineComments } from "@/screens/places/PostInlineComments";
 import { SearchResultCard } from "@/screens/search/SearchResultCard";
 import { CollectionCover } from "@/screens/collections/CollectionCover";
 import { CollectionActionBar } from "@/screens/collections/CollectionActionBar";
+import { AddToCalendarSheet } from "@/screens/calendar/AddToCalendarSheet";
 import { getAvatarUrl } from "@/constants/avatar";
 import { formatStopNumber, formatTripMeta, getTripTypeLabel, type TripDetailDto, type TripStopDto } from "@/services/social/tripTypes";
 
@@ -123,6 +124,9 @@ function TripBody({
   const authorName = trip.author.fullName ?? trip.author.username ?? "מטייל";
   const profileHref = `/places/profile/${trip.author.username ?? trip.author.id}`;
   const apiBase = `/api/social/trips/${trip.id}`;
+  /** *** חדש (בקשה מפורשת - "להכניס ליומן גם טיול בטבע"): הוספת הטיול ליומן. */
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarAddedOn, setCalendarAddedOn] = useState<string | null>(null);
 
   // תחנות לפי יום, כל יום ממוין לפי הסדר שלו
   const dayNumbers = [...new Set(trip.stops.map((s) => s.day))].sort((a, b) => a - b);
@@ -215,6 +219,36 @@ function TripBody({
           />
         </div>
         {commentsOpen && <PostInlineComments postId={trip.id} basePath={apiBase} />}
+
+        <button
+          type="button"
+          onClick={() => setCalendarOpen(true)}
+          className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98]"
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+            <path d="M3.5 10h17M8 3v4M16 3v4" />
+          </svg>
+          {calendarAddedOn
+            ? `נוסף ליומן · ${new Date(`${calendarAddedOn}T00:00:00`).toLocaleDateString("he-IL", { day: "numeric", month: "long" })}`
+            : "הוספה ליומן"}
+        </button>
+        {calendarOpen && (
+          <AddToCalendarSheet
+            item={{
+              itemType: "trip",
+              id: trip.id,
+              name: trip.title,
+              imageUrl: trip.coverUrl ?? trip.autoCoverUrl,
+              category: trip.tripType,
+            }}
+            onClose={() => setCalendarOpen(false)}
+            onDone={(r) => {
+              setCalendarOpen(false);
+              if (r.action === "added" && r.date) setCalendarAddedOn(r.date);
+            }}
+          />
+        )}
       </div>
 
       {/* ── מסלול הטיול: ימים ותחנות ממוספרות ── */}

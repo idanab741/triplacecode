@@ -91,3 +91,64 @@ export async function getFavoritePlaces(
 
   return results.filter((place): place is UnifiedPlace => place !== null);
 }
+export interface SavedPlaceItem {
+  place: UnifiedPlace;
+  placeType: PlaceType;
+  savedAt: string;
+  /** true = החלקה ימינה ב-TripMatch (status=liked, source=tripmatch); false = "שמירה" רגילה. */
+  fromTripmatch: boolean;
+}
+
+/**
+ * *** חדש (בקשה מפורשת - "יש המון כפתורי שמירה - לסדר, כולל החלקות ימינה"): כל המקומות שנשמרו, בשני
+ * המקורות יחד - "שמירה" (status=saved, מכל מקום באפליקציה) והחלקה ימינה ב-TripMatch (liked+tripmatch) -
+ * עם זמן השמירה, מהחדש לישן. אותה פתירת פרטים בדיוק כמו getFavoritePlaces (getUnifiedPlace).
+ */
+export async function getSavedPlaceItems(userId: string): Promise<SavedPlaceItem[]> {
+  const supabase = createClient();
+  const { data: rows } = await supabase
+    .from("favorites")
+    .select("place_id, place_type, status, source, created_at")
+    .eq("user_id", userId)
+    .in("status", ["saved", "liked"])
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const relevant = (rows ?? []).filter((r) => r.status === "saved" || (r.status === "liked" && r.source === "tripmatch"));
+  const resolved = await Promise.all(
+    relevant.map(async (r) => {
+      const place = await getUnifiedPlace(r.place_id as string);
+      if (!place) return null;
+      return {
+        place,
+        placeType: r.place_type as PlaceType,
+        savedAt: r.created_at as string,
+        fromTripmatch: r.status === "liked",
+      } satisfies SavedPlaceItem;
+    })
+  );
+  return resolved.filter((x): x is SavedPlaceItem => x !== null);
+}
+
+/** הסרה מ"הבחירות שלי" - מוחק את הרישום בלי קשר לסטטוס (שמירה או החלקה ימינה). */
+export async function removeSavedPlace(supabase: SupabaseClient, userId: string, placeId: string, placeType: PlaceType): Promise<void> {
+  await supabase.from("favorites").delete().eq("user_id", userId).eq("place_id", placeId);
+  if (placeType === "place") await recomputeTravelDna(supabase, userId);
+}
+
+/** החזרה אחרי "ביטול" - משחזר בדיוק את הרישום שהוסר. */
+export async function restoreSavedPlace(
+  supabase: SupabaseClient,
+  userId: string,
+  placeId: string,
+  placeType: PlaceType,
+  fromTripmatch: boolean
+): Promise<void> {
+  await supabase
+    .from("favorites")
+    .upsert(
+      { user_id: userId, place_id: placeId, place_type: placeType, status: fromTripmatch ? "liked" : "saved", ...(fromTripmatch ? { source: "tripmatch" } : {}) },
+      { onConflict: "user_id,place_id" }
+    );
+  if (placeType === "place") await recomputeTravelDna(supabase, userId);
+}

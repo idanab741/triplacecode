@@ -56,9 +56,27 @@ interface MonthCalendarProps {
   selectedDate: Date | null;
   onSelectDay: (date: Date) => void;
   onMonthChange: (year: number, month: number) => void;
+  /** בחירת תאריך להוספה - ימים שעברו לא לחיצים. */
+  disablePast?: boolean;
+  /** בלי מסגרת/רקע משלו - כשהוא יושב בתוך גיליון. */
+  bare?: boolean;
 }
 
-export function MonthCalendar({ eventDates, selectedDate, onSelectDay, onMonthChange }: MonthCalendarProps) {
+const BLUE = "#0A6DFE";
+
+function Arrow({ dir }: { dir: "prev" | "next" }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={dir === "next" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
+    </svg>
+  );
+}
+
+/**
+ * *** שדרוג עיצובי (בקשה מפורשת - "לסדר את היומן גם עיצובית"): קו העיצוב החדש - בלי צל וכרטיס, כחול
+ * מלא לסימון (היום = עיגול כחול מלא, נבחר = טבעת כחולה), נקודה כחולה מתחת לימים שיש בהם משהו ביומן.
+ */
+export function MonthCalendar({ eventDates, selectedDate, onSelectDay, onMonthChange, disablePast = false, bare = false }: MonthCalendarProps) {
   const [cursor, setCursor] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -70,99 +88,86 @@ export function MonthCalendar({ eventDates, selectedDate, onSelectDay, onMonthCh
   }, [cursor.year, cursor.month]);
 
   const cells = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
-  const weeks = useMemo(() => {
-    const rows: CalendarCell[][] = [];
-    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
-    return rows;
-  }, [cells]);
+  const todayStart = useMemo(() => {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  }, []);
 
-  function goToPrevMonth() {
+  function shift(delta: number) {
     setCursor((prev) => {
-      const month = prev.month === 0 ? 11 : prev.month - 1;
-      const year = prev.month === 0 ? prev.year - 1 : prev.year;
-      return { year, month };
+      const d = new Date(prev.year, prev.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
     });
   }
 
-  function goToNextMonth() {
-    setCursor((prev) => {
-      const month = prev.month === 11 ? 0 : prev.month + 1;
-      const year = prev.month === 11 ? prev.year + 1 : prev.year;
-      return { year, month };
-    });
-  }
+  const isCurrentMonth = cursor.year === todayStart.getFullYear() && cursor.month === todayStart.getMonth();
 
   return (
-    <div className="rounded-card bg-white p-4 shadow-soft">
-      <div className="mb-4 flex items-center justify-between">
+    <div className={bare ? "" : "rounded-2xl bg-[#F7F8FA] p-3.5"}>
+      <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
-          onClick={goToNextMonth}
-          aria-label="לחודש הבא"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary transition active:scale-90"
+          onClick={() => shift(-1)}
+          disabled={disablePast && isCurrentMonth}
+          aria-label="לחודש הקודם"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-ink transition active:bg-black/[0.05] disabled:opacity-25"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
+          <Arrow dir="prev" />
         </button>
-
-        <p className="text-base font-bold text-ink">
+        <p className="text-[16px] font-bold text-ink">
           {HEBREW_MONTHS[cursor.month]} {cursor.year}
         </p>
-
         <button
           type="button"
-          onClick={goToPrevMonth}
-          aria-label="לחודש הקודם"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary transition active:scale-90"
+          onClick={() => shift(1)}
+          aria-label="לחודש הבא"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-ink transition active:bg-black/[0.05]"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
+          <Arrow dir="next" />
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-1 text-center">
+      <div className="grid grid-cols-7 gap-y-0.5 text-center">
         {WEEKDAY_LETTERS.map((letter, i) => (
-          <div key={i} className="pb-2 text-xs font-semibold text-ink-secondary">
+          <div key={i} className="pb-1.5 text-[12px] font-semibold text-ink-secondary">
             {letter}
           </div>
         ))}
 
-        {weeks.map((week, weekIndex) =>
-          week.map((cell) => {
-            const key = dateKey(cell.date);
-            const hasEvent = cell.inCurrentMonth && eventDates.has(key);
-            const selected = selectedDate ? isSameDay(cell.date, selectedDate) : false;
-            return (
-              <button
-                key={`${weekIndex}-${key}`}
-                type="button"
-                onClick={() => onSelectDay(cell.date)}
-                className="mx-auto flex flex-col items-center gap-0.5 py-0.5"
+        {cells.map((cell) => {
+          const key = dateKey(cell.date);
+          const hasEvent = cell.inCurrentMonth && eventDates.has(key);
+          const selected = selectedDate ? isSameDay(cell.date, selectedDate) : false;
+          const past = disablePast && cell.date < todayStart;
+          const muted = !cell.inCurrentMonth || past;
+          return (
+            <button
+              key={key}
+              type="button"
+              disabled={past}
+              onClick={() => onSelectDay(cell.date)}
+              aria-pressed={selected}
+              aria-label={cell.date.toLocaleDateString("he-IL", { day: "numeric", month: "long" })}
+              className="mx-auto flex flex-col items-center gap-0.5 py-0.5 disabled:cursor-default"
+            >
+              <span
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-[15px] tabular-nums transition active:scale-90 ${
+                  muted ? "text-ink-secondary/35" : cell.isToday ? "font-bold text-white" : selected ? "font-bold text-ink" : "font-medium text-ink"
+                }`}
+                style={
+                  !muted && cell.isToday
+                    ? { background: BLUE, boxShadow: selected ? `0 0 0 2px #fff, 0 0 0 4px ${BLUE}` : undefined }
+                    : !muted && selected
+                      ? { boxShadow: `inset 0 0 0 2px ${BLUE}` }
+                      : undefined
+                }
               >
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium transition active:scale-90 ${
-                    !cell.inCurrentMonth
-                      ? "text-ink-secondary/35"
-                      : cell.isToday
-                        ? "bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-white font-bold"
-                        : selected
-                          ? "border-2 border-[var(--color-primary-start)] text-ink"
-                          : "text-ink"
-                  }`}
-                >
-                  {cell.date.getDate()}
-                </span>
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    hasEvent ? "bg-[var(--color-primary-start)]" : "bg-transparent"
-                  }`}
-                />
-              </button>
-            );
-          })
-        )}
+                {cell.date.getDate()}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: hasEvent ? BLUE : "transparent" }} />
+            </button>
+          );
+        })}
       </div>
     </div>
   );

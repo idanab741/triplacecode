@@ -628,6 +628,29 @@ export async function getCollectionCards(
   return cards;
 }
 
+/** האוספים ששמרתי (social_saves, target_type='collection'), לפי סדר השמירה (החדש ראשון).
+ *  אותו דפוס בדיוק כמו getViewerSavedTripCards - ה-RLS מסנן אוספים שהפכו פרטיים. */
+export async function getViewerSavedCollectionCards(supabase: SupabaseClient, viewerId: string, limit = 50): Promise<CollectionCardDto[]> {
+  const { data: saves, error } = await supabase
+    .from("social_saves")
+    .select("target_id")
+    .eq("user_id", viewerId)
+    .eq("target_type", "collection")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+
+  const ids = (saves ?? []).map((s) => s.target_id as string);
+  if (ids.length === 0) return [];
+
+  const { data: rows, error: rowsError } = await supabase.from("collections").select(COLLECTION_COLUMNS).in("id", ids);
+  if (rowsError) throw rowsError;
+
+  const { cards } = await buildCollections(supabase, viewerId, (rows ?? []) as CollectionRow[], "collage");
+  const order = new Map(ids.map((id, index) => [id, index]));
+  return cards.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // אינטראקציות: Like / Comment (Save עובר דרך toggleSocialSave הקיים)
 // ────────────────────────────────────────────────────────────────────────────

@@ -1,57 +1,60 @@
 ﻿"use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
-import { getFavoritePlaces, toggleFavorite } from "@/services/favorites/favoritesService";
-import type { UnifiedPlace } from "@/services/places/unifiedPlaceService";
-import { Screen, Skeleton, Button, SwipeToDeleteRow } from "@/components/ui";
+import { getSavedPlaceItems, removeSavedPlace, restoreSavedPlace, type SavedPlaceItem } from "@/services/favorites/favoritesService";
+import { Screen, Skeleton } from "@/components/ui";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { RetentionInfoModal } from "@/screens/trips/RetentionInfoModal";
+import { AddToCalendarSheet, type CalendarItemRef } from "@/screens/calendar/AddToCalendarSheet";
 import { getDaysRemainingBeforeRemoval } from "@/constants/contentRetention";
+import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { TRIP_TYPE_SHORT_LABEL, tripTypeIconSrc, tripTypeOfItem } from "@/constants/tripTypeOfItem";
 
 /**
- * *** תיקון אדריכלי (ר' migration 0057/0064 - trippy_ai_results):
- * עד עכשיו העמוד הזה שלף רק מ-trip_builder_sessions - תוצאות trippy AI
- * (הצ'אט המהיר) לא הופיעו כאן בכלל, למרות שהן כן מופיעות ב"הטיולים
- * שלי" בעמוד הבית (MyTripsSection.tsx). עכשיו מאחדים את שני המקורות
- * גם כאן, באותו דפוס בדיוק - שני fetch נפרדים, לא מעורבבים ב-DB, רק
- * בתצוגה, עם דגל isTrippyAi שמבדיל בין הכרטיסים בזמן ניווט/מחיקה/שמירה.
+ * *** בנוי מחדש (בקשה מפורשת - "יש המון כפתורי שמירה באפליקציה - צריך לסדר את זה כאן, כולל פוסטים
+ * וכולל החלקות ימינה"): כל מה שנשמר בכל מקום באפליקציה, במקום אחד, מהחדש לישן:
+ *  - מקומות: "שמירה" (עמוד אטרקציה / חיפוש / מפה) + החלקה ימינה ב-TripMatch (עם תג tripmatch).
+ *  - פוסטים, טיולים ואוספים של הקהילה (social_saves - קודם לא הופיעו כאן בכלל).
+ *  - "מסלולים שבניתי" - מסלולים זמניים שנבנו באפליקציה (לשונית נפרדת, מופיעה רק אם יש).
+ * "שמור" = בלי תאריך. לכל מקום/טיול יש כפתור "ליומן" שנותן לו תאריך.
+ * *** Trippy AI הושהה (בקשה מפורשת): תוצאות Trippy AI לא מוצגות (הנתונים לא נמחקים - SHOW_TRIPPY_AI).
  */
-interface SessionTrip {
+const SHOW_TRIPPY_AI = false;
+
+const BLUE = "#0A6DFE";
+const INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties;
+
+type Filter = "all" | "places" | "posts" | "trips" | "collections" | "built";
+
+interface SocialItem {
+  kind: "post" | "trip" | "collection";
   id: string;
-  source: "session";
+  savedAt: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  href: string;
+  tripType: string | null;
+}
+
+interface BuiltTrip {
+  id: string;
   tripType: string;
-  destinationLabel: string;
+  title: string;
   imageUrl: string | null;
   stopCount: number;
   createdAt: string;
   isSaved: boolean;
 }
 
-interface TrippyAiTrip {
-  id: string;
-  source: "trippy_ai";
-  destinationLabel: string;
-  imageUrl: string | null;
-  stopCount: number;
-  createdAt: string;
-  isSaved: boolean;
-}
-
-type ChoiceItem = SessionTrip | TrippyAiTrip;
-
-type Tab = "all" | "saved";
-
-const TAB_LABELS: Record<Tab, string> = {
-  // *** בקשה מפורשת - "רוצה שיהיה רק 'הטיולים שלי' ו'שמורים'": שתי לשוניות בלבד. לשונית "אטרקציות" (לייקים מ-TripMatch)
-  // הוסרה - הלייקים עברו לתוך "שמורים" (מתחת לאטרקציות השמורות), כדי שלא ייעלמו למשתמש.
-  all: "הטיולים שלי",
-  saved: "שמורים",
-};
+type Row =
+  | { key: string; kind: "place"; savedAt: string; item: SavedPlaceItem; tripType: HomeQuickCategoryId }
+  | { key: string; kind: "post" | "trip" | "collection"; savedAt: string; item: SocialItem };
 
 const TRIP_TYPE_ROUTE: Record<string, string> = {
   abroad_vacation: "abroad-vacation",
@@ -60,327 +63,548 @@ const TRIP_TYPE_ROUTE: Record<string, string> = {
   nightlife: "nightlife",
 };
 
-function tripResultPath(trip: ChoiceItem): string {
-  if (trip.source === "trippy_ai") return `/trip-builder/trippy-quick/result?savedId=${trip.id}`;
-  const routeSegment = TRIP_TYPE_ROUTE[trip.tripType] ?? trip.tripType.replace(/_/g, "-");
-  return `/trip-builder/${routeSegment}/result?sessionId=${trip.id}`;
-}
-
-function deleteTripPath(trip: ChoiceItem): string {
-  return trip.source === "trippy_ai" ? `/api/trippy-ai/${trip.id}` : `/api/trip-builder/sessions/${trip.id}`;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
-}
-
-/** תווית המקור (badge) של הכרטיס - "tripmatch"/"trippy AI" - בנוסף
- *  לתאריך, לא במקומו (ר' בקשה מפורשת - "להוסיף תאריכים... לא להחליף"). */
-function sourceBadgeLabel(trip: ChoiceItem): string | null {
-  if (trip.source === "trippy_ai") return "trippy AI";
-  if (trip.tripType === "tripmatch") return "tripmatch";
-  return null;
-}
-
 const RETENTION_POPUP_SEEN_KEY = "trips_retention_popup_seen_v1";
+
+const ip = { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const Icons = {
+  all: (
+    <svg {...ip}>
+      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4.5L5.5 21V4.5a1 1 0 0 1 1-1z" />
+    </svg>
+  ),
+  places: (
+    <svg {...ip}>
+      <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </svg>
+  ),
+  posts: (
+    <svg {...ip}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+      <circle cx="9" cy="9" r="1.6" />
+      <path d="m20.5 15.5-5-5-9 9" />
+    </svg>
+  ),
+  trips: (
+    <svg {...ip}>
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5" />
+    </svg>
+  ),
+  collections: (
+    <svg {...ip}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+    </svg>
+  ),
+  built: (
+    <svg {...ip}>
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2" />
+    </svg>
+  ),
+  calendar: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </svg>
+  ),
+  bookmarkFilled: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4.5L5.5 21V4.5a1 1 0 0 1 1-1z" />
+    </svg>
+  ),
+  trash: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+    </svg>
+  ),
+};
+
+const KIND_LABEL: Record<Row["kind"], string> = { place: "מקום", post: "פוסט", trip: "טיול", collection: "אוסף" };
+
+function socialSavePath(kind: "post" | "trip" | "collection", id: string): string {
+  return `/api/social/${kind === "post" ? "posts" : kind === "trip" ? "trips" : "collections"}/${id}/save`;
+}
+
+function formatShortDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+}
+
+function RoundAction({ label, onClick, children, active = false }: { label: string; onClick: () => void; children: ReactNode; active?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      aria-label={label}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${active ? "" : "bg-[#F1F2F5] text-ink"}`}
+      style={active ? { color: BLUE, background: "#EEF4FF" } : undefined}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** שורה ברשימה: תמונה (עם אייקון סוג הטיול למקומות), כותרת, שורת מידע, "ליומן" והסרה. */
+function SavedRow({
+  imageUrl,
+  fallback,
+  typeIcon,
+  title,
+  meta,
+  badge,
+  onOpen,
+  onCalendar,
+  onRemove,
+}: {
+  imageUrl: string | null;
+  fallback: ReactNode;
+  typeIcon?: string;
+  title: string;
+  meta: string;
+  badge?: string;
+  onOpen: () => void;
+  onCalendar?: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()} className="-mx-2 flex cursor-pointer items-center gap-3.5 rounded-2xl px-2 py-2.5 transition-colors active:bg-black/[0.04]">
+      <span className="relative shrink-0">
+        <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-xl bg-[#F1F2F5] text-ink-secondary">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            fallback
+          )}
+        </span>
+        {typeIcon && (
+          <span className="absolute -bottom-1.5 -start-1.5 block h-7 w-7 overflow-hidden rounded-full bg-white ring-2 ring-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={typeIcon} alt="" className="h-full w-full scale-125 object-cover" />
+          </span>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 text-[15.5px] font-semibold leading-snug text-ink">{title}</span>
+        <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-secondary">
+          <span className="truncate">{meta}</span>
+          {badge && <span className="shrink-0 rounded-full bg-[#F1EDFB] px-2 py-0.5 text-[11.5px] font-semibold text-places-purple">{badge}</span>}
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5">
+        {onCalendar && (
+          <RoundAction label="הוספה ליומן" onClick={onCalendar}>
+            {Icons.calendar}
+          </RoundAction>
+        )}
+        <RoundAction label="הסרה מהבחירות" onClick={onRemove} active>
+          {Icons.bookmarkFilled}
+        </RoundAction>
+      </span>
+    </div>
+  );
+}
 
 export default function TripsPage() {
   return (
     <Suspense>
-      <TripsPageContent />
+      <MyPicksContent />
     </Suspense>
   );
 }
 
-function TripsPageContent() {
+function MyPicksContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("all");
 
-  const [trips, setTrips] = useState<ChoiceItem[] | null>(null);
-  const [places, setPlaces] = useState<UnifiedPlace[] | null>(null);
-  // *** תוספת (בקשה מפורשת - "שמירה צריך להופיע בעמוד השמירה!!
-  // אטרקציות צריכות להופיע רק בהחלקה ימינה ב-TripMatch!!"): שתי
-  // פעולות שונות לגמרי, בכוונה לא מעורבבות: "שמור" (❤️ בעמוד אטרקציה/
-  // תוצאת חיפוש - status="saved", בלי source) שייך ללשונית "שמורים"
-  // כאן, ליד טיולים שמורים - לא ללשונית "אטרקציות" (ששייכת אך ורק
-  // ל"לייק" בהחלקה ימינה ב-TripMatch, status="liked"+source="tripmatch",
-  // ר' places state למעלה). savedPlaces הוא state נפרד מ-places בכוונה.
-  const [savedPlaces, setSavedPlaces] = useState<UnifiedPlace[] | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [typeFilter, setTypeFilter] = useState<HomeQuickCategoryId | null>(null);
+  const [places, setPlaces] = useState<SavedPlaceItem[] | null>(null);
+  const [social, setSocial] = useState<SocialItem[] | null>(null);
+  const [built, setBuilt] = useState<BuiltTrip[] | null>(null);
+  const [calendarItem, setCalendarItem] = useState<CalendarItemRef | null>(null);
+  const [toast, setToast] = useState<{ text: string; actionLabel?: string; action?: () => void } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showRetentionInfo, setShowRetentionInfo] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    setTrips(null);
-    const savedOnly = tab === "saved";
-
+    getSavedPlaceItems(user.id)
+      .then(setPlaces)
+      .catch(() => setPlaces([]));
+    fetch("/api/me/saved")
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d: { items?: SocialItem[] }) => setSocial(d.items ?? []))
+      .catch(() => setSocial([]));
     Promise.all([
-      fetch(`/api/trip-builder/sessions/saved${savedOnly ? "" : "?all=true"}`)
-        .then((res) => res.json())
+      fetch("/api/trip-builder/sessions/saved?all=true")
+        .then((r) => r.json())
         .catch(() => ({ trips: [] })),
-      fetch(`/api/trippy-ai${savedOnly ? "" : "?all=true"}`)
-        .then((res) => res.json())
-        .catch(() => ({ results: [] })),
-    ]).then(([sessionsData, trippyAiData]) => {
-      const fromSessions: ChoiceItem[] = (sessionsData.trips ?? []).map(
-        (t: { sessionId: string; tripType: string; destinationLabel: string; imageUrl: string | null; stopCount: number; createdAt: string; isSaved?: boolean }) => ({
+      SHOW_TRIPPY_AI
+        ? fetch("/api/trippy-ai?all=true")
+            .then((r) => r.json())
+            .catch(() => ({ results: [] }))
+        : Promise.resolve({ results: [] }),
+    ]).then(([sessions]) => {
+      setBuilt(
+        ((sessions.trips ?? []) as { sessionId: string; tripType: string; destinationLabel: string; imageUrl: string | null; stopCount: number; createdAt: string; isSaved?: boolean }[]).map((t) => ({
           id: t.sessionId,
-          source: "session" as const,
           tripType: t.tripType,
-          destinationLabel: t.destinationLabel,
+          title: t.destinationLabel,
           imageUrl: t.imageUrl,
           stopCount: t.stopCount,
           createdAt: t.createdAt,
           isSaved: t.isSaved === true,
-        })
+        }))
       );
-      const fromTrippyAi: ChoiceItem[] = (trippyAiData.results ?? []).map(
-        (r: { id: string; title: string; imageUrl: string | null; stopCount: number; createdAt: string; isSaved?: boolean }) => ({
-          id: r.id,
-          source: "trippy_ai" as const,
-          destinationLabel: r.title,
-          imageUrl: r.imageUrl,
-          stopCount: r.stopCount,
-          createdAt: r.createdAt,
-          isSaved: r.isSaved === true,
-        })
-      );
-      const merged = [...fromSessions, ...fromTrippyAi].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setTrips(merged);
     });
-  }, [user, tab]);
+  }, [user]);
 
   useEffect(() => {
-    if (!user || tab !== "saved") return;
-    setPlaces(null);
-    // *** תיקון: getFavoritePlaces בלי סינון מקור החזירה כל לייק בכל
-    // האפליקציה (גם מבניית מסלולים, לא רק TripMatch) - הלשונית הזו
-    // אמורה להציג רק לייקים שנעשו ב-TripMatch עצמו.
-    getFavoritePlaces(user.id, "liked", "tripmatch")
-      .then(setPlaces)
-      .catch(() => setPlaces([]));
-  }, [user, tab]);
-
-  useEffect(() => {
-    if (!user || tab !== "saved") return;
-    setSavedPlaces(null);
-    // *** תוספת (בקשה מפורשת - ר' הערה ליד savedPlaces state למעלה):
-    // status="saved" בלבד, בלי סינון source - תופס גם שמירה מ"תפתיע
-    // אותי", גם מעמוד תוצאת חיפוש, גם מכל מקום עתידי אחר שישתמש
-    // באותה פעולת "שמור" גנרית (בניגוד ל"אטרקציות", שמסננת במפורש
-    // source="tripmatch" בלבד).
-    getFavoritePlaces(user.id, "saved")
-      .then(setSavedPlaces)
-      .catch(() => setSavedPlaces([]));
-  }, [user, tab]);
-
-  // *** תוספת (בקשה מפורשת - Popup): מוצג פעם אחת בלבד (localStorage),
-  // ורק אחרי שהרשימה הראשונה (לשונית "כל הבחירות", ברירת המחדל) כבר
-  // נטענה - כדי שהמידע הדינמי (nearestExpiringDays, ר' למטה) יהיה
-  // מדויק כבר בפעם הראשונה שהמשתמש רואה את ה-Popup, לא ריק/מוערך.
-  useEffect(() => {
-    if (tab !== "all" || trips === null) return;
-    if (typeof window === "undefined") return;
+    if (filter !== "built" || built === null || typeof window === "undefined") return;
     if (window.localStorage.getItem(RETENTION_POPUP_SEEN_KEY)) return;
     setShowRetentionInfo(true);
-  }, [tab, trips]);
+  }, [filter, built]);
 
-  function handleCloseRetentionInfo() {
-    setShowRetentionInfo(false);
-    window.localStorage.setItem(RETENTION_POPUP_SEEN_KEY, "true");
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  function showToast(next: { text: string; actionLabel?: string; action?: () => void }) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(next);
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
   }
 
-  // *** תוספת - ר' RetentionInfoModal.tsx: הזמן שנשאר לבחירה הזמנית
-  // (לא-שמורה) הכי ותיקה - null אם כרגע אין אף בחירה זמנית (הכל כבר
-  // שמור, או שהרשימה עדיין ריקה). מחושב מכל הרשימה שכבר בזיכרון (tab
-  // "כל הבחירות") - לא קריאת רשת נוספת.
-  const unsavedTrips = (trips ?? []).filter((t) => !t.isSaved);
-  const nearestExpiringDays =
-    unsavedTrips.length > 0 ? Math.min(...unsavedTrips.map((t) => getDaysRemainingBeforeRemoval(t.createdAt))) : null;
+  const rows: Row[] = useMemo(() => {
+    const placeRows: Row[] = (places ?? []).map((item) => ({
+      key: `place:${item.place.id}`,
+      kind: "place",
+      savedAt: item.savedAt,
+      item,
+      tripType: tripTypeOfItem(item.place.category, item.place.subcategory),
+    }));
+    const socialRows: Row[] = (social ?? []).map((item) => ({ key: `${item.kind}:${item.id}`, kind: item.kind, savedAt: item.savedAt, item }));
+    return [...placeRows, ...socialRows].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }, [places, social]);
 
-  async function handleDeleteTrip(trip: ChoiceItem) {
-    setTrips((prev) => (prev ? prev.filter((t) => !(t.source === trip.source && t.id === trip.id)) : prev));
-    await fetch(deleteTripPath(trip), { method: "DELETE" }).catch(() => {});
-  }
+  const counts = {
+    all: rows.length,
+    places: rows.filter((r) => r.kind === "place").length,
+    posts: rows.filter((r) => r.kind === "post").length,
+    trips: rows.filter((r) => r.kind === "trip").length,
+    collections: rows.filter((r) => r.kind === "collection").length,
+    built: built?.length ?? 0,
+  };
 
-  async function handleUnlikePlace(placeId: string) {
-    setPlaces((prev) => (prev ? prev.filter((p) => p.id !== placeId) : prev));
+  const typeCounts = useMemo(() => {
+    const m = new Map<HomeQuickCategoryId, number>();
+    for (const r of rows) if (r.kind === "place") m.set(r.tripType, (m.get(r.tripType) ?? 0) + 1);
+    return m;
+  }, [rows]);
+
+  const visible = rows.filter((r) => {
+    if (filter === "places") return r.kind === "place" && (!typeFilter || r.tripType === typeFilter);
+    if (filter === "posts") return r.kind === "post";
+    if (filter === "trips") return r.kind === "trip";
+    if (filter === "collections") return r.kind === "collection";
+    return filter === "all";
+  });
+
+  const filters: { id: Filter; label: string; icon: ReactNode }[] = [
+    { id: "all", label: "הכל", icon: Icons.all },
+    { id: "places", label: "מקומות", icon: Icons.places },
+    { id: "posts", label: "פוסטים", icon: Icons.posts },
+    { id: "trips", label: "טיולים", icon: Icons.trips },
+    { id: "collections", label: "אוספים", icon: Icons.collections },
+    ...(counts.built > 0 ? [{ id: "built" as const, label: "מסלולים שבניתי", icon: Icons.built }] : []),
+  ];
+
+  async function removePlace(item: SavedPlaceItem) {
     if (!user) return;
+    setPlaces((prev) => (prev ? prev.filter((p) => p.place.id !== item.place.id) : prev));
     const supabase = createClient();
-    await toggleFavorite(supabase, user.id, placeId, "place", "liked").catch(() => {});
+    await removeSavedPlace(supabase, user.id, item.place.id, item.placeType).catch(() => {});
+    showToast({
+      text: "הוסר מהבחירות",
+      actionLabel: "ביטול",
+      action: async () => {
+        setToast(null);
+        setPlaces((prev) => (prev ? [item, ...prev.filter((p) => p.place.id !== item.place.id)] : [item]));
+        await restoreSavedPlace(supabase, user.id, item.place.id, item.placeType, item.fromTripmatch).catch(() => {});
+      },
+    });
   }
 
-  async function handleUnsavePlace(placeId: string) {
-    setSavedPlaces((prev) => (prev ? prev.filter((p) => p.id !== placeId) : prev));
-    if (!user) return;
-    const supabase = createClient();
-    await toggleFavorite(supabase, user.id, placeId, "place", "saved").catch(() => {});
+  async function removeSocial(item: SocialItem) {
+    setSocial((prev) => (prev ? prev.filter((s) => !(s.kind === item.kind && s.id === item.id)) : prev));
+    await fetch(socialSavePath(item.kind, item.id), { method: "POST" }).catch(() => {});
+    showToast({
+      text: "הוסר מהבחירות",
+      actionLabel: "ביטול",
+      action: async () => {
+        setToast(null);
+        setSocial((prev) => (prev ? [item, ...prev] : [item]));
+        await fetch(socialSavePath(item.kind, item.id), { method: "POST" }).catch(() => {});
+      },
+    });
   }
 
-  const tripEmptyMessage =
-    tab === "all"
-      ? "עוד לא בנית אף בחירה - כשתבנו טיול או מסלול, הוא יופיע כאן."
-      : 'עוד לא שמרת אף בחירה - כשתבנו מסלול ותשמרו אותו (בעזרת כפתור ה"שמור"), הוא יופיע כאן.';
+  async function deleteBuilt(trip: BuiltTrip) {
+    if (confirmDelete !== trip.id) {
+      setConfirmDelete(trip.id);
+      setTimeout(() => setConfirmDelete((c) => (c === trip.id ? null : c)), 3000);
+      return;
+    }
+    setConfirmDelete(null);
+    setBuilt((prev) => (prev ? prev.filter((t) => t.id !== trip.id) : prev));
+    await fetch(`/api/trip-builder/sessions/${trip.id}`, { method: "DELETE" }).catch(() => {});
+    showToast({ text: "המסלול נמחק" });
+  }
 
-  // *** בלשונית "שמורים" יש שני מקורות שונים (טיולים שמורים + אטרקציות
-  // שמורות) - "ריק" אמיתי הוא רק כששניהם ריקים, לא רק trips. ר' הערה
-  // ליד savedPlaces state למעלה.
-  const isSavedTabLoading = tab === "saved" && (loading || trips === null || savedPlaces === null || places === null);
-  const isSavedTabEmpty = tab === "saved" && (trips?.length ?? 0) === 0 && (savedPlaces?.length ?? 0) === 0 && (places?.length ?? 0) === 0;
+  const unsavedBuilt = (built ?? []).filter((t) => !t.isSaved);
+  const nearestExpiringDays = unsavedBuilt.length > 0 ? Math.min(...unsavedBuilt.map((t) => getDaysRemainingBeforeRemoval(t.createdAt))) : null;
+  const isLoading = loading || places === null || social === null;
+
+  const emptyText: Record<Filter, string> = {
+    all: "עוד לא שמרתם כלום. לחצו על שמירה בכל מקום, פוסט או טיול שאהבתם, והם יחכו לכם כאן.",
+    places: typeFilter ? `אין מקומות שמורים מסוג ${TRIP_TYPE_SHORT_LABEL[typeFilter]}.` : "עוד לא שמרתם מקומות. גם החלקה ימינה ב-tripmatch שומרת כאן.",
+    posts: "עוד לא שמרתם פוסטים.",
+    trips: "עוד לא שמרתם טיולים של הקהילה.",
+    collections: "עוד לא שמרתם אוספים.",
+    built: "אין מסלולים שבניתם.",
+  };
 
   return (
-    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
-      {/* *** בקשה מפורשת - "הבחירות שלי צריך להיות עם הבר העליון החדש של triplace": הבר התכלת (כמו בעמוד הבית) עם כפתור חזור; הכותרת עברה מתחתיו. */}
+    <Screen withBottomNavSpacing className="!bg-white !px-0 !pt-0">
       <HomeStatusBarTint />
-      <CollapsibleTopBar onBack={() => router.push("/home")} />
-      <h1 className="px-5 pb-1 pt-5 text-xl font-bold text-ink">הבחירות שלי</h1>
+      <CollapsibleTopBar onBack={() => router.push("/profile")} />
 
-      <div className="mx-auto flex max-w-xl flex-col gap-4 px-5 pt-5">
-        <div className="flex rounded-pill bg-bg-secondary p-1">
-          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-pill py-2 text-sm font-semibold transition-colors ${
-                tab === t
-                  ? "bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-white"
-                  : "text-ink-secondary"
-              }`}
-            >
-              {TAB_LABELS[t]}
-            </button>
-          ))}
-        </div>
+      <div className="mx-auto max-w-xl pb-6" style={INK}>
+        <header className="px-5 pt-4">
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">הבחירות שלי</h1>
+          <p className="mt-1 text-[14px] text-ink-secondary">כל מה ששמרתם, במקום אחד. רוצים לקבוע תאריך? לחצו על היומן.</p>
+        </header>
 
-        {(tab === "saved" ? isSavedTabLoading : loading || trips === null) ? (
-            <div className="flex flex-col gap-3">
-              {[0, 1, 2].map((i) => (
-                <Skeleton key={i} className="h-28 w-full rounded-card" />
-              ))}
-            </div>
-          ) : (tab === "saved" ? isSavedTabEmpty : (trips?.length ?? 0) === 0) ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <p className="text-sm text-ink-secondary">{tripEmptyMessage}</p>
-              <Button href="/home">לדף הבית</Button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {(trips ?? []).map((trip) => {
-                const badge = sourceBadgeLabel(trip);
-                const daysRemaining = trip.isSaved ? null : getDaysRemainingBeforeRemoval(trip.createdAt);
-                return (
-                  <SwipeToDeleteRow key={`${trip.source}-${trip.id}`} resetKey={tab} onDelete={() => handleDeleteTrip(trip)}>
-                    <button
-                      type="button"
-                      onClick={() => router.push(tripResultPath(trip))}
-                      className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
+        {/* סינון לפי סוג */}
+        <nav aria-label="סינון" className="flex gap-2 overflow-x-auto px-5 pb-1 pt-4" style={{ scrollbarWidth: "none" }}>
+          {filters.map((f) => {
+            const active = filter === f.id;
+            const count = counts[f.id];
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  setFilter(f.id);
+                  setTypeFilter(null);
+                }}
+                aria-pressed={active}
+                className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold transition active:scale-95 ${active ? "text-white" : "bg-[#F1F2F5] text-ink"}`}
+                style={active ? { background: BLUE } : undefined}
+              >
+                {f.icon}
+                {f.label}
+                {!isLoading && count > 0 && <span className={`tabular-nums ${active ? "text-white/80" : "text-ink-secondary"}`}>{count}</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* במקומות: סינון נוסף לפי סוג טיול - אותם אייקונים של עמוד הבית */}
+        {filter === "places" && typeCounts.size > 0 && (
+          <div className="flex gap-1 overflow-x-auto px-5 pt-3" style={{ scrollbarWidth: "none" }}>
+            {HOME_QUICK_CATEGORIES.filter((c) => typeCounts.has(c.id)).map((c) => {
+              const active = typeFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setTypeFilter(active ? null : c.id)}
+                  aria-pressed={active}
+                  className="flex w-[60px] shrink-0 flex-col items-center gap-1 transition active:scale-95"
+                >
+                  <span className="relative">
+                    <span
+                      className="block h-11 w-11 overflow-hidden rounded-full bg-[#F1F2F5]"
+                      style={active ? { boxShadow: `0 0 0 2.5px #fff, 0 0 0 4.5px ${BLUE}` } : undefined}
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.imageSrc} alt="" className="h-full w-full scale-125 object-cover" />
+                    </span>
+                    <span className="absolute -bottom-1 -start-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold text-white ring-2 ring-white tabular-nums" style={{ background: BLUE }}>
+                      {typeCounts.get(c.id)}
+                    </span>
+                  </span>
+                  <span className={`w-full truncate text-center text-[11.5px] ${active ? "font-bold text-ink" : "font-medium text-ink-secondary"}`}>{TRIP_TYPE_SHORT_LABEL[c.id]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="px-5 pt-4">
+          {filter === "built" ? (
+            <>
+              <p className="mb-2 rounded-xl bg-[#F4F5F7] px-3.5 py-3 text-[13.5px] leading-snug text-ink-secondary">
+                מסלולים שבניתם באפליקציה. מסלול שלא שמרתם נמחק אוטומטית אחרי 14 יום.
+              </p>
+              {(built ?? []).map((trip) => {
+                const days = trip.isSaved ? null : getDaysRemainingBeforeRemoval(trip.createdAt);
+                const segment = TRIP_TYPE_ROUTE[trip.tripType] ?? trip.tripType.replace(/_/g, "-");
+                const confirming = confirmDelete === trip.id;
+                return (
+                  <div
+                    key={trip.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push(`/trip-builder/${segment}/result?sessionId=${trip.id}`)}
+                    onKeyDown={(e) => e.key === "Enter" && router.push(`/trip-builder/${segment}/result?sessionId=${trip.id}`)}
+                    className="-mx-2 flex cursor-pointer items-center gap-3.5 rounded-2xl px-2 py-2.5 transition-colors active:bg-black/[0.04]"
+                  >
+                    <span className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F1F2F5] text-ink-secondary">
                       {trip.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={trip.imageUrl} alt={trip.destinationLabel} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
+                        <img src={trip.imageUrl} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">🧳</div>
+                        Icons.trips
                       )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[15px] font-bold text-ink">{trip.destinationLabel}</p>
-                        {/* *** תיקון (בקשה מפורשת - "להוסיף תאריכים בכרטיסיות
-                            של tripmatch ו-trippy AI"): התאריך מוצג תמיד
-                            עכשיו, גם כשיש badge מקור (tripmatch/trippy AI) -
-                            לפני כן badge כזה "הסתיר" את התאריך לגמרי. */}
-                        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-secondary">
-                          {badge && <span className="font-semibold text-accent">{badge}</span>}
-                          <span>
-                            {trip.source === "session" ? `${trip.stopCount} תחנות · ` : ""}
-                            נוצר ב-{formatDate(trip.createdAt)}
-                          </span>
-                        </p>
-                        {/* *** תוספת (בקשה מפורשת - "לוודא שהיא מוגדרת
-                            כזמנית"): צ'יפ קטן על בחירות לא-שמורות, עם
-                            ספירת ימים דינמית (לא "14 יום" קבוע). */}
-                        {daysRemaining != null && (
-                          <p className="mt-1 inline-block rounded-pill bg-[var(--color-primary-start)]/10 px-2 py-0.5 text-[11px] font-semibold text-[var(--color-primary-start)]">
-                            {daysRemaining === 0 ? "אחרון היום - שמרו כדי לא לאבד" : `זמני · יישמר עוד ${daysRemaining} ${daysRemaining === 1 ? "יום" : "ימים"}`}
-                          </p>
-                        )}
-                      </div>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 text-[15.5px] font-semibold leading-snug text-ink">{trip.title}</span>
+                      <span className="mt-0.5 block text-[13px] text-ink-secondary">
+                        {trip.tripType === "tripmatch" ? "tripmatch · " : ""}
+                        {trip.stopCount} תחנות
+                      </span>
+                      {days != null && (
+                        <span className="mt-1 inline-block rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[11.5px] font-semibold" style={{ color: BLUE }}>
+                          {days === 0 ? "נמחק היום - שמרו כדי לא לאבד" : `זמני · עוד ${days} ${days === 1 ? "יום" : "ימים"}`}
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteBuilt(trip);
+                      }}
+                      aria-label={confirming ? "לחצו שוב למחיקה" : "מחיקת המסלול"}
+                      className={`flex h-10 shrink-0 items-center justify-center gap-1 rounded-full transition active:scale-95 ${confirming ? "bg-danger px-3.5 text-[13px] font-semibold text-white" : "w-10 bg-[#F1F2F5] text-ink"}`}
+                    >
+                      {confirming ? "למחוק?" : Icons.trash}
                     </button>
-                  </SwipeToDeleteRow>
+                  </div>
                 );
               })}
-
-              {/* *** תוספת (בקשה מפורשת - "שמירה צריך להופיע בעמוד
-                  השמירה!!"): אטרקציות בודדות ששמרו (❤️ בעמוד אטרקציה/
-                  תוצאת חיפוש, status="saved") - מתחת לטיולים השמורים,
-                  לא מעורבב באותה רשימה (צורות כרטיס/ניווט/מחיקה שונות),
-                  אבל כן באותה לשונית "שמורים" בדיוק כמו שהתבקש. */}
-              {tab === "saved" && savedPlaces && savedPlaces.length > 0 && (
-                <>
-                  <p className="mt-2 text-sm font-bold text-ink">אטרקציות שמורות</p>
-                  {savedPlaces.map((place) => (
-                    <SwipeToDeleteRow key={place.id} resetKey={tab} onDelete={() => handleUnsavePlace(place.id)}>
-                      <button
-                        type="button"
-                        onClick={() => router.push(place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`)}
-                        className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
-                      >
-                        {place.imageUrls[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={place.imageUrls[0]} alt={place.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
-                        ) : (
-                          <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
-                          <p className="mt-0.5 truncate text-xs text-ink-secondary">
-                            {[place.subcategory, place.category, place.city].filter(Boolean)[0]}
-                            {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
-                          </p>
-                        </div>
-                      </button>
-                    </SwipeToDeleteRow>
-                  ))}
-                </>
-              )}
-              {/* לייקים מ-TripMatch (החלקה ימינה) - עברו לכאן מלשונית "אטרקציות" שהוסרה (בקשה מפורשת: רק "הטיולים שלי" ו"שמורים") */}
-              {tab === "saved" && places && places.length > 0 && (
-                <>
-                  <p className="mt-2 text-sm font-bold text-ink">אטרקציות שאהבתם ב־TripMatch</p>
-                  {places.map((place) => (
-                    <SwipeToDeleteRow key={`liked-${place.id}`} resetKey={tab} onDelete={() => handleUnlikePlace(place.id)}>
-                      <button
-                        type="button"
-                        onClick={() => router.push(place.type === "destination" ? `/destination/${place.id}` : `/place/${place.id}`)}
-                        className="flex w-full items-center gap-3 overflow-hidden rounded-card bg-bg-secondary p-3 text-right"
-                      >
-                        {place.imageUrls[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={place.imageUrls[0]} alt={place.name} className="h-20 w-24 shrink-0 rounded-xl object-cover" />
-                        ) : (
-                          <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-xl bg-bg-secondary text-2xl">📍</div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[15px] font-bold text-ink">{place.name}</p>
-                          <p className="mt-0.5 truncate text-xs text-ink-secondary">
-                            {[place.subcategory, place.category, place.city].filter(Boolean)[0]}
-                            {place.rating != null && ` · ⭐ ${place.rating.toFixed(1)}`}
-                          </p>
-                        </div>
-                      </button>
-                    </SwipeToDeleteRow>
-                  ))}
-                </>
-              )}
+            </>
+          ) : isLoading ? (
+            <div className="flex flex-col gap-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3.5">
+                  <Skeleton className="h-[76px] w-[76px] rounded-xl" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+              ))}
             </div>
-          )
-        }
+          ) : visible.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 px-4 py-14 text-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#F1F2F5] text-ink-secondary">{Icons.all}</span>
+              <p className="max-w-[300px] text-[15px] leading-relaxed text-ink-secondary">{emptyText[filter]}</p>
+              <button
+                type="button"
+                onClick={() => router.push("/home")}
+                className="h-12 rounded-xl px-8 text-[15.5px] font-semibold text-white transition active:scale-[0.98]"
+                style={{ background: BLUE }}
+              >
+                לגלות מקומות
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {visible.map((row) => {
+                if (row.kind === "place") {
+                  const p = row.item.place;
+                  return (
+                    <SavedRow
+                      key={row.key}
+                      imageUrl={p.imageUrls[0] ?? null}
+                      fallback={Icons.places}
+                      typeIcon={tripTypeIconSrc(row.tripType)}
+                      title={p.name}
+                      meta={[TRIP_TYPE_SHORT_LABEL[row.tripType], p.city, p.rating != null ? `★ ${p.rating.toFixed(1)}` : null].filter(Boolean).join(" · ")}
+                      badge={row.item.fromTripmatch ? "tripmatch" : undefined}
+                      onOpen={() => router.push(p.type === "destination" ? `/destination/${p.id}` : `/place/${p.id}`)}
+                      onCalendar={
+                        p.type === "destination"
+                          ? undefined
+                          : () => setCalendarItem({ itemType: "place", id: p.id, name: p.name, imageUrl: p.imageUrls[0] ?? null, category: p.category ?? p.subcategory })
+                      }
+                      onRemove={() => removePlace(row.item)}
+                    />
+                  );
+                }
+                const s = row.item;
+                return (
+                  <SavedRow
+                    key={row.key}
+                    imageUrl={s.imageUrl}
+                    fallback={s.kind === "post" ? Icons.posts : s.kind === "trip" ? Icons.trips : Icons.collections}
+                    typeIcon={s.kind === "trip" && s.tripType ? tripTypeIconSrc(tripTypeOfItem(s.tripType)) : undefined}
+                    title={s.title}
+                    meta={[KIND_LABEL[s.kind], s.subtitle].filter(Boolean).join(" · ")}
+                    onOpen={() => router.push(s.href)}
+                    onCalendar={s.kind === "trip" ? () => setCalendarItem({ itemType: "trip", id: s.id, name: s.title, imageUrl: s.imageUrl, category: s.tripType }) : undefined}
+                    onRemove={() => removeSocial(s)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
+      {calendarItem && (
+        <AddToCalendarSheet
+          item={calendarItem}
+          onClose={() => setCalendarItem(null)}
+          onDone={(r) => {
+            setCalendarItem(null);
+            if (r.action === "added" && r.date) showToast({ text: `נוסף ליומן · ${formatShortDate(r.date)}`, actionLabel: "ליומן", action: () => router.push("/calendar") });
+          }}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed inset-x-0 bottom-[104px] z-50 flex justify-center px-5" role="status">
+          <div className="flex w-full max-w-md items-center gap-3 rounded-xl bg-[#0f1419] py-2 pe-2 ps-4 text-white shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
+            <span className="min-w-0 flex-1 truncate text-[14.5px] font-medium">{toast.text}</span>
+            {toast.action && (
+              <button type="button" onClick={toast.action} className="h-9 shrink-0 rounded-lg px-3 text-[14.5px] font-bold text-[#6EA8FF] active:bg-white/10">
+                {toast.actionLabel}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {showRetentionInfo && (
-        <RetentionInfoModal onClose={handleCloseRetentionInfo} nearestExpiringDays={nearestExpiringDays} />
+        <RetentionInfoModal
+          nearestExpiringDays={nearestExpiringDays}
+          onClose={() => {
+            setShowRetentionInfo(false);
+            window.localStorage.setItem(RETENTION_POPUP_SEEN_KEY, "true");
+          }}
+        />
       )}
 
       <MainBottomNav active="profile" />

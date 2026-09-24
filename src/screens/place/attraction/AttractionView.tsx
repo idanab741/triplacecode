@@ -47,7 +47,13 @@ export function AttractionView({ data, reviews, activeNavTab = "home" }: { data:
       </div>
 
       {/* 3 */}
-      <AttractionSaveShareRow placeId={data.id} placeName={data.name} placeType={data.source === "tripadd" ? "tripadd" : "place"} />
+      <AttractionSaveShareRow
+        placeId={data.id}
+        placeName={data.name}
+        placeType={data.source === "tripadd" ? "tripadd" : "place"}
+        imageUrl={data.imageUrls[0] ?? null}
+        category={data.categories.join(" ")}
+      />
 
       {/* 4 */}
       <AttractionRatingsSummary
