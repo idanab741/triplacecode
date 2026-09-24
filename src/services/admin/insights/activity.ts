@@ -211,7 +211,7 @@ export async function loadActivity(db: Db, lookbackDays = 730): Promise<Activity
       db.from("stories").select("author_id,created_at").gte("created_at", since).order("id").range(f, t)
     ),
     safeFetchAll<{ user_id: string; created_at: string }>("favorites", errors, (f, t) =>
-      db.from("favorites").select("user_id,created_at").gte("created_at", since).order("id").range(f, t)
+      db.from("favorites").select("user_id,created_at").in("status", ["liked", "saved"]).gte("created_at", since).order("id").range(f, t)
     ),
     safeFetchAll<{ user_id: string; created_at: string }>("post_likes", errors, (f, t) =>
       db.from("post_likes").select("user_id,created_at").gte("created_at", since).order("created_at").order("user_id").range(f, t)

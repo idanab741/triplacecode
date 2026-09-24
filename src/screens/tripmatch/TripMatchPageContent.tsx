@@ -16,7 +16,7 @@ import { toggleFavorite } from "@/services/favorites/favoritesService";
 import { listAddresses } from "@/services/addresses/addressesService";
 import { SwipeHeader, SwipeProgressBar } from "@/screens/tripmatch/SwipeHeader";
 import { FilterCircleButton } from "@/screens/tripmatch/FilterCircleButton";
-import { TripMatchCard, TRIPMATCH_CARD_BUTTON_ZONE, TRIPMATCH_MAIN_BUTTON_SIZE, resolveCardTap } from "@/screens/tripmatch/TripMatchCard";
+import { TripMatchCard, TRIPMATCH_BUTTON_ROW, resolveCardTap } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -24,6 +24,7 @@ import { SaveTripIconButton } from "@/screens/trip-builder/SaveTripIconButton";
 import dynamic from "next/dynamic";
 import { haversineDistanceKm, estimateTravelMinutes } from "@/services/tripBuilder/geo";
 import type { CandidatePlace } from "@/services/tripBuilder/types";
+import { toTripAddCategory } from "@/services/tripMatch/matchScore";
 import { useFeatureOnboardingGuard } from "@/hooks/useFeatureOnboardingGuard";
 import { getCategoryLabel } from "@/utils/categoryLabels";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
@@ -93,15 +94,6 @@ function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilter
 const DECK_MAX_CARD_WIDTH = 340;
 const DECK_SIDE_GUTTER = 24;
 const DECK_CARD_ASPECT = 0.66;
-/** אותו חצי-עיגול תחתון כמו ב-TripMatchCard - מוחל גם על הכרטיסים מאחור
- *  כדי שהחצי-עיגול יישאר לבן ונקי (בלי שתמונת הכרטיס שמאחור תציץ דרכו). */
-const DECK_NOTCH_MASK = {
-  WebkitMaskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
-  maskImage: "radial-gradient(circle 38px at 50% calc(100% + 24px), transparent 0 37px, #000 38px)",
-  WebkitMaskRepeat: "no-repeat",
-  maskRepeat: "no-repeat",
-} as const;
-
 /** הכרטיסים המציצים מאחורי הכרטיס הקדמי - [0] = הקרוב (depth 1) ... [3] =
  *  הרחוק (depth 4). rot = זווית (מעלות, סביב תחתית הכרטיס), y = הזזה אנכית
  *  בפיקסלים (שלילי = כלפי מעלה). ערכי embedded קטנים כדי להישאר בתוך
@@ -209,27 +201,15 @@ export function TripMatchPageContent({
     setActiveCategoryFilters((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   }
   function matchesQuickCategoryFilter(candidate: CandidatePlace, id: HomeQuickCategoryId): boolean {
-    switch (id) {
-      case "attraction":
-        return candidate.category === "attractions";
-      case "food":
-        return candidate.category === "restaurants";
-      case "nightlife":
-        return candidate.category === "nightlife";
-      case "nature":
-        return candidate.category === "nature";
-      case "sleep":
-        return candidate.category === "hotels";
-      case "shopping":
-        // *** אין (עדיין) מקומות עם category="shopping" עצמו - "שופינג"
-        // קיים היום רק כתגית (trip_type_tags/tags) בשאר האפליקציה, לכן
-        // הסינון כאן לפי חפיפת תגית, לא לפי עמודת category.
-        return new Set([...candidate.tripTypeTags, ...candidate.cuisineTags, ...(candidate.tags ?? [])]).has(
-          "shopping"
-        );
-      default:
-        return false;
+    // *** תיקון (באג - "מסעדה שלא מופיעה בפילטר של מסעדות"): הכרטיסים מגיעים עם קטגוריות TripAdd
+    // (food/attraction/nature/nightlife/sleep/shopping) - בדיוק אותם מזהים כמו עיגולי הסינון. ההשוואה
+    // הישנה בדקה מול שמות המאגר הישן (restaurants/attractions/hotels) ולכן מסעדות, אטרקציות, לינה
+    // ושופינג אף פעם לא עברו את הסינון. toTripAddCategory מקבל את שני הפורמטים (גם חפיסות ישנות).
+    if (toTripAddCategory(candidate.category) === id) return true;
+    if (id === "shopping") {
+      return new Set([...candidate.tripTypeTags, ...candidate.cuisineTags, ...(candidate.tags ?? [])]).has("shopping");
     }
+    return false;
   }
 
   // "אחר" - בחירה ידנית של תתי-קטגוריות מתוך כל 19 האפשרויות (התאמות אישיות),
@@ -312,7 +292,7 @@ export function TripMatchPageContent({
       const h = Math.round(navTop - stageDocTop - 12);
       // רצפה: הכרטיס לא יהיה "שטוח" מדי במסכים נמוכים מאוד (אז הוא פשוט
       // ממשיך מתחת לבר וגוללים). 1.15 = גובה מינימלי ביחס לרוחב.
-      const next = width > 0 ? Math.max(h, Math.round(width * 1.15)) : null;
+      const next = width > 0 ? Math.max(h, Math.round(width * 1.05) + TRIPMATCH_BUTTON_ROW) : null;
       setDeckStageHeight((prev) => (prev === next ? prev : next));
     };
     measure();
@@ -389,13 +369,36 @@ export function TripMatchPageContent({
     width: "100%",
     aspectRatio: String(DECK_CARD_ASPECT),
   };
-  const DECK_LAYER_STYLE = {
+  // *** עיצוב חדש (בקשה מפורשת - "תעצב כמו בדוגמה"): הכרטיסים תופסים את כל תיבת ה-Deck חוץ משורת
+  // הכפתורים, שיושבת עכשיו *מתחת* לכרטיס (לא בתוכו). מכיוון שהכרטיס כבר לא נוגע בבר התחתון, אין יותר
+  // צורך בחצי-העיגול סביב הגלובוס.
+  const DECK_CARD_STYLE = {
     position: "absolute" as const,
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: TRIPMATCH_BUTTON_ROW,
   };
 
   const [filters, setFilters] = useState<TripMatchFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // מקומות שדילגו עליהם (X) - מוסתרים לצמיתות עד שחזור מתוך חלון הסינון.
+  const [skippedCount, setSkippedCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    let cancelled = false;
+    fetch("/api/tripmatch/skipped")
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d: { count?: number }) => {
+        if (!cancelled) setSkippedCount(d.count ?? 0);
+      })
+      .catch(() => {
+        if (!cancelled) setSkippedCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filtersOpen]);
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
   const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>(restoredDeck?.likedPlaces ?? []);
   const [hasSwipedAny, setHasSwipedAny] = useState(Boolean(restoredDeck && restoredDeck.decidedIds.length > 0));
@@ -707,6 +710,21 @@ export function TripMatchPageContent({
     handleSelectCity({ value: query, label: query, type: "city" }, { immediate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [embedded, initialCityQuery, selectedCity, restoredDeck]);
+
+  /** "שחזור כל המקומות ואיפוס" (בקשה מפורשת): מחזיר את כל המקומות שדילגו עליהם, מאפס סינונים
+   *  ועיגולי קטגוריה, וטוען את החפיסה מחדש ליעד הנוכחי. */
+  async function handleRestoreSkipped() {
+    const res = await fetch("/api/tripmatch/skipped", { method: "DELETE" });
+    if (!res.ok) {
+      setError("לא הצלחנו לשחזר את המקומות, נסו שוב");
+      return;
+    }
+    setSkippedCount(0);
+    setFiltersOpen(false);
+    setActiveCategoryFilters([]);
+    if (deckCacheKey) clearDeck(deckCacheKey);
+    await handleBrowseAll(selectedCity ?? undefined);
+  }
 
   function handleEditDestination() {
     // *** תיקון (Home - מוטמע): כש-embedded=true, שורת החיפוש של Home
@@ -1170,9 +1188,9 @@ export function TripMatchPageContent({
         ? distanceLimited
         : distanceLimited.filter((c) => activeCategoryFilters.some((id) => matchesQuickCategoryFilter(c, id)));
     const filtered = applyFilters(categoryFiltered, filters);
-    const sorted = [...filtered].sort(
-      (a, b) => computeMatchPercent(b, filters, userPreferences) - computeMatchPercent(a, filters, userPreferences)
-    );
+    // אחוז ההתאמה האישי מגיע מהשרת (matchScore.ts); החישוב המקומי נשאר רק לחפיסות ישנות שנשמרו לפני כן.
+    const matchOf = (c: CandidatePlace) => c.matchPercent ?? computeMatchPercent(c, filters, userPreferences);
+    const sorted = [...filtered].sort((a, b) => matchOf(b) - matchOf(a));
     const decided = new Set(decidedIds);
     return { deck: sorted, visibleCandidates: sorted.filter((c) => !decided.has(c.id)) };
   }, [candidates, filters, userLocation, userPreferences, nearMeActive, activeCategoryFilters, decidedIds]);
@@ -1180,6 +1198,14 @@ export function TripMatchPageContent({
   /** כמה כבר הוחלט בתוך החפיסה הנוכחית (אחרי סינון) - "X-1" ב-"X/Y". */
   const totalDecisions = deckSize - visibleCandidates.length;
   const currentCandidate = visibleCandidates[candidateIndex];
+  // אחוז ההתאמה האישי שמוצג על הכרטיס (טבעת + סיבה) - מהשרת; חפיסה ישנה מה-cache נופלת לחישוב המקומי.
+  const currentMatch = currentCandidate
+    ? {
+        percent: currentCandidate.matchPercent ?? computeMatchPercent(currentCandidate, filters, userPreferences),
+        reasons: currentCandidate.matchReasons ?? [],
+        personalized: currentCandidate.matchPersonalized ?? true,
+      }
+    : null;
   const currentPhotoIndex =
     currentCandidate && photoState.candidateId === currentCandidate.id ? photoState.index : 0;
 
@@ -1772,8 +1798,8 @@ export function TripMatchPageContent({
                         className="pointer-events-none absolute overflow-hidden rounded-[28px] border-[2px] border-white bg-bg-secondary"
                         style={
                           embedded
-                            ? { ...DECK_LAYER_STYLE, ...DECK_NOTCH_MASK, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
-                            : { top: 0, height: "100%", left: 0, right: 0, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            ? { ...DECK_CARD_STYLE, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
+                            : { top: 0, left: 0, right: 0, bottom: TRIPMATCH_BUTTON_ROW, transform: `rotate(${rot}deg)`, transformOrigin: "50% 100%" }
                         }
                       />
                     ))}
@@ -1781,7 +1807,7 @@ export function TripMatchPageContent({
                       type="button"
                       onClick={handleAddPlaceClick}
                       className="absolute flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[28px] border-[2px] border-white bg-white shadow-[0_18px_40px_rgba(16,24,40,0.14)] transition active:scale-[0.98]"
-                      style={embedded ? DECK_LAYER_STYLE : { top: 0, height: "100%", left: 0, right: 0 }}
+                      style={embedded ? DECK_CARD_STYLE : { top: 0, left: 0, right: 0, bottom: TRIPMATCH_BUTTON_ROW }}
                     >
                       <span
                         className="flex h-16 w-16 items-center justify-center rounded-full shadow-[0_8px_20px_rgba(10,109,254,0.4)]"
@@ -1846,12 +1872,12 @@ export function TripMatchPageContent({
                         // ל-inset-x-0 (מלא רוחב ה-container, כמו קודם).
                         style={
                           embedded
-                            ? { ...DECK_LAYER_STYLE, ...DECK_NOTCH_MASK, transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`, transformOrigin: "50% 100%" }
+                            ? { ...DECK_CARD_STYLE, transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`, transformOrigin: "50% 100%" }
                             : {
                                 top: 0,
-                                height: "100%",
                                 left: 0,
                                 right: 0,
+                                bottom: TRIPMATCH_BUTTON_ROW,
                                 transform: `translateY(${cfg.y}px) rotate(${cfg.rot}deg)`,
                                 transformOrigin: "50% 100%",
                               }
@@ -1875,7 +1901,7 @@ export function TripMatchPageContent({
                     // content width and shifting the whole deck left.
                     <div
                       data-tripmatch-front-surface=""
-                      style={DECK_LAYER_STYLE}
+                      style={DECK_CARD_STYLE}
                     >
                       <SwipeCard
                         ref={swipeCardRef}
@@ -1894,11 +1920,13 @@ export function TripMatchPageContent({
                             matchTotal={totalDecisions + visibleCandidates.length}
                             cityLabel={selectedCityLabel || selectedCity || ""}
                             centerBox={{ top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", aspectRatio: "auto" }}
+                            match={currentMatch}
                           />
                         )}
                       </SwipeCard>
                     </div>
                   ) : (
+                    <div className="absolute" style={{ top: 0, left: 0, right: 0, bottom: TRIPMATCH_BUTTON_ROW }}>
                     <SwipeCard
                       ref={swipeCardRef}
                       key={`${currentCandidate.id}-${swipeResetTick}`}
@@ -1916,9 +1944,11 @@ export function TripMatchPageContent({
                           matchTotal={totalDecisions + visibleCandidates.length}
                           cityLabel={selectedCityLabel || selectedCity || ""}
                           centerBox={null}
+                          match={currentMatch}
                         />
                       )}
                     </SwipeCard>
+                    </div>
                   )}
 
                   {/* *** כפתורי הפעולה - קבועים לגמרי (בקשה מפורשת - "לא
@@ -1937,37 +1967,25 @@ export function TripMatchPageContent({
                       pointer-events-none על השורה (ו-auto רק על הכפתורים)
                       כדי שהרווחים בין הכפתורים לא יחסמו החלקה/לחיצה על
                       הכרטיס שמתחתיהם. */}
+                  {/* *** עיצוב חדש (בקשה מפורשת - "תעצב כמו בדוגמה"): שורת הכפתורים מתחת לכרטיס, ממורכזת -
+                      דלג (לבן, X אדום), חזרה (קטן, אפור) ואהבתי (גרדיאנט כחול המותג). עדיין siblings של
+                      ה-SwipeCard (לא זזים בגרירה) ומפעילים אותו דרך ref לאותה אנימציית fly-out. dir="ltr" -
+                      X תמיד משמאל והלב מימין. aria-label נשמרים (SearchIntroOverlay מאתר את הכפתורים לפיהם). */}
                   <div
-                    aria-hidden="true"
-                    // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד קואורדינטות
-                    // מ-JS (cardBox.top+height) - העטיפה עצמה מקבלת בדיוק את
-                    // אותה תיבת CSS כמו הכרטיס (CARD_BOX_STYLE, spread) - אז
-                    // יש לה בדיוק את אותו גודל/מיקום כמו הכרטיס, מחושב ע"י
-                    // הדפדפן (לא JS). בתוך העטיפה הזו, שורת הכפתורים בפועל
-                    // ממוקמת ב-bottom:ZONE *יחסית לעטיפה* (לא לקונטיינר החיצוני)
-                    // - כלומר תמיד קרוב לתחתית *הכרטיס עצמו*, לא משנה מה הגובה
-                    // המחושב שלו בפועל.
-                    style={embedded ? { ...DECK_LAYER_STYLE, pointerEvents: "none" as const } : { top: 0, height: "100%", left: 0, right: 0 }}
+                    dir="ltr"
+                    className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-start justify-center gap-5 pt-3"
+                    style={{ height: TRIPMATCH_BUTTON_ROW }}
                   >
-                    <div
-                      dir="ltr"
-                      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center gap-[16px]"
-                      style={{ height: TRIPMATCH_MAIN_BUTTON_SIZE, bottom: TRIPMATCH_CARD_BUTTON_ZONE }}
-                    >
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.nope()}
                       aria-label="דלג"
-                      className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto mt-1.5 flex h-[64px] w-[64px] items-center justify-center rounded-full bg-white text-[#e5484d] shadow-[0_10px_26px_-6px_rgba(16,24,40,0.28)] ring-1 ring-black/[0.04] transition active:scale-90 disabled:opacity-50"
                     >
-                      {/* *** שדרוג (בקשה מפורשת - "להתאים לעיצוב שלנו"): כפתורים וקטוריים חדים במקום תמונות
-                          PNG - עיגול לבן מלא, צל ברור, אייקון בצבע מלא. אותו גודל ואותו מיקום בדיוק. */}
-                      <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-white text-[#F0304E] shadow-[0_10px_28px_rgba(0,0,0,0.35)]">
-                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" aria-hidden="true">
-                          <path d="M6 6l12 12M18 6 6 18" />
-                        </svg>
-                      </span>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6 6 18" />
+                      </svg>
                     </button>
 
                     <button
@@ -1975,17 +1993,12 @@ export function TripMatchPageContent({
                       disabled={busy || lastDecision == null}
                       onClick={handleRewind}
                       aria-label="חזור לכרטיס הקודם"
-                      // *** כולו בתוך הכרטיס (בקשה מפורשת): 71→54px ומיושר לראש
-                      // השורה (self-start) - התחתית שלו ~68px מעל תחתית הכרטיס,
-                      // מעל החצי-עיגול (רדיוס 57px), כך שהוא לא "חצי בחוץ".
-                      className="pointer-events-auto flex h-[54px] w-[54px] self-start items-center justify-center transition active:scale-90 disabled:opacity-40"
+                      className="pointer-events-auto mt-[16px] flex h-[44px] w-[44px] items-center justify-center rounded-full bg-white text-[#8a8fa3] shadow-[0_6px_16px_-4px_rgba(16,24,40,0.22)] ring-1 ring-black/[0.04] transition active:scale-90 disabled:opacity-40"
                     >
-                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#5b6472] shadow-[0_8px_20px_rgba(0,0,0,0.3)]">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M9 14 4 9l5-5" />
-                          <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-                        </svg>
-                      </span>
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M9 14 4 9l5-5" />
+                        <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+                      </svg>
                     </button>
 
                     <button
@@ -1993,15 +2006,13 @@ export function TripMatchPageContent({
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.like()}
                       aria-label="אהבתי"
-                      className="pointer-events-auto flex h-[98px] w-[98px] items-center justify-center transition active:scale-90 disabled:opacity-50"
+                      className="pointer-events-auto flex h-[72px] w-[72px] items-center justify-center rounded-full text-white shadow-[0_14px_30px_-8px_rgba(27,111,232,0.65)] transition active:scale-90 disabled:opacity-50"
+                      style={{ background: "linear-gradient(145deg, var(--color-primary-start) 0%, var(--color-primary-end) 100%)" }}
                     >
-                      <span className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-[#0A6DFE] text-white shadow-[0_10px_28px_rgba(10,109,254,0.5)]">
-                        <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                          <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" />
-                        </svg>
-                      </span>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" />
+                      </svg>
                     </button>
-                    </div>
                   </div>
 
                   {/* *** תוספת (בקשה מפורשת - "פלואו מושלם"): במהלך אישור
@@ -2009,7 +2020,7 @@ export function TripMatchPageContent({
                       בלי שום אינדיקציה זה מרגיש "תקוע". אינדיקטור עדין
                       וממורכז, לא חוסם - רק מבהיר שמשהו קורה ברקע. */}
                   {busy && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-[114px] flex justify-center">
+                    <div className="pointer-events-none absolute inset-x-0 flex justify-center" style={{ bottom: TRIPMATCH_BUTTON_ROW + 16 }}>
                       <div className="flex items-center gap-2 rounded-pill bg-black/50 px-3.5 py-2 text-xs font-medium text-white backdrop-blur-sm">
                         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                         שומר...
@@ -2186,6 +2197,8 @@ export function TripMatchPageContent({
           onClose={() => setFiltersOpen(false)}
           preferredTags={[...(userPreferences?.interests ?? []), ...(userPreferences?.culinaryStyles ?? [])]}
           resultCount={visibleCandidates.length}
+          skippedCount={skippedCount}
+          onRestoreSkipped={handleRestoreSkipped}
         />
       )}
 

@@ -6,6 +6,7 @@ import { geocodePlaceName } from "@/services/tripBuilder/geocodingService";
 import type { CandidatePlace, LatLng } from "@/services/tripBuilder/types";
 import { HOME_QUICK_CATEGORY_LABELS } from "@/locales/he/homeQuickCategories";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
+import { loadMatchProfile, computeMatch } from "@/services/tripMatch/matchScore";
 import { getTravelDna, type TravelDna } from "@/services/travelDna/travelDnaService";
 
 export interface TripMatchSession {
@@ -206,11 +207,12 @@ async function fetchTripAddCandidates(
   const EXCLUSION_TTL_DAYS = 14;
   const exclusionCutoffIso = new Date(Date.now() - EXCLUSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const excluded = new Set([...session.liked_place_ids, ...session.rejected_place_ids]);
+  // לייק/שמירה - מוסתרים 14 יום. דילוג (X) ב-TripMatch - מוסתר עד ששוחזר ידנית ("מקומות שדילגתי" בסינון).
   const { data: pastDecisions } = await supabase
     .from("favorites")
-    .select("place_id")
+    .select("place_id, status, source, created_at")
     .eq("user_id", session.user_id)
-    .gte("created_at", exclusionCutoffIso);
+    .or(`created_at.gte."${exclusionCutoffIso}",and(status.eq.skipped,source.eq.tripmatch)`);
   for (const row of pastDecisions ?? []) excluded.add(row.place_id as string);
 
   const { data, error } = await query.order("created_at", { ascending: false }).limit(limit * 3);
@@ -347,7 +349,31 @@ async function fetchTripAddCandidates(
   // הראשי הוא עכשיו לפי ציון האישיות (taxonomy_categories/tags + למידה
   // התנהגותית מ-favorites), לא לפי מרחק גרידא. מרחק נשאר שובר-שוויון,
   // כדי שבין שני מקומות שווי-התאמה עדיין נראה קודם את הקרוב יותר.
+  // *** אחוז התאמה אישי לכל כרטיס (בקשה מפורשת - "אחוז התאמה למשתמש לפי ההתאמה האישית"): טעם
+  // (העדפות + טקסונומיה), התנהגות (לייקים/דחיות קודמים), איכות, קרבה וצרכים - ר' matchScore.ts.
+  const profile = await loadMatchProfile(supabase, session.user_id, dna).catch(() => null);
+  const taxonomyById = new Map(rows.map((r) => [r.id as string, (r.taxonomy_tags as string[] | null) ?? []]));
+  for (const c of withinRadius) {
+    const match = computeMatch(
+      {
+        category: c.category,
+        subcategory: c.subcategory,
+        taxonomyTags: taxonomyById.get(c.id) ?? [],
+        googleRating: c.googleRating,
+        rating: c.rating,
+        distanceKm: c.distanceKm,
+        accessible: c.accessible,
+      },
+      profile
+    );
+    c.matchPercent = match.percent;
+    c.matchReasons = match.reasons;
+    c.matchPersonalized = match.personalized;
+  }
+  // המיון הראשי: אחוז ההתאמה (שכבר כולל את ציון ה-DNA), ואחריו ציון האישיות הישן ומרחק כשוברי שוויון.
   const withDistance = [...withinRadius].sort((a, b) => {
+    const matchDiff = (b.matchPercent ?? 0) - (a.matchPercent ?? 0);
+    if (matchDiff !== 0) return matchDiff;
     const scoreDiff = (scoreById.get(b.id) ?? 0) - (scoreById.get(a.id) ?? 0);
     if (scoreDiff !== 0) return scoreDiff;
     return searchDistanceKm(a) - searchDistanceKm(b);
