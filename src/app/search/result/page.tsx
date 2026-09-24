@@ -141,7 +141,7 @@ function SearchResultContent() {
       <div className="relative w-full">
         <div className="absolute inset-x-0 top-0 z-30 h-16 w-full">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-            <Image src="/images/triplace-logo-black.png" alt="" width={110} height={34} className={`object-contain ${WHITE_ICON_FILTER}`} />
+            <Image src="/images/triplace-logo-black.png" alt="" width={174} height={53} className={`-my-[7px] h-[53px] w-[174px] max-w-none object-contain ${WHITE_ICON_FILTER}`} />
             <button
               type="button"
               onClick={() => router.push("/home")}

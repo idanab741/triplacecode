@@ -36,11 +36,11 @@ const LONG_TEXT_LINES = 6;
 const MAX_MEDIA_TILES = 4;
 const LIKE_COLOR = "#F43F5E";
 
-const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 function HeartIcon({ filled }: { filled: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON} fill={filled ? "currentColor" : "none"}>
+    <svg width="22" height="22" viewBox="0 0 24 24" {...ICON} fill={filled ? "currentColor" : "none"}>
       <path d="M12 20.6s-7.6-4.7-7.6-10.4A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 2.6c0 5.7-7.6 10.4-7.6 10.4Z" />
     </svg>
   );
@@ -48,7 +48,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
 
 function CommentIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}>
+    <svg width="22" height="22" viewBox="0 0 24 24" {...ICON}>
       <path d="M20.5 12a8 8 0 0 1-11.7 7.1L3.8 20.4l1.4-4.4A8 8 0 1 1 20.5 12Z" />
     </svg>
   );
@@ -56,7 +56,7 @@ function CommentIcon() {
 
 function BookmarkIcon({ filled }: { filled: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON} fill={filled ? "currentColor" : "none"}>
+    <svg width="22" height="22" viewBox="0 0 24 24" {...ICON} fill={filled ? "currentColor" : "none"}>
       <path d="M6.5 4h11a1 1 0 0 1 1 1v15.2l-6.5-4.3-6.5 4.3V5a1 1 0 0 1 1-1Z" />
     </svg>
   );
@@ -64,7 +64,7 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
 
 function ShareIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" {...ICON}>
+    <svg width="22" height="22" viewBox="0 0 24 24" {...ICON}>
       <path d="m21.5 3-19 7.4 7.3 2.8L12.6 21l8.9-18Z" />
       <path d="m9.8 13.2 5.4-5" />
     </svg>
@@ -98,7 +98,7 @@ function ActionButton({
       <span key={popKey} className={color && popKey ? "pc-pop" : ""}>
         {children}
       </span>
-      {count != null && count > 0 && <span className="min-w-[1ch] text-[13px] font-medium tabular-nums">{count}</span>}
+      {count != null && count > 0 && <span className="min-w-[1ch] text-[13.5px] tabular-nums">{count}</span>}
     </button>
   );
 }
@@ -211,10 +211,10 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
   ];
 
   return (
-    <article className="flex gap-3 border-b border-black/[0.07] px-4 py-3.5">
+    <article className="flex gap-3 border-b border-black/[0.07] px-4 pb-2.5 pt-3.5">
       {/* אווטאר */}
       <Link href={profileHref} className="shrink-0 self-start" aria-label={authorName}>
-        <span className="block h-11 w-11 overflow-hidden rounded-full bg-bg-secondary">
+        <span className="block h-10 w-10 overflow-hidden rounded-full bg-bg-secondary">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={getAvatarUrl(item.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
         </span>
@@ -233,7 +233,7 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
               </svg>
             )}
           </Link>
-          <span className="shrink-0 whitespace-nowrap text-[13.5px] text-ink-secondary">
+          <span className="shrink-0 whitespace-nowrap text-[14px] text-ink-secondary">
             · {formatRelativeTimeHe(item.createdAt)}
             {typeLabel ? ` · ${typeLabel}` : ""}
           </span>
@@ -381,7 +381,7 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
 
         {/* מקום / יעד - קישור עדין. "כתוב ביקורת" בתוך המסגרת, בצד שמאל */}
         {(item.place || item.destination) && (
-          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-black/[0.08] px-3 py-2 transition hover:bg-black/[0.02]">
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-black/[0.035] py-2 pe-2 ps-2.5 transition-colors active:bg-black/[0.06]">
             <Link
               href={item.place ? `/place/${item.place.id}` : `/destination/${item.destination?.id}`}
               className="flex min-w-0 flex-1 items-center gap-2"
@@ -397,13 +397,13 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
                   <circle cx="12" cy="10" r="2.5" />
                 </svg>
               )}
-              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{item.place?.name ?? item.destination?.name}</span>
+              <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink">{item.place?.name ?? item.destination?.name}</span>
             </Link>
             {item.place ? (
               <button
                 type="button"
                 onClick={() => onWriteReview(item.place!.id, item.place!.name)}
-                className="shrink-0 whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] font-semibold text-places-purple transition active:scale-95"
+                className="shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-semibold text-places-purple transition-colors active:bg-places-purple/10"
               >
                 כתוב ביקורת
               </button>
@@ -419,7 +419,7 @@ export function PostCard({ item, onLikeToggle, onSaveToggle, onWriteReview, onEd
         <PostLikersStrip postId={item.id} likeCount={likeCount} refreshKey={likersRefresh} />
 
         {/* פעולות */}
-        <div className="mt-1.5 flex items-center justify-between">
+        <div className="mt-2 flex items-center justify-between pe-1">
           <ActionButton label="תגובות" count={item.stats.comments} color={commentsExpanded ? "var(--color-places-purple)" : undefined} onClick={() => setCommentsExpanded((v) => !v)}>
             <CommentIcon />
           </ActionButton>

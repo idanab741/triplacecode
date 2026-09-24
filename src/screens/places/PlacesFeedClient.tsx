@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
@@ -34,6 +34,17 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+/**
+ * *** בקשה מפורשת ("נראה דהוי"): גווני טקסט חדים יותר לעמוד הבית בלבד. הטוקנים הגלובליים
+ * (ink כחלחל-כהה #1a1a2e, ink-secondary אפור-בהיר #8a8fa3) נותנים מראה חלבי; כאן מוחלפים
+ * לשחור-ניטרלי וטקסט משני כהה יותר, כמו ב-X/אינסטגרם. כל text-ink / text-ink-secondary
+ * בתוך העמוד מקבלים את זה אוטומטית (CSS variables), בלי לגעת בשאר האפליקציה.
+ */
+const HOME_INK = {
+  "--color-ink": "#0f1419",
+  "--color-ink-secondary": "#5b6472",
+} as CSSProperties;
 
 interface PlacesFeedClientProps {
   /** המשתמש שכבר אומת בשרת (page.tsx) - נמנע מהמתנה ל-AuthProvider בצד הלקוח בטעינה הראשונה. */
@@ -196,15 +207,15 @@ export function PlacesFeedClient({ initialUser, initialEntries, initialNextCurso
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24">
+    <div className="min-h-screen bg-white pb-24" style={HOME_INK}>
       <HomeStatusBarTint color="#ffffff" solidBackground />
       {/* *** בקשה מפורשת - "החלק העליון כמו בעמוד הבית, המיקום זהה, ושורת החיפוש
           ב-place's עם תפקיד אחר": אותו רכיב בדיוק כמו הבר של triplace (מיקום/מידות/
           נדבק/מתכווץ בגלילה), עם שורת "צור תוכן חדש" + חיפוש place's במקום החיפוש. */}
       {/* *** בקשה מפורשת - "רקע לבן, רק הטקסט places בסגול": הבר השקוף
           (על רקע העמוד הבהיר), לוגו places בסגול. */}
-      <CollapsibleTopBar headerRow={<PlacesHeaderRow badgeTone="purple" />}>
-        <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
+      <CollapsibleTopBar headerRow={<PlacesHeaderRow badgeTone="purple" logo="triplace" plain />}>
+        <PlacesTopBarCreate variant="flat" placeholder="חיפוש מטיילים" onCreate={() => setCreateMenuOpen(true)} />
       </CollapsibleTopBar>
 
 

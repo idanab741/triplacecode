@@ -14,6 +14,9 @@ export const PLACES_BAR_SHADOW = "none";
 const WHITE_CIRCLE =
   "flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-4px_rgba(50,10,120,0.45)]";
 
+const PLAIN_ICON =
+  "flex h-10 w-10 items-center justify-center rounded-full transition-colors active:bg-black/[0.05]";
+
 /**
  * שורת הכותרת העליונה של הבר הסגול של place's. *** אותה שורה בדיוק, במיקום
  * ובמידות זהים, כמו HomeHeader של עמוד הבית (grid-cols-[40px_1fr_40px], px-5,
@@ -27,6 +30,8 @@ export function PlacesHeaderRow({
   menuHref,
   logoTone = "brand",
   badgeTone = "blue",
+  logo = "places",
+  plain = false,
 }: {
   onBack?: () => void;
   menuHref?: string;
@@ -34,16 +39,26 @@ export function PlacesHeaderRow({
   logoTone?: "brand" | "white";
   /** צבע עיגול מונה ההתראות - "purple" רק בבית ובמפה (בקשה מפורשת). */
   badgeTone?: "blue" | "purple";
+  /** *** בקשה מפורשת - "בעמוד הבית במקום places יהיה triplace בצבע סגול על רקע שקוף":
+   *  "triplace" = לוגו triplace (אותה תיבה 128x39, אותו צבע סגול/לבן דרך mask).
+   *  ברירת מחדל "places" - שאר העמודים (מפה, פרופיל וכו') לא משתנים. */
+  logo?: "places" | "triplace";
+  /** *** בקשה מפורשת (עמוד הבית - "מלא צל מסביב לכל כפתור, נראה בנוי ב-AI"): true = אייקוני
+   *  הצ'אט והפעמון נקיים, בלי עיגול לבן וצל - כמו בברים של X/פייסבוק/אינסטגרם. ברירת מחדל
+   *  false: במפה העיגולים נשארים, כי שם הם יושבים מעל המפה וצריכים ניגודיות. */
+  plain?: boolean;
 }) {
+  const circle = plain ? PLAIN_ICON : WHITE_CIRCLE;
+  const logoSrc = logo === "triplace" ? "/images/triplace-logo-black.png" : "/images/places-logo.png";
   return (
     <header className="relative z-10 grid h-[52px] grid-cols-[40px_1fr_40px] items-center px-5 pt-3 pb-0">
       {onBack ? (
-        <div className={WHITE_CIRCLE}>
+        <div className={circle}>
           <BackButton onBack={onBack} />
         </div>
       ) : (
-        <Link href="/places/chat" aria-label="צ'אט" className={WHITE_CIRCLE}>
-          <Image src="/images/places-chat-icon.png" alt="" width={22} height={20} className="object-contain" />
+        <Link href="/places/chat" aria-label="צ'אט" className={circle}>
+          <Image src="/images/places-chat-icon.png" alt="" width={24} height={22} className={plain ? "h-[22px] w-6 object-contain" : "object-contain"} />
         </Link>
       )}
 
@@ -56,12 +71,16 @@ export function PlacesHeaderRow({
             mask מאותו קובץ לוגו - הצורה זהה ב-100%, רק הצבע משתנה. */}
         <span
           role="img"
-          aria-label="place's"
-          className="block h-[39px] w-[128px] select-none"
+          aria-label={logo === "triplace" ? "TRIPLACE" : "place's"}
+          className={
+            logo === "triplace"
+              ? "block h-[53px] w-[174px] shrink-0 select-none"
+              : "block h-[39px] w-[128px] select-none"
+          }
           style={{
             backgroundColor: logoTone === "white" ? "#ffffff" : "var(--color-places-purple)",
-            WebkitMaskImage: "url(/images/places-logo.png)",
-            maskImage: "url(/images/places-logo.png)",
+            WebkitMaskImage: `url(${logoSrc})`,
+            maskImage: `url(${logoSrc})`,
             WebkitMaskSize: "contain",
             maskSize: "contain",
             WebkitMaskRepeat: "no-repeat",
@@ -75,13 +94,13 @@ export function PlacesHeaderRow({
       <div className="justify-self-end">
         {/* menuHref (עמוד הפרופיל שלי): תפריט שלוש-הפסים מחליף את הפעמון, באותו עיגול לבן ובאותו מיקום. */}
         {menuHref ? (
-          <Link href={menuHref} aria-label="תפריט" className={WHITE_CIRCLE}>
+          <Link href={menuHref} aria-label="תפריט" className={circle}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b21b6" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </Link>
         ) : (
-          <PlacesNotificationBell solid badgeTone={badgeTone} />
+          <PlacesNotificationBell solid plain={plain} badgeTone={badgeTone} />
         )}
       </div>
     </header>

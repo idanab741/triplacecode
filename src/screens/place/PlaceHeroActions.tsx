@@ -121,9 +121,9 @@ export function PlaceHeroActions({
         <Image
           src="/images/triplace-logo-black.png"
           alt=""
-          width={140}
-          height={43}
-          className={`object-contain ${WHITE_ICON_FILTER}`}
+          width={174}
+          height={53}
+          className={`-my-[7px] h-[53px] w-[174px] max-w-none object-contain ${WHITE_ICON_FILTER}`}
         />
 
         {/* שמירה + שיתוף — צד ימין */}

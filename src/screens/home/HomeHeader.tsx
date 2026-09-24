@@ -91,7 +91,7 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
         <span
           role="img"
           aria-label="TRIPLACE"
-          className="block h-[39px] w-[128px] select-none"
+          className="block h-[53px] w-[174px] shrink-0 select-none"
           style={{
             backgroundColor: logoTone === "white" ? "#ffffff" : "#000000", // *** בקשה מפורשת: triplace בשחור (על הבר השקוף)
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",

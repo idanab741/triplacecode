@@ -6,6 +6,10 @@ import { getAvatarUrl } from "@/constants/avatar";
 
 interface PlacesTopBarCreateProps {
   onCreate: () => void;
+  /** *** בקשה מפורשת (עמוד הבית): "flat" = שדה אפור שטוח בלי צל וטבעת, כמו שורות החיפוש
+   *  של X/פייסבוק. ברירת מחדל "floating" - במפה השורה צפה מעל המפה וצריכה את הצל. */
+  variant?: "floating" | "flat";
+  placeholder?: string;
 }
 
 interface PersonResult {
@@ -26,7 +30,8 @@ interface PersonResult {
  * אותו דפוס כמו SearchBarLink בבית: התפריט מוצג כשיש פוקוס + טקסט של 2 תווים לפחות, בלי state
  * "פתוח/סגור" נפרד. תוצאות ישנות מתנקות מיד בכל הקשה, ותשובה מאוחרת של בקשה קודמת נזרקת (cancelled).
  */
-export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
+export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder = "חפש ב-place's" }: PlacesTopBarCreateProps) {
+  const flat = variant === "flat";
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [results, setResults] = useState<PersonResult[] | null>(null);
@@ -68,13 +73,19 @@ export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
 
   return (
     <div className="relative">
-      <div className="flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(50,10,120,0.28)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[var(--color-places-purple)]/40">
+      <div
+        className={
+          flat
+            ? "flex h-11 items-center gap-2.5 rounded-full bg-[#f0f1f4] px-4 text-[15px] text-ink transition-colors focus-within:bg-white focus-within:ring-1 focus-within:ring-[var(--color-places-purple)]"
+            : "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(50,10,120,0.28)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[var(--color-places-purple)]/40"
+        }
+      >
         <svg
           width={20}
           height={20}
           viewBox="0 0 24 24"
           fill="none"
-          stroke="var(--color-places-purple)"
+          stroke={flat ? "var(--color-ink-secondary)" : "var(--color-places-purple)"}
           strokeWidth="2"
           strokeLinecap="round"
           className="shrink-0"
@@ -95,8 +106,8 @@ export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
             // דיליי קצר - כדי שלחיצה על תוצאה תספיק להירשם לפני שהתפריט נסגר.
             blurTimeoutRef.current = setTimeout(() => setFocused(false), 150);
           }}
-          placeholder="חפש ב-place's"
-          aria-label="חיפוש ב-place's"
+          placeholder={placeholder}
+          aria-label={placeholder}
           enterKeyHint="search"
           className="w-full min-w-0 bg-transparent text-[16px] font-normal text-ink placeholder:text-ink-secondary focus:outline-none"
         />
@@ -112,7 +123,7 @@ export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
           </button>
         )}
 
-        <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />
+        {!flat && <span aria-hidden="true" className="h-6 w-px shrink-0 bg-ink-secondary/20" />}
         <button
           type="button"
           onClick={onCreate}
@@ -121,7 +132,11 @@ export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
         >
           <span
             className="flex h-6 w-6 items-center justify-center rounded-full text-[17px] font-bold leading-none text-white"
-            style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
+            style={{
+              background: flat
+                ? "var(--color-places-purple)"
+                : "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))",
+            }}
           >
             +
           </span>
@@ -131,7 +146,9 @@ export function PlacesTopBarCreate({ onCreate }: PlacesTopBarCreateProps) {
       {showPanel && (
         <div
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute inset-x-0 top-full z-20 mt-1 max-h-[300px] overflow-y-auto overscroll-contain rounded-card bg-white shadow-lg"
+          className={`absolute inset-x-0 top-full z-20 mt-1.5 max-h-[300px] overflow-y-auto overscroll-contain bg-white ${
+            flat ? "rounded-2xl ring-1 ring-black/[0.08] shadow-[0_12px_32px_-12px_rgba(15,20,25,0.25)]" : "rounded-card shadow-lg"
+          }`}
         >
           {results === null && <p className="px-4 py-3 text-center text-sm text-ink-secondary">מחפש...</p>}
           {results !== null && results.length === 0 && (

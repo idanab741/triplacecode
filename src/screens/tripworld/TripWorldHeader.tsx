@@ -13,7 +13,7 @@ export function TripWorldHeader() {
   return (
     <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
       <div className="flex h-16 items-center justify-center gap-2 px-5">
-        <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={110} height={34} className="object-contain" />
+        <Image src="/images/triplace-logo-black.png" alt="TRIPLACE" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
         <span className="h-5 w-px bg-ink-secondary/20" />
         <h1 className="text-lg font-bold text-ink">TripWorld</h1>
       </div>

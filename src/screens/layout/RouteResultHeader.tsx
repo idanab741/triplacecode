@@ -25,7 +25,7 @@ export function RouteResultHeader({ onBack, heroSrc, onSave, saved, onShare }: R
     <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
       <div className="relative h-16">
         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          <Image src="/images/trip-triplace-logo.png" alt="" width={110} height={34} className="object-contain" />
+          <Image src="/images/trip-triplace-logo.png" alt="" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
           <BackButton onBack={onBack} />
         </div>
 

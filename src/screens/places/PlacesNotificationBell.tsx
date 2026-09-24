@@ -59,11 +59,14 @@ function toActivityItem(item: SocialNotificationItem): ActivityItem {
 interface PlacesNotificationBellProps {
   /** true (בר place's הסגול): עיגול לבן מלא עם צל - בדיוק כמו הפעמון בבר של עמוד הבית. */
   solid?: boolean;
+  /** true (עמוד הבית): אייקון נקי בלי עיגול, מסגרת או צל - כמו X/פייסבוק/אינסטגרם.
+   *  גובר על solid. */
+  plain?: boolean;
   /** צבע עיגול המונה: "purple" - בית ומפה (place's); ברירת מחדל כחול בכל שאר האפליקציה. */
   badgeTone?: "blue" | "purple";
 }
 
-export function PlacesNotificationBell({ solid = false, badgeTone = "blue" }: PlacesNotificationBellProps = {}) {
+export function PlacesNotificationBell({ solid = false, plain = false, badgeTone = "blue" }: PlacesNotificationBellProps = {}) {
   const router = useRouter();
   const { preferences, preferencesLoading } = useAuth();
   const [open, setOpen] = useState(false);
@@ -157,15 +160,17 @@ export function PlacesNotificationBell({ solid = false, badgeTone = "blue" }: Pl
         aria-label="התראות"
         aria-expanded={open}
         className={`relative flex h-10 w-10 items-center justify-center rounded-full ${
-          solid
+          plain
+            ? "transition-colors active:bg-black/[0.05]"
+            : solid
             ? "bg-white shadow-[0_4px_12px_-4px_rgba(50,10,120,0.45)]"
             : "border border-ink-secondary/15 bg-white/70 backdrop-blur-sm"
         }`}
       >
-        <Image src="/icons/bell.png" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
+        <Image src="/icons/bell.png" alt="" width={24} height={24} className={plain ? "h-6 w-6" : "h-[22px] w-[22px]"} />
         {unreadCount != null && unreadCount > 0 && (
           <span
-            className="absolute -left-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white"
+            className={`absolute ${plain ? "left-0.5 top-0.5" : "-left-1 -top-1"} flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white`}
             style={{ background: badgeTone === "purple" ? "var(--color-places-purple)" : "var(--color-primary-start)" }}
           >
             {unreadCount > 99 ? "99+" : unreadCount}

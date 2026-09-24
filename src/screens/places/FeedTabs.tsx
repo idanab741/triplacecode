@@ -22,7 +22,7 @@ export function FeedTabs({ active, onChange }: { active: PlacesFeedView; onChang
   );
 
   return (
-    <div role="tablist" aria-label="תצוגת פיד" className="relative grid grid-cols-2 border-b border-black/[0.08] bg-transparent">
+    <div role="tablist" aria-label="תצוגת פיד" className="relative grid grid-cols-2 border-b border-black/[0.07] bg-transparent">
       {TABS.map((tab) => {
         const selected = active === tab.id;
         return (
@@ -32,10 +32,10 @@ export function FeedTabs({ active, onChange }: { active: PlacesFeedView; onChang
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
-            className="py-3.5 text-[15px] outline-none transition-colors focus-visible:bg-black/[0.04] active:bg-black/[0.03]"
+            className="py-3 text-[15px] outline-none transition-colors focus-visible:bg-black/[0.04] active:bg-black/[0.03]"
             style={{
               color: selected ? "var(--color-ink)" : "var(--color-ink-secondary, #8a94a6)",
-              fontWeight: selected ? 800 : 600,
+              fontWeight: selected ? 700 : 500,
             }}
           >
             {tab.label}

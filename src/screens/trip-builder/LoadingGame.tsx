@@ -245,7 +245,7 @@ export function LoadingGame({ statusText, steps }: LoadingGameProps) {
     <div className="fixed inset-0 z-50 flex flex-col bg-bg">
       <div className="relative h-14 px-4 pt-4">
         <div className="absolute left-2 top-4 flex items-center gap-2">
-          <Image src="/images/trip-triplace-logo.png" alt="" width={130} height={40} className="object-contain" />
+          <Image src="/images/trip-triplace-logo.png" alt="" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
           <Link
             href="/home"
             className="flex h-9 w-9 shrink-0 items-center justify-center text-ink"

@@ -81,9 +81,9 @@ export function TripHeroHeader({
           <Image
             src="/images/triplace-logo-black.png"
             alt=""
-            width={140}
-            height={43}
-            className={`object-contain ${
+            width={174}
+            height={53}
+            className={`-my-[7px] h-[53px] w-[174px] max-w-none object-contain ${
               dark ? WHITE_ICON_FILTER : ""
             }`}
           />
