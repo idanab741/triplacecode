@@ -109,7 +109,6 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
     : activeItem?.activeColor
       ? `color-mix(in srgb, ${activeItem.activeColor} 13%, transparent)`
       : "rgba(15,20,25,0.07)";
-  const inactiveLabel = dark ? "rgba(255,255,255,0.92)" : "rgba(15,20,25,0.82)";
 
   return (
     <nav aria-label="ניווט ראשי" className="pointer-events-none fixed inset-x-0 bottom-0 z-50">
@@ -117,7 +116,7 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
         data-main-bottom-nav=""
         dir="rtl"
         ref={barRef}
-        className={`tab-glass pointer-events-auto relative mx-auto flex h-16 items-stretch rounded-[32px] p-1.5 ${dark ? "tab-glass--dark" : ""}`}
+        className={`tab-glass pointer-events-auto relative mx-auto flex h-[58px] items-stretch rounded-[29px] p-1.5 ${dark ? "tab-glass--dark" : ""}`}
         style={{
           width: "calc(100% - 24px)",
           maxWidth: 460,
@@ -137,20 +136,19 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
         >
           <span
             key={stretchKey}
-            className={`block h-full w-full rounded-[26px] ${stretchKey > 0 ? "tab-indicator-stretch" : ""}`}
+            className={`block h-full w-full rounded-[23px] ${stretchKey > 0 ? "tab-indicator-stretch" : ""}`}
             style={{ background: tint, transition: "background-color 300ms ease" }}
           />
         </span>
 
         {items.map((item) => {
           const isActive = item.id === activeId;
-          const labelColor = isActive ? (dark ? "#fff" : (item.activeColor ?? "#0A6DFE")) : inactiveLabel;
 
           // *** תוקן (בקשה מפורשת - "האייקון של tripmatch באיכות לא טובה, שיהיה כמו מקודם וגדול יותר"):
           // הגלובוס מצויר מנקודות - ב-34px הנקודות התמזגו לכתם. חזר לגודל המקורי (56px) עם הטבעת
           // המסתובבת וההילה, ובולט מעל הגלולה באמצע הבר - בדיוק כמו בבר הקודם.
           const icon = item.elevated ? (
-            <span className="relative -mt-[26px] flex h-[64px] w-[64px] items-center justify-center">
+            <span className="relative -mt-[26px] flex h-[64px] w-[64px] shrink-0 items-center justify-center">
               {item.elevatedIcon ? (
                 <span className="relative z-10 flex h-[56px] w-[56px] items-center justify-center overflow-hidden rounded-full">{item.elevatedIcon}</span>
               ) : (
@@ -170,35 +168,29 @@ export function BottomNav({ items, activeId, onChange, tone = "light" }: BottomN
             <span className="flex h-7 w-7 items-center justify-center">{item.icon}</span>
           );
 
+          // *** בקשה מפורשת ("שלא יהיה את הטקסט בתחתית האייקון"): אייקונים בלבד. השם נשאר כ-aria-label
+          // לקוראי מסך. הגלובוס נצמד לראש הטאב (items-start) ובולט 20px מעל הבר - מרכזו 12px מתחת לראש
+          // הבר, בדיוק כמו קודם, כך שהחצי-עיגול בכרטיס של tripmatch ממשיך להתאים לו.
           const inner = (
-            <>
-              <span className={`flex items-end justify-center ${item.elevated ? "h-[38px]" : "h-[34px]"}`}>
-                {icon}
-              </span>
-              <span
-                className="w-full truncate whitespace-nowrap text-center text-[10.5px] leading-[13px] transition-colors duration-300"
-                style={{ color: labelColor, fontWeight: isActive ? 700 : 600 }}
-              >
-                {item.label}
-              </span>
-            </>
+            <span className={`flex h-full w-full justify-center ${item.elevated ? "items-start" : "items-center"}`}>{icon}</span>
           );
 
           const cls =
-            "tab-item relative z-10 flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[26px] outline-none focus-visible:ring-2 focus-visible:ring-[#0A6DFE]/60";
+            "tab-item relative z-10 flex min-w-0 flex-1 items-center justify-center rounded-[23px] outline-none focus-visible:ring-2 focus-visible:ring-[#0A6DFE]/60";
 
           return item.href ? (
             <Link
               key={item.id}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
+              aria-label={item.label}
               onClick={() => handleTap(item)}
               className={cls}
             >
               {inner}
             </Link>
           ) : (
-            <button key={item.id} type="button" aria-pressed={isActive} onClick={() => handleTap(item)} className={cls}>
+            <button key={item.id} type="button" aria-pressed={isActive} aria-label={item.label} onClick={() => handleTap(item)} className={cls}>
               {inner}
             </button>
           );

@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { BottomNav, type BottomNavItem } from "@/components/ui";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
+import { useAuth } from "@/hooks/useAuth";
+import { getAvatarUrl } from "@/constants/avatar";
 
 /** אייקון ניווט שמתחלף בין גרסה פעילה ולא-פעילה, לפי הטאב הנבחר.
  *  scale אופציונלי — פיצוי זמני על אייקונים שנשמרו עם שוליים לא אחידים בקובץ. */
@@ -39,6 +41,28 @@ function NavIcon({
   );
 }
 
+/**
+ * *** בקשה מפורשת ("במקום האייקון של הפרופיל - עיגול עם תמונת הפרופיל של המשתמש, עם מסגרת בעובי של
+ * שאר הכפתורים"): תמונת הפרופיל בעיגול, עם מסגרת 2px - אותו עובי קו כמו שאר האייקונים בבר.
+ * פעיל: מסגרת כחולה עם רווח לבן דק בינה לבין התמונה (כמו באינסטגרם). עד שהפרופיל נטען - עיגול אפור.
+ */
+function ProfileAvatarIcon({ active, avatarUrl, loading, dark }: { active: boolean; avatarUrl: string | null; loading: boolean; dark: boolean }) {
+  const ring = active ? "#0A6DFE" : dark ? "#ffffff" : "#0f1419";
+  return (
+    <span
+      className="flex h-[30px] w-[30px] items-center justify-center rounded-full"
+      style={{ boxShadow: `inset 0 0 0 2px ${ring}`, padding: active ? 3.5 : 2 }}
+    >
+      {loading ? (
+        <span className="block h-full w-full rounded-full bg-[#E9ECF1]" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={getAvatarUrl(avatarUrl, 96)} alt="" className="block h-full w-full rounded-full object-cover" draggable={false} />
+      )}
+    </span>
+  );
+}
+
 interface MainBottomNavProps {
   active: "home" | "favorites" | "ai" | "community" | "profile" | "places" | "tripworld" | "tripmatch" | "content";
   /** רק לעמודי place's: מחליף את העיגול המסתובב של Trippy AI בכפתור "+"
@@ -56,6 +80,7 @@ interface MainBottomNavProps {
 export function MainBottomNav({ active, elevatedOverride, tone = "light" }: MainBottomNavProps) {
   // הבר התחתון מופיע בכל עמודי האפליקציה - לכן כאן מתעדכן "מחובר עכשיו" של המשתמש.
   usePresenceHeartbeat();
+  const { profile, profileLoading } = useAuth();
   const whiteWhenInactive = tone === "dark";
   const items: BottomNavItem[] = [
     {
@@ -115,12 +140,11 @@ export function MainBottomNav({ active, elevatedOverride, tone = "light" }: Main
       id: "profile",
       label: "פרופיל",
       icon: (
-        <NavIcon
+        <ProfileAvatarIcon
           active={active === "profile"}
-          activeSrc="/images/icon-profile-active.png"
-          inactiveSrc="/images/icon-profile-inactive.png"
-          alt="פרופיל"
-          whiteWhenInactive={whiteWhenInactive}
+          avatarUrl={profile?.avatar_url ?? null}
+          loading={profileLoading && !profile}
+          dark={whiteWhenInactive}
         />
       ),
       href: "/places/profile/me",
