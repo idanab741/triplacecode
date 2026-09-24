@@ -425,6 +425,7 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
           imageUrl: socialTrip.imageUrl,
           stopCount: socialTrip.stopCount,
           href: `/places/trip/${row.trip_id}`,
+          route: socialTrip.route,
         },
       });
       continue;
@@ -448,6 +449,7 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
           // *** מגבלה קיימת: לטיולי האשף אין (עדיין) דף צפייה ציבורי - ה-result page שלהם הוא "בעלים בלבד"
           // (RLS). לכן רק הבעלים מקבל קישור; לשאר הצופים הכרטיס מוצג בלי ניווט.
           href: session.user_id === viewerId ? tripResultPath(session.trip_type, session.id) : null,
+          route: routeFromPoints((session.final_itinerary as { stops?: { latitude?: number | null; longitude?: number | null }[] } | null)?.stops),
         },
       });
       continue;
@@ -473,12 +475,20 @@ async function hydrateItems(supabase: SupabaseClient, viewerId: string, rows: It
             trippy.user_id === viewerId
               ? `/trip-builder/trippy-quick/result?savedId=${trippy.id}`
               : `/trip-builder/trippy-quick/shared/${trippy.share_token}`,
+          route: routeFromPoints(stops),
         },
       });
     }
   }
 
   return result;
+}
+
+/** נקודות מסלול מתוך רשימת תחנות גולמית - רק תחנות עם מיקום תקין, לפי הסדר. */
+function routeFromPoints(stops: { latitude?: number | null; longitude?: number | null }[] | null | undefined) {
+  return (stops ?? [])
+    .filter((s) => typeof s.latitude === "number" && typeof s.longitude === "number" && Number.isFinite(s.latitude) && Number.isFinite(s.longitude))
+    .map((s) => ({ latitude: s.latitude as number, longitude: s.longitude as number }));
 }
 
 function itemImage(item: CollectionItemDto): string | null {

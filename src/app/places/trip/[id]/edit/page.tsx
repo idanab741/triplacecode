@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
+import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
+import { CREATE_INK } from "@/screens/create/CreateUi";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { TripForm, newTripFormStop, type TripFormInitial } from "@/screens/trips/TripForm";
@@ -66,15 +67,18 @@ export default function EditTripPage({ params }: { params: Promise<{ id: string 
   }, [id, user]);
 
   return (
-    <div className="min-h-screen bg-white">
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={() => router.back()} />
+    <div className="min-h-screen bg-white" style={CREATE_INK}>
+      {/* *** עיצוב מחדש: הבר העליון של triplace (עם חזור), כמו בעמוד יצירת הטיול. */}
+      <HomeStatusBarTint />
+      <CollapsibleTopBar onBack={() => router.back()} />
       {error ? (
         <PlacesEmptyState title={error} />
       ) : !trip ? (
-        <div className="px-5 pt-6">
-          <Skeleton className="mb-4 h-10 w-full" />
-          <Skeleton className="h-40 w-full" />
+        <div className="mx-auto max-w-xl px-5 pt-4">
+          <Skeleton className="mb-2 h-8 w-56" />
+          <Skeleton className="mb-6 h-4 w-44" />
+          <Skeleton className="mb-6 h-12 w-full" />
+          <Skeleton className="aspect-[16/9] w-full" />
         </div>
       ) : (
         // ר' ההערה המלאה ב-places/trip/create/page.tsx - אותו תיקון בדיוק (בר תחתון + פס-88px

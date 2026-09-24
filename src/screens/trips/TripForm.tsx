@@ -12,8 +12,23 @@ import { CollectionItemPickerSheet } from "@/screens/collections/CollectionItemP
 import { CoverPickerSheet } from "@/screens/collections/CoverPickerSheet";
 import { VisibilityChips } from "@/screens/collections/VisibilityChips";
 import type { CollectionFormItem } from "@/screens/collections/collectionFormTypes";
-
-const PURPLE_GRADIENT = "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))";
+import { Button } from "@/components/ui";
+import {
+  ActionRow,
+  CREATE_BLUE,
+  CloseIcon,
+  CreatePageHeader,
+  ErrorBox,
+  FIELD_CLASS,
+  FieldLabel,
+  GripIcon,
+  ImageIcon,
+  OptionalTag,
+  PinIcon,
+  PlusIcon,
+  Svg,
+  TEXTAREA_CLASS,
+} from "@/screens/create/CreateUi";
 const DRAFT_KEY = "trip_draft_v1";
 /** *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, אל תחזיר אותי אחורה לעמוד 'מקום' - תן לי להוסיף
  *  בטיול עצמו כבר"): שני מפתחות session נפרדים מ-DRAFT_KEY (שקיים רק ב-create) - אלה עובדים גם
@@ -85,23 +100,8 @@ function SortableStopRow({
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined, opacity: isDragging ? 0.9 : 1 };
 
   return (
-    <li ref={setNodeRef} style={style} className="rounded-card bg-white p-2.5 shadow-soft ring-1 ring-black/5">
-      <div className="flex items-center gap-2.5">
-        {/* מספר התחנה - מתעדכן אוטומטית כשהסדר משתנה */}
-        <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12.5px] font-extrabold text-white tabular-nums"
-          style={{ background: PURPLE_GRADIENT }}
-        >
-          {formatStopNumber(number)}
-        </span>
-        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-card bg-bg-secondary">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {stop.imageUrl && <img src={stop.imageUrl} alt="" className="h-full w-full object-cover" />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14.5px] font-bold text-ink">{stop.title}</span>
-          {stop.subtitle && <span className="block truncate text-[12px] text-ink-secondary">{stop.subtitle}</span>}
-        </span>
+    <li ref={setNodeRef} style={style} className={`rounded-[20px] bg-[#F7F8FA] p-2.5 ${isDragging ? "shadow-[0_12px_28px_-10px_rgba(15,20,25,0.3)]" : ""}`}>
+      <div className="flex items-center gap-2">
         {/* ידית גרירה בלבד (לא כל הכרטיס) - כדי שגלילת העמוד במובייל לא תתנגש עם הגרירה */}
         <button
           type="button"
@@ -109,21 +109,38 @@ function SortableStopRow({
           {...attributes}
           {...listeners}
           style={{ touchAction: "none" }}
-          className="flex h-9 w-8 shrink-0 cursor-grab items-center justify-center text-ink-secondary active:cursor-grabbing"
+          className="flex h-10 w-6 shrink-0 cursor-grab items-center justify-center text-[#b3b9c3] active:cursor-grabbing"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.7" />
-            <circle cx="15" cy="6" r="1.7" />
-            <circle cx="9" cy="12" r="1.7" />
-            <circle cx="15" cy="12" r="1.7" />
-            <circle cx="9" cy="18" r="1.7" />
-            <circle cx="15" cy="18" r="1.7" />
-          </svg>
+          <GripIcon />
         </button>
-        <button type="button" onClick={onRemove} aria-label="הסרה" className="shrink-0 rounded-full p-2 text-ink-secondary hover:bg-black/[0.05]">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+        {/* התמונה עם מספר התחנה עליה - המספר מתעדכן אוטומטית כשהסדר משתנה */}
+        <span className="relative h-14 w-14 shrink-0">
+          <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-[14px] bg-[#EFF1F4] text-[#9aa1ad]">
+            {stop.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={stop.imageUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <PinIcon />
+            )}
+          </span>
+          <span
+            className="absolute -top-1.5 -start-1.5 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[11.5px] font-bold tabular-nums text-white ring-2 ring-[#F7F8FA]"
+            style={{ background: CREATE_BLUE }}
+          >
+            {formatStopNumber(number)}
+          </span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold text-ink">{stop.title}</span>
+          {stop.subtitle && <span className="block truncate text-[12.5px] text-ink-secondary">{stop.subtitle}</span>}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="הסרה"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-ink-secondary shadow-[0_1px_3px_rgba(15,20,25,0.12)] active:scale-90"
+        >
+          <CloseIcon />
         </button>
       </div>
       <div className="mt-2 flex items-center gap-2">
@@ -132,21 +149,28 @@ function SortableStopRow({
           onChange={(e) => onNoteChange(e.target.value)}
           maxLength={TRIP_LIMITS.maxNote}
           placeholder="הערה (למשל: להגיע לפני 10:00)"
-          className="min-w-0 flex-1 rounded-pill bg-bg-secondary px-3.5 py-2 text-[13px] text-ink focus:outline-none"
+          className="h-10 min-w-0 flex-1 rounded-full bg-white px-4 text-[14px] text-ink placeholder:text-[#9aa1ad] focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/30"
         />
         {dayCount > 1 && (
-          <select
-            value={dayNumber}
-            onChange={(e) => onMoveToDay(Number(e.target.value))}
-            aria-label="העברה ליום אחר"
-            className="shrink-0 rounded-pill bg-bg-secondary px-2.5 py-2 text-[12.5px] font-semibold text-ink focus:outline-none"
-          >
-            {Array.from({ length: dayCount }, (_, i) => (
-              <option key={i} value={i + 1}>
-                יום {i + 1}
-              </option>
-            ))}
-          </select>
+          <label className="relative flex h-10 shrink-0 items-center">
+            <select
+              value={dayNumber}
+              onChange={(e) => onMoveToDay(Number(e.target.value))}
+              aria-label="העברה ליום אחר"
+              className="h-10 appearance-none rounded-full bg-white pe-8 ps-3.5 text-[13px] font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/30"
+            >
+              {Array.from({ length: dayCount }, (_, i) => (
+                <option key={i} value={i + 1}>
+                  יום {i + 1}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute end-3 text-ink-secondary">
+              <Svg size={12}>
+                <path d="m6 9 6 6 6-6" />
+              </Svg>
+            </span>
+          </label>
         )}
       </div>
     </li>
@@ -364,65 +388,104 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
 
   const missing = TRIP_LIMITS.minStops - stopCount;
 
-  return (
-    <div className="px-5 pb-12 pt-6">
-      <h1 className="mb-1 text-[22px] font-extrabold leading-tight text-ink">{mode === "create" ? "צרו את הטיול שלכם" : "עריכת טיול"}</h1>
-      {mode === "create" && <p className="mb-5 text-[14px] text-ink-secondary">לאן יוצאים?</p>}
-      {mode === "edit" && <div className="mb-5" />}
+  /** השורה שמתחת ל"הוספת תחנה" - מה חסר כדי לפרסם, או טיפ על גרירה. */
+  function addStopHint(dayStops: number): string | undefined {
+    if (missing > 0) return `כדי לפרסם צריך לפחות ${TRIP_LIMITS.minStops} תחנות${stopCount > 0 ? ` - עוד ${missing}` : ""}`;
+    if (dayStops > 1) return "אפשר לגרור כדי לשנות סדר";
+    return undefined;
+  }
 
-      <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">שם הטיול</label>
+  return (
+    <div className="mx-auto max-w-xl px-5 pb-12 pt-4">
+      {/* *** עיצוב מחדש (בקשה מפורשת - "נתאים לעיצוב של האפליקציה"): אותה שפה כמו פוסט / מקום /
+          חוויות - כותרת גדולה, שדות אפורים-בהירים בלי מסגרות, כחול לבחירה, והכפתור הראשי הקבוע. */}
+      <CreatePageHeader
+        title={mode === "create" ? "צרו את הטיול שלכם" : "עריכת טיול"}
+        subtitle={mode === "create" ? "לאן יוצאים? שם, תחנות - וזהו" : "שנו תחנות, סדר או פרטים"}
+      />
+
+      <FieldLabel htmlFor="trip-title">שם הטיול</FieldLabel>
       <input
+        id="trip-title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         maxLength={TRIP_LIMITS.maxTitle}
-        placeholder="שם הטיול"
-        className="w-full rounded-card border border-ink-secondary/20 px-4 py-3 text-[16px] focus:outline-none"
-        style={{ borderColor: title ? "var(--color-places-purple)" : undefined }}
+        placeholder="איך תקראו לטיול?"
+        className={`${FIELD_CLASS} text-[16px]`}
       />
-      <p className="mb-4 mt-1 text-[12px] text-ink-secondary">למשל: {TITLE_EXAMPLES.map((e) => `"${e}"`).join(" · ")}</p>
+      {/* רעיונות לשם - לחיצה ממלאת את השדה. נעלמים ברגע שמתחילים לכתוב. */}
+      {!title && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {TITLE_EXAMPLES.map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => setTitle(example)}
+              className="h-8 rounded-full border border-black/[0.08] px-3 text-[13px] font-medium text-ink-secondary transition active:scale-95 active:bg-[#F1F2F5]"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
+      )}
 
-      <label className="mb-1 block text-[13px] font-semibold text-ink-secondary">תיאור (אופציונלי)</label>
-      <textarea
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        maxLength={TRIP_LIMITS.maxDescription}
-        rows={3}
-        placeholder="ספרו קצת על הטיול..."
-        className="mb-5 w-full resize-none rounded-card border border-ink-secondary/20 px-4 py-3 text-[15px] focus:outline-none"
-      />
+      <div className="mt-6">
+        <FieldLabel htmlFor="trip-description">
+          תיאור <OptionalTag />
+        </FieldLabel>
+        <textarea
+          id="trip-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          maxLength={TRIP_LIMITS.maxDescription}
+          rows={3}
+          placeholder="ספרו קצת על הטיול..."
+          className={TEXTAREA_CLASS}
+        />
+      </div>
 
       {/* *** תיקון (בקשה מפורשת - "צריך להעלים את כל סוגי הטיול - זה לא רלוונטי! זה טיול!!"): הוסרה
-          לגמרי בחירת "סוג הטיול" (חופשה בארץ/טיול יומי/דיוט רומנטי/חו"ל/חיי לילה/מסעדות וכו') -
-          תגיות שנועדו למקום בודד (QUICK_CATEGORIES), לא לטיול שלם. tripType עצמו נשאר null תמיד
-          עכשיו (לא נמחק מה-state/payload - כדי לא לשבור את סכימת ה-API), פשוט אין יותר UI לבחור אותו. */}
+          לגמרי בחירת "סוג הטיול". tripType עצמו נשאר null תמיד (לא נמחק מה-state/payload - כדי לא
+          לשבור את סכימת ה-API), פשוט אין יותר UI לבחור אותו. */}
 
-      <label className="mb-2 block text-[13px] font-semibold text-ink-secondary">תמונת הטיול</label>
-      <div className="mb-6 overflow-hidden rounded-2xl shadow-soft">
-        <div className="relative">
+      <div className="mt-6">
+        <FieldLabel>תמונת הטיול</FieldLabel>
+        <div className="relative overflow-hidden rounded-[20px]">
           <CollectionCover coverUrl={coverUrl ?? stopImages[0] ?? null} collageUrls={[]} type="trips" className="aspect-[16/9]" />
           <button
             type="button"
             onClick={() => setCoverSheetOpen(true)}
-            className="absolute bottom-2 end-2 rounded-pill bg-black/55 px-3 py-1.5 text-[12px] font-semibold text-white"
+            className="absolute bottom-2.5 end-2.5 flex h-9 items-center gap-1.5 rounded-full bg-black/55 px-3.5 text-[13px] font-semibold text-white backdrop-blur-sm active:scale-95"
           >
-            החלפת תמונה
+            <ImageIcon size={16} />
+            החלפה
           </button>
         </div>
-        <p className="bg-white px-3 py-2 text-[12px] text-ink-secondary">{coverUrl ? "התמונה שבחרתם" : "תמונה אוטומטית - התמונה של התחנה הראשונה"}</p>
+        <p className="mt-1.5 text-[12.5px] text-ink-secondary">{coverUrl ? "התמונה שבחרתם" : "נבחרת אוטומטית - התמונה של התחנה הראשונה"}</p>
       </div>
 
-      <div className="mb-2 flex items-center justify-between">
-        <label className="text-[13px] font-semibold text-ink-secondary">תחנות ({stopCount})</label>
-      </div>
+      <div className="mt-6">
+        <div className="mb-1.5 flex items-baseline justify-between">
+          <FieldLabel>תחנות</FieldLabel>
+          {stopCount > 0 && <span className="text-[13px] font-medium tabular-nums text-ink-secondary">{stopCount}</span>}
+        </div>
 
-      <div className="flex flex-col gap-5">
-        {days.map((day, dayIndex) => {
-          return (
-            <section key={day.id}>
+        <div className="flex flex-col gap-6">
+          {days.map((day, dayIndex) => (
+            <section key={day.id} aria-label={multiDay ? `יום ${dayIndex + 1}` : undefined}>
               {multiDay && (
                 <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-[15px] font-extrabold text-ink">יום {dayIndex + 1}</h2>
-                  <button type="button" onClick={() => handleRemoveDay(dayIndex)} className="text-[12px] font-semibold text-ink-secondary">
+                  <h2 className="flex items-baseline gap-2 text-[16px] font-bold text-ink">
+                    יום {dayIndex + 1}
+                    <span className="text-[13px] font-medium text-ink-secondary">
+                      {day.stops.length === 1 ? "תחנה אחת" : `${day.stops.length} תחנות`}
+                    </span>
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDay(dayIndex)}
+                    className="h-8 rounded-full bg-[#F1F2F5] px-3 text-[12.5px] font-semibold text-ink-secondary active:scale-95"
+                  >
                     הסרת יום
                   </button>
                 </div>
@@ -431,7 +494,7 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
               {day.stops.length > 0 && (
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(dayIndex, e)}>
                   <SortableContext items={day.stops.map((s) => s.key)} strategy={verticalListSortingStrategy}>
-                    <ul className="mb-2.5 flex flex-col gap-2">
+                    <ul className="mb-2 flex flex-col gap-2">
                       {/* המספור מתחיל מ-01 מחדש בכל יום (כמו בעמוד הטיול) ומתעדכן אוטומטית עם הסדר */}
                       {day.stops.map((stop, position) => (
                         <SortableStopRow
@@ -450,47 +513,48 @@ export function TripForm({ mode, tripId, initial }: TripFormProps) {
                 </DndContext>
               )}
 
-              <button
-                type="button"
-                onClick={() => setPickerDay(dayIndex)}
+              <ActionRow
+                icon={<PinIcon />}
+                title={multiDay ? `הוספת תחנה ליום ${dayIndex + 1}` : "הוספת תחנה"}
+                subtitle={addStopHint(day.stops.length)}
                 disabled={stopCount >= TRIP_LIMITS.maxStops}
-                className="h-12 rounded-xl text-[15.5px] font-semibold w-full border-2 border-dashed disabled:opacity-50"
-                style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
-              >
-                + הוספת תחנה
-              </button>
+                onClick={() => setPickerDay(dayIndex)}
+              />
             </section>
-          );
-        })}
+          ))}
+        </div>
+
+        {days.length < TRIP_LIMITS.maxDays && (
+          <button
+            type="button"
+            onClick={handleAddDay}
+            className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-full text-[14px] font-semibold transition active:bg-[#F1F2F5]"
+            style={{ color: CREATE_BLUE }}
+          >
+            <PlusIcon size={18} />
+            {multiDay ? "הוספת יום" : "טיול של כמה ימים? הוסיפו יום"}
+          </button>
+        )}
       </div>
 
-      {missing > 0 && <p className="mt-2 text-center text-[12px] text-ink-secondary">כדי לפרסם צריך לפחות {TRIP_LIMITS.minStops} תחנות</p>}
-
-      {days.length < TRIP_LIMITS.maxDays && (
-        <button type="button" onClick={handleAddDay} className="mt-4 w-full py-2 text-center text-[13.5px] font-bold" style={{ color: "var(--color-places-purple)" }}>
-          + הוספת יום
-        </button>
-      )}
-
-      <label className="mb-2 mt-5 block text-[13px] font-semibold text-ink-secondary">מי יכול לראות?</label>
-      <div className="mb-6">
+      <div className="mt-6">
+        <FieldLabel>מי יכול לראות?</FieldLabel>
         <VisibilityChips value={visibility} onChange={setVisibility} />
       </div>
 
-      {error && <p className="mb-3 text-[12.5px] text-red-500">{error}</p>}
+      {error && <ErrorBox>{error}</ErrorBox>}
 
-      <button
-        type="button"
-        disabled={!canPublish}
-        onClick={handleSubmit}
-        className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
-        style={{ background: PURPLE_GRADIENT }}
-      >
+      <Button type="button" fullWidth disabled={!canPublish} onClick={handleSubmit} className="mt-8">
         {submitting ? "שומרים..." : mode === "create" ? "פרסום טיול" : "שמירת שינויים"}
-      </button>
+      </Button>
 
       {mode === "edit" && (
-        <button type="button" onClick={handleDelete} disabled={submitting} className="mt-3 w-full py-2.5 text-[13.5px] font-bold text-red-500 disabled:opacity-50">
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={submitting}
+          className="mt-2 h-11 w-full text-[14px] font-semibold text-[#C8373C] disabled:opacity-50"
+        >
           מחיקת הטיול
         </button>
       )}

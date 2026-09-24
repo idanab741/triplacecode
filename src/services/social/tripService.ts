@@ -395,18 +395,26 @@ export async function getViewerSavedTripCards(supabase: SupabaseClient, viewerId
 
 /** תקציר טיול (כותרת/תמונה/מספר תחנות) לתצוגת פריט-טיול בתוך אוסף (collectionService).
  *  ה-client הרגיל - טיול שהצופה לא רשאי לראות פשוט לא חוזר (ה-RLS מכבד visibility). */
-export async function getTripSummaries(
-  supabase: SupabaseClient,
-  viewerId: string,
-  tripIds: string[]
-): Promise<Map<string, { title: string; imageUrl: string | null; stopCount: number }>> {
-  const result = new Map<string, { title: string; imageUrl: string | null; stopCount: number }>();
+export interface TripSummary {
+  title: string;
+  imageUrl: string | null;
+  stopCount: number;
+  /** נקודות המסלול לפי יום וסדר (רק תחנות עם מיקום) - למפת "חוויה של טיולים". */
+  route: { latitude: number; longitude: number }[];
+}
+
+export async function getTripSummaries(supabase: SupabaseClient, viewerId: string, tripIds: string[]): Promise<Map<string, TripSummary>> {
+  const result = new Map<string, TripSummary>();
   if (tripIds.length === 0) return result;
 
   const { data } = await supabase.from("trips").select(TRIP_COLUMNS).in("id", tripIds);
-  const { cards } = await buildTrips(supabase, viewerId, (data ?? []) as TripRow[], "card");
+  // *** "full" (במקום "card"): צריך את כל התחנות עם המיקומים שלהן כדי לצייר את המסלול על המפה.
+  const { cards, stopsByTrip } = await buildTrips(supabase, viewerId, (data ?? []) as TripRow[], "full");
   for (const card of cards) {
-    result.set(card.id, { title: card.title, imageUrl: card.coverUrl ?? card.autoCoverUrl, stopCount: card.stopCount });
+    const route = (stopsByTrip.get(card.id) ?? [])
+      .filter((s) => s.place.latitude != null && s.place.longitude != null)
+      .map((s) => ({ latitude: s.place.latitude as number, longitude: s.place.longitude as number }));
+    result.set(card.id, { title: card.title, imageUrl: card.coverUrl ?? card.autoCoverUrl, stopCount: card.stopCount, route });
   }
   return result;
 }

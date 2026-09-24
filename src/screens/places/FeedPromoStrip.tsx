@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSurpriseMe } from "@/hooks/useSurpriseMe";
 
 type Promo = {
-  id: "surprise" | "runtrippy" | "my-trips";
+  id: "surprise" | "runtrippy" | "my-trips" | "hot";
   /** לאן מנווטים בלחיצה. בלי href - הבאנר מפעיל את "תפתיעו אותי". */
   href?: string;
   image: string;
@@ -15,7 +15,7 @@ type Promo = {
   ratio: number;
 };
 
-/** *** סדר מפורש (בקשה מפורשת): RunTrippy -> הבחירות שלי -> תפתיעו אותי. */
+/** *** סדר מפורש (בקשה מפורשת): RunTrippy -> הבחירות שלי -> תפתיעו אותי -> כל מה שחם (עמוד /hot). */
 const PROMOS: Promo[] = [
   {
     id: "runtrippy",
@@ -36,6 +36,13 @@ const PROMOS: Promo[] = [
     image: "/images/home/feed-promo-surprise.webp",
     alt: "בא לכם לצאת לטייל עכשיו? תפתיעו אותי",
     ratio: 1600 / 345,
+  },
+  {
+    id: "hot",
+    href: "/hot",
+    image: "/images/home/feed-promo-hot.webp",
+    alt: "כל מה שחם",
+    ratio: 1600 / 366,
   },
 ];
 

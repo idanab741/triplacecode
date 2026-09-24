@@ -84,10 +84,19 @@ export interface CollectionTripItemDto {
     stopCount: number;
     /** יעד הניווט. null = לצופה שאינו הבעלים אין כרגע דף צפייה ציבורי בטיול (ר' הערה ב-collectionService). */
     href: string | null;
+    /** *** תוספת (בקשה מפורשת - "עמוד עם מפה ונעצים בכל המקומות"): נקודות המסלול של הטיול לפי הסדר
+     *  (רק תחנות עם מיקום) - כדי לצייר את כל הטיולים של החוויה על מפה אחת. אופציונלי: מקור בלי
+     *  מיקומים פשוט לא מצויר, והכרטיס שלו עדיין מוצג. */
+    route?: CollectionRoutePoint[];
   };
 }
 
 export type CollectionItemDto = CollectionPlaceItemDto | CollectionTripItemDto;
+
+export interface CollectionRoutePoint {
+  latitude: number;
+  longitude: number;
+}
 
 export interface CollectionDetailDto extends CollectionCardDto {
   items: CollectionItemDto[];

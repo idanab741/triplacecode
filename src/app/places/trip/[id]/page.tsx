@@ -1,38 +1,55 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
-import { PlacesHeader } from "@/screens/places/PlacesHeader";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { PostInlineComments } from "@/screens/places/PostInlineComments";
-import { SearchResultCard } from "@/screens/search/SearchResultCard";
-import { CollectionCover } from "@/screens/collections/CollectionCover";
 import { CollectionActionBar } from "@/screens/collections/CollectionActionBar";
 import { AddToCalendarSheet } from "@/screens/calendar/AddToCalendarSheet";
 import { getAvatarUrl } from "@/constants/avatar";
+import { getPlaceCategoryLabel } from "@/constants/placeCategories";
+import { optimizeImage } from "@/utils/imageUrl";
+import { CREATE_INK } from "@/screens/create/CreateUi";
+import { directionsUrl, journeyColor, type JourneyLine, type JourneyMarker } from "@/screens/journey/JourneyMap";
+import {
+  CalendarIcon,
+  HeroIconButton,
+  MediaTile,
+  MoreIcon,
+  NavigateIcon,
+  PinSmallIcon,
+  BackIcon,
+  PRIMARY_LINK_CLASS,
+} from "@/screens/journey/JourneyUi";
 import { formatStopNumber, formatTripMeta, getTripTypeLabel, type TripDetailDto, type TripStopDto } from "@/services/social/tripTypes";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח.
-// ResultMap הקיים (מפת תוצאת בניית-טיול): נעצים ממוספרים, צבע לפי יום, וקו מחבר בין התחנות של כל יום.
-const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), { ssr: false });
+const JourneyMap = dynamic(() => import("@/screens/journey/JourneyMap").then((m) => m.JourneyMap), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-[#EEF0EA]" />,
+});
 
 type MapDayFilter = "all" | number;
 
-/** עמוד טיול: "מסלול שאפשר לקחת ולצאת איתו לדרך". Hero -> יוצר -> פעולות -> מסלול הטיול (ימים ותחנות ממוספרות) -> מפה. */
+/**
+ * *** עיצוב מחדש (בקשה מפורשת - "בסוף יצא עמוד עם מפה עם נעצים בכל המקומות של הטיול, עם תמונות
+ * וסרטונים, מעוצב יפה", בקו העיצובי של האפליקציה, נגיש ומזמין):
+ * מפה בראש העמוד (נעצים ממוספרים וקו מסלול בצבע של כל יום) -> גיליון שעולה עליה: כותרת, יוצר,
+ * פעולות, "רגעים מהטיול" (התמונות של התחנות) -> המסלול כציר זמן (תחנה = מספר, הערה, תמונות,
+ * ניווט) -> בר קבוע "יוצאים לדרך" (Google Maps עם כל התחנות של היום/הטיול).
+ * המפה והרשימה מחוברות: לחיצה על נעץ גוללת לתחנה; "במפה" בתחנה מסמן אותה על המפה.
+ * כל הנתונים הם אותם נתונים שכבר הגיעו מ-/api/social/trips/[id] - שום API לא השתנה.
+ */
 export default function TripPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [trip, setTrip] = useState<TripDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mapDay, setMapDay] = useState<MapDayFilter>("all");
   const [justCreated, setJustCreated] = useState(false);
 
   useEffect(() => {
@@ -68,116 +85,177 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24">
-      <HomeStatusBarTint color="#7C3AED" />
-      <PlacesHeader variant="purple" onBack={() => router.back()} />
+    <div className="min-h-screen bg-white" style={CREATE_INK}>
+      <HomeStatusBarTint />
 
       {justCreated && (
-        <div className="fixed inset-x-4 bottom-24 z-50 rounded-pill bg-ink px-4 py-3 text-center text-[13px] font-semibold text-white shadow-soft">
-          יצרתם טיול 🎉
+        <div role="status" className="fixed inset-x-4 bottom-28 z-[45] rounded-full bg-[#0f1419] px-4 py-3 text-center text-[14px] font-semibold text-white shadow-soft">
+          יצרתם טיול! הנה הוא על המפה
         </div>
       )}
 
       {error ? (
-        <PlacesEmptyState title={error} actionLabel="חזרה" onAction={() => router.back()} />
-      ) : !trip ? (
-        <div className="p-4">
-          <Skeleton className="mb-4 aspect-[16/10] w-full" />
-          <Skeleton className="mb-2 h-6 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
+        <div className="pt-6">
+          <PlacesEmptyState title={error} actionLabel="חזרה" onAction={() => router.back()} />
         </div>
+      ) : !trip ? (
+        <TripSkeleton />
       ) : (
-        <TripBody
-          trip={trip}
-          commentsOpen={commentsOpen}
-          onToggleComments={() => setCommentsOpen((v) => !v)}
-          menuOpen={menuOpen}
-          onToggleMenu={() => setMenuOpen((v) => !v)}
-          onDelete={handleDelete}
-          mapDay={mapDay}
-          onMapDayChange={setMapDay}
-        />
+        <TripBody trip={trip} onBack={() => router.back()} onDelete={handleDelete} />
       )}
     </div>
   );
 }
 
-function TripBody({
-  trip,
-  commentsOpen,
-  onToggleComments,
-  menuOpen,
-  onToggleMenu,
-  onDelete,
-  mapDay,
-  onMapDayChange,
-}: {
-  trip: TripDetailDto;
-  commentsOpen: boolean;
-  onToggleComments: () => void;
-  menuOpen: boolean;
-  onToggleMenu: () => void;
-  onDelete: () => void;
-  mapDay: MapDayFilter;
-  onMapDayChange: (day: MapDayFilter) => void;
-}) {
+function TripSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="טוען את הטיול">
+      <div className="h-[46vh] min-h-[300px] animate-pulse bg-[#EEF0EA]" />
+      <div className="relative -mt-6 rounded-t-[28px] bg-white px-5 pt-6">
+        <div className="h-4 w-40 animate-pulse rounded bg-[#EFF1F4]" />
+        <div className="mt-3 h-8 w-3/4 animate-pulse rounded-lg bg-[#EFF1F4]" />
+        <div className="mt-5 flex items-center gap-3">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-[#EFF1F4]" />
+          <div className="h-4 w-32 animate-pulse rounded bg-[#EFF1F4]" />
+        </div>
+        <div className="mt-6 flex gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-40 w-[120px] animate-pulse rounded-[18px] bg-[#EFF1F4]" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function hasCoords(stop: TripStopDto): boolean {
+  return stop.place.latitude != null && stop.place.longitude != null;
+}
+
+function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () => void; onDelete: () => void }) {
   const authorName = trip.author.fullName ?? trip.author.username ?? "מטייל";
   const profileHref = `/places/profile/${trip.author.username ?? trip.author.id}`;
   const apiBase = `/api/social/trips/${trip.id}`;
-  /** *** חדש (בקשה מפורשת - "להכניס ליומן גם טיול בטבע"): הוספת הטיול ליומן. */
+
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mapDay, setMapDay] = useState<MapDayFilter>("all");
+  const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarAddedOn, setCalendarAddedOn] = useState<string | null>(null);
 
   // תחנות לפי יום, כל יום ממוין לפי הסדר שלו
-  const dayNumbers = [...new Set(trip.stops.map((s) => s.day))].sort((a, b) => a - b);
-  const stopsByDay = new Map<number, TripStopDto[]>(
-    dayNumbers.map((day) => [day, trip.stops.filter((s) => s.day === day).sort((a, b) => a.position - b.position)])
+  const dayNumbers = useMemo(() => [...new Set(trip.stops.map((s) => s.day))].sort((a, b) => a - b), [trip.stops]);
+  const stopsByDay = useMemo(
+    () => new Map<number, TripStopDto[]>(dayNumbers.map((day) => [day, trip.stops.filter((s) => s.day === day).sort((a, b) => a.position - b.position)])),
+    [dayNumbers, trip.stops]
   );
+  const orderedStops = useMemo(() => dayNumbers.flatMap((day) => stopsByDay.get(day) ?? []), [dayNumbers, stopsByDay]);
   const multiDay = dayNumbers.length > 1;
+  const dayColor = (day: number) => journeyColor(dayNumbers.indexOf(day));
 
   const ratings = trip.stops.map((s) => s.place.rating).filter((r): r is number => r != null);
   const avgRating = ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
 
-  // useMemo: ResultMap מתאים את התצוגה (fitBounds) בכל שינוי של מערך התחנות - בלי זה המפה "קופצת" בכל רינדור (למשל פתיחת תגובות).
-  const mapStops = useMemo(
+  // העיר הנפוצה ביותר בין התחנות - שורת ה"איפה" מעל הכותרת.
+  const mainCity = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of trip.stops) if (s.place.city) counts.set(s.place.city, (counts.get(s.place.city) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }, [trip.stops]);
+
+  // ───────── המפה ─────────
+  const visibleStops = useMemo(() => orderedStops.filter((s) => hasCoords(s) && (mapDay === "all" || s.day === mapDay)), [orderedStops, mapDay]);
+  const markers = useMemo<JourneyMarker[]>(
     () =>
-      trip.stops
-        .filter((s) => s.place.latitude != null && s.place.longitude != null && (mapDay === "all" || s.day === mapDay))
-        .sort((a, b) => a.day - b.day || a.position - b.position)
-        .map((s) => ({ stopId: s.id, name: s.place.name, latitude: s.place.latitude as number, longitude: s.place.longitude as number, dayIndex: s.day })),
-    [trip.stops, mapDay]
+      visibleStops.map((s) => ({
+        id: s.id,
+        latitude: s.place.latitude as number,
+        longitude: s.place.longitude as number,
+        name: s.place.name,
+        label: String(s.position + 1),
+        color: dayColor(s.day),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleStops, dayNumbers]
   );
+  const lines = useMemo<JourneyLine[]>(
+    () =>
+      dayNumbers
+        .filter((day) => mapDay === "all" || day === mapDay)
+        .map((day) => ({
+          id: `day-${day}`,
+          color: dayColor(day),
+          dashed: dayNumbers.indexOf(day) % 2 === 1,
+          points: (stopsByDay.get(day) ?? []).filter(hasCoords).map((s) => ({ latitude: s.place.latitude as number, longitude: s.place.longitude as number })),
+        }))
+        .filter((l) => l.points.length > 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dayNumbers, stopsByDay, mapDay]
+  );
+  const goUrl = directionsUrl(visibleStops.map((s) => ({ latitude: s.place.latitude as number, longitude: s.place.longitude as number })));
+
+  function focusStopInList(stopId: string) {
+    setSelectedStopId(stopId);
+    document.getElementById(`stop-${stopId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function showStopOnMap(stop: TripStopDto) {
+    if (mapDay !== "all" && mapDay !== stop.day) setMapDay("all");
+    setSelectedStopId(stop.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ───────── "רגעים מהטיול": התמונות של התחנות, לפי סדר המסלול ─────────
+  const moments = useMemo(() => {
+    const list: { key: string; url: string; stop: TripStopDto }[] = [];
+    for (const stop of orderedStops) {
+      for (const url of stop.place.imageUrls.slice(0, 2)) {
+        if (list.length >= 12) break;
+        list.push({ key: `${stop.id}-${url}`, url, stop });
+      }
+    }
+    return list;
+  }, [orderedStops]);
 
   return (
     <>
-      <CollectionCover coverUrl={trip.coverUrl ?? trip.autoCoverUrl} collageUrls={[]} type="trips" className="aspect-[16/10] w-full" />
+      {/* ───── מפה ───── */}
+      <div className="trip-hero-map relative h-[46vh] min-h-[300px] max-h-[460px] bg-[#EEF0EA]">
+        <style>{`.trip-hero-map .leaflet-bottom{bottom:30px}`}</style>
+        {markers.length > 0 ? (
+          <JourneyMap
+            markers={markers}
+            lines={lines}
+            selectedId={selectedStopId}
+            onSelect={focusStopInList}
+            className="h-full"
+            padding={{ top: 90, right: 40, bottom: multiDay ? 110 : 70, left: 40 }}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center px-8 text-center text-[14px] text-ink-secondary">
+            אין נתוני מיקום לתחנות {mapDay === "all" ? "בטיול הזה" : "ביום הזה"}
+          </div>
+        )}
 
-      <div className="px-4 pt-4">
-        <div className="flex items-start gap-2">
-          <h1 className="min-w-0 flex-1 text-[22px] font-extrabold leading-tight text-ink">{trip.title}</h1>
+        {/* כפתורים עליונים. המפה עטופה ב-isolate (z-0), אז z-10 מספיק כדי לשבת מעליה. */}
+        <div className="pointer-events-none absolute inset-x-4 z-10 flex items-start justify-between" style={{ top: "max(env(safe-area-inset-top), 16px)" }}>
+          <HeroIconButton label="חזרה" onClick={onBack}>
+            <BackIcon />
+          </HeroIconButton>
           {trip.viewerState.isSelf && (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                aria-label="עוד"
-                aria-expanded={menuOpen}
-                onClick={onToggleMenu}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-ink-secondary hover:bg-black/[0.05]"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="5" cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
-                </svg>
-              </button>
+            <div className="pointer-events-auto relative">
+              <HeroIconButton label="אפשרויות" onClick={() => setMenuOpen((v) => !v)} expanded={menuOpen}>
+                <MoreIcon />
+              </HeroIconButton>
               {menuOpen && (
                 <>
-                  <button type="button" aria-label="סגור" className="fixed inset-0 z-10 cursor-default" onClick={onToggleMenu} />
-                  <div className="absolute end-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl bg-white py-1 shadow-[0_8px_30px_rgba(0,0,0,0.16)] ring-1 ring-black/5">
-                    <Link href={`/places/trip/${trip.id}/edit`} className="flex w-full items-center px-3.5 py-2.5 text-[14px] font-semibold text-ink hover:bg-black/[0.04]">
-                      עריכה
+                  <button type="button" aria-label="סגירה" className="fixed inset-0 z-10 cursor-default" onClick={() => setMenuOpen(false)} />
+                  <div className="absolute end-0 top-full z-20 mt-2 w-40 overflow-hidden rounded-[16px] bg-white p-1.5 shadow-[0_12px_32px_-8px_rgba(15,20,25,0.3)] ring-1 ring-black/[0.06]">
+                    <Link href={`/places/trip/${trip.id}/edit`} className="flex h-11 w-full items-center rounded-[10px] px-3 text-[14px] font-semibold text-ink active:bg-[#F1F2F5]">
+                      עריכת הטיול
                     </Link>
-                    <button type="button" onClick={onDelete} className="flex w-full items-center px-3.5 py-2.5 text-[14px] font-semibold text-red-500 hover:bg-black/[0.04]">
+                    <button type="button" onClick={onDelete} className="flex h-11 w-full items-center rounded-[10px] px-3 text-[14px] font-semibold text-[#C8373C] active:bg-[#F1F2F5]">
                       מחיקה
                     </button>
                   </div>
@@ -187,143 +265,268 @@ function TripBody({
           )}
         </div>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-semibold text-ink-secondary">
-          <span>{formatTripMeta(trip.stopCount, trip.dayCount)}</span>
-          {trip.tripType && <span className="rounded-pill bg-bg-secondary px-2.5 py-0.5 text-[12px] text-ink">{getTripTypeLabel(trip.tripType)}</span>}
-          {avgRating != null && <span>⭐ {avgRating.toFixed(1)} ממוצע התחנות</span>}
-          {trip.visibility === "private" ? <span>· פרטי</span> : trip.visibility === "friends" ? <span>· חברים</span> : null}
-        </div>
-
-        {trip.description && <p className="mt-2 whitespace-pre-wrap text-[14.5px] leading-relaxed text-ink">{trip.description}</p>}
-
-        <div className="mt-3 flex items-center gap-2.5">
-          <Link href={profileHref} className="shrink-0" aria-label={authorName}>
-            <span className="block h-9 w-9 overflow-hidden rounded-full bg-bg-secondary">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={getAvatarUrl(trip.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
-            </span>
-          </Link>
-          <Link href={profileHref} className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink">
-            מאת {authorName}
-          </Link>
-        </div>
-
-        <div className="mt-3 border-y border-black/[0.07] py-1">
-          <CollectionActionBar
-            item={trip}
-            basePath={apiBase}
-            sharePath={`/places/trip/${trip.id}`}
-            shareText={`${trip.title} - טיול ב-TRIPLACE`}
-            commentsActive={commentsOpen}
-            onToggleComments={onToggleComments}
-          />
-        </div>
-        {commentsOpen && <PostInlineComments postId={trip.id} basePath={apiBase} />}
-
-        <button
-          type="button"
-          onClick={() => setCalendarOpen(true)}
-          className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98]"
-        >
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
-            <path d="M3.5 10h17M8 3v4M16 3v4" />
-          </svg>
-          {calendarAddedOn
-            ? `נוסף ליומן · ${new Date(`${calendarAddedOn}T00:00:00`).toLocaleDateString("he-IL", { day: "numeric", month: "long" })}`
-            : "הוספה ליומן"}
-        </button>
-        {calendarOpen && (
-          <AddToCalendarSheet
-            item={{
-              itemType: "trip",
-              id: trip.id,
-              name: trip.title,
-              imageUrl: trip.coverUrl ?? trip.autoCoverUrl,
-              category: trip.tripType,
-            }}
-            onClose={() => setCalendarOpen(false)}
-            onDone={(r) => {
-              setCalendarOpen(false);
-              if (r.action === "added" && r.date) setCalendarAddedOn(r.date);
-            }}
-          />
+        {/* סינון ימים על המפה */}
+        {multiDay && (
+          <div
+            role="group"
+            aria-label="הצגת ימים על המפה"
+            className="absolute inset-x-0 bottom-11 z-10 flex gap-1.5 overflow-x-auto px-4"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {(["all", ...dayNumbers] as MapDayFilter[]).map((option) => {
+              const active = mapDay === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setMapDay(option);
+                    setSelectedStopId(null);
+                  }}
+                  className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold shadow-[0_3px_10px_-4px_rgba(15,20,25,0.3)] transition active:scale-95 ${
+                    active ? "bg-[#0f1419] text-white" : "bg-white text-ink"
+                  }`}
+                >
+                  {option !== "all" && <span className="h-2.5 w-2.5 rounded-full" style={{ background: dayColor(option) }} />}
+                  {option === "all" ? "כל הימים" : `יום ${option}`}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* ── מסלול הטיול: ימים ותחנות ממוספרות ── */}
-      <section className="px-4 pt-6">
-        <h2 className="mb-3 text-[18px] font-extrabold text-ink">מסלול הטיול</h2>
-        {trip.stops.length === 0 && <p className="py-6 text-center text-[13px] text-ink-secondary">אין תחנות להצגה בטיול הזה.</p>}
+      {/* ───── הגיליון ───── */}
+      <div className="relative z-10 -mt-6 rounded-t-[28px] bg-white pb-32">
+        <div className="mx-auto max-w-xl px-5 pt-5">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-ink-secondary">
+            {mainCity && (
+              <span className="flex items-center gap-1">
+                <PinSmallIcon />
+                {mainCity}
+              </span>
+            )}
+            <span>{formatTripMeta(trip.stopCount, trip.dayCount)}</span>
+            {avgRating != null && <span>· ★ {avgRating.toFixed(1)}</span>}
+            {trip.tripType && <span>· {getTripTypeLabel(trip.tripType)}</span>}
+            {trip.visibility === "private" ? <span>· פרטי</span> : trip.visibility === "friends" ? <span>· חברים</span> : null}
+          </p>
+          <h1 className="mt-1.5 text-[28px] font-bold leading-tight tracking-tight text-ink">{trip.title}</h1>
 
-        <div className="flex flex-col gap-6">
-          {dayNumbers.map((day) => (
-            <div key={day}>
-              {/* בטיול של יום אחד לא מעמיסים - כותרת "יום N" רק כשיש כמה ימים */}
-              {multiDay && (
-                <h3 className="mb-2.5 border-b border-black/[0.07] pb-1.5 text-[15px] font-extrabold" style={{ color: "var(--color-places-purple)" }}>
-                  יום {day}
-                </h3>
-              )}
-              <div className="grid grid-cols-2 gap-x-3 gap-y-4">
-                {(stopsByDay.get(day) ?? []).map((stop) => (
-                  <div key={stop.id} className="min-w-0">
-                    <div className="relative">
-                      {/* Place Card הקיים של TRIPLACE (כרטיס תוצאות החיפוש) - עם מספר התחנה */}
-                      <SearchResultCard
-                        place={{
-                          id: stop.place.id,
-                          name: stop.place.name,
-                          category: stop.place.category,
-                          rating: stop.place.rating,
-                          city: stop.place.city,
-                          image_urls: stop.place.imageUrls,
-                        }}
-                      />
-                      <span
-                        className="pointer-events-none absolute start-2 top-2 flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 text-[12.5px] font-extrabold text-white tabular-nums shadow-soft"
-                        style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
-                      >
-                        {formatStopNumber(stop.position)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[11.5px] font-semibold text-ink-secondary">תחנה {stop.position + 1}</p>
-                    {stop.note && <p className="mt-0.5 text-[12.5px] italic leading-snug text-ink-secondary">&ldquo;{stop.note}&rdquo;</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+          <Link href={profileHref} className="mt-4 flex items-center gap-3 rounded-[16px] active:opacity-80">
+            <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#EFF1F4]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={getAvatarUrl(trip.author.avatarUrl)} alt="" className="h-full w-full object-cover" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold text-ink">{authorName}</span>
+              {trip.author.username && <span className="block truncate text-[12.5px] text-ink-secondary">@{trip.author.username}</span>}
+            </span>
+          </Link>
 
-      {/* ── מפה: חלק מהותי מהטיול (לא תצוגה משנית) ── */}
-      <section className="px-4 pt-7">
-        <h2 className="mb-3 text-[18px] font-extrabold text-ink">מסלול על המפה</h2>
+          {trip.description && <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">{trip.description}</p>}
 
-        {multiDay && (
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {(["all", ...dayNumbers] as MapDayFilter[]).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onMapDayChange(option)}
-                aria-pressed={mapDay === option}
-                className={`shrink-0 rounded-pill px-4 py-1.5 text-[13px] font-semibold ${mapDay === option ? "text-white" : "bg-bg-secondary text-ink-secondary"}`}
-                style={mapDay === option ? { background: "var(--color-places-purple)" } : undefined}
-              >
-                {option === "all" ? "כל הטיול" : `יום ${option}`}
-              </button>
-            ))}
+          <div className="mt-4 border-y border-black/[0.07] py-1">
+            <CollectionActionBar
+              item={trip}
+              basePath={apiBase}
+              sharePath={`/places/trip/${trip.id}`}
+              shareText={`${trip.title} - טיול ב-TRIPLACE`}
+              commentsActive={commentsOpen}
+              onToggleComments={() => setCommentsOpen((v) => !v)}
+            />
           </div>
+          {commentsOpen && <PostInlineComments postId={trip.id} basePath={apiBase} />}
+        </div>
+
+        {/* ───── רגעים מהטיול ───── */}
+        {moments.length > 0 && (
+          <section aria-labelledby="trip-moments" className="mt-7">
+            <h2 id="trip-moments" className="mx-auto max-w-xl px-5 text-[19px] font-bold text-ink">
+              רגעים מהטיול
+            </h2>
+            <div className="mt-3 flex gap-2 overflow-x-auto px-5 pb-1" style={{ scrollbarWidth: "none" }}>
+              {moments.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => focusStopInList(m.stop.id)}
+                  aria-label={`${m.stop.place.name} - מעבר לתחנה`}
+                  className="relative h-40 w-[120px] shrink-0 overflow-hidden rounded-[18px] bg-[#EFF1F4] transition active:scale-[0.97]"
+                >
+                  <MediaTile url={optimizeImage(m.url, 320)} />
+                  <span
+                    className="absolute end-2 top-2 flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-white px-1 text-[12px] font-bold text-white"
+                    style={{ background: dayColor(m.stop.day) }}
+                  >
+                    {m.stop.position + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
 
-        {mapStops.length > 0 ? (
-          <ResultMap stops={mapStops} numbering="perDay" heightClassName="h-[55vh]" />
-        ) : (
-          <p className="rounded-card bg-bg-secondary py-8 text-center text-[13px] text-ink-secondary">אין נתוני מיקום לתחנות {mapDay === "all" ? "בטיול הזה" : "ביום הזה"}.</p>
-        )}
-      </section>
+        {/* ───── המסלול ───── */}
+        <section aria-labelledby="trip-route" className="mx-auto mt-8 max-w-xl px-5">
+          <h2 id="trip-route" className="text-[19px] font-bold text-ink">
+            המסלול
+          </h2>
+          {trip.stops.length === 0 && <p className="py-6 text-center text-[14px] text-ink-secondary">אין תחנות להצגה בטיול הזה.</p>}
+
+          <div className="mt-2 flex flex-col gap-7">
+            {dayNumbers.map((day) => {
+              const stops = stopsByDay.get(day) ?? [];
+              const color = dayColor(day);
+              return (
+                <div key={day}>
+                  {multiDay && (
+                    <h3 className="mb-3 mt-2 flex items-center gap-2 text-[16px] font-bold text-ink">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} aria-hidden="true" />
+                      יום {day}
+                      <span className="text-[13px] font-medium text-ink-secondary">{stops.length === 1 ? "תחנה אחת" : `${stops.length} תחנות`}</span>
+                    </h3>
+                  )}
+                  <ol className="flex flex-col">
+                    {stops.map((stop, index) => (
+                      <StopRow
+                        key={stop.id}
+                        stop={stop}
+                        color={color}
+                        isLast={index === stops.length - 1}
+                        selected={selectedStopId === stop.id}
+                        onShowOnMap={hasCoords(stop) ? () => showStopOnMap(stop) : undefined}
+                      />
+                    ))}
+                  </ol>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      {/* ───── בר פעולה קבוע ───── */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-30 bg-white/95 px-4 pt-3 shadow-[0_-10px_24px_-14px_rgba(15,20,25,0.25)] backdrop-blur"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 14px)" }}
+      >
+        <div className="mx-auto flex max-w-xl gap-2">
+          {goUrl ? (
+            <a href={goUrl} target="_blank" rel="noopener noreferrer" className={`${PRIMARY_LINK_CLASS} flex-1`}>
+              <NavigateIcon />
+              {multiDay && mapDay !== "all" ? `יוצאים לדרך · יום ${mapDay}` : "יוצאים לדרך"}
+            </a>
+          ) : (
+            <span className={`${PRIMARY_LINK_CLASS} flex-1 opacity-50`}>יוצאים לדרך</span>
+          )}
+          <button
+            type="button"
+            onClick={() => setCalendarOpen(true)}
+            aria-label={calendarAddedOn ? `נוסף ליומן ב-${calendarAddedOn}` : "הוספה ליומן"}
+            className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#F1F2F5] px-4 text-[15px] font-semibold text-ink transition active:scale-[0.97]"
+          >
+            <CalendarIcon />
+            {calendarAddedOn ? new Date(`${calendarAddedOn}T00:00:00`).toLocaleDateString("he-IL", { day: "numeric", month: "short" }) : "ליומן"}
+          </button>
+        </div>
+      </div>
+
+      {calendarOpen && (
+        <AddToCalendarSheet
+          item={{ itemType: "trip", id: trip.id, name: trip.title, imageUrl: trip.coverUrl ?? trip.autoCoverUrl, category: trip.tripType }}
+          onClose={() => setCalendarOpen(false)}
+          onDone={(r) => {
+            setCalendarOpen(false);
+            if (r.action === "added" && r.date) setCalendarAddedOn(r.date);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** תחנה בציר הזמן: מספר בצבע היום + קו מקווקו לתחנה הבאה, שם, סוג ועיר, הערת היוצר, תמונות, פעולות. */
+function StopRow({
+  stop,
+  color,
+  isLast,
+  selected,
+  onShowOnMap,
+}: {
+  stop: TripStopDto;
+  color: string;
+  isLast: boolean;
+  selected: boolean;
+  onShowOnMap?: () => void;
+}) {
+  const images = stop.place.imageUrls;
+  const extra = images.length - 3;
+  const navUrl = hasCoords(stop) ? directionsUrl([{ latitude: stop.place.latitude as number, longitude: stop.place.longitude as number }]) : null;
+  const subtitle = [getPlaceCategoryLabel(stop.place.category), stop.place.city].filter(Boolean).join(" · ");
+
+  return (
+    <li id={`stop-${stop.id}`} className="flex scroll-mt-24 gap-3">
+      <div className="flex w-8 shrink-0 flex-col items-center" aria-hidden="true">
+        <span
+          className={`flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-bold tabular-nums text-white transition ${selected ? "ring-4 ring-offset-2" : ""}`}
+          style={{ background: color, "--tw-ring-color": `${color}40` } as CSSProperties}
+        >
+          {formatStopNumber(stop.position)}
+        </span>
+        {!isLast && <span className="mt-1.5 w-0 flex-1 border-r-2 border-dashed border-[#D5DCE6]" />}
+      </div>
+
+      <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-7"}`}>
+        <Link href={`/place/${stop.place.id}`} className="block active:opacity-70">
+          <span className="block text-[17px] font-semibold leading-snug text-ink">{stop.place.name}</span>
+          {subtitle && <span className="mt-0.5 block text-[13px] text-ink-secondary">{subtitle}</span>}
+        </Link>
+
+        {stop.note && <p className="mt-2.5 rounded-[14px] bg-[#F7F8FA] px-3.5 py-2.5 text-[14px] leading-relaxed text-ink">{stop.note}</p>}
+
+        {images.length > 0 && (
+          <Link
+            href={`/place/${stop.place.id}`}
+            aria-label={`תמונות של ${stop.place.name}`}
+            className={`mt-2.5 grid gap-1.5 ${images.length === 1 ? "grid-cols-1" : images.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}
+          >
+            {images.slice(0, 3).map((url, i) => (
+              <span key={url} className={`relative overflow-hidden rounded-[14px] bg-[#EFF1F4] ${images.length === 1 ? "aspect-[16/9]" : "aspect-square"}`}>
+                <MediaTile url={optimizeImage(url, images.length === 1 ? 640 : 280)} />
+                {i === 2 && extra > 0 && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[16px] font-semibold text-white">+{extra}</span>
+                )}
+              </span>
+            ))}
+          </Link>
+        )}
+
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {navUrl && (
+            <a
+              href={navUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3.5 text-[13px] font-semibold text-ink active:scale-95"
+            >
+              <NavigateIcon size={15} />
+              ניווט
+            </a>
+          )}
+          {onShowOnMap && (
+            <button
+              type="button"
+              onClick={onShowOnMap}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3.5 text-[13px] font-semibold text-ink active:scale-95"
+            >
+              <PinSmallIcon />
+              במפה
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
