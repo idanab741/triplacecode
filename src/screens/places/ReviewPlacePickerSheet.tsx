@@ -86,7 +86,7 @@ export function ReviewPlacePickerSheet({ onClose, onSelectPlace, onSuggestNewPla
             onClose();
             onSuggestNewPlace();
           }}
-          className="mt-3 w-full rounded-pill border py-2.5 text-[13px] font-bold"
+          className="h-12 rounded-xl text-[15.5px] font-semibold mt-3 w-full border"
           style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
         >
           לא מוצאים את המקום? הוסיפו אותו

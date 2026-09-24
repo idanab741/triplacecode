@@ -297,7 +297,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         type="button"
         onClick={() => setPickerOpen(true)}
         disabled={items.length >= COLLECTION_LIMITS.maxItems}
-        className="w-full rounded-pill border-2 border-dashed py-3 text-[14px] font-bold disabled:opacity-50"
+        className="h-12 rounded-xl text-[15.5px] font-semibold w-full border-2 border-dashed disabled:opacity-50"
         style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
       >
         + {labels.addLabel}
@@ -319,7 +319,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         type="button"
         disabled={!canPublish}
         onClick={handleSubmit}
-        className="w-full rounded-pill py-3.5 text-[15px] font-bold text-white disabled:opacity-50"
+        className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
         style={{ background: PURPLE_GRADIENT }}
       >
         {submitting ? "שומרים..." : mode === "create" ? "פרסום החוויה" : "שמירת שינויים"}

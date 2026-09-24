@@ -279,7 +279,7 @@ export default function CreateStoryPage() {
           type="button"
           onClick={handlePublish}
           disabled={submitting || uploading}
-          className="rounded-pill bg-white px-8 py-3 text-[14px] font-bold text-ink shadow-lg disabled:opacity-50"
+          className="h-12 rounded-xl text-[15.5px] font-semibold bg-white px-8 text-ink shadow-lg disabled:opacity-50"
         >
           {submitting ? "מפרסם..." : "פרסם"}
         </button>

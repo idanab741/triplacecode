@@ -259,7 +259,7 @@ export function TripsExplainerSheet({ onClose, startCount = 0 }: { onClose: () =
           <button
             type="button"
             onClick={onClose}
-            className="tx-rise mt-5 w-full rounded-pill py-3.5 text-[15px] font-bold text-white shadow-soft"
+            className="h-12 rounded-xl text-[15.5px] font-semibold tx-rise mt-5 w-full text-white shadow-soft"
             style={{ ["--d" as string]: "1.35s", background: BLUE_GRADIENT }}
           >
             הבנתי, יאללה!

@@ -144,7 +144,7 @@ export function InviteFriendsCard({ inviteUrl, onClose }: InviteFriendsCardProps
     <div className="overflow-hidden rounded-card bg-white shadow-soft">
       {/* אזור ויזואלי מרכזי - תמונת ה-HERO האמיתית של triplace */}
       <div className="relative h-44 w-full overflow-hidden">
-        <Image src="/images/hero-invite-friends.jpg" alt="קמע triplace עם מזוודה" fill priority className="object-cover" />
+        <Image src="/images/hero-invite-friends.png" alt="קמע triplace עם מזוודה" fill priority className="object-cover" />
         <div
           className="absolute inset-0"
           style={{ background: "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 45%)" }}

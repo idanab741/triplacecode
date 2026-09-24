@@ -243,7 +243,7 @@ function SearchResultContent() {
                 type="button"
                 onClick={handleRemoveFromCalendar}
                 disabled={removingFromCalendar}
-                className="w-full rounded-pill border border-[var(--color-primary-start)] py-2 text-sm font-semibold text-[var(--color-primary-start)] disabled:opacity-60"
+                className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-[var(--color-primary-start)] text-[var(--color-primary-start)] disabled:opacity-60"
               >
                 {removingFromCalendar ? "מסיר..." : "✓ ביומן - הסרה מהיומן"}
               </button>
@@ -251,7 +251,7 @@ function SearchResultContent() {
               <button
                 type="button"
                 onClick={handleAddToJournal}
-                className="w-full rounded-pill py-2 text-sm font-semibold text-white"
+                className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
                 + הוספה ליומן

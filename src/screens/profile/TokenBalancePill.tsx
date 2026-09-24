@@ -151,7 +151,7 @@ function RanOutContent({ cycleStart, onClose }: { cycleStart: string; onClose: (
         <button
           type="button"
           onClick={onClose}
-          className="w-full rounded-pill px-6 py-3 text-sm font-semibold text-white shadow-soft"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full px-6 text-white shadow-soft"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >
           המשך לגלות
@@ -163,7 +163,7 @@ function RanOutContent({ cycleStart, onClose }: { cycleStart: string; onClose: (
           type="button"
           disabled
           aria-disabled="true"
-          className="relative w-full cursor-not-allowed rounded-pill border border-ink-secondary/15 bg-bg-secondary/60 px-6 py-3 text-sm font-semibold text-ink-secondary"
+          className="h-12 rounded-xl text-[15.5px] font-semibold relative w-full cursor-not-allowed border border-ink-secondary/15 bg-bg-secondary/60 px-6 text-ink-secondary"
         >
           מנוי
           <span

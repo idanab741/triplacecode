@@ -437,7 +437,7 @@ export function ChooseLocationSheet({ onClose, onSelect }: ChooseLocationSheetPr
             <button
               type="button"
               onClick={() => setView("addAddress")}
-              className="w-full rounded-pill px-6 py-2 text-sm font-semibold text-white shadow-soft"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full px-6 text-white shadow-soft"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               הוספת כתובת

@@ -5,7 +5,9 @@ import { ChevronStartIcon } from "./icons";
 /** גובה אחיד לשני הלוגואים. קובץ הלוגו של triplace כולל שוליים שקופים גדולים יותר משל Google,
  *  ולכן התיבה שלו גבוהה יותר - כך שהאותיות עצמן יוצאות באותו גובה. */
 const GOOGLE_LOGO = "h-[18px] w-auto";
-const TRIPLACE_LOGO = "h-[25px] w-auto";
+/** בשורת הדירוג האחת - מעט קטנים יותר, כדי ששני הצדדים ייכנסו בשורה אחת גם במסך צר. */
+const ROW_GOOGLE_LOGO = "h-[16px] w-auto";
+const ROW_TRIPLACE_LOGO = "h-[22px] w-auto";
 
 function Star() {
   return (
@@ -15,24 +17,29 @@ function Star() {
   );
 }
 
+/**
+ * *** בקשה מפורשת ("שורת הביקורות של triplace ו-google צריכות להיות באותה שורה! לא 2"):
+ * כל תא הוא שורה אחת אופקית - לוגו, ציון, כוכב ומספר מדרגים זה לצד זה (קודם הלוגו ישב מעל
+ * הציון, כך שכל צד התפצל לשתי שורות). שני התאים חולקים את אותה שורה עם קו מפריד ביניהם.
+ */
 function RatingCell({ logo, rating, count, emptyText }: { logo: ReactNode; rating: number | null; count: number | null; emptyText: string }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col items-center gap-1.5 py-1">
-      <span className="flex h-[26px] items-center">{logo}</span>
+    <div className="flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap py-1">
+      <span className="flex h-[22px] shrink-0 items-center">{logo}</span>
       {rating != null ? (
-        <span className="flex items-center gap-1">
-          <span className="text-[17px] font-bold text-ink tabular-nums">{rating.toFixed(1)}</span>
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="text-[15.5px] font-bold text-ink tabular-nums">{rating.toFixed(1)}</span>
           <Star />
-          {count != null && count > 0 && <span className="text-[13px] text-ink-secondary tabular-nums">({count.toLocaleString("he-IL")})</span>}
+          {count != null && count > 0 && <span className="truncate text-[12.5px] text-ink-secondary tabular-nums">({count.toLocaleString("he-IL")})</span>}
         </span>
       ) : (
-        <span className="text-[13px] text-ink-secondary">{emptyText}</span>
+        <span className="truncate text-[12.5px] text-ink-secondary">{emptyText}</span>
       )}
     </div>
   );
 }
 
-/** 4. דירוג Google | דירוג triplace - זה לצד זה, עם הלוגואים באותו גודל. */
+/** 4. דירוג Google | דירוג triplace - בשורה אחת, עם הלוגואים באותו גודל אופטי. */
 export function AttractionRatingsSummary({
   googleRating,
   googleRatingCount,
@@ -45,16 +52,16 @@ export function AttractionRatingsSummary({
   triplaceRatingCount: number;
 }) {
   return (
-    <div className="mx-5 mt-4 flex items-stretch">
+    <div className="mx-5 mt-4 flex items-center">
       <RatingCell
-        logo={<Image src="/images/google-logo.png" alt="Google" width={200} height={70} className={GOOGLE_LOGO} />}
+        logo={<Image src="/images/google-logo.png" alt="Google" width={200} height={70} className={ROW_GOOGLE_LOGO} />}
         rating={googleRating}
         count={googleRatingCount}
         emptyText="אין דירוג"
       />
-      <span aria-hidden="true" className="w-px self-stretch bg-black/[0.08]" />
+      <span aria-hidden="true" className="h-6 w-px shrink-0 bg-black/[0.1]" />
       <RatingCell
-        logo={<Image src="/images/triplace-logo-black.png" alt="triplace" width={174} height={53} className={TRIPLACE_LOGO} />}
+        logo={<Image src="/images/triplace-logo-black.png" alt="triplace" width={174} height={53} className={ROW_TRIPLACE_LOGO} />}
         rating={triplaceRatingCount > 0 ? triplaceRating : null}
         count={triplaceRatingCount}
         emptyText="עוד אין דירוג"

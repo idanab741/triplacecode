@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite, type PlaceType } from "@/services/favorites/favoritesService";
+import { ShareToFriendsSheet } from "@/screens/places/ShareToFriendsSheet";
 
 interface AttractionSaveShareRowProps {
   placeId: string;
@@ -24,6 +25,7 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [justShared, setJustShared] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -48,7 +50,16 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
     }
   }
 
+  /**
+   * *** בקשה מפורשת ("למה אי אפשר לשלוח בתוך האפליקציה לחברים ומשתמשים?"):
+   * משתמש מחובר - נפתח גיליון השליחה לחברים (אותו גיליון בדיוק כמו בפוסטים), ומשם גם
+   * "עוד" לשיתוף חיצוני ו"קישור". אורח (לא מחובר) - אין לו צ'אט, אז שיתוף המכשיר כמו קודם.
+   */
   async function handleShare() {
+    if (user) {
+      setShareOpen(true);
+      return;
+    }
     setJustShared(true);
     setTimeout(() => setJustShared(false), 1500);
     const url = window.location.href;
@@ -70,7 +81,7 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
           type="button"
           onClick={handleSave}
           disabled={busy}
-          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60"
+          className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-[#EFF1F4] text-ink transition active:scale-[0.98] disabled:opacity-60"
         >
           <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={18} height={18} />
           {saved ? "נשמר" : "שמירה"}
@@ -79,11 +90,19 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
       <button
         type="button"
         onClick={handleShare}
-        className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
+        className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
       >
         <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={20} height={20} />
         {justShared ? "הועתק!" : "שיתוף"}
       </button>
+
+      {shareOpen && (
+        <ShareToFriendsSheet
+          options={[{ label: "המקום", target: { kind: "place", id: placeId } }]}
+          externalShareTitle={placeName}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

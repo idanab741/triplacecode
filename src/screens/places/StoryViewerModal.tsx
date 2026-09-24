@@ -208,7 +208,7 @@ export function StoryViewerModal({ rail, startAuthorIndex, viewerId, onClose, on
                     setPaused(false);
                   }}
                   disabled={deleting}
-                  className="flex-1 rounded-pill border border-ink-secondary/20 py-2.5 text-[13.5px] font-semibold text-ink disabled:opacity-60"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 border border-ink-secondary/20 text-ink disabled:opacity-60"
                 >
                   ביטול
                 </button>
@@ -216,7 +216,7 @@ export function StoryViewerModal({ rail, startAuthorIndex, viewerId, onClose, on
                   type="button"
                   onClick={handleConfirmDelete}
                   disabled={deleting}
-                  className="flex-1 rounded-pill bg-danger py-2.5 text-[13.5px] font-semibold text-white disabled:opacity-60"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 bg-danger text-white disabled:opacity-60"
                 >
                   {deleting ? "מוחק..." : "מחיקה"}
                 </button>

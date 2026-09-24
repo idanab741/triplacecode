@@ -137,7 +137,7 @@ export function CreateReviewSheet({ placeId, placeName, onClose, onSubmitted, on
             type="button"
             disabled={submitting || uploading}
             onClick={handleSubmit}
-            className="w-full rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
+            className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
             style={{ background: "var(--color-places-purple)" }}
           >
             {submitting ? "מפרסם..." : "פרסם ביקורת"}

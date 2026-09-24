@@ -67,7 +67,7 @@ export default async function JoinPage({ params }: JoinPageProps) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg px-6 text-center">
       <div className="relative h-20 w-20 overflow-hidden rounded-full shadow-soft">
-        <Image src="/images/hero-invite-friends.jpg" alt="" fill className="object-cover" priority />
+        <Image src="/images/hero-invite-friends.png" alt="" fill className="object-cover" priority />
       </div>
       <p className="text-sm font-medium text-ink-secondary">מכינים לך את TRIPLACE...</p>
       <JoinRedirect code={code} />

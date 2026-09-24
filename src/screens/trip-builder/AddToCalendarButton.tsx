@@ -69,7 +69,7 @@ export function AddToCalendarButton({ sessionId, date }: AddToCalendarButtonProp
           type="button"
           onClick={handleRemove}
           disabled={loading}
-          className="w-full rounded-pill border-2 border-[var(--color-primary-start)] py-2 text-sm font-semibold text-[var(--color-primary-start)] disabled:opacity-60"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full border-2 border-[var(--color-primary-start)] text-[var(--color-primary-start)] disabled:opacity-60"
         >
           {loading ? "מסיר..." : "✓ ביומן - הסרה מהיומן"}
         </button>
@@ -78,7 +78,7 @@ export function AddToCalendarButton({ sessionId, date }: AddToCalendarButtonProp
           type="button"
           onClick={handleAdd}
           disabled={loading}
-          className="w-full rounded-pill py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-60"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >
           {loading ? "שומר..." : "הוספה ליומן"}

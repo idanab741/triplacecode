@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { BottomSheet } from "@/components/ui";
 import { getAvatarUrl } from "@/constants/avatar";
 import { ensureConversation, sendSharedMessage, type ShareTarget } from "@/services/social/dmService";
@@ -29,11 +30,15 @@ export function ShareToFriendsSheet({
   options,
   onClose,
   onSent,
+  externalShareTitle,
 }: {
   options: ShareOption[];
   onClose: () => void;
   /** כמה נמענים קיבלו בהצלחה - כדי שמונה השליחות בכרטיס יעלה מיד. */
   onSent?: (count: number) => void;
+  /** *** חדש (עמוד האטרקציה / חלונית המקום במפה): כשמועבר - כפתור "עוד" בראש הגיליון פותח את
+   *  גיליון השיתוף של המכשיר (וואטסאפ וכו'), כדי ששיתוף מחוץ לאפליקציה לא ילך לאיבוד. */
+  externalShareTitle?: string;
 }) {
   const [people, setPeople] = useState<Person[] | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -105,11 +110,28 @@ export function ShareToFriendsSheet({
     setSentCount(ok);
   }
 
-  async function handleCopyLink() {
+  function targetUrl() {
     const target = options[optionIndex].target;
     const path = target.kind === "post" ? `/places/post/${target.id}` : `/place/${target.id}`;
+    return `${window.location.origin}${path}`;
+  }
+
+  async function handleExternalShare() {
+    const url = targetUrl();
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: externalShareTitle, url });
+      } catch {
+        /* המשתמש ביטל */
+      }
+      return;
+    }
+    await handleCopyLink();
+  }
+
+  async function handleCopyLink() {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      await navigator.clipboard.writeText(targetUrl());
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -139,19 +161,34 @@ export function ShareToFriendsSheet({
           type="button"
           disabled={sending}
           onClick={handleSend}
-          className="h-12 w-full rounded-xl bg-places-purple text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full bg-places-purple text-white transition active:scale-[0.98] disabled:opacity-60"
         >
           {sending ? "שולחים..." : selected.size === 1 ? "שליחה" : `שליחה ל-${selected.size}`}
         </button>
       </div>
     ) : undefined;
 
-  return (
+  // *** פורטל ל-body: הגיליון נפתח גם מתוך המפה (שכבה מבודדת - isolate), ובלי פורטל הוא היה נכלא
+  // מתחת לחלונית המקום. ב-body הוא תמיד מעל העמוד, והבר התחתון נשאר גלוי כרגיל.
+  const sheet = (
     <BottomSheet onClose={onClose} footer={footer}>
       <div className={`px-5 ${footer ? "" : "pb-8"}`} style={{ "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties}>
         {/* *** בקשה מפורשת ("בצד מדי"): כותרת ממורכזת כמו בגיליון השיתוף של אינסטגרם, והתוכן עם
             ריווח צד (px-5) - קודם הגיליון לא נתן ריווח, והכותרת נדבקה לקצה המסך. */}
         <div className="relative mb-4 flex h-9 items-center justify-center">
+          {externalShareTitle && (
+            <button
+              type="button"
+              onClick={handleExternalShare}
+              aria-label="שיתוף מחוץ לאפליקציה"
+              className="absolute start-0 top-0 flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13.5px] font-medium text-ink-secondary transition-colors active:bg-black/[0.05]"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 15V3M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+              </svg>
+              עוד
+            </button>
+          )}
           <h2 className="text-[16px] font-bold text-ink">שליחה</h2>
           <button
             type="button"
@@ -175,7 +212,7 @@ export function ShareToFriendsSheet({
             </span>
             <p className="text-[16px] font-semibold text-ink">{sentCount === 1 ? "נשלח" : `נשלח ל-${sentCount} אנשים`}</p>
             {error && <p className="text-[13px] text-ink-secondary">{error}</p>}
-            <button type="button" onClick={onClose} className="mt-1 h-11 rounded-xl bg-[#EFF1F4] px-8 text-[15px] font-semibold text-ink">
+            <button type="button" onClick={onClose} className="h-12 rounded-xl text-[15.5px] font-semibold mt-1 bg-[#EFF1F4] px-8 text-ink">
               סגירה
             </button>
           </div>
@@ -277,4 +314,6 @@ export function ShareToFriendsSheet({
       </div>
     </BottomSheet>
   );
+
+  return typeof document === "undefined" ? sheet : createPortal(sheet, document.body);
 }

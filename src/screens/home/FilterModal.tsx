@@ -263,7 +263,7 @@ export function FilterModal({
                 onChangeMinRating(0);
                 setQuery("");
               }}
-              className="mt-5 w-full rounded-pill border border-ink-secondary/20 py-2.5 text-[13px] font-semibold text-ink-secondary"
+              className="h-12 rounded-xl text-[15.5px] font-semibold mt-5 w-full border border-ink-secondary/20 text-ink-secondary"
             >
               נקה הכל
             </button>

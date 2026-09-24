@@ -26,7 +26,7 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const classes = `inline-flex items-center justify-center gap-2 rounded-pill px-6 py-4 text-base font-bold transition-opacity hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none ${
+  const classes = `inline-flex h-12 items-center justify-center gap-2 rounded-xl px-6 text-[15.5px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 disabled:pointer-events-none ${
     fullWidth ? "w-full" : ""
   } ${variantClasses[variant]} ${className}`;
 

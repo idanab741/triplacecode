@@ -348,7 +348,7 @@ export function SearchIntroOverlay({ open, onClose }: SearchIntroOverlayProps) {
                 <button
                   type="button"
                   onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-pill py-3 text-sm font-bold text-white shadow-[0_10px_22px_-8px_rgba(24,119,242,0.8)] transition active:scale-[0.98]"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 text-white shadow-[0_10px_22px_-8px_rgba(24,119,242,0.8)] transition active:scale-[0.98]"
                   style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                 >
                   {isLast ? "בואו נתחיל" : "הבא"}

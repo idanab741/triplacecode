@@ -231,7 +231,7 @@ function WelcomeOnboarding() {
         <button
           type="button"
           onClick={handleNext}
-          className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >
           {isLast ? "המשך לאפליקציה" : "הבא"}

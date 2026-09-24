@@ -274,7 +274,7 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
           type="button"
           disabled={uploading || media.length >= MAX_FILES}
           onClick={() => fileInputRef.current?.click()}
-          className="mt-3 flex w-full items-center justify-center gap-2 rounded-card border border-dashed px-4 py-3 text-[14px] font-semibold disabled:opacity-40"
+          className="h-12 rounded-xl text-[15.5px] font-semibold mt-3 flex w-full items-center justify-center gap-2 border border-dashed px-4 disabled:opacity-40"
           style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
         >
           {uploading ? "מעלה..." : "+ הוסיפו תמונות או סרטון"}

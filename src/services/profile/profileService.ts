@@ -1,5 +1,4 @@
 import { createClient } from "@/services/supabase/client";
-import { compressImageFile } from "@/utils/compressImage";
 import { WELCOME_ONBOARDING_ENABLED } from "@/constants/onboarding";
 
 export interface Profile {
@@ -55,10 +54,8 @@ export async function updateProfile(
   return supabase.from("profiles").upsert({ id: userId, ...updates });
 }
 
-export async function uploadAvatar(userId: string, originalFile: File): Promise<string> {
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
   const supabase = createClient();
-  // *** ביצועים: תמונת פרופיל לא צריכה יותר מ-800px (ר' compressImage.ts).
-  const file = await compressImageFile(originalFile, 800, 0.85);
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = `${userId}/avatar.${ext}`;
 

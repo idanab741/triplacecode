@@ -21,6 +21,7 @@ import { getSessionLocation } from "@/utils/sessionLocation";
 import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import type { FriendsMapPin, FriendsMapContribution } from "@/services/social/friendsMapService";
 import { getFriendPinIcon } from "./friendPin";
+import { ShareToFriendsSheet } from "./ShareToFriendsSheet";
 
 type Filter = "all" | "friends" | "mine";
 type LatLng = { lat: number; lng: number };
@@ -195,7 +196,10 @@ function PlaceContributionsSheet({
   onOpenPlace: () => void;
 }) {
   const [viewer, setViewer] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const rating = pin.userRatingAvg ?? pin.rating;
+  /** פוסט לגיבוי - אם מסיבה כלשהי המקום לא נמצא באף מאגר, נשלח הפוסט האחרון עליו. */
+  const fallbackPostId = pin.contributions.find((c) => c.id.startsWith("post:"))?.id.slice("post:".length);
 
   return (
     <div className="absolute inset-0 z-[1200] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={pin.name}>
@@ -220,13 +224,26 @@ function PlaceContributionsSheet({
               {pin.recommendersCount === 1 ? "משתמש אחד שיתף" : `${pin.recommendersCount} משתמשים שיתפו`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onOpenPlace}
-            className="shrink-0 rounded-full bg-places-purple px-4 py-2 text-[13px] font-semibold text-white transition active:scale-95"
-          >
-            לעמוד המקום
-          </button>
+          {/* *** בקשה מפורשת ("אפשרות לשלוח מקום לחברים באפליקציה ולשתף - בחלונית המקום") */}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              aria-label={`שליחת ${pin.name} לחברים`}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F1EDFB] text-places-purple transition active:scale-95"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21.5 2.5 10.5 13.5M21.5 2.5l-7 19-4-8-8-4 19-7z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={onOpenPlace}
+              className="rounded-full bg-places-purple px-4 py-2 text-[13px] font-semibold text-white transition active:scale-95"
+            >
+              לעמוד המקום
+            </button>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-black/[0.06] pb-6">
@@ -276,6 +293,14 @@ function PlaceContributionsSheet({
           ))}
         </div>
       </div>
+
+      {shareOpen && (
+        <ShareToFriendsSheet
+          options={[{ label: "המקום", target: { kind: "place", id: pin.placeId, fallbackPostId } }]}
+          externalShareTitle={pin.name}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
 
       {viewer && (
         <button
@@ -529,7 +554,7 @@ export function PlacesFriendsMap({
             <button
               type="button"
               onClick={onCreate}
-              className="mt-4 rounded-full bg-places-purple px-6 py-2.5 text-[14px] font-semibold text-white transition active:scale-95"
+              className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 bg-places-purple px-6 text-white transition active:scale-95"
             >
               צור פוסט על מקום
             </button>

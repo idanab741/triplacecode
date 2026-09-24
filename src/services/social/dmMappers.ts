@@ -21,6 +21,8 @@ export interface DmMessageRow {
   text: string | null;
   trip_id: string | null;
   place_id: string | null;
+  /** מיגרציה 0096 - מקום מ-tripadd_submissions (kind=place). חסר לפני שהמיגרציה רצה. */
+  tripadd_id?: string | null;
   post_id: string | null;
   review_id: string | null;
   read_at: string | null;
@@ -80,7 +82,7 @@ export function mapMessageRow(row: DmMessageRow): DmMessageDto {
     kind: row.kind,
     text: row.text,
     tripId: row.trip_id,
-    placeId: row.place_id,
+    placeId: row.place_id ?? row.tripadd_id ?? null,
     postId: row.post_id,
     reviewId: row.review_id,
     readAt: row.read_at,

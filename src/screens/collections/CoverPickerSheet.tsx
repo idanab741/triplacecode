@@ -80,7 +80,7 @@ export function CoverPickerSheet({ coverUrl, imageUrls, autoLabel = "קאבר א
           type="button"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="w-full rounded-pill border py-2.5 text-[13.5px] font-bold disabled:opacity-50"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full border disabled:opacity-50"
           style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
         >
           {uploading ? "מעלה..." : "העלאת תמונה מהמכשיר"}

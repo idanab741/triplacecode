@@ -516,7 +516,7 @@ function TrippyQuickResultContent() {
               type="button"
               onClick={handleAddStop}
               disabled={addingStop}
-              className="w-full rounded-pill border border-dashed border-accent/40 py-2.5 text-sm font-semibold text-accent disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-dashed border-accent/40 text-accent disabled:opacity-50"
             >
               {addingStop ? "מוסיפים עצירה..." : "+ הוסיפו עצירה למסלול"}
             </button>
@@ -524,7 +524,7 @@ function TrippyQuickResultContent() {
             <button
               type="button"
               onClick={() => setCalendarOpen(true)}
-              className="w-full rounded-pill py-2.5 text-sm font-semibold text-white shadow-md"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               {addedToCalendar ? "✓ נוסף - הוספה שוב?" : "הוספה ליומן"}
@@ -554,7 +554,7 @@ function TrippyQuickResultContent() {
             <button
               type="button"
               onClick={handleConfirmAddToCalendar}
-              className="mt-4 w-full rounded-pill py-2.5 text-sm font-semibold text-white shadow-md"
+              className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 w-full text-white shadow-md"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               הוספה ליומן
@@ -590,14 +590,14 @@ function TrippyQuickResultContent() {
               <button
                 type="button"
                 onClick={() => setSwapConfirmStop(null)}
-                className="flex-1 rounded-pill border border-ink-secondary/25 py-2.5 text-sm font-semibold text-ink"
+                className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 border border-ink-secondary/25 text-ink"
               >
                 לא
               </button>
               <button
                 type="button"
                 onClick={handleConfirmSwap}
-                className="flex-1 rounded-pill py-2.5 text-sm font-semibold text-white shadow-md"
+                className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white shadow-md"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
                 כן

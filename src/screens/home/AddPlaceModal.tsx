@@ -332,7 +332,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-pill px-6 py-2.5 text-[13px] font-bold text-white"
+              className="h-12 rounded-xl text-[15.5px] font-semibold px-6 text-white"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               סגור
@@ -424,7 +424,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                   type="button"
                   onClick={handleFindLocation}
                   disabled={locating || matching || !nameQuery.trim() || (!coords && !manualAddress.trim())}
-                  className="mt-2 w-full rounded-pill py-2.5 text-[13px] font-bold text-white disabled:opacity-40"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold mt-2 w-full text-white disabled:opacity-40"
                   style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                 >
                   {locating ? "מאתר את מיקומך..." : matching ? "מאתר את המקום..." : "אתר מיקום"}
@@ -545,7 +545,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
                 type="button"
                 disabled={submitting}
                 onClick={handleSubmit}
-                className="w-full rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
+                className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
                 style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
               >
                 {submitting ? "שומר..." : "שמור מקום"}

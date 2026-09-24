@@ -120,7 +120,7 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
         <button
           type="button"
           onClick={handleStartNavigation}
-          className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-4 text-base font-bold text-ink"
+          className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-bg-secondary text-ink"
         >
           <Icon name="google-maps" size={22} />
           Google Maps
@@ -128,7 +128,7 @@ export function PlaceNavigationCard({ placeId, latitude, longitude }: PlaceNavig
         <button
           type="button"
           onClick={handleStartWaze}
-          className="flex flex-1 items-center justify-center gap-2 rounded-pill bg-bg-secondary py-4 text-base font-bold text-ink"
+          className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-bg-secondary text-ink"
         >
           <Icon name="waze" size={26} />
           Waze

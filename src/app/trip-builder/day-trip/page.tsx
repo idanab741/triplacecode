@@ -746,7 +746,7 @@ const footerAction = getFooterAction();
                   <button
                     type="button"
                     onClick={confirmEdit}
-                    className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white shadow-md"
                     style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                   >
                     עדכן
@@ -848,7 +848,7 @@ return m.role === "assistant" ? (
             <button
               type="button"
               onClick={confirmBuildTogether}
-              className="w-full rounded-pill py-3 text-sm font-semibold text-white"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               בואו נבנה יחד
@@ -856,7 +856,7 @@ return m.role === "assistant" ? (
             <button
               type="button"
               onClick={confirmBuildAlone}
-              className="w-full rounded-pill border border-accent/30 bg-accent/5 py-3 text-sm font-semibold text-accent"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent"
             >
               אמשיך לבד
             </button>
@@ -886,7 +886,7 @@ return m.role === "assistant" ? (
               type="button"
               onClick={footerAction.onClick}
               disabled={footerAction.disabled}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               {footerAction.label}

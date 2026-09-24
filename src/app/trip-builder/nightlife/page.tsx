@@ -364,7 +364,7 @@ export default function NightlifeQuestionnairePage() {
               type="button"
               onClick={footerAction.onClick}
               disabled={footerAction.disabled}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               {footerAction.label}

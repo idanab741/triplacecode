@@ -989,7 +989,7 @@ function confirmBooked() {
                   <button
                     type="button"
                     onClick={chooseEditNoDate}
-                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent"
                   >
                     אין לי עוד תאריך
                   </button>
@@ -1053,7 +1053,7 @@ function confirmBooked() {
                   <button
                     type="button"
                     onClick={chooseEditSurpriseMe}
-                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent"
                   >
                     🎁 תפתיעו אותי
                   </button>
@@ -1159,7 +1159,7 @@ function confirmBooked() {
                       (editingStage === "freeIntent" && !editTempFreeText.trim()) ||
                       (editingStage === "destination" && editTempDestinations.every((c) => !c.trim()))
                     }
-                    className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white shadow-md disabled:opacity-50"
                     style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                   >
                     עדכן
@@ -1200,7 +1200,7 @@ function confirmBooked() {
                 <button
                   type="button"
                   onClick={confirmNoDate}
-                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent"
                 >
                   אין לי עוד תאריך
                 </button>
@@ -1415,7 +1415,7 @@ function confirmBooked() {
                   <button
                     type="button"
                     onClick={chooseSurpriseMe}
-                    className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2.5 text-sm font-semibold text-accent"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent"
                   >
                     🎁 תפתיעו אותי
                   </button>
@@ -1494,7 +1494,7 @@ function confirmBooked() {
                   type="button"
                   onClick={confirmFreeIntentTogether}
                   disabled={!tempFreeIntent.trim() || extractingIntent}
-                  className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                 >
                   בואו נבנה יחד
@@ -1503,7 +1503,7 @@ function confirmBooked() {
                   type="button"
                   onClick={confirmFreeIntentAlone}
                   disabled={!tempFreeIntent.trim() || extractingIntent}
-                  className="w-full rounded-pill border border-accent/30 bg-accent/5 py-2 text-sm font-semibold text-accent disabled:opacity-50"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold w-full border border-accent/30 bg-accent/5 text-accent disabled:opacity-50"
                 >
                   אמשיך לבד
                 </button>
@@ -1561,7 +1561,7 @@ function confirmBooked() {
                   form.travelStyle !== "single_destination" &&
                   tempDestinations.every((c) => !c.trim()))
               }
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               המשך

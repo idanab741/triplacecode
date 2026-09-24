@@ -186,7 +186,7 @@ function ReviewStep() {
             type="button"
             disabled={rating === 0 || submitting || uploading}
             onClick={handlePublish}
-            className="w-full rounded-pill py-3.5 text-[15px] font-bold text-white disabled:opacity-40"
+            className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-40"
             style={{ background: PURPLE_GRADIENT }}
           >
             {submitting ? "מפרסמים..." : "פרסום ביקורת"}

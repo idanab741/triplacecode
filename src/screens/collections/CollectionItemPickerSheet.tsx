@@ -212,7 +212,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
               <button
                 type="button"
                 onClick={onGoAddPlace}
-                className="mt-3 w-full rounded-pill border py-2.5 text-[13px] font-bold"
+                className="h-12 rounded-xl text-[15.5px] font-semibold mt-3 w-full border"
                 style={{ borderColor: "var(--color-places-purple)", color: "var(--color-places-purple)" }}
               >
                 לא מוצאים את המקום? הוסיפו אותו ל־TRIPLACE
@@ -274,7 +274,7 @@ export function CollectionItemPickerSheet({ type, addedKeys, onAdd, onClose, onG
           </>
         )}
 
-        <button type="button" onClick={onClose} className="mt-4 w-full rounded-pill py-3 text-[14px] font-bold text-white" style={{ background: "var(--color-places-purple)" }}>
+        <button type="button" onClick={onClose} className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 w-full text-white" style={{ background: "var(--color-places-purple)" }}>
           סיום
         </button>
       </div>

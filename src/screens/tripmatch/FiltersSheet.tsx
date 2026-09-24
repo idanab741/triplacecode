@@ -131,14 +131,14 @@ export function FiltersSheet({ candidates, filters, onChange, onClose, preferred
             type="button"
             onClick={() => onChange(EMPTY_FILTERS)}
             disabled={activeCount === 0}
-            className="rounded-2xl bg-bg-secondary px-6 py-3.5 text-[14px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-40"
+            className="h-12 rounded-xl text-[15.5px] font-semibold bg-bg-secondary px-6 text-ink transition active:scale-[0.98] disabled:opacity-40"
           >
             איפוס
           </button>
           <button
             type="button"
             onClick={onClose}
-            className={`flex-1 rounded-2xl py-3.5 text-[15px] font-bold text-white shadow-[0_10px_22px_-10px_rgba(27,111,232,0.8)] transition active:scale-[0.98] ${
+            className={`h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white shadow-[0_10px_22px_-10px_rgba(27,111,232,0.8)] transition active:scale-[0.98] ${
               resultCount === 0 ? "opacity-70" : ""
             }`}
             style={{ background: BRAND_GRADIENT }}

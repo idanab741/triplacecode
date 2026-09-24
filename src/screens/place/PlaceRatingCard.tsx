@@ -91,7 +91,7 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
             <button
               type="button"
               onClick={() => setFormOpen(true)}
-              className="flex h-11 w-full items-center justify-center rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
+              className="h-12 rounded-xl text-[15.5px] font-semibold flex w-full items-center justify-center bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
             >
               {myReview ? "עריכת הדירוג שלי" : "דרגו את המקום הזה"}
             </button>
@@ -111,14 +111,14 @@ export function PlaceRatingCard({ averageRating, reviewCount, reviews, myReview,
                   type="button"
                   disabled={submitting || draftRating < 1}
                   onClick={() => onSubmit(draftRating, draftComment)}
-                  className="h-11 flex-1 rounded-xl bg-ink text-[15px] font-semibold text-white disabled:opacity-40"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 bg-ink text-white disabled:opacity-40"
                 >
                   {submitting ? "שולח..." : "שליחת דירוג"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormOpen(false)}
-                  className="h-11 rounded-xl bg-[#EFF1F4] px-5 text-[15px] font-semibold text-ink"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold bg-[#EFF1F4] px-5 text-ink"
                 >
                   ביטול
                 </button>

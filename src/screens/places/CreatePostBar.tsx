@@ -34,7 +34,7 @@ export function CreatePostBar({ onClick }: CreatePostBarProps) {
       <button
         type="button"
         onClick={onClick}
-        className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-pill py-2.5 text-[14px] font-bold text-white"
+        className="h-12 rounded-xl text-[15.5px] font-semibold flex min-w-0 flex-1 items-center justify-center gap-2 text-white"
         style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[15px] leading-none">+</span>

@@ -213,7 +213,7 @@ export default function ProfileView({
               type="button"
               disabled={busy}
               onClick={handleFollowToggle}
-              className={`h-10 flex-1 rounded-xl text-[14px] font-semibold transition active:scale-[0.98] disabled:opacity-60 ${
+              className={`h-12 rounded-xl text-[15.5px] font-semibold flex-1 transition active:scale-[0.98] disabled:opacity-60 ${
                 following ? "bg-[#EFF1F4] text-ink" : "text-white"
               }`}
               style={following ? undefined : { background: BLUE }}
@@ -223,7 +223,7 @@ export default function ProfileView({
             <button
               type="button"
               onClick={() => router.push(`/places/chat?with=${encodeURIComponent(profile.username ?? profile.id)}`)}
-              className="h-10 flex-1 rounded-xl bg-[#EFF1F4] text-[14px] font-semibold text-ink transition active:scale-[0.98]"
+              className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
             >
               הודעה
             </button>
@@ -233,7 +233,7 @@ export default function ProfileView({
         {isSelf && (
           <Link
             href="/places/profile/edit"
-            className="mt-4 flex h-10 w-full items-center justify-center rounded-xl bg-[#EFF1F4] text-[14px] font-semibold text-ink transition active:scale-[0.99]"
+            className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 flex w-full items-center justify-center bg-[#EFF1F4] text-ink transition active:scale-[0.99]"
           >
             עריכת פרופיל
           </Link>

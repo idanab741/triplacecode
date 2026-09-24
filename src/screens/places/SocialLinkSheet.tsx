@@ -68,7 +68,7 @@ export function SocialLinkSheet({ platform, current, onClose, onSave }: SocialLi
           type="button"
           disabled={saving || value.trim().length === 0}
           onClick={handleSave}
-          className="mt-4 w-full rounded-pill py-3 text-[14.5px] font-bold text-white disabled:opacity-50"
+          className="h-12 rounded-xl text-[15.5px] font-semibold mt-4 w-full text-white disabled:opacity-50"
           style={{ background: "linear-gradient(150deg, #22B8FD, #007CFE)" }}
         >
           {saving ? "שומרים..." : "שמירה"}

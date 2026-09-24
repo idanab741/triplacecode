@@ -609,7 +609,7 @@ export function CreatePlacePageContent() {
                   <button
                     type="button"
                     onClick={() => selectById(duplicateOf.id, duplicateOf.name, false)}
-                    className="mt-2 w-full rounded-pill py-2.5 text-[13.5px] font-bold text-white"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold mt-2 w-full text-white"
                     style={{ background: PURPLE_GRADIENT }}
                   >
                     כתיבת ביקורת
@@ -672,7 +672,7 @@ export function CreatePlacePageContent() {
               type="button"
               disabled={adding || checkingDuplicate || !!duplicateOf}
               onClick={handleAddPlace}
-              className="mt-6 w-full rounded-pill py-3.5 text-[15px] font-bold text-white disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold mt-6 w-full text-white disabled:opacity-50"
               style={{ background: PURPLE_GRADIENT }}
             >
               {adding ? "מוסיפים..." : "הוספת מקום"}
@@ -769,7 +769,7 @@ export function CreatePlacePageContent() {
                   type="button"
                   disabled={publishing || uploading}
                   onClick={handlePublish}
-                  className="mt-6 w-full rounded-pill py-3.5 text-[15px] font-bold text-white disabled:opacity-40"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold mt-6 w-full text-white disabled:opacity-40"
                   style={{ background: PURPLE_GRADIENT }}
                 >
                   {publishing ? "מפרסמים..." : "פרסום ביקורת"}

@@ -1,9 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
-import { Chip, Screen, Stepper, Switch } from "@/components/ui";
+import { Screen } from "@/components/ui";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -25,26 +24,62 @@ import { PREFERENCES_TAXONOMY, type PreferencesTaxonomyCategory } from "@/locale
 import { DIETARY_RESTRICTIONS, TRANSPORTATION, ACCESSIBILITY_TYPES } from "@/locales/he/preferences";
 import { HOME_QUICK_CATEGORIES } from "@/constants/homeQuickCategories";
 
-const PRIMARY_GRADIENT = "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))";
+/**
+ * *** שדרוג עיצובי (בקשה מפורשת - "נשדרג לפי העיצוב החדש של העמודים שלנו, צבעים חדים יותר,
+ * ולהשתמש באייקונים של כל סוג טיול"): אותו קו כמו עמוד האטרקציה - רקע לבן נקי, טקסט שחור חד,
+ * משטחים אפורים מלאים, כחול triplace אחיד ומלא (בלי גרדיאנטים דהויים).
+ *  - במקום פס ההתקדמות: שורת אייקוני סוגי הטיול (אותם אייקונים כמו בעמוד הבית) - רואים באיזה
+ *    סוג טיול נמצאים, בכמה כבר בחרתם, ולחיצה על אייקון קופצת ישר אליו.
+ *  - קבוצות: שורות עם עיגול סימון (כמו רשימת בחירה), החץ פותח את התגיות הספציפיות.
+ * הלוגיקה (שמירה, דילוג, השלמה, הפניות) לא השתנתה.
+ */
+const BLUE = "#0A6DFE";
+const INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties;
 
-/** אותם אייקוני-תמונה בדיוק כמו שורת "סוגי הטיול" בעמוד הבית (בקשה מפורשת
- *  - "יש תמונת אייקון לכל סוג טיול! תשתמש גם בהם! זה מופיע בעמוד הבית"),
- *  במקום אימוג'י גנרי. HomeQuickCategoryId ו-TripAddCategory אותו מרחב ערכים. */
+/** אותם אייקוני-תמונה בדיוק כמו שורת "סוגי הטיול" בעמוד הבית. */
 const CATEGORY_ICON_SRC: Record<TaxonomyFieldKey, string> = Object.fromEntries(
   HOME_QUICK_CATEGORIES.map((c) => [c.id, c.imageSrc])
 ) as Record<TaxonomyFieldKey, string>;
 
+/** שם קצר מתחת לאייקון בשורת סוגי הטיול (השם המלא מופיע בכותרת). */
+const SHORT_LABEL: Record<TaxonomyFieldKey, string> = {
+  food: "אוכל",
+  attraction: "אטרקציות",
+  nature: "טבע",
+  shopping: "קניות",
+  sleep: "לינה",
+  nightlife: "חיי לילה",
+};
+
+function CheckIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function CompassIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5 5-2z" />
+    </svg>
+  );
+}
+
 function ChevronIcon({ expanded }: { expanded: boolean }) {
   return (
     <svg
-      width="15"
-      height="15"
+      width="16"
+      height="16"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.5"
+      strokeWidth="2.4"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
       className="transition-transform duration-300"
       style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}
     >
@@ -53,15 +88,86 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
   );
 }
 
+/** תגית בחירה - משטח אפור / כחול מלא כשנבחרה. */
+function TagChip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-medium transition active:scale-95 ${
+        selected ? "text-white" : "bg-[#F1F2F5] text-ink"
+      }`}
+      style={selected ? { background: BLUE } : undefined}
+    >
+      {selected && <CheckIcon size={12} />}
+      {label}
+    </button>
+  );
+}
+
+/** שורת סוגי הטיול - אייקון לכל שלב, טבעת כחולה סביב הנוכחי, תג כחול עם מספר הבחירות. */
+function TripTypeStrip({
+  stepIndex,
+  counts,
+  onJump,
+}: {
+  stepIndex: number;
+  counts: number[];
+  onJump: (index: number) => void;
+}) {
+  return (
+    <nav aria-label="סוגי טיול" className="flex justify-between gap-1 pb-1 pt-1">
+      {STEPS.map((s, i) => {
+        const current = i === stepIndex;
+        const count = counts[i];
+        const label = s.type === "taxonomy" ? SHORT_LABEL[s.key] : "עוד";
+        return (
+          <button
+            key={s.type === "taxonomy" ? s.key : "extra"}
+            type="button"
+            onClick={() => onJump(i)}
+            aria-current={current ? "step" : undefined}
+            className="flex min-w-0 flex-1 flex-col items-center gap-1.5 transition active:scale-95"
+          >
+            <span className="relative">
+              <span
+                className={`flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-[#F1F2F5] text-ink transition-shadow ${
+                  current ? "" : "opacity-80"
+                }`}
+                style={current ? { boxShadow: `0 0 0 2.5px #fff, 0 0 0 4.5px ${BLUE}` } : undefined}
+              >
+                {s.type === "taxonomy" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={CATEGORY_ICON_SRC[s.key]} alt="" className="h-full w-full scale-125 object-cover" />
+                ) : (
+                  <CompassIcon />
+                )}
+              </span>
+              {count > 0 && (
+                <span
+                  className="absolute -bottom-1 -start-1 flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold text-white ring-2 ring-white tabular-nums"
+                  style={{ background: BLUE }}
+                >
+                  {count}
+                </span>
+              )}
+            </span>
+            <span className={`w-full truncate text-center text-[11px] leading-tight ${current ? "font-bold text-ink" : "font-medium text-ink-secondary"}`}>
+              {label}
+            </span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 /**
- * כרטיס קבוצת-משנה אחת - בנוי כהרחבה של סגנון ה-Chip הקיים באפליקציה
- * (אותה גלולה מעוגלת, אותו גרדיאנט כחול/צל כשנבחר) ולא כקומפוננטה
- * חדשה המצאתית, בדיוק כדי לענות על ההערה "נראה קצת חובבנית, צריך
- * שיותאם לקווים של האפליקציה שלנו". לחיצה על גוף הגלולה = בחירה/ביטול
- * של הקבוצה כולה. לחיצה על החץ בקצה = פתיחה/סגירה של תתי-התגיות, בלי
- * לשנות את הבחירה.
+ * קבוצת-משנה אחת: לחיצה על השורה = בחירה/ביטול של הקבוצה כולה (עיגול סימון כחול).
+ * לחיצה על החץ = פתיחה/סגירה של התגיות הספציפיות, בלי לשנות את הבחירה.
  */
-function GroupPill({
+function GroupRow({
   group,
   tags,
   groupSelected,
@@ -86,61 +192,101 @@ function GroupPill({
 }) {
   return (
     <div
-      className="overflow-hidden rounded-card opacity-0"
+      className={`overflow-hidden rounded-2xl opacity-0 transition-colors ${groupSelected ? "bg-[#EEF4FF]" : "bg-[#F4F5F7]"}`}
       style={{
-        background: groupSelected ? PRIMARY_GRADIENT : "white",
-        boxShadow: groupSelected ? "0 4px 12px rgba(24,119,242,0.28)" : "0 2px 8px rgba(16,24,40,0.08)",
-        animation: "prefFadeInUp 0.4s ease forwards",
-        animationDelay: `${index * 45}ms`,
+        boxShadow: groupSelected ? `inset 0 0 0 1.5px ${BLUE}` : undefined,
+        animation: "prefFadeInUp 0.35s ease forwards",
+        animationDelay: `${index * 35}ms`,
       }}
     >
       <div className="flex items-center">
         <button
           type="button"
           onClick={onToggleGroup}
-          className={`flex flex-1 items-center justify-between gap-2 py-2.5 pe-2 ps-4 text-right font-medium transition active:opacity-70 ${
-            groupSelected ? "text-white" : "text-ink"
-          }`}
+          aria-pressed={groupSelected}
+          className="flex min-h-[54px] flex-1 items-center gap-3 py-2.5 pe-1 ps-4 text-start transition active:opacity-70"
         >
-          <span className="text-[13.5px]">{group}</span>
-          {selectedTagsCount > 0 && (
-            <span
-              className={`shrink-0 rounded-pill px-2 py-0.5 text-[10.5px] font-bold ${
-                groupSelected ? "bg-white/25 text-white" : "text-white"
-              }`}
-              style={groupSelected ? undefined : { background: PRIMARY_GRADIENT }}
-            >
-              {selectedTagsCount}
-            </span>
-          )}
+          <span
+            className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full transition-colors ${
+              groupSelected ? "text-white" : "bg-white shadow-[inset_0_0_0_1.5px_rgba(15,20,25,0.22)]"
+            }`}
+            style={groupSelected ? { background: BLUE } : undefined}
+          >
+            {groupSelected && <CheckIcon size={12} />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold leading-snug text-ink">{group}</span>
+            {selectedTagsCount > 0 && (
+              <span className="block text-[12.5px] font-semibold" style={{ color: BLUE }}>
+                {selectedTagsCount === 1 ? "נבחרה אפשרות אחת" : `נבחרו ${selectedTagsCount} אפשרויות`}
+              </span>
+            )}
+          </span>
         </button>
         <button
           type="button"
           onClick={onToggleExpand}
-          aria-label={isExpanded ? "סגור תתי-קטגוריות" : "פתח תתי-קטגוריות"}
-          className={`flex h-10 w-10 shrink-0 items-center justify-center ${groupSelected ? "text-white" : "text-ink-secondary"}`}
+          aria-expanded={isExpanded}
+          aria-label={isExpanded ? `סגירת האפשרויות של ${group}` : `עוד אפשרויות ב${group}`}
+          className="flex h-[54px] shrink-0 items-center gap-1 pe-3.5 ps-2 text-[12.5px] font-medium text-ink-secondary"
         >
+          {tags.length}
           <ChevronIcon expanded={isExpanded} />
         </button>
       </div>
 
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-out"
-        style={{ gridTemplateRows: isExpanded ? "1fr" : "0fr" }}
-      >
+      <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: isExpanded ? "1fr" : "0fr" }}>
         <div className="overflow-hidden">
-          <div
-            className={`flex flex-wrap gap-1.5 px-3.5 pb-3 pt-1 ${groupSelected ? "border-t border-white/20" : "border-t border-ink-secondary/10"}`}
-          >
+          <div className="flex flex-wrap gap-2 border-t border-black/[0.06] px-4 pb-4 pt-3">
             {tags.map((tag) => (
-              <Chip key={tag} size="sm" selected={selectedTags.includes(tag)} onClick={() => onToggleTag(tag)}>
-                {tag}
-              </Chip>
+              <TagChip key={tag} label={tag} selected={selectedTags.includes(tag)} onClick={() => onToggleTag(tag)} />
             ))}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** כותרת קטע בסגנון עמוד האטרקציה: אייקון + כותרת מודגשת. */
+function ExtraSection({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-black/[0.06] pt-5 first:border-t-0 first:pt-0">
+      <h2 className="mb-3 flex items-center gap-2.5 text-[17px] font-bold text-ink">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F1F2F5] text-ink">{icon}</span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+const svgProps = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+
+function CarIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M5 17h14M6.5 17v2M17.5 17v2M4 13l1.8-5A2 2 0 0 1 7.7 6.6h8.6a2 2 0 0 1 1.9 1.4L20 13v4H4v-4zM4 13h16" />
+      <circle cx="7.5" cy="14.8" r=".6" />
+      <circle cx="16.5" cy="14.8" r=".6" />
+    </svg>
+  );
+}
+
+function ForkIcon() {
+  return (
+    <svg {...svgProps}>
+      <path d="M7 3v8M4.5 3v5a2.5 2.5 0 0 0 5 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7v3h3" />
+    </svg>
+  );
+}
+
+function WheelchairIcon() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="10" cy="4.5" r="1.6" />
+      <path d="M10 8v5h5l2.5 5M10 10.5H14M7.5 11.2A5 5 0 1 0 14 18" />
+    </svg>
   );
 }
 
@@ -311,6 +457,31 @@ function PreferencesPageContent() {
 
   const nextDisabled = saving || (step.type === "taxonomy" && currentSelectionCount === 0);
 
+  /** מספר הבחירות בכל שלב - לתגים הכחולים בשורת סוגי הטיול. */
+  const stepCounts = STEPS.map((st) =>
+    st.type === "taxonomy"
+      ? countCategorySelections(form.taxonomy[st.key])
+      : form.transportation.length + form.dietary_restrictions.length + form.accessibility_types.length + (form.kosher ? 1 : 0)
+  );
+
+  /** קפיצה ישירה לסוג טיול מהשורה העליונה - הבחירות שכבר נעשו נשמרות ברקע, כדי שלא ילכו לאיבוד. */
+  function jumpTo(index: number) {
+    if (index === stepIndex || saving) return;
+    if (user) {
+      const accessibility = form.accessibility_types.length > 0;
+      void savePreferences(user.id, {
+        taxonomy_selections: form.taxonomy,
+        transportation: form.transportation,
+        dietary_restrictions: form.dietary_restrictions,
+        kosher: form.kosher,
+        accessibility,
+        accessibility_types: form.accessibility_types,
+      });
+    }
+    setStepIndex(index);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   if (loading || profileLoading || preferencesLoading || !initialized) {
     return (
       <Screen withBottomNavSpacing={false}>
@@ -320,43 +491,45 @@ function PreferencesPageContent() {
   }
 
   return (
-    <Screen withBottomNavSpacing className="!bg-bg !px-0 !pt-0">
+    <Screen withBottomNavSpacing className="!bg-white !px-0 !pt-0">
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => (stepIndex > 0 ? handleBack() : router.push(returnTo || "/home"))} />
 
-      <div className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-4 pt-5">
-        <Stepper current={stepIndex + 1} total={STEPS.length} />
+      <div className="mx-auto flex max-w-xl flex-col px-5 pb-6 pt-4" style={INK}>
+        <TripTypeStrip stepIndex={stepIndex} counts={stepCounts} onJump={jumpTo} />
 
-        <header key={stepIndex} className="text-center opacity-0" style={{ animation: "prefPopIn 0.35s ease forwards" }}>
-          <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-bg-secondary shadow-soft">
+        <header key={stepIndex} className="mt-5 flex items-center gap-3.5 opacity-0" style={{ animation: "prefPopIn 0.3s ease forwards" }}>
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#F1F2F5] text-ink">
             {currentCategory ? (
-              <Image
-                src={CATEGORY_ICON_SRC[currentCategory.id]}
-                alt=""
-                width={64}
-                height={64}
-                className="h-full w-full scale-125 object-cover"
-              />
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={CATEGORY_ICON_SRC[currentCategory.id]} alt="" className="h-full w-full scale-125 object-cover" />
             ) : (
-              <span className="text-3xl">🧭</span>
+              <CompassIcon />
             )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[12.5px] font-semibold text-ink-secondary tabular-nums">
+              שלב {stepIndex + 1} מתוך {STEPS.length}
+            </p>
+            <h1 className="text-[24px] font-bold leading-tight tracking-tight text-ink">
+              {currentCategory ? currentCategory.label : "עוד כמה דברים חשובים"}
+            </h1>
           </div>
-          <h1 className="text-2xl font-bold text-ink">{currentCategory ? currentCategory.label : "עוד כמה דברים חשובים"}</h1>
-          <p className="mt-1.5 px-4 text-[12.5px] leading-snug text-ink-secondary">
-            {currentCategory
-              ? "גע כדי לבחור, ולחץ על החץ כדי לגלות עוד אפשרויות בפנים"
-              : "כדי שנוכל להתאים לך המלצות מדויקות עוד יותר"}
-          </p>
         </header>
+        <p className="mt-2 text-[14px] leading-snug text-ink-secondary">
+          {currentCategory
+            ? "סמנו מה אתם אוהבים. החץ פותח אפשרויות מדויקות יותר בתוך כל קבוצה."
+            : "כדי שנוכל להתאים לכם המלצות מדויקות עוד יותר."}
+        </p>
 
         {step.type === "taxonomy" && currentCategory && (
-          <div className="flex flex-col gap-2">
+          <div className="mt-5 flex flex-col gap-2">
             {currentCategory.groups.map((g, i) => {
               const key = `${currentCategory.id}::${g.group}`;
               const selection = form.taxonomy[currentCategory.id];
               const selectedTagsInGroup = g.tags.filter((t) => selection.tags.includes(t));
               return (
-                <GroupPill
+                <GroupRow
                   key={key}
                   group={g.group}
                   tags={g.tags}
@@ -375,89 +548,101 @@ function PreferencesPageContent() {
         )}
 
         {step.type === "extra" && (
-          <div className="flex flex-col gap-5">
-            <div>
-              <p className="mb-2.5 text-center text-sm font-semibold text-ink">מהי דרך ההתניידות המועדפת עליך?</p>
-              <div className="flex flex-wrap justify-center gap-2">
+          <div className="mt-6 flex flex-col gap-5">
+            <ExtraSection icon={<CarIcon />} title="איך אתם מתניידים?">
+              <div className="flex flex-wrap gap-2">
                 {TRANSPORTATION.map((option) => (
-                  <Chip
+                  <TagChip
                     key={option.value}
+                    label={option.label}
                     selected={form.transportation.includes(option.value)}
                     onClick={() => toggleListValue("transportation", option.value)}
-                  >
-                    {option.label}
-                  </Chip>
+                  />
                 ))}
               </div>
-            </div>
+            </ExtraSection>
 
-            <div className="border-t border-ink-secondary/10 pt-4">
-              <p className="mb-2.5 text-center text-sm font-semibold text-ink">העדפות אוכל מיוחדות</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            <ExtraSection icon={<ForkIcon />} title="העדפות אוכל">
+              <div className="flex flex-wrap gap-2">
                 {DIETARY_RESTRICTIONS.map((option) => {
                   const isKosher = option.value === "kosher";
                   const selected = isKosher ? form.kosher : form.dietary_restrictions.includes(option.value);
                   return (
-                    <Chip
+                    <TagChip
                       key={option.value}
+                      label={option.label}
                       selected={selected}
                       onClick={() =>
-                        isKosher
-                          ? setForm((f) => ({ ...f, kosher: !f.kosher }))
-                          : toggleListValue("dietary_restrictions", option.value)
+                        isKosher ? setForm((f) => ({ ...f, kosher: !f.kosher })) : toggleListValue("dietary_restrictions", option.value)
                       }
-                    >
-                      {option.label}
-                    </Chip>
+                    />
                   );
                 })}
               </div>
-            </div>
+            </ExtraSection>
 
-            {/* *** תוספת (בקשה מפורשת - "נגישות - צריך לסמן אם צריך! לא
-                שזה יופיע לכולם!"): שער - כותרת + מתג בלבד לכולם; רשימת
-                סוגי הנגישות הספציפיים מוצגת רק אחרי שמסמנים שיש צורך. */}
-            <div className="border-t border-ink-secondary/10 pt-4">
-              <Switch checked={accessibilityNeeded} onChange={toggleAccessibilityNeeded} label="יש לי צורך בהתאמות נגישות בטיול" />
-
-              <div
-                className="grid transition-[grid-template-rows] duration-300 ease-out"
-                style={{ gridTemplateRows: accessibilityNeeded ? "1fr" : "0fr" }}
+            {/* נגישות: מתג לכולם, ורשימת הסוגים רק אחרי שמסמנים שיש צורך (בקשה קודמת - "לא שזה יופיע לכולם"). */}
+            <ExtraSection icon={<WheelchairIcon />} title="נגישות">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={accessibilityNeeded}
+                onClick={() => toggleAccessibilityNeeded(!accessibilityNeeded)}
+                className="flex w-full items-center justify-between gap-4 rounded-2xl bg-[#F4F5F7] px-4 py-3.5 text-start"
               >
+                <span className="text-[15px] font-medium text-ink">יש לי צורך בהתאמות נגישות</span>
+                <span
+                  className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
+                  style={{ background: accessibilityNeeded ? BLUE : "#D5D9E0" }}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.25)] transition-all ${
+                      accessibilityNeeded ? "end-0.5" : "start-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+
+              <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: accessibilityNeeded ? "1fr" : "0fr" }}>
                 <div className="overflow-hidden">
-                  <p className="mx-auto mb-2.5 mt-3 max-w-[280px] text-center text-[11.5px] leading-snug text-ink-secondary">
-                    סמן/י אילו סוגי נגישות חשובים לך - כדי שנציג לך רק מקומות שבאמת מתאימים
+                  <p className="mb-2.5 mt-3.5 text-[13px] leading-snug text-ink-secondary">
+                    סמנו אילו סוגי נגישות חשובים לכם, ונציג רק מקומות שבאמת מתאימים.
                   </p>
-                  <div className="flex flex-wrap justify-center gap-2 pb-1">
+                  <div className="flex flex-wrap gap-2 pb-1">
                     {ACCESSIBILITY_TYPES.map((option) => (
-                      <Chip
+                      <TagChip
                         key={option.value}
+                        label={option.emoji ? `${option.emoji} ${option.label}` : option.label}
                         selected={form.accessibility_types.includes(option.value)}
                         onClick={() => toggleListValue("accessibility_types", option.value)}
-                      >
-                        {option.emoji ? `${option.emoji} ${option.label}` : option.label}
-                      </Chip>
+                      />
                     ))}
                   </div>
                 </div>
               </div>
-            </div>
+            </ExtraSection>
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={nextDisabled}
-          className="rounded-pill py-2 text-sm font-semibold text-white shadow-md transition disabled:opacity-50"
-          style={{ background: PRIMARY_GRADIENT }}
-        >
-          {isLastStep ? "סיום" : "הבא"}
-        </button>
-
-        <button type="button" onClick={handleSkip} disabled={saving} className="text-center text-sm text-ink-secondary">
-          דלג
-        </button>
+        <div className="mt-7 flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={handleNext}
+            disabled={nextDisabled}
+            className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white transition active:scale-[0.98] disabled:opacity-40"
+            style={{ background: BLUE }}
+          >
+            {saving ? "שומרים..." : isLastStep ? "סיום" : "הבא"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSkip}
+            disabled={saving}
+            className="h-11 w-full rounded-xl text-[14.5px] font-medium text-ink-secondary transition active:bg-black/[0.04]"
+          >
+            דלג על השלב
+          </button>
+        </div>
       </div>
 
       <MainBottomNav active="profile" />

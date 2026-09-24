@@ -204,7 +204,7 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-pill px-6 py-2.5 text-[13px] font-bold text-white"
+            className="h-12 rounded-xl text-[15.5px] font-semibold px-6 text-white"
             style={{ background: PLACES_PURPLE_GRADIENT }}
           >
             סגור
@@ -292,7 +292,7 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
                   onClose();
                   router.push(`/place/${duplicateOf.id}`);
                 }}
-                className="flex-1 rounded-pill border border-ink-secondary/20 py-2 text-[12.5px] font-bold text-ink"
+                className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 border border-ink-secondary/20 text-ink"
               >
                 פתח את המקום
               </button>
@@ -300,7 +300,7 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
                 <button
                   type="button"
                   onClick={() => setReviewSheetOpen(true)}
-                  className="flex-1 rounded-pill py-2 text-[12.5px] font-bold text-white"
+                  className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white"
                   style={{ background: PLACES_PURPLE_GRADIENT }}
                 >
                   ⭐ כתוב ביקורת
@@ -405,7 +405,7 @@ export function SuggestPlaceSheet({ onClose, onBack }: SuggestPlaceSheetProps) {
             type="button"
             disabled={submitting}
             onClick={handleSubmit}
-            className="w-full rounded-pill py-3 text-[14px] font-bold text-white disabled:opacity-50"
+            className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
             style={{ background: PLACES_PURPLE_GRADIENT }}
           >
             {submitting ? "שולח..." : "שלח הצעה"}

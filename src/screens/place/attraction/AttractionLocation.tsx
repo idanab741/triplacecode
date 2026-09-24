@@ -100,7 +100,7 @@ export function AttractionLocation({ placeId, latitude, longitude }: { placeId: 
           href={`https://waze.com/ul?ll=${latitude},${longitude}&navigate=yes`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
+          className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
         >
           <Icon name="waze" size={24} />
           Waze
@@ -109,7 +109,7 @@ export function AttractionLocation({ placeId, latitude, longitude }: { placeId: 
           href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15px] font-semibold text-ink transition active:scale-[0.98]"
+          className="h-12 rounded-xl text-[15.5px] font-semibold flex flex-1 items-center justify-center gap-2 bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
         >
           <Icon name="google-maps" size={21} />
           Google Maps

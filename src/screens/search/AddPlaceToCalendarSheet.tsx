@@ -86,7 +86,7 @@ export function AddPlaceToCalendarSheet({
           type="button"
           onClick={handleConfirm}
           disabled={!selectedDate || saving}
-          className="w-full rounded-pill py-3 text-sm font-semibold text-white disabled:opacity-50"
+          className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white disabled:opacity-50"
           style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
         >
           {saving ? "מוסיף..." : "אישור והוספה ליומן"}

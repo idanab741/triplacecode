@@ -512,7 +512,7 @@ export default function RestaurantsCafesQuestionnairePage() {
                   <button
                     type="button"
                     onClick={confirmEdit}
-                    className="flex-1 rounded-pill py-2 text-sm font-semibold text-white shadow-md"
+                    className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 text-white shadow-md"
                     style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
                   >
                     עדכן
@@ -612,7 +612,7 @@ export default function RestaurantsCafesQuestionnairePage() {
               type="button"
               onClick={footerAction.onClick}
               disabled={footerAction.disabled}
-              className="w-full rounded-pill py-2 text-sm font-semibold text-white shadow-md disabled:opacity-50"
+              className="h-12 rounded-xl text-[15.5px] font-semibold w-full text-white shadow-md disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
             >
               {footerAction.label}
