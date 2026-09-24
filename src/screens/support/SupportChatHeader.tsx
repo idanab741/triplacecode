@@ -1,58 +1,50 @@
 ﻿"use client";
-import { TRIPLACE_LOGO_STYLE } from "@/components/ui/triplaceLogo";
 
+import { useState } from "react";
 import { BackButton } from "@/components/ui";
 
 interface SupportChatHeaderProps {
   onBack: () => void;
 }
 
-/** אווטאר שירות לקוחות - אייקון headset בגרדיאנט המותג, לא הדמות/הלוגו
- *  של טריפי (Trippy AI). מזוהה בבירור כ"נציג אנושי", לא כ-AI. */
+/** טריפי (trippy-avatar). אם הקובץ לא נטען - אייקון אוזניות, כדי שלא יופיע עיגול שבור. */
 function SupportAvatar() {
-  return (
-    <span
-      className="flex h-full w-full items-center justify-center"
-      style={{ background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))" }}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5Z" />
-        <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5Z" />
-      </svg>
-    </span>
-  );
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="flex h-full w-full items-center justify-center bg-[#0A6DFE] text-white">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3v5Z" />
+          <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3v5Z" />
+        </svg>
+      </span>
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src="/images/trippy-avatar.png" alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />;
 }
 
 /**
- * Header של צ'אט שירות הלקוחות - אותה שפה חזותית בדיוק כמו ChatHeader.tsx
- * של Trippy AI (לוגו משמאל, כפתור חזרה, אווטאר+נקודת "online" מימין),
- * אבל בלי progress bar (אין שלבים/שאלון כאן) ועם אווטאר/כותרת ששייכים
- * במפורש לשירות לקוחות אנושי - "TRIPLACE שירות לקוחות", לא "טריפי AI".
+ * *** בקשה מפורשת ("הכותרת לא זהה לעמודי הצ'אט החדשים - בלי triplace, וכפתור חזור בצד ימין, עם התמונה של
+ * trippy"): אותו מבנה בדיוק כמו DmChatHeader - בר לבן בגובה 64px, כפתור חזרה בהתחלה (ימין ב-RTL), ואחריו
+ * אווטאר (טריפי) עם נקודת "מחובר" ירוקה, השם ותת-כותרת. בלי לוגו triplace.
  */
 export function SupportChatHeader({ onBack }: SupportChatHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
-      <div className="relative h-16">
-        <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
-          <span
-            role="img"
-            aria-label="TRIPLACE"
-            className="-my-[7px] block h-[53px] w-[174px] shrink-0 select-none"
-            style={TRIPLACE_LOGO_STYLE}
-          />
-          <BackButton onBack={onBack} />
-        </div>
-
-        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-2 pr-[7px]">
-          <div className="relative h-[34px] w-[34px] shrink-0">
-            <div className="relative h-full w-full overflow-hidden rounded-full ring-2 ring-white shadow-sm">
-              <SupportAvatar />
-            </div>
-            <span className="absolute bottom-0 left-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white" />
-          </div>
-          <p className="text-lg font-bold leading-tight text-ink">שירות לקוחות</p>
-        </div>
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-3 bg-white px-2 shadow-sm">
+      <BackButton onBack={onBack} />
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="relative h-9 w-9 shrink-0">
+          <span className="block h-full w-full overflow-hidden rounded-full bg-bg-secondary">
+            <SupportAvatar />
+          </span>
+          <span className="absolute -bottom-0.5 -start-0.5 h-3 w-3 rounded-full bg-[#22C55E] ring-2 ring-white" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[15.5px] font-bold leading-tight text-ink">שירות לקוחות</span>
+          <span className="block truncate text-[12.5px] leading-tight text-ink-secondary">צוות triplace</span>
+        </span>
       </div>
     </header>
   );

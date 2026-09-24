@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/services/auth/authService";
@@ -10,7 +10,125 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { InviteFriendsModal } from "@/components/invite/InviteFriendsModal";
 import { TripsBalanceBadge } from "@/screens/profile/TripsBalanceBadge";
 import { getAvatarUrl } from "@/constants/avatar";
-import { Button, Skeleton } from "@/components/ui";
+import { Skeleton } from "@/components/ui";
+
+/**
+ * *** שדרוג עיצובי (בקשה מפורשת - "נעצב את עמוד ההגדרות בהתאם לעיצוב החדש"): אותו קו כמו עמוד האטרקציה
+ * ועריכת הפרופיל - רקע לבן, טקסט שחור חד, כותרות קטע מודגשות, ושורות בסגנון פייסבוק (אייקון בעיגול
+ * אפור, כותרת, תת-כותרת וחץ) במקום כרטיסים עם צל. הלוגיקה (ניווט, התנתקות, מחיקת חשבון) לא השתנתה.
+ */
+const INK = { "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties;
+
+const ip = { width: 21, height: 21, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+
+const MenuIcons = {
+  sliders: (
+    <svg {...ip}>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </svg>
+  ),
+  user: (
+    <svg {...ip}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  ),
+  bookmark: (
+    <svg {...ip}>
+      <path d="M6.5 3.5h11a1 1 0 0 1 1 1V21l-6.5-4.5L5.5 21V4.5a1 1 0 0 1 1-1z" />
+    </svg>
+  ),
+  calendar: (
+    <svg {...ip}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </svg>
+  ),
+  invite: (
+    <svg {...ip}>
+      <circle cx="9.5" cy="8" r="3.5" />
+      <path d="M3 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" />
+    </svg>
+  ),
+  route: (
+    <svg {...ip}>
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="6" r="2.5" />
+      <path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5" />
+    </svg>
+  ),
+  headset: (
+    <svg {...ip}>
+      <path d="M4 17v-5a8 8 0 0 1 16 0v5" />
+      <path d="M20 18a2 2 0 0 1-2 2h-1a1.5 1.5 0 0 1-1.5-1.5V15a1.5 1.5 0 0 1 1.5-1.5h3V18zM4 18a2 2 0 0 0 2 2h1a1.5 1.5 0 0 0 1.5-1.5V15A1.5 1.5 0 0 0 7 13.5H4V18z" />
+    </svg>
+  ),
+  shield: (
+    <svg {...ip}>
+      <path d="M12 3 5 6v5.5c0 4.3 3 7.8 7 9.5 4-1.7 7-5.2 7-9.5V6l-7-3z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  ),
+  logout: (
+    <svg {...ip}>
+      <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" />
+    </svg>
+  ),
+};
+
+function Chevron() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-secondary">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+/** שורה בתפריט: אייקון בעיגול אפור, כותרת (ותת-כותרת), חץ. disabled = "בקרוב". */
+function MenuRow({
+  icon,
+  title,
+  subtitle,
+  onClick,
+  soon = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle?: string;
+  onClick?: () => void;
+  soon?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={soon}
+      className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3.5 rounded-xl px-2 py-2.5 text-start transition-colors active:bg-black/[0.04] disabled:active:bg-transparent"
+    >
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-ink ${soon ? "opacity-50" : ""}`}>{icon}</span>
+      <span className={`min-w-0 flex-1 ${soon ? "opacity-50" : ""}`}>
+        <span className="block text-[15.5px] font-semibold leading-snug text-ink">{title}</span>
+        {subtitle && <span className="block truncate text-[13px] text-ink-secondary">{subtitle}</span>}
+      </span>
+      {soon ? (
+        <span className="shrink-0 rounded-full bg-[#F1F2F5] px-2.5 py-1 text-[12px] font-semibold text-ink-secondary">בקרוב</span>
+      ) : (
+        <Chevron />
+      )}
+    </button>
+  );
+}
+
+function MenuSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="px-5 pt-6">
+      <h2 className="mb-1.5 text-[17px] font-bold text-ink">{title}</h2>
+      <div className="flex flex-col">{children}</div>
+    </section>
+  );
+}
 
 export default function ProfilePage() {
   const { loading, profile, profileLoading } = useAuth();
@@ -47,178 +165,100 @@ export default function ProfilePage() {
     }
   }
 
-  function ChevronLeft() {
-    return (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-ink-secondary"
-      >
-        <path d="M15 6l-6 6 6 6" />
-      </svg>
-    );
-  }
-
   if (loading || profileLoading) {
     return (
-      <div className="min-h-screen bg-bg pb-28">
-        <div className="mx-auto flex max-w-xl flex-col items-center gap-4 pt-10">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-56" />
+      <div className="min-h-screen bg-white pb-28">
+        <div className="mx-auto flex max-w-xl items-center gap-3.5 px-5 pt-24">
+          <Skeleton className="h-[72px] w-[72px] rounded-full" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-24" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg pb-28">
-      {/* *** בקשה מפורשת - "בלי תמונה ובלי קאבר בעמוד הזה ספציפית": עמוד התפריט (שלוש הפסים בפרופיל) - בלי תמונת
-          הפרופיל ובלי הקאבר. במקומם - בר triplace עם חזרה, ומיד אחריו השם והרשימה. כרטיס "פרטים אישיים" (שם/אימייל/סיסמה)
-          הוסר: אותם שדות בדיוק נמצאים ב"עריכת פרופיל". */}
+    <div className="min-h-screen bg-white pb-28" style={INK}>
+      {/* בלי קאבר בעמוד הזה (בקשה קודמת): בר triplace עם חזרה, ומיד אחריו התמונה, השם והרשימה. */}
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => router.back()} />
       <div className="mx-auto max-w-xl">
-        <div className="overflow-hidden rounded-b-[50px] bg-white">
-          <div className="flex flex-col gap-4 px-5 pb-5 pt-5">
-            {/* *** בקשה מפורשת - "עיגול של תמונת הפרופיל עם השם ליד משמאל": העיגול מימין (התחלה ב-RTL), השם והעיר משמאלו. */}
-            <div className="flex items-center gap-3.5">
-              <span className="block h-[76px] w-[76px] shrink-0 overflow-hidden rounded-full border-[3px] border-white bg-bg-secondary shadow-soft ring-1 ring-black/5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={getAvatarUrl(profile?.avatar_url)} alt="" className="h-full w-full object-cover" />
-              </span>
-              <div className="min-w-0 flex-1 text-start">
-                {/* *** בקשה מפורשת - "שהטריפים שלי יהיו ליד השם" (ושורת "במיוחד להרצה" הוסרה) */}
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <h1 className="min-w-0 truncate text-xl font-bold text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
-                  <TripsBalanceBadge />
-                </div>
-                <p className="truncate text-sm text-ink-secondary">{profile?.city || "—"}</p>
-              </div>
+        {/* תמונת פרופיל מימין, השם + הטריפים והעיר משמאלה (בקשות קודמות). */}
+        <div className="flex items-center gap-3.5 px-5 pb-2 pt-4">
+          <span className="block h-[72px] w-[72px] shrink-0 overflow-hidden rounded-full bg-[#E9ECF1] shadow-[0_2px_10px_rgba(15,20,25,0.12)] ring-[3px] ring-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={getAvatarUrl(profile?.avatar_url)} alt="" className="h-full w-full object-cover" />
+          </span>
+          <div className="min-w-0 flex-1 text-start">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="min-w-0 truncate text-[22px] font-bold leading-tight tracking-tight text-ink">{profile?.full_name || "המשתמש שלי"}</h1>
+              <TripsBalanceBadge />
             </div>
+            {profile?.city && <p className="mt-0.5 truncate text-[14px] text-ink-secondary">{profile.city}</p>}
           </div>
         </div>
 
-        {/* *** בקשה מפורשת - "רווח אחיד לכולם!!!!": כל השורות (הכירו, התאמות, עריכת פרופיל, הבחירות, היומן, ...) ברשימה אחת
-            עם gap-3 (12px) קבוע. קודם: gap-2 בתוך בלוק לבן + 32px בין הבלוק לרשימה + gap-4 בשאר. הבלוק הלבן מכיל רק את השם. */}
-        <div className="flex flex-col gap-3 px-5 pb-4 pt-4">
+        <MenuSection title="החשבון שלי">
+          <MenuRow icon={MenuIcons.sliders} title="התאמות אישיות" subtitle="סוגי הטיול שאתם אוהבים" onClick={() => router.push("/preferences?returnTo=/profile")} />
+          <MenuRow icon={MenuIcons.user} title="עריכת פרופיל" subtitle="שם, תמונה, אימייל וסיסמה" onClick={() => router.push("/places/profile/edit")} />
+          {/* "הבחירות שלי" מוביל ל-/trips (שם עדכני בלבד - בקשה קודמת). */}
+          <MenuRow icon={MenuIcons.bookmark} title="הבחירות שלי" subtitle="מקומות וטיולים ששמרתם" onClick={() => router.push("/trips")} />
+          <MenuRow icon={MenuIcons.calendar} title="היומן שלי" onClick={() => router.push("/calendar")} />
+        </MenuSection>
+
+        <MenuSection title="חברים">
+          {/* "הזמן חברים" נפתח כבועה מעל המסך (בקשה קודמת - "בועה נפתחת, לא עמוד נפרד"). */}
+          <MenuRow icon={MenuIcons.invite} title="הזמנת חברים" subtitle="שתפו ותזכו בהטבות" onClick={() => setShowInviteModal(true)} />
+          <MenuRow icon={MenuIcons.route} title="שיתוף מסלול בין חברים" soon />
+        </MenuSection>
+
+        <MenuSection title="עזרה ומידע">
+          <MenuRow icon={MenuIcons.headset} title="שירות לקוחות" subtitle="יש לכם שאלה? כתבו לנו" onClick={() => router.push("/support")} />
+          <MenuRow icon={MenuIcons.shield} title="מדיניות פרטיות ותנאי שימוש" onClick={() => router.push("/terms")} />
+        </MenuSection>
+
+        <div className="flex flex-col gap-2 px-5 pt-8">
           <button
             type="button"
-            onClick={() => router.push("/preferences?returnTo=/profile")}
-            className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
+            onClick={handleSignOut}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98]"
           >
-            <span className="font-bold text-ink">התאמות אישיות</span>
-            <ChevronLeft />
+            {MenuIcons.logout}
+            התנתקות
           </button>
-
-          {/* *** בקשה מפורשת - "עריכת פרופיל בין התאמות אישיות לבין הבחירות שלי" + "למה רווח כזה גדול?": השורה בתוך אותו בלוק לבן,
-              צמודה ל"התאמות אישיות" באותו מרווח קטן כמו בין שתי השורות שמעליה (לא בתחילת הרשימה התחתונה, שם נוצר רווח). */}
-          <button
-            type="button"
-            onClick={() => router.push("/places/profile/edit")}
-            className="flex w-full items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <span className="font-bold text-ink">עריכת פרופיל</span>
-            <ChevronLeft />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push("/trips")}
-            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            {/* *** תיקון (בקשה מפורשת - "לשנות את הטיולים שלי - לבחירות
-                שלי"): מוביל לאותו עמוד בדיוק (/trips) - רק שם עדכני. */}
-            <span className="font-bold text-ink">הבחירות שלי</span>
-            <ChevronLeft />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push("/calendar")}
-            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <span className="font-bold text-ink">היומן שלי</span>
-            <ChevronLeft />
-          </button>
-
-          <div className="rounded-card bg-white p-4 shadow-soft">
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-secondary">בקרוב</p>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between py-1.5 opacity-50">
-                <span className="text-ink">שיתוף מסלול בין חברים</span>
-                <span className="rounded-pill bg-bg-secondary px-2 py-0.5 text-xs text-ink-secondary">בקרוב</span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => router.push("/terms")}
-            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <span className="text-ink">מדיניות פרטיות ותנאי שימוש</span>
-            <ChevronLeft />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => router.push("/support")}
-            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <div className="text-start">
-              <p className="font-bold text-ink">שירות לקוחות</p>
-              <p className="text-xs text-ink-secondary">יש לכם שאלה? כתבו לנו</p>
-            </div>
-            <ChevronLeft />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowInviteModal(true)}
-            className="flex items-center justify-between rounded-card bg-white px-5 py-4 shadow-soft transition active:scale-[0.98]"
-          >
-            <div className="text-start">
-              <p className="font-bold text-ink">הזמן חברים</p>
-              <p className="text-xs text-ink-secondary">שתף ותזכה בהטבות</p>
-            </div>
-            <ChevronLeft />
-          </button>
-
-          <Button variant="secondary" fullWidth onClick={handleSignOut}>
-            התנתק — יציאה מהחשבון
-          </Button>
 
           {!showDeleteConfirm ? (
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(true)}
-              className="py-2 text-center text-sm text-danger"
+              className="h-11 w-full rounded-xl text-[14.5px] font-medium text-danger transition active:bg-danger/[0.06]"
             >
-              מחק חשבון
+              מחיקת החשבון
             </button>
           ) : (
-            <div className="rounded-card bg-danger/10 p-4 text-center">
-              <p className="mb-3 text-sm text-danger">פעולה בלתי הפיכה — כל הנתונים יימחקו לצמיתות.</p>
-              {deleteError && <p className="mb-3 text-xs text-danger">{deleteError}</p>}
-              <div className="flex gap-2">
-                <Button variant="secondary" fullWidth onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+            <div className="mt-2 rounded-2xl bg-[#FDECEC] p-4" role="alert">
+              <p className="text-[15.5px] font-bold text-[#C4282D]">למחוק את החשבון?</p>
+              <p className="mt-1 text-[14px] leading-snug text-[#8E2A2D]">הפעולה בלתי הפיכה. כל הנתונים שלכם יימחקו לצמיתות.</p>
+              {deleteError && <p className="mt-2 text-[13px] font-medium text-[#C4282D]">{deleteError}</p>}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="h-12 flex-1 rounded-xl bg-white text-[15.5px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60"
+                >
                   ביטול
-                </Button>
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  className="!bg-danger !text-white disabled:!opacity-60"
+                </button>
+                <button
+                  type="button"
                   onClick={handleDeleteAccount}
                   disabled={deleting}
+                  className="h-12 flex-1 rounded-xl bg-danger text-[15.5px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
                 >
-                  {deleting ? "מוחק..." : "כן, מחק את החשבון"}
-                </Button>
+                  {deleting ? "מוחקים..." : "כן, למחוק"}
+                </button>
               </div>
             </div>
           )}

@@ -95,8 +95,8 @@ export function PlacesHeaderRow({
         {/* menuHref (עמוד הפרופיל שלי): תפריט שלוש-הפסים מחליף את הפעמון, באותו עיגול לבן ובאותו מיקום. */}
         {menuHref ? (
           <Link href={menuHref} aria-label="תפריט" className={circle}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b21b6" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 7h16M4 12h16M4 17h16" />
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5b21b6" strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 6.5h16M4 12h16M4 17.5h16" />
             </svg>
           </Link>
         ) : (

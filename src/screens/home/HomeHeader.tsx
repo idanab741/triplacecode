@@ -125,8 +125,10 @@ export function HomeHeader({ loading, onBack, menuHref, logoTone = "brand" }: Ho
           aria-label="תפריט"
           className={`${iconBox} justify-self-end`}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            <path d="M4 7h16M4 12h16M4 17h16" />
+          {/* *** בקשה מפורשת ("שלושת הפסים - בעובי של שאר הכפתורים, יותר עבה וגדול"): אותו גודל (26px) ועובי
+              קו (2.75) כמו החץ של כפתור החזור בצד השני של הבר. לבן בעמודים כהים. */}
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={dark ? "#fff" : "#000"} strokeWidth="2.75" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6.5h16M4 12h16M4 17.5h16" />
           </svg>
         </Link>
       ) : (
