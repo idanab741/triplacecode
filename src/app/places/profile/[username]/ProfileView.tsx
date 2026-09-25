@@ -11,6 +11,7 @@ import { ProfileContentGrid } from "@/screens/places/ProfileContentGrid";
 import { ProfileSocialLinks } from "@/screens/places/ProfileSocialLinks";
 import { SocialLinkSheet } from "@/screens/places/SocialLinkSheet";
 import { getAvatarUrl } from "@/constants/avatar";
+import { ProfileAvatarRing, getProfileRingTier } from "@/screens/places/ProfileAvatarRing";
 import { DEFAULT_PROFILE_HERO_URL } from "@/constants/profileCover";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { SocialPlatform } from "@/services/social/socialLinks";
@@ -87,20 +88,15 @@ export default function ProfileView({
   const coverUrl = profile.coverUrl;
   const following = profile.viewerState.following;
 
-  /** תמונת הפרופיל: עיגול *מושלם* מעל שכבת הטבעת (לא מתחתיה). *** תיקון (בקשה מפורשת - "יש לבן בצדדים, שהעיגול
-   *  יהיה מושלם - אפילו אם תדביק מעליו את תמונת הפרופיל במיקום מושלם"): החור בטבעת שבקובץ המסגרת אינו עיגול מושלם
-   *  (רדיוסו נע בין 20.5% ל-21.6% מרוחב הקאבר, ומרכזו 50.14%/69.04%), ולכן תמונה מתחתיו השאירה שוליים לבנים
-   *  בצדדים. עכשיו התמונה *מעל* הטבעת: עיגול מושלם ברדיוס 21.85% (גדול מכל נקודה בחור) במרכז (50.08%, 69.03%) -
-   *  מכסה את כל אי-הסדירות, והקצה הפנימי של הטבעת נהיה עיגול מושלם. רקע כחול מאחור - שוליים שקופים בתמונה
-   *  נראים ככחול ולא כלבן. משותפת לשני מצבי הקאבר. */
+  /** תמונת הפרופיל - עיגול מושלם עם טבעת דקה שצבעה לפי מספר העוקבים (ר' ProfileAvatarRing). משותפת לשני מצבי הקאבר. */
+  const ringTier = getProfileRingTier(profile.counts.followers);
   const avatarLayer = (
-    <span
-      className="absolute left-[50.08%] top-[69.03%] aspect-square w-[43.7%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full"
-      style={{ background: BLUE }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
-    </span>
+    <ProfileAvatarRing followers={profile.counts.followers}>
+      <span className="block h-full w-full overflow-hidden rounded-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
+      </span>
+    </ProfileAvatarRing>
   );
 
   return (
@@ -111,8 +107,8 @@ export default function ProfileView({
       {/* הקאבר: מתחיל מראש המסך ממש, מתחת לבר השקוף (-mt-16 = גובה הבר: 52px + pb-3), בלי פס לבן מעליו.
           כל המידות באחוזים מרוחב הקאבר. שני מצבים:
           א. בלי קאבר משלו: התמונה המלאה עם ה-HERO (profile-default-hero) -> תמונת הפרופיל מעליה.
-          ב. עם קאבר משלו: המסגרת הריקה -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> הטבעת (profile-cover-ring, מעל הקאבר,
-             ולכן חסר לקאבר חלק מתחת) -> תמונת הפרופיל. */}
+          ב. עם קאבר משלו: המסגרת הריקה -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> תמונת הפרופיל עם הטבעת
+             (ProfileAvatarRing), שהשוליים הלבנים שלה חותכים נקי את תחתית הקאבר. */}
       <div className="relative -mt-16 aspect-square w-full overflow-hidden bg-white">
         {coverUrl ? (
           <>
@@ -128,14 +124,6 @@ export default function ProfileView({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={optimizeImage(coverUrl, 320, { height: 320 })} alt="" className="h-full w-full object-cover" />
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/profile-cover-ring.webp"
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
-            />
             {avatarLayer}
           </>
         ) : (
@@ -164,11 +152,26 @@ export default function ProfileView({
           <div className="flex min-w-0 flex-col items-center text-center">
             <h2 className="flex items-center justify-center gap-1 truncate text-[20px] font-bold leading-tight text-ink">
               {profile.fullName}
-              {profile.isCreator && (
-                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0" aria-label="יוצר תוכן">
-                  <circle cx="12" cy="12" r="10" fill={BLUE} />
-                  <path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+              {/* *** בקשה מפורשת ("תג ליד השם - כמות העוקבים והאם הוא מאומת"): וי כחול למאומתים (אימות
+                  ידני מהאדמין), ותג רמת העוקבים בצבע הטבעת (מ-1K). */}
+              {profile.isVerified && (
+                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0" role="img" aria-label="פרופיל מאומת">
+                  <path
+                    fill={BLUE}
+                    d="M12 1.8l2.4 1.9 3-.4 1.1 2.8 2.8 1.1-.4 3 1.9 2.4-1.9 2.4.4 3-2.8 1.1-1.1 2.8-3-.4L12 22.2l-2.4-1.9-3 .4-1.1-2.8-2.8-1.1.4-3L1.2 12l1.9-2.4-.4-3 2.8-1.1 1.1-2.8 3 .4z"
+                  />
+                  <path d="m7.8 12.3 2.8 2.8 5.6-5.9" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
+              )}
+              {ringTier.badge && (
+                <span
+                  className="shrink-0 rounded-full px-2 py-[3px] text-[11px] font-extrabold leading-none text-white"
+                  style={{ background: ringTier.fill, textShadow: "0 1px 1px rgba(0,0,0,0.25)" }}
+                  aria-label={`${ringTier.badge} עוקבים`}
+                  dir="ltr"
+                >
+                  {ringTier.badge}
+                </span>
               )}
             </h2>
             {profile.username && (

@@ -61,6 +61,8 @@ export interface UserDetail {
     age: number | null;
     isAnonymous: boolean;
     isBanned: boolean;
+    /** וי כחול בפרופיל - נקבע רק מכאן (ר' PATCH /api/admin/users/[id], action verify/unverify) */
+    isVerified: boolean;
     bannedUntil: string | null;
     signupDate: string;
     lastLogin: string | null;

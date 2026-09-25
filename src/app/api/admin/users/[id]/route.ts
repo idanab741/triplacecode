@@ -48,11 +48,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = await request.json().catch(() => null);
   const action = body?.action;
+  const supabase = createAdminClient();
+
+  // *** אימות פרופיל (וי כחול ליד השם) - רק מהאדמין. ר' migration 0098: טריגר מונע ממשתמש לשנות את זה בעצמו.
+  if (action === "verify" || action === "unverify") {
+    const { error } = await supabase.from("profiles").update({ is_verified: action === "verify" }).eq("id", userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, isVerified: action === "verify" });
+  }
+
   if (action !== "suspend" && action !== "restore") {
     return NextResponse.json({ error: "פעולה לא תקינה" }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
   const { error } = await supabase.auth.admin.updateUserById(userId, {
     ban_duration: action === "suspend" ? "876000h" : "none", // ~100 שנה = "בפועל לצמיתות", הפיך תמיד דרך restore
   });

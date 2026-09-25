@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ProfileAvatarRing } from "@/screens/places/ProfileAvatarRing";
 import { Button, Checkbox, Field, Icon, Input, Screen, Select } from "@/components/ui";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { useAuth } from "@/hooks/useAuth";
@@ -153,10 +154,7 @@ export default function ProfileSetupPage() {
           className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
         />
         <CircleBackButton onBack={() => router.back()} className="absolute start-5 top-3 z-10" />
-        <div
-          className="absolute left-[50.08%] top-[69.03%] aspect-square w-[43.7%] -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ background: "#0A6DFE" }}
-        >
+        <ProfileAvatarRing>
           {user && (
             <AvatarUploader
               userId={user.id}
@@ -165,7 +163,7 @@ export default function ProfileSetupPage() {
               bordered={false}
             />
           )}
-        </div>
+        </ProfileAvatarRing>
       </div>
 
       <div className="mx-auto flex max-w-xl flex-col gap-6 px-6 pb-4 pt-6">
