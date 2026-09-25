@@ -9,10 +9,6 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { SearchIntroOverlay } from "@/screens/home/SearchIntroOverlay";
-import { HomeMyTripsRow } from "@/screens/home/HomeMyTripsRow";
-import { HomeHotRow } from "@/screens/home/HomeHotRow";
-import { HomeDiscoverSection } from "@/screens/home/HomeDiscoverSection";
-import { HomeNearbyRow } from "@/screens/home/HomeNearbyRow";
 import { SearchBarLink } from "@/screens/home/SearchBarLink";
 import { AddPlaceModal } from "@/screens/home/AddPlaceModal";
 import { ChooseLocationSheet } from "@/screens/home/ChooseLocationSheet";
@@ -94,11 +90,6 @@ export default function TripMatchHomePage() {
   // *** "צור טיול" (כרטיסיית "הטיולים שלי"): גולל למעלה ומציג הסבר על שורת
   // החיפוש - ואז המשתמש מתחיל להחליק. ר' SearchIntroOverlay.tsx.
   const [introOpen, setIntroOpen] = useState(false);
-
-  function handleCreateTrip() {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setIntroOpen(true);
-  }
 
   function handleCloseIntro() {
     setIntroOpen(false);
@@ -336,15 +327,6 @@ export default function TripMatchHomePage() {
         </div>
 
 
-        {/* *** חדש (בקשה מפורשת - "מתחת לכפתורים של ההחלקות"): שני קטעים
-            מתחת לכרטיסיות ההחלקה - "הטיולים שלי" (כרטיסיית "צור טיול" +
-            הטיולים האחרונים) ו"כל מה שחם" (אטרקציות אהובות). */}
-        <div className="mt-6 flex flex-col gap-7 pb-4">
-          <HomeMyTripsRow onCreateTrip={handleCreateTrip} />
-          <HomeHotRow />
-          <HomeDiscoverSection />
-          <HomeNearbyRow />
-        </div>
       </div>
 
       {/* Home-only: the embedded TripMatch column never scrolls sideways.
