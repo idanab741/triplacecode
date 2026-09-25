@@ -27,14 +27,43 @@ import { SelectionActionBar } from "@/screens/collections/SelectionActionBar";
 import type { MapArea } from "@/services/places/mapAreaTypes";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
-type Filter = "all" | "friends" | "mine";
+type Filter = "all" | "following" | "verified" | "mine";
 type LatLng = { lat: number; lng: number };
 
-const FILTERS: { id: Filter; label: string }[] = [
-  // "כולם" (ולא "הכל") - כדי לא להתבלבל עם "הכל" של שורת סוגי המקומות.
-  { id: "all", label: "כולם" },
-  { id: "friends", label: "חברים" },
-  { id: "mine", label: "שלי" },
+/** *** בקשה מפורשת (לפי דוגמה מאפליקציה אחרת): מי מופיע על המפה - באייקונים. "הכל" בטקסט,
+ *  השאר אייקונים: אנשים שאני עוקב אחריהם, מאומתים (יוצרי תוכן), ושלי (מה שהעליתי + מה ששמרתי). */
+const FILTERS: { id: Filter; label: string; icon: React.ReactNode | null }[] = [
+  { id: "all", label: "הכל", icon: null },
+  {
+    id: "following",
+    label: "אנשים שאני עוקב אחריהם",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="9" cy="8" r="3.5" />
+        <path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5" />
+        <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.7.8 2.7 2.5 3 5.2" />
+      </svg>
+    ),
+  },
+  {
+    id: "verified",
+    label: "מאומתים - יוצרי תוכן",
+    icon: (
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2.5l2.3 1.8 2.9-.4 1.1 2.7 2.7 1.1-.4 2.9 1.8 2.3-1.8 2.3.4 2.9-2.7 1.1-1.1 2.7-2.9-.4L12 21.5l-2.3-1.8-2.9.4-1.1-2.7-2.7-1.1.4-2.9L1.6 12l1.8-2.3-.4-2.9 2.7-1.1 1.1-2.7 2.9.4z" />
+        <path d="m8.3 12.2 2.6 2.6 4.9-5.2" />
+      </svg>
+    ),
+  },
+  {
+    id: "mine",
+    label: "שלי - מה שהעליתי ושמרתי",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6.5 3.5h11a1 1 0 0 1 1 1v16l-6.5-4.2-6.5 4.2v-16a1 1 0 0 1 1-1Z" />
+      </svg>
+    ),
+  },
 ];
 
 /** צל "צף" אחיד ועדין לכל מה שיושב מעל המפה - ניטרלי (לא סגלגל) וצמוד, במקום ההילות הכבדות.
@@ -219,6 +248,7 @@ function AvatarStack({ recommenders }: { recommenders: FriendsMapPin["recommende
 }
 
 function recommendersLabel(pin: FriendsMapPin): string {
+  if (pin.recommendersCount === 0) return pin.savedByViewer ? "שמרת את המקום" : "";
   const others = pin.recommenders.filter((r) => !r.isSelf);
   if (others.length === 0) return "שיתפת את המקום";
   const first = others[0].name;
@@ -303,7 +333,7 @@ function PlaceContributionsSheet({
               {pin.city && <span className="truncate">{pin.city}</span>}
             </p>
             <p className="mt-1 text-[12.5px] font-bold text-places-purple">
-              {pin.recommendersCount === 1 ? "משתמש אחד שיתף" : `${pin.recommendersCount} משתמשים שיתפו`}
+              {pin.recommendersCount === 0 ? "שמרת את המקום" : pin.recommendersCount === 1 ? "משתמש אחד שיתף" : `${pin.recommendersCount} משתמשים שיתפו`}
             </p>
           </div>
           {/* *** בקשה מפורשת ("אפשרות לשלוח מקום לחברים באפליקציה ולשתף - בחלונית המקום") */}
@@ -483,8 +513,9 @@ export function PlacesFriendsMap({
   const filtered = useMemo(() => {
     if (!pins) return [];
     let list = pins;
-    if (filter === "friends") list = list.filter((p) => p.hasFriend);
-    else if (filter === "mine") list = list.filter((p) => p.hasSelf);
+    if (filter === "following") list = list.filter((p) => p.hasFriend);
+    else if (filter === "verified") list = list.filter((p) => p.hasVerified);
+    else if (filter === "mine") list = list.filter((p) => p.hasSelf || p.savedByViewer);
     if (categories.length > 0) list = list.filter((p) => p.category != null && categories.includes(p.category as HomeQuickCategoryId));
     // אזור שנבחר בחיפוש - רק מקומות בתוך התחום שלו (הנעצים והכרטיסים)
     if (area) {
@@ -588,6 +619,7 @@ export function PlacesFriendsMap({
               position={[pin.latitude, pin.longitude]}
               icon={getFriendPinIcon({
                 photoUrl: pin.imageUrl,
+                creatorAvatarUrl: pin.verifiedBy ? getAvatarUrl(pin.verifiedBy.avatarUrl) : null,
                 count: pin.recommendersCount,
                 selected: !selecting && pin.key === activeKey,
                 checked: selecting && checkedKeys.includes(pin.key),
@@ -637,12 +669,14 @@ export function PlacesFriendsMap({
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-label={f.label}
+                title={f.label}
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full px-4 py-1.5 text-[13px] transition-colors ${
+                className={`flex h-8 items-center justify-center rounded-full text-[13px] transition-colors ${f.icon ? "w-10" : "px-4"} ${
                   selected ? "bg-places-purple font-semibold text-white" : "font-medium text-ink active:bg-black/[0.05]"
                 }`}
               >
-                {f.label}
+                {f.icon ?? f.label}
               </button>
             );
           })}
@@ -721,7 +755,7 @@ export function PlacesFriendsMap({
             </svg>
           </span>
           <p className="mt-3 text-[16px] font-extrabold text-ink">
-            {error ? "לא הצלחנו לטעון את המפה" : categories.length > 0 && (pins?.length ?? 0) > 0 ? "אין כאן מקומות מהסוג הזה" : filter === "mine" ? "עוד אין לכם מקומות על המפה" : filter === "friends" ? "לחברים שלכם עוד אין מקומות על המפה" : "אין עדיין מקומות על המפה"}
+            {error ? "לא הצלחנו לטעון את המפה" : categories.length > 0 && (pins?.length ?? 0) > 0 ? "אין כאן מקומות מהסוג הזה" : filter === "mine" ? "עוד אין לכם מקומות על המפה" : filter === "following" ? "לאנשים שאתם עוקבים אחריהם עוד אין מקומות על המפה" : filter === "verified" ? "עוד אין כאן מקומות של יוצרי תוכן מאומתים" : "אין עדיין מקומות על המפה"}
           </p>
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
