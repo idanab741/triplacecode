@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { getSavedPlaceItems, removeSavedPlace, restoreSavedPlace, type SavedPlaceItem } from "@/services/favorites/favoritesService";
-import { Screen, Skeleton } from "@/components/ui";
+import { Screen, Skeleton, SwipeActionsRow, type SwipeAction } from "@/components/ui";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -15,6 +15,7 @@ import { getDaysRemainingBeforeRemoval } from "@/constants/contentRetention";
 import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 import { TRIP_TYPE_SHORT_LABEL, tripTypeIconSrc, tripTypeOfItem } from "@/constants/tripTypeOfItem";
 import { SelectionActionBar } from "@/screens/collections/SelectionActionBar";
+import { AddToSheet } from "@/screens/collections/AddToSheet";
 
 /**
  * *** בנוי מחדש (בקשה מפורשת - "יש המון כפתורי שמירה באפליקציה - צריך לסדר את זה כאן, כולל פוסטים
@@ -134,24 +135,15 @@ function formatShortDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("he-IL", { day: "numeric", month: "long" });
 }
 
-function RoundAction({ label, onClick, children, active = false }: { label: string; onClick: () => void; children: ReactNode; active?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      aria-label={label}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-90 ${active ? "" : "bg-[#F1F2F5] text-ink"}`}
-      style={active ? { color: BLUE, background: "#EEF4FF" } : undefined}
-    >
-      {children}
-    </button>
-  );
-}
+const ADD_ICON = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
 
-/** שורה ברשימה: תמונה (עם אייקון סוג הטיול למקומות), כותרת, שורת מידע, "ליומן" והסרה. */
+/** שורה ברשימה: תמונה (עם אייקון סוג הטיול למקומות), כותרת ושורת מידע.
+ *  *** בקשה מפורשת ("שיטת החלקות - ימינה מחיקה, שמאלה יומן והוספה לאוסף"): בלי כפתורים בשורה -
+ *  החלקה ימינה = הסרה מהבחירות, החלקה שמאלה = יומן / הוספה ל... (או לחיצה ארוכה). */
 function SavedRow({
   imageUrl,
   fallback,
@@ -161,6 +153,7 @@ function SavedRow({
   badge,
   onOpen,
   onCalendar,
+  onAddTo,
   onRemove,
   selection,
 }: {
@@ -172,12 +165,19 @@ function SavedRow({
   badge?: string;
   onOpen: () => void;
   onCalendar?: () => void;
+  /** "הוספה ל..." - מפה / טיול (רק למקומות) */
+  onAddTo?: () => void;
   onRemove: () => void;
   /** בחירה מרובה: במקום כפתורי היומן/ההסרה - עיגול סימון, והלחיצה על השורה מסמנת. */
   selection?: { checked: boolean };
 }) {
+  const actions: SwipeAction[] = [
+    ...(onCalendar ? [{ key: "calendar", label: "יומן", icon: Icons.calendar, color: BLUE, onClick: onCalendar }] : []),
+    ...(onAddTo ? [{ key: "add", label: "הוספה ל...", icon: ADD_ICON, color: "#7C3AED", onClick: onAddTo }] : []),
+  ];
   return (
-    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()} className="-mx-2 flex cursor-pointer items-center gap-3.5 rounded-2xl px-2 py-2.5 transition-colors active:bg-black/[0.04]">
+    <SwipeActionsRow onDelete={onRemove} actions={actions} disabled={!!selection} className="-mx-2 rounded-2xl">
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()} className="flex cursor-pointer items-center gap-3.5 px-2 py-2.5 transition-colors active:bg-black/[0.04]">
       <span className="relative shrink-0">
         <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-xl bg-[#F1F2F5] text-ink-secondary">
           {imageUrl ? (
@@ -213,19 +213,9 @@ function SavedRow({
             <path d="m5 12.5 4.5 4.5L19 7.5" />
           </svg>
         </span>
-      ) : (
-      <span className="flex shrink-0 items-center gap-1.5">
-        {onCalendar && (
-          <RoundAction label="הוספה ליומן" onClick={onCalendar}>
-            {Icons.calendar}
-          </RoundAction>
-        )}
-        <RoundAction label="הסרה מהבחירות" onClick={onRemove} active>
-          {Icons.bookmarkFilled}
-        </RoundAction>
-      </span>
-      )}
+      ) : null}
     </div>
+    </SwipeActionsRow>
   );
 }
 
@@ -247,9 +237,9 @@ function MyPicksContent() {
   const [social, setSocial] = useState<SocialItem[] | null>(null);
   const [built, setBuilt] = useState<BuiltTrip[] | null>(null);
   const [calendarItem, setCalendarItem] = useState<CalendarItemRef | null>(null);
+  const [addToItem, setAddToItem] = useState<{ id: string; name: string } | null>(null);
   const [toast, setToast] = useState<{ text: string; actionLabel?: string; action?: () => void } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showRetentionInfo, setShowRetentionInfo] = useState(false);
   // *** בחירה מרובה (בקשה מפורשת - "לבחור כמה אטרקציות ואז ליצור אוסף חדש / מסלול"): רק מקומות.
   const [selecting, setSelecting] = useState(false);
@@ -381,13 +371,8 @@ function MyPicksContent() {
     });
   }
 
-  async function deleteBuilt(trip: BuiltTrip) {
-    if (confirmDelete !== trip.id) {
-      setConfirmDelete(trip.id);
-      setTimeout(() => setConfirmDelete((c) => (c === trip.id ? null : c)), 3000);
-      return;
-    }
-    setConfirmDelete(null);
+  // החלקה ימינה + לחיצה על "מחיקה" = אישור מספיק (שני צעדים), אין צורך בלחיצה נוספת
+  async function deleteBuiltNow(trip: BuiltTrip) {
     setBuilt((prev) => (prev ? prev.filter((t) => t.id !== trip.id) : prev));
     await fetch(`/api/trip-builder/sessions/${trip.id}`, { method: "DELETE" }).catch(() => {});
     showToast({ text: "המסלול נמחק" });
@@ -422,17 +407,18 @@ function MyPicksContent() {
                 setSelecting(true);
                 setFilter("places");
               }}
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3.5 text-[13.5px] font-semibold text-ink transition active:scale-95"
+              aria-label="בחירה מרובה - יצירת מפה או טיול"
+              title="בחירה מרובה"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-ink transition active:scale-95"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
                 <path d="m8 12.3 2.8 2.8L16 9.6" />
               </svg>
-              בחירה
             </button>
           )}
           </div>
-          <p className="mt-1 text-[14px] text-ink-secondary">כל מה ששמרתם, במקום אחד. רוצים לקבוע תאריך? לחצו על היומן.</p>
+          <p className="mt-1 text-[14px] text-ink-secondary">כל מה ששמרתם, במקום אחד. החליקו שורה שמאלה ליומן או להוספה למפה, ימינה להסרה.</p>
         </header>
 
         {/* סינון לפי סוג */}
@@ -501,15 +487,14 @@ function MyPicksContent() {
               {(built ?? []).map((trip) => {
                 const days = trip.isSaved ? null : getDaysRemainingBeforeRemoval(trip.createdAt);
                 const segment = TRIP_TYPE_ROUTE[trip.tripType] ?? trip.tripType.replace(/_/g, "-");
-                const confirming = confirmDelete === trip.id;
                 return (
+                  <SwipeActionsRow key={trip.id} onDelete={() => deleteBuiltNow(trip)} deleteLabel="מחיקה" className="-mx-2 rounded-2xl">
                   <div
-                    key={trip.id}
                     role="button"
                     tabIndex={0}
                     onClick={() => router.push(`/trip-builder/${segment}/result?sessionId=${trip.id}`)}
                     onKeyDown={(e) => e.key === "Enter" && router.push(`/trip-builder/${segment}/result?sessionId=${trip.id}`)}
-                    className="-mx-2 flex cursor-pointer items-center gap-3.5 rounded-2xl px-2 py-2.5 transition-colors active:bg-black/[0.04]"
+                    className="flex cursor-pointer items-center gap-3.5 px-2 py-2.5 transition-colors active:bg-black/[0.04]"
                   >
                     <span className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F1F2F5] text-ink-secondary">
                       {trip.imageUrl ? (
@@ -531,18 +516,8 @@ function MyPicksContent() {
                         </span>
                       )}
                     </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteBuilt(trip);
-                      }}
-                      aria-label={confirming ? "לחצו שוב למחיקה" : "מחיקת המסלול"}
-                      className={`flex h-10 shrink-0 items-center justify-center gap-1 rounded-full transition active:scale-95 ${confirming ? "bg-danger px-3.5 text-[13px] font-semibold text-white" : "w-10 bg-[#F1F2F5] text-ink"}`}
-                    >
-                      {confirming ? "למחוק?" : Icons.trash}
-                    </button>
                   </div>
+                  </SwipeActionsRow>
                 );
               })}
             </>
@@ -595,6 +570,7 @@ function MyPicksContent() {
                           ? undefined
                           : () => setCalendarItem({ itemType: "place", id: p.id, name: p.name, imageUrl: p.imageUrls[0] ?? null, category: p.category ?? p.subcategory })
                       }
+                      onAddTo={p.type === "destination" ? undefined : () => setAddToItem({ id: p.id, name: p.name })}
                       onRemove={() => removePlace(row.item)}
                       selection={selecting && p.type !== "destination" ? { checked: checkedIds.includes(p.id) } : undefined}
                     />
@@ -620,6 +596,7 @@ function MyPicksContent() {
         </div>
       </div>
 
+      {addToItem && <AddToSheet ids={[addToItem.id]} label={addToItem.name} onClose={() => setAddToItem(null)} />}
       {calendarItem && (
         <AddToCalendarSheet
           item={calendarItem}

@@ -21,6 +21,7 @@ export { Stepper } from "./Stepper";
 export { SwipeCard, type SwipeCardHandle } from "./SwipeCard";
 export { BottomSheet } from "./BottomSheet";
 export { SwipeToDeleteRow } from "./SwipeToDeleteRow";
+export { SwipeActionsRow, type SwipeAction } from "./SwipeActionsRow";
 export { SwipeUpToDeleteCard } from "./SwipeUpToDeleteCard";
 export { BackButton } from "./BackButton";
 export { AiGlobeIcon } from "./AiGlobeIcon";
