@@ -128,6 +128,62 @@ function MapController({
   return null;
 }
 
+/** *** בקשה מפורשת ("שהכפתורים ייעלמו ויחזרו"): בזמן שהמשתמש גורר/מגדיל את המפה - שורת הסינון,
+ *  הכרטיסים והכפתורים שלמטה נעלמים, וחוזרים לבד רגע אחרי שהוא עוזב. רק מחוות של המשתמש -
+ *  תזוזה יזומה (fitBounds / flyTo לכרטיס שנבחר) לא מעלימה אותם. */
+const CONTROLS_RETURN_MS = 700;
+
+function ControlsAutoHide({ onHiddenChange }: { onHiddenChange: (hidden: boolean) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+    let pointersDown = 0;
+    let moving = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const hide = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      moving = true;
+      onHiddenChange(true);
+    };
+    const scheduleShow = () => {
+      if (!moving || pointersDown > 0) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        moving = false;
+        onHiddenChange(false);
+      }, CONTROLS_RETURN_MS);
+    };
+    const onDown = () => {
+      pointersDown += 1;
+    };
+    const onUp = () => {
+      pointersDown = Math.max(0, pointersDown - 1);
+      scheduleShow();
+    };
+    // צביטה/זום של המשתמש (אצבעות על המפה) - לא זום של flyTo.
+    const onZoomStart = () => {
+      if (pointersDown > 0) hide();
+    };
+    container.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    map.on("dragstart", hide);
+    map.on("zoomstart", onZoomStart);
+    map.on("moveend", scheduleShow);
+    return () => {
+      if (timer) clearTimeout(timer);
+      container.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      map.off("dragstart", hide);
+      map.off("zoomstart", onZoomStart);
+      map.off("moveend", scheduleShow);
+    };
+  }, [map, onHiddenChange]);
+  return null;
+}
+
 function AvatarStack({ recommenders }: { recommenders: FriendsMapPin["recommenders"] }) {
   return (
     <span className="flex -space-x-1.5 rtl:space-x-reverse">
@@ -349,6 +405,14 @@ export function PlacesFriendsMap({
   const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [fly, setFly] = useState<{ key: string; n: number } | null>(null);
   const [locateToken, setLocateToken] = useState(0);
+  const [controlsHidden, setControlsHidden] = useState(false);
+  // מעבר רך להעלמה/חזרה של הפקדים שמעל המפה (ר' ControlsAutoHide).
+  const controlsStyle = (shiftY: number): React.CSSProperties => ({
+    opacity: controlsHidden ? 0 : 1,
+    transform: controlsHidden ? `translateY(${shiftY}px)` : "none",
+    pointerEvents: controlsHidden ? "none" : undefined,
+    transition: "opacity 220ms ease, transform 260ms cubic-bezier(0.22, 1, 0.36, 1), top 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+  });
   const [userLoc, setUserLoc] = useState<LatLng | null>(() => {
     const saved = getSessionLocation();
     return saved ? { lat: saved.lat, lng: saved.lng } : null;
@@ -488,6 +552,7 @@ export function PlacesFriendsMap({
           ))}
 
           {userLoc && <Marker position={[userLoc.lat, userLoc.lng]} icon={USER_ICON} zIndexOffset={-500} />}
+          <ControlsAutoHide onHiddenChange={setControlsHidden} />
           <MapController pins={filtered} userLoc={userLoc} fitToken={fitToken} fly={fly} locateToken={locateToken} />
         </MapContainer>
       )}
@@ -503,7 +568,7 @@ export function PlacesFriendsMap({
 
       {/* *** בקשה מפורשת: "כולם / חברים / שלי" + כפתור המיקום שלי - למטה, מתחת לפס הכרטיסים
           (מעל הבר התחתון). inset-x-5 = אותם שוליים כמו שורת הכותרת. */}
-      <div className="absolute inset-x-5 bottom-3 z-[1000] flex items-center justify-between">
+      <div className="absolute inset-x-5 bottom-3 z-[1000] flex items-center justify-between" style={controlsStyle(16)}>
         <div className={`flex rounded-full bg-white p-1 ring-1 ring-black/[0.06] ${FLOAT}`} role="tablist" aria-label="סינון המלצות">
           {FILTERS.map((f) => {
             const selected = filter === f.id;
@@ -541,7 +606,7 @@ export function PlacesFriendsMap({
           ובסגול של place's. יושבת ישר מתחת ללוגו. */}
       <div
         className="absolute inset-x-0 z-[1000]"
-        style={{ top: topOffsetPx, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+        style={{ top: topOffsetPx, ...controlsStyle(-12) }}
       >
         <TripMatchCategoryChips
           selected={categories}
@@ -590,7 +655,7 @@ export function PlacesFriendsMap({
           ref={scrollerRef}
           onScroll={handleCardsScroll}
           className="stories-rail-track absolute inset-x-0 bottom-14 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
-          style={{ scrollbarWidth: "none" }}
+          style={{ scrollbarWidth: "none", ...controlsStyle(24) }}
         >
           {filtered.map((pin) => {
             const selected = pin.key === activeKey;
