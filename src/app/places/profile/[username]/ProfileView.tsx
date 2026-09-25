@@ -11,6 +11,7 @@ import { ProfileContentGrid } from "@/screens/places/ProfileContentGrid";
 import { ProfileSocialLinks } from "@/screens/places/ProfileSocialLinks";
 import { SocialLinkSheet } from "@/screens/places/SocialLinkSheet";
 import { getAvatarUrl } from "@/constants/avatar";
+import { ProfileAvatarRing } from "@/screens/places/ProfileAvatarRing";
 import { DEFAULT_PROFILE_HERO_URL } from "@/constants/profileCover";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
 import type { SocialPlatform } from "@/services/social/socialLinks";
@@ -87,20 +88,14 @@ export default function ProfileView({
   const coverUrl = profile.coverUrl;
   const following = profile.viewerState.following;
 
-  /** תמונת הפרופיל: עיגול *מושלם* מעל שכבת הטבעת (לא מתחתיה). *** תיקון (בקשה מפורשת - "יש לבן בצדדים, שהעיגול
-   *  יהיה מושלם - אפילו אם תדביק מעליו את תמונת הפרופיל במיקום מושלם"): החור בטבעת שבקובץ המסגרת אינו עיגול מושלם
-   *  (רדיוסו נע בין 20.5% ל-21.6% מרוחב הקאבר, ומרכזו 50.14%/69.04%), ולכן תמונה מתחתיו השאירה שוליים לבנים
-   *  בצדדים. עכשיו התמונה *מעל* הטבעת: עיגול מושלם ברדיוס 21.85% (גדול מכל נקודה בחור) במרכז (50.08%, 69.03%) -
-   *  מכסה את כל אי-הסדירות, והקצה הפנימי של הטבעת נהיה עיגול מושלם. רקע כחול מאחור - שוליים שקופים בתמונה
-   *  נראים ככחול ולא כלבן. משותפת לשני מצבי הקאבר. */
+  /** תמונת הפרופיל - עיגול מושלם עם טבעת כחולה דקה (ר' ProfileAvatarRing). משותפת לשני מצבי הקאבר. */
   const avatarLayer = (
-    <span
-      className="absolute left-[50.08%] top-[69.03%] aspect-square w-[43.7%] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full"
-      style={{ background: BLUE }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
-    </span>
+    <ProfileAvatarRing>
+      <span className="block h-full w-full overflow-hidden rounded-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
+      </span>
+    </ProfileAvatarRing>
   );
 
   return (
@@ -111,8 +106,8 @@ export default function ProfileView({
       {/* הקאבר: מתחיל מראש המסך ממש, מתחת לבר השקוף (-mt-16 = גובה הבר: 52px + pb-3), בלי פס לבן מעליו.
           כל המידות באחוזים מרוחב הקאבר. שני מצבים:
           א. בלי קאבר משלו: התמונה המלאה עם ה-HERO (profile-default-hero) -> תמונת הפרופיל מעליה.
-          ב. עם קאבר משלו: המסגרת הריקה -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> הטבעת (profile-cover-ring, מעל הקאבר,
-             ולכן חסר לקאבר חלק מתחת) -> תמונת הפרופיל. */}
+          ב. עם קאבר משלו: המסגרת הריקה -> הקאבר כעיגול (70%, מרכז 50%/39.2%) -> תמונת הפרופיל עם הטבעת
+             (ProfileAvatarRing), שהשוליים הלבנים שלה חותכים נקי את תחתית הקאבר. */}
       <div className="relative -mt-16 aspect-square w-full overflow-hidden bg-white">
         {coverUrl ? (
           <>
@@ -128,14 +123,6 @@ export default function ProfileView({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={optimizeImage(coverUrl, 320, { height: 320 })} alt="" className="h-full w-full object-cover" />
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/profile-cover-ring.webp"
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover object-top"
-            />
             {avatarLayer}
           </>
         ) : (
