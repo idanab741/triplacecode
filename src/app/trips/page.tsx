@@ -14,6 +14,7 @@ import { AddToCalendarSheet, type CalendarItemRef } from "@/screens/calendar/Add
 import { getDaysRemainingBeforeRemoval } from "@/constants/contentRetention";
 import { HOME_QUICK_CATEGORIES, type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 import { TRIP_TYPE_SHORT_LABEL, tripTypeIconSrc, tripTypeOfItem } from "@/constants/tripTypeOfItem";
+import { SelectionActionBar } from "@/screens/collections/SelectionActionBar";
 
 /**
  * *** בנוי מחדש (בקשה מפורשת - "יש המון כפתורי שמירה באפליקציה - צריך לסדר את זה כאן, כולל פוסטים
@@ -161,6 +162,7 @@ function SavedRow({
   onOpen,
   onCalendar,
   onRemove,
+  selection,
 }: {
   imageUrl: string | null;
   fallback: ReactNode;
@@ -171,6 +173,8 @@ function SavedRow({
   onOpen: () => void;
   onCalendar?: () => void;
   onRemove: () => void;
+  /** בחירה מרובה: במקום כפתורי היומן/ההסרה - עיגול סימון, והלחיצה על השורה מסמנת. */
+  selection?: { checked: boolean };
 }) {
   return (
     <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => e.key === "Enter" && onOpen()} className="-mx-2 flex cursor-pointer items-center gap-3.5 rounded-2xl px-2 py-2.5 transition-colors active:bg-black/[0.04]">
@@ -197,6 +201,19 @@ function SavedRow({
           {badge && <span className="shrink-0 rounded-full bg-[#F1EDFB] px-2 py-0.5 text-[11.5px] font-semibold text-places-purple">{badge}</span>}
         </span>
       </span>
+      {selection ? (
+        <span
+          aria-hidden="true"
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+            selection.checked ? "text-white" : "bg-white text-transparent ring-2 ring-black/15"
+          }`}
+          style={selection.checked ? { background: BLUE } : undefined}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m5 12.5 4.5 4.5L19 7.5" />
+          </svg>
+        </span>
+      ) : (
       <span className="flex shrink-0 items-center gap-1.5">
         {onCalendar && (
           <RoundAction label="הוספה ליומן" onClick={onCalendar}>
@@ -207,6 +224,7 @@ function SavedRow({
           {Icons.bookmarkFilled}
         </RoundAction>
       </span>
+      )}
     </div>
   );
 }
@@ -233,6 +251,12 @@ function MyPicksContent() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [showRetentionInfo, setShowRetentionInfo] = useState(false);
+  // *** בחירה מרובה (בקשה מפורשת - "לבחור כמה אטרקציות ואז ליצור אוסף חדש / מסלול"): רק מקומות.
+  const [selecting, setSelecting] = useState(false);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -387,14 +411,32 @@ function MyPicksContent() {
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => router.push("/profile")} />
 
-      <div className="mx-auto max-w-xl pb-6" style={INK}>
+      <div className={`mx-auto max-w-xl ${selecting ? "pb-28" : "pb-6"}`} style={INK}>
         <header className="px-5 pt-4">
+          <div className="flex items-center justify-between gap-3">
           <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">הבחירות שלי</h1>
+          {!selecting && counts.places > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelecting(true);
+                setFilter("places");
+              }}
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3.5 text-[13.5px] font-semibold text-ink transition active:scale-95"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+                <path d="m8 12.3 2.8 2.8L16 9.6" />
+              </svg>
+              בחירה
+            </button>
+          )}
+          </div>
           <p className="mt-1 text-[14px] text-ink-secondary">כל מה ששמרתם, במקום אחד. רוצים לקבוע תאריך? לחצו על היומן.</p>
         </header>
 
         {/* סינון לפי סוג */}
-        <nav aria-label="סינון" className="flex gap-2 overflow-x-auto px-5 pb-1 pt-4" style={{ scrollbarWidth: "none" }}>
+        <nav aria-label="סינון" hidden={selecting} className="flex gap-2 overflow-x-auto px-5 pb-1 pt-4" style={{ scrollbarWidth: "none" }}>
           {filters.map((f) => {
             const active = filter === f.id;
             const count = counts[f.id];
@@ -543,13 +585,18 @@ function MyPicksContent() {
                       title={p.name}
                       meta={[TRIP_TYPE_SHORT_LABEL[row.tripType], p.city, p.rating != null ? `★ ${p.rating.toFixed(1)}` : null].filter(Boolean).join(" · ")}
                       badge={row.item.fromTripmatch ? "tripmatch" : undefined}
-                      onOpen={() => router.push(p.type === "destination" ? `/destination/${p.id}` : `/place/${p.id}`)}
+                      onOpen={() =>
+                        selecting
+                          ? p.type !== "destination" && toggleChecked(p.id)
+                          : router.push(p.type === "destination" ? `/destination/${p.id}` : `/place/${p.id}`)
+                      }
                       onCalendar={
                         p.type === "destination"
                           ? undefined
                           : () => setCalendarItem({ itemType: "place", id: p.id, name: p.name, imageUrl: p.imageUrls[0] ?? null, category: p.category ?? p.subcategory })
                       }
                       onRemove={() => removePlace(row.item)}
+                      selection={selecting && p.type !== "destination" ? { checked: checkedIds.includes(p.id) } : undefined}
                     />
                   );
                 }
@@ -607,6 +654,17 @@ function MyPicksContent() {
         />
       )}
 
+      {selecting && (
+        <SelectionActionBar
+          selectedIds={checkedIds}
+          onCancel={() => {
+            setSelecting(false);
+            setCheckedIds([]);
+          }}
+          className="fixed inset-x-3 z-[60] mx-auto max-w-xl"
+          style={{ bottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 10px)" }}
+        />
+      )}
       <MainBottomNav active="profile" />
     </Screen>
   );
