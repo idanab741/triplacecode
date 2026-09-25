@@ -1,5 +1,6 @@
 "use client";
 
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { use, useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,7 +17,7 @@ import { getAvatarUrl } from "@/constants/avatar";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
 import { optimizeImage } from "@/utils/imageUrl";
 import { CREATE_INK } from "@/screens/create/CreateUi";
-import { directionsUrl, journeyColor, type JourneyLine, type JourneyMarker } from "@/screens/journey/JourneyMap";
+import { directionsUrl, journeyColor, type JourneyLine, type JourneyMarker } from "@/screens/journey/journeyUtils";
 import {
   BackIcon,
   ChevronEndIcon,
@@ -82,7 +83,7 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
 
   if (error || !collection) {
     return (
-      <div className="min-h-screen bg-white pb-24" style={CREATE_INK}>
+      <div className="min-h-screen bg-white pb-32" style={CREATE_INK}>
         <HomeStatusBarTint />
         <CollapsibleTopBar onBack={() => router.back()} />
         {error ? (
@@ -98,14 +99,22 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
             <div className="mt-6 h-[300px] w-full animate-pulse rounded-[24px] bg-[#EEF0EA]" />
           </div>
         )}
+        <MainBottomNav active="places" />
       </div>
     );
   }
 
+  // *** בקשה מפורשת ("חסר לי פה בר תחתון"): הבר התחתון של האפליקציה גם בעמוד האוסף.
   return collection.type === "trips" ? (
-    <TripsExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+    <>
+      <TripsExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+      <MainBottomNav active="places" />
+    </>
   ) : (
-    <PlacesExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+    <>
+      <PlacesExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+      <MainBottomNav active="places" />
+    </>
   );
 }
 
@@ -228,7 +237,7 @@ function PlacesExperience({ collection, onBack, onDelete }: { collection: Collec
   }
 
   return (
-    <div className="min-h-screen bg-white pb-24" style={CREATE_INK}>
+    <div className="min-h-screen bg-white pb-32" style={CREATE_INK}>
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={onBack} />
 
@@ -526,7 +535,7 @@ function TripsExperience({ collection, onBack, onDelete }: { collection: Collect
   const hasMap = markers.length > 0;
 
   return (
-    <div className="min-h-screen bg-white pb-24" style={CREATE_INK}>
+    <div className="min-h-screen bg-white pb-32" style={CREATE_INK}>
       <HomeStatusBarTint />
 
       {hasMap ? (
