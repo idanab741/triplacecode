@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getAvatarUrl } from "@/constants/avatar";
+import type { AreaSuggestion, MapArea } from "@/services/places/mapAreaTypes";
 
 interface PlacesTopBarCreateProps {
   onCreate: () => void;
@@ -10,6 +11,9 @@ interface PlacesTopBarCreateProps {
    *  של X/פייסבוק. ברירת מחדל "floating" - במפה השורה צפה מעל המפה וצריכה את הצל. */
   variant?: "floating" | "flat";
   placeholder?: string;
+  /** *** בקשה מפורשת ("אם ארשום אתונה - המפה תראה לי את אתונה בתוך הגבולות של העיר"): במפת place's
+   *  החיפוש מציע גם ערים / כפרים / אזורים, ובחירה בהם מעבירה את המפה אליהם. בלי זה - רק אנשים. */
+  onSelectArea?: (area: MapArea) => void;
 }
 
 interface PersonResult {
@@ -30,11 +34,14 @@ interface PersonResult {
  * אותו דפוס כמו SearchBarLink בבית: התפריט מוצג כשיש פוקוס + טקסט של 2 תווים לפחות, בלי state
  * "פתוח/סגור" נפרד. תוצאות ישנות מתנקות מיד בכל הקשה, ותשובה מאוחרת של בקשה קודמת נזרקת (cancelled).
  */
-export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder = "חפש ב-place's" }: PlacesTopBarCreateProps) {
+export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder = "חפש ב-place's", onSelectArea }: PlacesTopBarCreateProps) {
   const flat = variant === "flat";
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [results, setResults] = useState<PersonResult[] | null>(null);
+  const [areas, setAreas] = useState<AreaSuggestion[]>([]);
+  const [loadingArea, setLoadingArea] = useState<string | null>(null);
+  const [areaError, setAreaError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -42,10 +49,20 @@ export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder
 
   useEffect(() => {
     setResults(null);
+    setAreas([]);
+    setAreaError(null);
     if (term.length < 2) return;
 
     let cancelled = false;
     const timer = setTimeout(() => {
+      if (onSelectArea) {
+        fetch(`/api/places/area-autocomplete?q=${encodeURIComponent(term)}`)
+          .then((r) => r.json())
+          .then((data: { suggestions?: AreaSuggestion[] }) => {
+            if (!cancelled) setAreas(data.suggestions ?? []);
+          })
+          .catch(() => {});
+      }
       fetch(`/api/social/search?q=${encodeURIComponent(term)}`)
         .then((r) => r.json())
         .then((data: { people?: PersonResult[]; creators?: PersonResult[] }) => {
@@ -62,7 +79,26 @@ export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [term]);
+  }, [term, onSelectArea]);
+
+  async function pickArea(suggestion: AreaSuggestion) {
+    if (!onSelectArea || loadingArea) return;
+    setLoadingArea(suggestion.placeId);
+    setAreaError(null);
+    try {
+      const res = await fetch(`/api/places/area?placeId=${encodeURIComponent(suggestion.placeId)}`);
+      const data = (await res.json().catch(() => ({}))) as { area?: MapArea; error?: string };
+      if (!res.ok || !data.area) throw new Error(data.error ?? "לא הצלחנו לטעון את המקום");
+      onSelectArea(data.area);
+      setQuery("");
+      inputRef.current?.blur();
+      setFocused(false);
+    } catch (e) {
+      setAreaError(e instanceof Error ? e.message : "לא הצלחנו לטעון את המקום");
+    } finally {
+      setLoadingArea(null);
+    }
+  }
 
   function clear() {
     setQuery("");
@@ -150,8 +186,38 @@ export function PlacesTopBarCreate({ onCreate, variant = "floating", placeholder
             flat ? "rounded-2xl ring-1 ring-black/[0.08] shadow-[0_12px_32px_-12px_rgba(15,20,25,0.25)]" : "rounded-card shadow-lg"
           }`}
         >
-          {results === null && <p className="px-4 py-3 text-center text-sm text-ink-secondary">מחפש...</p>}
-          {results !== null && results.length === 0 && (
+          {areas.length > 0 && (
+            <>
+              <p className="px-4 pb-1 pt-2.5 text-[12px] font-semibold text-ink-secondary">מקומות על המפה</p>
+              {areas.map((a) => (
+                <button
+                  key={a.placeId}
+                  type="button"
+                  onClick={() => pickArea(a)}
+                  className="flex w-full items-center gap-3 border-b border-ink-secondary/10 px-4 py-2.5 text-start hover:bg-bg-secondary"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-places-bg text-places-purple">
+                    {loadingArea === a.placeId ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-places-purple/30 border-t-places-purple" />
+                    ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-bold text-ink">{a.mainText}</span>
+                    {a.secondaryText && <span className="block truncate text-[12px] text-ink-secondary">{a.secondaryText}</span>}
+                  </span>
+                </button>
+              ))}
+              {areaError && <p className="px-4 py-2 text-[12.5px] text-danger">{areaError}</p>}
+              {results && results.length > 0 && <p className="px-4 pb-1 pt-2.5 text-[12px] font-semibold text-ink-secondary">אנשים</p>}
+            </>
+          )}
+          {results === null && areas.length === 0 && <p className="px-4 py-3 text-center text-sm text-ink-secondary">מחפש...</p>}
+          {results !== null && results.length === 0 && areas.length === 0 && (
             <p className="px-4 py-3 text-center text-sm text-ink-secondary">לא נמצאו תוצאות</p>
           )}
           {results?.map((person) => (
