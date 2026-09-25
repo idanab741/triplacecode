@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -20,39 +20,31 @@ interface Mode {
   /** 3 צעדים קצרים - איך יוצרים */
   includes: string[];
   cta: string;
-  a: string;
-  b: string;
 }
 
 const MODES: Mode[] = [
-  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים ותיוג של המקום", includes: ["בוחרים תמונות", "כותבים כמה מילים", "מפרסמים"], cta: "צרו פוסט", a: "#FF8FB8", b: "#FFA96B" },
-  { id: "place", label: "מקום", title: "המליצו על מקום שאהבתם", sub: "ציון, כמה מילים ותמונות - וכולם יגלו אותו במפה", includes: ["מחפשים את המקום", "נותנים ציון", "כותבים ביקורת"], cta: "המליצו על מקום", a: "#B69CFF", b: "#5EC8FF" },
-  { id: "collection", label: "חוויה", title: "אספו מקומות תחת רעיון אחד", sub: "\"בתי הקפה הכי שווים\", \"מקומות לדייט\" - רשימה שכולם יכולים לשמור", includes: ["נותנים שם", "מוסיפים מקומות", "מפרסמים"], cta: "צרו חוויה", a: "#5BE3A8", b: "#38D6E8" },
-  { id: "trip", label: "טיול", title: "בנו מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים - עם מפה וניווט", includes: ["מוסיפים תחנות", "מסדרים לפי ימים", "יוצאים לדרך"], cta: "צרו טיול", a: "#FFCB5C", b: "#FF7F8E" },
+  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים ותיוג של המקום", includes: ["בוחרים תמונות", "כותבים כמה מילים", "מפרסמים"], cta: "צרו פוסט" },
+  { id: "place", label: "מקום", title: "המליצו על מקום שאהבתם", sub: "ציון, כמה מילים ותמונות - וכולם יגלו אותו במפה", includes: ["מחפשים את המקום", "נותנים ציון", "כותבים ביקורת"], cta: "המליצו על מקום" },
+  { id: "collection", label: "חוויה", title: "אספו מקומות תחת רעיון אחד", sub: "\"בתי הקפה הכי שווים\", \"מקומות לדייט\" - רשימה שכולם יכולים לשמור", includes: ["נותנים שם", "מוסיפים מקומות", "מפרסמים"], cta: "צרו חוויה" },
+  { id: "trip", label: "טיול", title: "בנו מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים - עם מפה וניווט", includes: ["מוסיפים תחנות", "מסדרים לפי ימים", "יוצאים לדרך"], cta: "צרו טיול" },
 ];
 
 const CSS = `
 .cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
 /* הכרטיס המרכזי - "המסך" של המצב הנבחר (כמו העינית במצלמה של אינסטגרם) */
-.cx-stage { position:relative; border-radius:30px; overflow:hidden; touch-action:pan-y; user-select:none;
-  background:#0f0f12; box-shadow:0 30px 60px -30px color-mix(in srgb, var(--a) 55%, transparent); transition:box-shadow .4s ease; }
-.cx-stage-bg { position:absolute; inset:0; transition:opacity .45s ease;
-  background:
-    radial-gradient(120% 70% at 85% 0%, color-mix(in srgb, var(--a) 55%, transparent), transparent 60%),
-    radial-gradient(110% 70% at 10% 100%, color-mix(in srgb, var(--b) 50%, transparent), transparent 65%),
-    #121216; }
+/* *** בקשה מפורשת ("צעקני, כפתורים לא בסגנון שלנו"): משטח כהה שקט ואחיד - כמו הריבועים הקודמים בעמוד -
+   בלי הילות צבעוניות וגרדיאנטים. הצבע היחיד בעמוד הוא הכחול של כפתור היצירה. */
+.cx-stage { position:relative; border-radius:24px; overflow:hidden; touch-action:pan-y; user-select:none; background:#141416; }
 .cx-scene { animation:cx-scene-in .42s cubic-bezier(.2,.8,.2,1) both; }
 .cx-scene[data-dir="prev"] { animation-name:cx-scene-in-prev; }
 @keyframes cx-scene-in { from { opacity:0; transform:translateX(-28px) scale(.98); } to { opacity:1; transform:none; } }
 @keyframes cx-scene-in-prev { from { opacity:0; transform:translateX(28px) scale(.98); } to { opacity:1; transform:none; } }
-.cx-chip { background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
 /* שורת המצבים - כמו POST / STORY / REEL */
 .cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
 .cx-mode { transition:color .25s, opacity .25s, transform .25s; -webkit-tap-highlight-color:transparent; }
-/* כפתור ה"צילום" - מתחיל את היצירה */
-.cx-shutter { -webkit-tap-highlight-color:transparent; transition:transform .15s cubic-bezier(.2,.8,.2,1); }
-.cx-shutter:active { transform:scale(.92); }
-.cx-shutter-core { background:linear-gradient(135deg, var(--a), var(--b)); transition:background .35s; box-shadow:0 10px 26px -8px color-mix(in srgb, var(--a) 80%, transparent); }
+/* כפתור היצירה - הכפתור הראשי של האפליקציה (כחול, h-12, rounded-xl), כמו בכל שאר העמודים */
+.cx-cta { -webkit-tap-highlight-color:transparent; transition:transform .15s cubic-bezier(.2,.8,.2,1), opacity .15s; }
+.cx-cta:active { transform:scale(.98); opacity:.92; }
 @media (prefers-reduced-motion: reduce) { .cx-scene { animation:none !important; } .cx-rail { transition:none; } }
 `;
 
@@ -139,7 +131,7 @@ export default function ContentPage() {
       <HomeStatusBarTint />
       <style>{CSS + CREATE_PREVIEW_CSS}</style>
 
-      <div className="cx-page relative isolate flex flex-col" style={{ "--a": mode.a, "--b": mode.b } as CSSProperties}>
+      <div className="cx-page relative isolate flex flex-col">
         {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות), לוגו בלבן על הרקע הכהה */}
         <CollapsibleTopBar logoTone="white" />
 
@@ -155,24 +147,15 @@ export default function ContentPage() {
               onPointerCancel={() => (drag.current = null)}
               className="cx-stage mt-2 flex min-h-[420px] flex-1 flex-col outline-none"
             >
-              <span className="cx-stage-bg" aria-hidden="true" />
               <div key={mode.id} data-dir={dir} className="cx-scene relative flex flex-1 flex-col items-center justify-center px-5 pb-4 pt-6 text-center">
                 {/* דוגמה חיה של התוצאה - איך זה ייראה באפליקציה */}
                 <div className="flex w-full justify-center" aria-hidden="true">
                   <CreateModePreview mode={mode.id} />
                 </div>
-                <h1 className="mt-5 text-[23px] font-extrabold leading-tight tracking-tight">{mode.title}</h1>
-                <p className="mt-1.5 max-w-[19rem] text-balance text-[14px] leading-snug text-white/75">{mode.sub}</p>
-                <ol className="mt-3.5 flex flex-wrap justify-center gap-1.5" aria-label="איך זה עובד">
-                  {mode.includes.map((t, i) => (
-                    <li key={t} className="cx-chip flex items-center gap-1.5 rounded-full py-1 pe-3 ps-1 text-[12px] font-semibold text-white/90">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-extrabold" style={{ color: "#111" }}>
-                        {i + 1}
-                      </span>
-                      {t}
-                    </li>
-                  ))}
-                </ol>
+                <h1 className="mt-5 text-[22px] font-bold leading-tight tracking-tight">{mode.title}</h1>
+                <p className="mt-1.5 max-w-[19rem] text-balance text-[14.5px] leading-snug text-white/60">{mode.sub}</p>
+                {/* איך זה עובד - שורת טקסט שקטה, בלי "בועות" */}
+                <p className="mt-3 text-[13px] font-medium text-white/45">{mode.includes.join(" · ")}</p>
               </div>
               {/* נקודות - איפה אנחנו בין 4 הסוגים */}
               <div className="relative flex justify-center gap-1.5 pb-4" aria-hidden="true">
@@ -182,19 +165,15 @@ export default function ContentPage() {
               </div>
             </section>
 
-            {/* כפתור היצירה - ברור, עם טקסט, בצבעי הסוג הנבחר */}
-            <div className="mt-4 flex justify-center">
-              <button
-                type="button"
-                onClick={start}
-                className="cx-shutter cx-shutter-core flex h-14 min-w-[70%] items-center justify-center gap-2 rounded-full px-8 text-[17px] font-extrabold text-white"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                {mode.cta}
-              </button>
-            </div>
+            {/* כפתור היצירה - הכפתור הראשי הרגיל של האפליקציה */}
+            <button
+              type="button"
+              onClick={start}
+              className="cx-cta mt-4 flex h-12 w-full items-center justify-center rounded-xl text-[15.5px] font-semibold text-white"
+              style={{ background: "#0A6DFE" }}
+            >
+              {mode.cta}
+            </button>
 
             {/* שורת המצבים - כמו POST / STORY / REEL באינסטגרם */}
             <div ref={railBoxRef} className="relative mt-3 overflow-hidden" role="tablist" aria-label="בחירת סוג העלאה">
