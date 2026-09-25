@@ -10,6 +10,7 @@ import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { PlacesHeaderRow } from "@/screens/places/PlacesHeaderRow";
 import { PlacesTopBarCreate } from "@/screens/places/PlacesTopBarCreate";
 import { CreateMenuSheet } from "@/screens/places/CreateMenuSheet";
+import type { MapArea } from "@/services/places/mapAreaTypes";
 
 // המפה (Leaflet) משתמשת ב-window/DOM - נטענת רק בצד הלקוח.
 const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
@@ -25,6 +26,8 @@ export function PlacesMapClient() {
   const router = useRouter();
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // עיר / כפר שנבחרו בחיפוש - המפה מתמקדת בהם (ר' PlacesFriendsMap / AreaLayer).
+  const [area, setArea] = useState<MapArea | null>(null);
 
   return (
     <div className="relative min-h-screen bg-white pb-0">
@@ -33,7 +36,7 @@ export function PlacesMapClient() {
       {/* *** בקשה מפורשת: שורת החיפוש מופיעה רק במשיכה למטה (כמו בבית). המשיכה נקלטת רק על הבר
           עצמו - גרירה על המפה/הכרטיסים לא פותחת אותה. */}
       <CollapsibleTopBar pullFromBarOnly onRevealChange={setSearchOpen} headerRow={<PlacesHeaderRow badgeTone="purple" plain />}>
-        <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} />
+        <PlacesTopBarCreate onCreate={() => setCreateMenuOpen(true)} onSelectArea={setArea} />
       </CollapsibleTopBar>
 
       {/* *** תיקון (בקשה מפורשת - "החלוניות של המקומות נופלות למטה כשמתחילים להחליק"): המפה
@@ -49,6 +52,8 @@ export function PlacesMapClient() {
           onCreate={() => setCreateMenuOpen(true)}
           // מתחת לבר: שורת הלוגו (52) + pb-3 (12) + מרווח; כששורת החיפוש פתוחה - עוד 64
           topOffsetPx={searchOpen ? 136 : 72}
+          area={area}
+          onClearArea={() => setArea(null)}
         />
       </div>
 

@@ -5,7 +5,7 @@ import { optimizeImage } from "@/utils/imageUrl";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MapContainer, TileLayer, AttributionControl, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, AttributionControl, Marker, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -24,6 +24,7 @@ import { getFriendPinIcon } from "./friendPin";
 import { ShareToFriendsSheet } from "./ShareToFriendsSheet";
 import { TripMatchCategoryChips } from "@/screens/tripmatch/TripMatchCategoryChips";
 import { SelectionActionBar } from "@/screens/collections/SelectionActionBar";
+import type { MapArea } from "@/services/places/mapAreaTypes";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 type Filter = "all" | "friends" | "mine";
@@ -89,17 +90,21 @@ function MapController({
   fitToken,
   fly,
   locateToken,
+  paused = false,
 }: {
   pins: FriendsMapPin[];
   userLoc: LatLng | null;
   fitToken: string;
   fly: { key: string; n: number } | null;
   locateToken: number;
+  /** כשנבחר אזור בחיפוש - AreaLayer קובע את התצוגה, לא ההתאמה לנעצים */
+  paused?: boolean;
 }) {
   const map = useMap();
 
   useEffect(() => {
     map.invalidateSize();
+    if (paused) return;
     const points = pickFocusPoints(pins, userLoc);
     if (points.length === 0) return;
     if (points.length === 1) {
@@ -183,6 +188,23 @@ function ControlsAutoHide({ onHiddenChange }: { onHiddenChange: (hidden: boolean
     };
   }, [map, onHiddenChange]);
   return null;
+}
+
+/** אזור שנבחר בחיפוש (עיר / כפר): המפה עוברת אליו ומסמנת את גבול העיר. */
+function AreaLayer({ area }: { area: MapArea }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyToBounds(L.latLngBounds(area.bounds), { paddingTopLeft: [28, 190], paddingBottomRight: [28, 230], duration: 0.8, maxZoom: 15 });
+  }, [area, map]);
+  if (!area.boundary) return null;
+  return (
+    <GeoJSON
+      key={`${area.name}:${area.center.lat},${area.center.lng}`}
+      data={area.boundary}
+      interactive={false}
+      style={{ color: "#7C3AED", weight: 2.5, opacity: 0.9, fillColor: "#7C3AED", fillOpacity: 0.06, dashArray: "6 6" }}
+    />
+  );
 }
 
 function AvatarStack({ recommenders }: { recommenders: FriendsMapPin["recommenders"] }) {
@@ -389,12 +411,17 @@ export function PlacesFriendsMap({
   onCreate,
   onInteractingChange,
   topOffsetPx = 12,
+  area = null,
+  onClearArea,
 }: {
   onCreate?: () => void;
   /** נקרא כשהאצבע נוגעת במפה (true) ובעת הרמתה (false) - העמוד מסתיר בזמן הזה את הטאבים. */
   onInteractingChange?: (active: boolean) => void;
   /** מרחק מהקצה העליון (px) לשורת הסינון/המיקום - מתעדכן כשהטאבים מוצגים/מוסתרים. */
   topOffsetPx?: number;
+  /** עיר / כפר שנבחרו בחיפוש - המפה מתמקדת בהם ומסמנת את הגבול (גם כשאין שם נעצים). */
+  area?: MapArea | null;
+  onClearArea?: () => void;
 }) {
   const router = useRouter();
   const [pins, setPins] = useState<FriendsMapPin[] | null>(null);
@@ -459,11 +486,17 @@ export function PlacesFriendsMap({
     if (filter === "friends") list = list.filter((p) => p.hasFriend);
     else if (filter === "mine") list = list.filter((p) => p.hasSelf);
     if (categories.length > 0) list = list.filter((p) => p.category != null && categories.includes(p.category as HomeQuickCategoryId));
+    // אזור שנבחר בחיפוש - רק מקומות בתוך התחום שלו (הנעצים והכרטיסים)
+    if (area) {
+      const [[s, w], [n, e]] = area.bounds;
+      list = list.filter((p) => p.latitude >= s && p.latitude <= n && p.longitude >= w && p.longitude <= e);
+    }
     return list;
-  }, [pins, filter, categories]);
+  }, [pins, filter, categories, area]);
 
   const activeKey = filtered.some((p) => p.key === selectedKey) ? selectedKey : (filtered[0]?.key ?? null);
-  const fitToken = `${filter}|${filtered.map((p) => p.key).join(",")}`;
+  // כולל את האזור - כשמבטלים אזור שנבחר בחיפוש, המפה חוזרת להתאים את עצמה לנעצים
+  const fitToken = `${filter}|${area ? `${area.center.lat},${area.center.lng}` : ""}|${filtered.map((p) => p.key).join(",")}`;
 
   /** בחירה בידי המשתמש (לחיצה על נעץ / גלילת כרטיסים): גם בוחרת וגם מטיסה את המפה. */
   function selectByUser(key: string) {
@@ -566,7 +599,8 @@ export function PlacesFriendsMap({
 
           {userLoc && <Marker position={[userLoc.lat, userLoc.lng]} icon={USER_ICON} zIndexOffset={-500} />}
           <ControlsAutoHide onHiddenChange={setControlsHidden} />
-          <MapController pins={filtered} userLoc={userLoc} fitToken={fitToken} fly={fly} locateToken={locateToken} />
+          {area && <AreaLayer area={area} />}
+          <MapController pins={filtered} userLoc={userLoc} fitToken={fitToken} fly={fly} locateToken={locateToken} paused={!!area} />
         </MapContainer>
       )}
 
@@ -619,13 +653,14 @@ export function PlacesFriendsMap({
           type="button"
           onClick={() => setSelecting(true)}
           disabled={filtered.length === 0}
-          className={`flex h-10 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-semibold text-ink ring-1 ring-black/[0.06] transition active:scale-95 disabled:opacity-50 ${FLOAT}`}
+          aria-label="בחירה מרובה - יצירת אוסף או מסלול"
+          title="בחירה מרובה"
+          className={`flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink ring-1 ring-black/[0.06] transition active:scale-95 disabled:opacity-50 ${FLOAT}`}
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
             <path d="m8 12.3 2.8 2.8L16 9.6" />
           </svg>
-          בחירה
         </button>
         <button
           type="button"
@@ -659,7 +694,25 @@ export function PlacesFriendsMap({
       </div>
 
       {/* מצב ריק / שגיאה */}
-      {isEmpty && (
+      {/* האזור שנבחר בחיפוש - תגית עם השם ו-✕ לחזרה למפה הרגילה */}
+      {area && (
+        <div className="absolute inset-x-0 z-[1000] flex justify-center" style={{ top: topOffsetPx + 58, ...controlsStyle(-12) }}>
+          <span className={`flex h-9 max-w-[80%] items-center gap-1.5 rounded-full bg-white pe-1.5 ps-3.5 text-[13.5px] font-semibold text-ink ring-1 ring-black/[0.06] ${FLOAT}`}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+              <circle cx="12" cy="10" r="2.5" />
+            </svg>
+            <span className="truncate">{area.name}</span>
+            {onClearArea && (
+              <button type="button" onClick={onClearArea} aria-label="ביטול המיקום שנבחר" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-[11px] font-bold text-ink-secondary">
+                ✕
+              </button>
+            )}
+          </span>
+        </div>
+      )}
+
+      {isEmpty && !area && (
         <div className={`absolute inset-x-6 top-1/2 z-[1000] -translate-y-[60%] rounded-3xl bg-white p-6 text-center ring-1 ring-black/[0.06] ${FLOAT}`}>
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-places-bg text-places-purple">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
