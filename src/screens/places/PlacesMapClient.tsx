@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type React from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -38,9 +39,11 @@ export function PlacesMapClient() {
       {/* *** תיקון (בקשה מפורשת - "החלוניות של המקומות נופלות למטה כשמתחילים להחליק"): המפה
           כבר לא בזרימת העמוד מתחת לבר - היא שכבה קבועה מראש המסך ועד הבר התחתון, והבר השקוף
           מרחף מעליה. כך גובה הבר (למשל שורת החיפוש) לא יכול להזיז את המפה ואת הכרטיסים. */}
+      {/* *** בקשה מפורשת ("למה המפה לא נמשכת מתחת לבר התחתון?"): המפה בגובה המסך המלא, גם מתחת
+          לבר הצף. --map-bottom-inset = גובה הבר, כדי שהכרטיסים והכפתורים שעל המפה יישבו מעליו. */}
       <div
-        className="absolute inset-x-0 top-0 isolate z-0"
-        style={{ height: "calc(100dvh - 66px - max(env(safe-area-inset-bottom), 22px))" }}
+        className="h-viewport-safe absolute inset-x-0 top-0 isolate z-0"
+        style={{ "--map-bottom-inset": "calc(66px + max(env(safe-area-inset-bottom), 22px))" } as React.CSSProperties}
       >
         <PlacesFriendsMap
           onCreate={() => setCreateMenuOpen(true)}

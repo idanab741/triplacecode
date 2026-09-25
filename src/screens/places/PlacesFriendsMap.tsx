@@ -105,7 +105,7 @@ function MapController({
       map.setView(points[0], 14, { animate: false });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 185], paddingBottomRight: [44, 225], maxZoom: 15, animate: false });
+    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 185], paddingBottomRight: [44, 320], maxZoom: 15, animate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToken]);
 
@@ -568,7 +568,10 @@ export function PlacesFriendsMap({
 
       {/* *** בקשה מפורשת: "כולם / חברים / שלי" + כפתור המיקום שלי - למטה, מתחת לפס הכרטיסים
           (מעל הבר התחתון). inset-x-5 = אותם שוליים כמו שורת הכותרת. */}
-      <div className="absolute inset-x-5 bottom-3 z-[1000] flex items-center justify-between" style={controlsStyle(16)}>
+      <div
+        className="absolute inset-x-5 z-[1000] flex items-center justify-between"
+        style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 12px)", ...controlsStyle(16) }}
+      >
         <div className={`flex rounded-full bg-white p-1 ring-1 ring-black/[0.06] ${FLOAT}`} role="tablist" aria-label="סינון המלצות">
           {FILTERS.map((f) => {
             const selected = filter === f.id;
@@ -654,8 +657,8 @@ export function PlacesFriendsMap({
         <div
           ref={scrollerRef}
           onScroll={handleCardsScroll}
-          className="stories-rail-track absolute inset-x-0 bottom-14 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
-          style={{ scrollbarWidth: "none", ...controlsStyle(24) }}
+          className="stories-rail-track absolute inset-x-0 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
+          style={{ scrollbarWidth: "none", bottom: "calc(var(--map-bottom-inset, 0px) + 56px)", ...controlsStyle(24) }}
         >
           {filtered.map((pin) => {
             const selected = pin.key === activeKey;
