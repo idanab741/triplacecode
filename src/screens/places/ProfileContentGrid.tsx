@@ -11,15 +11,15 @@ const TABS: { id: ProfileContentFilter; label: string }[] = [
   { id: "all", label: "הכל" },
   { id: "post", label: "פוסטים" },
   { id: "review", label: "ביקורות" },
-  { id: "collection", label: "חוויות" },
+  { id: "collection", label: "מפות" },
   { id: "trip", label: "טיולים" },
 ];
 
 const EMPTY_TEXT: Record<ProfileContentFilter, { self: string; other: string }> = {
-  all: { self: "כל מה שתפרסמו - פוסטים, ביקורות, חוויות וטיולים - יופיע כאן.", other: "אין עדיין תוכן להצגה כאן." },
+  all: { self: "כל מה שתפרסמו - פוסטים, ביקורות, מפות וטיולים - יופיע כאן.", other: "אין עדיין תוכן להצגה כאן." },
   post: { self: "עוד לא פרסמתם פוסט.", other: "אין עדיין פוסטים להצגה כאן." },
   review: { self: "עוד לא כתבתם ביקורת.", other: "אין עדיין ביקורות להצגה כאן." },
-  collection: { self: "עוד לא יצרתם חוויה.", other: "אין עדיין חוויות להצגה כאן." },
+  collection: { self: "עוד לא יצרתם מפה.", other: "אין עדיין מפות להצגה כאן." },
   trip: { self: "עוד לא יצרתם טיול.", other: "אין עדיין טיולים להצגה כאן." },
 };
 

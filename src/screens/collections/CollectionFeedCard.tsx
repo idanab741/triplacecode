@@ -50,7 +50,7 @@ export function CollectionFeedCard({ item }: { item: CollectionCardDto }) {
             className="absolute start-2.5 top-2.5 flex items-center gap-1 rounded-pill px-2.5 py-1 text-[11.5px] font-bold text-white"
             style={{ background: "linear-gradient(135deg, var(--color-places-purple), var(--color-places-violet))" }}
           >
-            {item.type === "places" ? "📍" : "✈️"} חוויה
+            {item.type === "places" ? "📍 מפה" : "✈️ טיולים"}
           </span>
         </div>
         <div className="px-3.5 pb-3 pt-2.5">

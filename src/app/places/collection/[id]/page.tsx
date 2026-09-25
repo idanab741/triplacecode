@@ -69,14 +69,14 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
     fetch(`/api/social/collections/${id}`)
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת החוויה");
+        if (!res.ok) throw new Error(data.error ?? "שגיאה בטעינת המפה");
         setCollection(data.collection as CollectionDetailDto);
       })
       .catch((err) => setError(err.message));
   }, [id, user]);
 
   async function handleDelete() {
-    if (!window.confirm("למחוק את החוויה? הפעולה לא הפיכה.")) return;
+    if (!window.confirm("למחוק את המפה? הפעולה לא הפיכה.")) return;
     const res = await fetch(`/api/social/collections/${id}`, { method: "DELETE" });
     if (res.ok) router.replace("/home");
   }
@@ -89,7 +89,7 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
         {error ? (
           <PlacesEmptyState title={error} actionLabel="חזרה" onAction={() => router.back()} />
         ) : (
-          <div aria-busy="true" aria-label="טוען את החוויה" className="mx-auto max-w-xl px-4 pt-2">
+          <div aria-busy="true" aria-label="טוען את המפה" className="mx-auto max-w-xl px-4 pt-2">
             <div className="aspect-[16/10] w-full animate-pulse rounded-[24px] bg-[#EFF1F4]" />
             <div className="mt-5 h-8 w-3/4 animate-pulse rounded-lg bg-[#EFF1F4]" />
             <div className="mt-4 flex items-center gap-3">
@@ -132,7 +132,7 @@ function OwnerMenu({ collectionId, onDelete }: { collectionId: string; onDelete:
           <button type="button" aria-label="סגירה" className="fixed inset-0 z-10 cursor-default" onClick={() => setOpen(false)} />
           <div className="absolute end-0 top-full z-20 mt-2 w-40 overflow-hidden rounded-[16px] bg-white p-1.5 shadow-[0_12px_32px_-8px_rgba(15,20,25,0.3)] ring-1 ring-black/[0.06]">
             <Link href={`/places/collection/${collectionId}/edit`} className="flex h-11 w-full items-center rounded-[10px] px-3 text-[14px] font-semibold text-ink active:bg-[#F1F2F5]">
-              עריכת החוויה
+              עריכת המפה
             </Link>
             <button type="button" onClick={onDelete} className="flex h-11 w-full items-center rounded-[10px] px-3 text-[14px] font-semibold text-[#C8373C] active:bg-[#F1F2F5]">
               מחיקה
@@ -153,7 +153,7 @@ function ExperienceHeader({ collection }: { collection: CollectionDetailDto }) {
   return (
     <div className="mx-auto max-w-xl px-5">
       <p className="flex flex-wrap items-center gap-x-2 text-[13px] font-medium text-ink-secondary">
-        <span>חוויה</span>
+        <span>מפה</span>
         <span>· {COLLECTION_TYPE_LABELS[collection.type].itemCount(collection.itemCount)}</span>
         {collection.visibility === "private" ? <span>· פרטי</span> : collection.visibility === "friends" ? <span>· חברים</span> : null}
       </p>
@@ -341,7 +341,7 @@ function PlacesExperience({ collection, onBack, onDelete }: { collection: Collec
           )}
         </div>
 
-        {items.length === 0 && <p className="py-8 text-center text-[14px] text-ink-secondary">אין מקומות להצגה בחוויה הזו.</p>}
+        {items.length === 0 && <p className="py-8 text-center text-[14px] text-ink-secondary">אין מקומות להצגה במפה הזו.</p>}
 
         {view === "list" ? (
           <ol className="mt-4 flex flex-col gap-8">
@@ -579,7 +579,7 @@ function TripsExperience({ collection, onBack, onDelete }: { collection: Collect
           <h2 id="exp-trips-title" className="px-1 text-[19px] font-bold text-ink">
             {COLLECTION_TYPE_LABELS.trips.itemCount(items.length)}
           </h2>
-          {items.length === 0 && <p className="py-8 text-center text-[14px] text-ink-secondary">אין טיולים להצגה בחוויה הזו.</p>}
+          {items.length === 0 && <p className="py-8 text-center text-[14px] text-ink-secondary">אין טיולים להצגה במפה הזו.</p>}
 
           <ol className="mt-3 flex flex-col gap-3">
             {items.map((item, index) => (

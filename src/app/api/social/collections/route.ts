@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const type = body?.type as CollectionType | undefined;
   if (type !== "places" && type !== "trips") {
-    return NextResponse.json({ error: "סוג החוויה לא תקין" }, { status: 422 });
+    return NextResponse.json({ error: "סוג המפה לא תקין" }, { status: 422 });
   }
 
   try {
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
     if (err instanceof CollectionInputError) return NextResponse.json({ error: err.message }, { status: 422 });
-    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה ביצירת החוויה" }, { status: 400 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה ביצירת המפה" }, { status: 400 });
   }
 }

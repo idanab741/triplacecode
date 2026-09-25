@@ -27,7 +27,7 @@ export function SelectionActionBar({
   selectedIds,
   onCancel,
   accent = "#0A6DFE",
-  labels = { collection: "אוסף חדש", trip: "מסלול חדש" },
+  labels = { collection: "מפה חדשה", trip: "טיול חדש" },
   allowEmpty = false,
   style,
   className = "",

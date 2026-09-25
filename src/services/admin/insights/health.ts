@@ -41,7 +41,7 @@ const REQUIRED_TABLES: { table: string; feature: string; migration: string }[] =
   { table: "posts", feature: "פיד קהילה", migration: "0068_social_posts_media_likes_comments.sql" },
   { table: "dm_messages", feature: "הודעות פרטיות", migration: "0093_direct_messages.sql" },
   { table: "trips", feature: "טיולים (פרופיל)", migration: "0090_trips.sql" },
-  { table: "collections", feature: "אוספים", migration: "0089_collections.sql" },
+  { table: "collections", feature: "מפות (אוספים)", migration: "0089_collections.sql" },
 ];
 
 const REQUIRED_ENV: { key: string; feature: string; critical: boolean }[] = [

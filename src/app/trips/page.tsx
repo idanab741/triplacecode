@@ -124,7 +124,7 @@ const Icons = {
   ),
 };
 
-const KIND_LABEL: Record<Row["kind"], string> = { place: "מקום", post: "פוסט", trip: "טיול", collection: "אוסף" };
+const KIND_LABEL: Record<Row["kind"], string> = { place: "מקום", post: "פוסט", trip: "טיול", collection: "מפה" };
 
 function socialSavePath(kind: "post" | "trip" | "collection", id: string): string {
   return `/api/social/${kind === "post" ? "posts" : kind === "trip" ? "trips" : "collections"}/${id}/save`;
@@ -344,10 +344,10 @@ function MyPicksContent() {
 
   const filters: { id: Filter; label: string; icon: ReactNode }[] = [
     { id: "all", label: "הכל", icon: Icons.all },
-    { id: "places", label: "מקומות", icon: Icons.places },
     { id: "posts", label: "פוסטים", icon: Icons.posts },
+    { id: "places", label: "מקומות", icon: Icons.places },
+    { id: "collections", label: "מפות", icon: Icons.collections },
     { id: "trips", label: "טיולים", icon: Icons.trips },
-    { id: "collections", label: "אוספים", icon: Icons.collections },
     ...(counts.built > 0 ? [{ id: "built" as const, label: "מסלולים שבניתי", icon: Icons.built }] : []),
   ];
 
@@ -402,7 +402,7 @@ function MyPicksContent() {
     places: typeFilter ? `אין מקומות שמורים מסוג ${TRIP_TYPE_SHORT_LABEL[typeFilter]}.` : "עוד לא שמרתם מקומות. גם החלקה ימינה ב-tripmatch שומרת כאן.",
     posts: "עוד לא שמרתם פוסטים.",
     trips: "עוד לא שמרתם טיולים של הקהילה.",
-    collections: "עוד לא שמרתם אוספים.",
+    collections: "עוד לא שמרתם מפות.",
     built: "אין מסלולים שבניתם.",
   };
 

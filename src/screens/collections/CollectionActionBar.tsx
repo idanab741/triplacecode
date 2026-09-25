@@ -146,7 +146,7 @@ export function CollectionActionBar({ item, commentsActive, onToggleComments, ba
   }
 
   async function handleShare() {
-    const result = await shareItem(item, sharePath ?? collectionPath(item.id), shareText ?? `${item.title} - חוויה ב-TRIPLACE`);
+    const result = await shareItem(item, sharePath ?? collectionPath(item.id), shareText ?? `${item.title} - מפה ב-TRIPLACE`);
     if (result === "copied") {
       setToast("הקישור הועתק");
       setTimeout(() => setToast(null), 2000);

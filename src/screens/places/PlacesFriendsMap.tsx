@@ -262,7 +262,7 @@ const KIND_LABEL: Record<FriendsMapContribution["kind"], string> = {
   review: "ביקורת",
   post: "פוסט",
   trip: "הוסיף/ה לטיול",
-  collection: "הוסיף/ה לאוסף",
+  collection: "הוסיף/ה למפה",
 };
 
 function timeAgo(iso: string): string {
@@ -660,7 +660,6 @@ export function PlacesFriendsMap({
           selectedIds={(pins ?? []).filter((p) => checkedKeys.includes(p.key)).map((p) => p.placeId)}
           onCancel={pickMode ? (checkedKeys.length > 0 ? () => setCheckedKeys([]) : undefined) : exitSelecting}
           accent="var(--color-places-purple)"
-          labels={pickMode ? { collection: "מפה חדשה", trip: "מסלול חדש" } : undefined}
           allowEmpty={pickMode}
           className="absolute inset-x-3 z-[1000]"
           style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 8px)", ...controlsStyle(16) }}
@@ -697,7 +696,7 @@ export function PlacesFriendsMap({
           type="button"
           onClick={() => setSelecting(true)}
           disabled={filtered.length === 0}
-          aria-label="בחירה מרובה - יצירת אוסף או מסלול"
+          aria-label="בחירה מרובה - יצירת מפה או טיול"
           title="בחירה מרובה"
           className={`flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink ring-1 ring-black/[0.06] transition active:scale-95 disabled:opacity-50 ${FLOAT}`}
         >
@@ -770,7 +769,7 @@ export function PlacesFriendsMap({
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
               ? "נסו שוב בעוד רגע."
-              : "מקומות שיועלו, יקבלו ביקורת, יפורסמו בפוסט או יתווספו לטיול או לאוסף יופיעו כאן על המפה."}
+              : "מקומות שיועלו, יקבלו ביקורת, יפורסמו בפוסט או יתווספו למפה או לטיול יופיעו כאן על המפה."}
           </p>
           {!error && onCreate && (
             <button
