@@ -2,17 +2,8 @@
 
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { COLLECTION_LIMITS } from "@/services/social/collectionTypes";
-import { COLLECTION_DRAFT_KEY, TRIP_DRAFT_KEY } from "./createDrafts";
-import { formItemKey, type CollectionFormItem } from "./collectionFormTypes";
-
-interface CollectablePlace {
-  inputId: string;
-  placeId: string;
-  name: string;
-  subtitle: string | null;
-  imageUrl: string | null;
-}
+import { AddToSheet } from "./AddToSheet";
+import { prepareNewMap, prepareNewTrip, resolveCollectablePlaces } from "./placeTargets";
 
 type Target = "collection" | "trip";
 
@@ -45,6 +36,7 @@ export function SelectionActionBar({
   const router = useRouter();
   const [busy, setBusy] = useState<Target | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [addToOpen, setAddToOpen] = useState(false);
   const count = selectedIds.length;
 
   async function create(target: Target) {
@@ -56,47 +48,8 @@ export function SelectionActionBar({
     setBusy(target);
     setError(null);
     try {
-      const res = await fetch("/api/places/collectable", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selectedIds }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { places?: CollectablePlace[]; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "משהו השתבש, נסו שוב");
-      const seen = new Set<string>();
-      const places = (data.places ?? []).filter((p) => (seen.has(p.placeId) ? false : (seen.add(p.placeId), true)));
-      if (places.length === 0) throw new Error("לא הצלחנו להוסיף את המקומות שנבחרו");
-
-      if (target === "collection") {
-        const items: CollectionFormItem[] = places.slice(0, COLLECTION_LIMITS.maxItems).map((p) => ({
-          key: formItemKey("place", p.placeId),
-          kind: "place",
-          refId: p.placeId,
-          title: p.name,
-          subtitle: p.subtitle,
-          imageUrl: p.imageUrl,
-          note: "",
-        }));
-        localStorage.setItem(
-          COLLECTION_DRAFT_KEY,
-          JSON.stringify({ type: "places", title: "", description: "", coverUrl: null, visibility: "public", items })
-        );
-        router.push("/places/collection/create?type=places");
-      } else {
-        const stops = places.map((p, i) => ({
-          key: `stop-sel-${Date.now().toString(36)}-${i}`,
-          placeId: p.placeId,
-          title: p.name,
-          subtitle: p.subtitle,
-          imageUrl: p.imageUrl,
-          note: "",
-        }));
-        sessionStorage.setItem(
-          TRIP_DRAFT_KEY,
-          JSON.stringify({ title: "", description: "", coverUrl: null, tripType: null, visibility: "public", days: [{ id: `day-sel-${Date.now().toString(36)}`, stops }] })
-        );
-        router.push("/places/trip/create");
-      }
+      const places = await resolveCollectablePlaces(selectedIds);
+      router.push(target === "collection" ? prepareNewMap(places) : prepareNewTrip(places));
     } catch (e) {
       setError(e instanceof Error ? e.message : "משהו השתבש, נסו שוב");
       setBusy(null);
@@ -148,7 +101,23 @@ export function SelectionActionBar({
           {labels.trip}
         </button>
       </div>
+      {/* *** בקשה מפורשת ("להוסיף למפה / לטיול קיימים"): כשנבחר משהו - גם הוספה למה שכבר יצרתם */}
+      {count > 0 && (
+        <button
+          type="button"
+          onClick={() => setAddToOpen(true)}
+          disabled={busy !== null}
+          className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-full text-[13.5px] font-semibold transition active:bg-[#F1F2F5] disabled:opacity-45"
+          style={{ color: accent }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          הוספה למפה או טיול קיימים
+        </button>
+      )}
       {error && <p className="px-1 pt-2 text-[12.5px] text-danger">{error}</p>}
+      {addToOpen && <AddToSheet ids={selectedIds} label={count === 1 ? "מקום אחד" : `${count} מקומות`} onClose={() => setAddToOpen(false)} />}
     </div>
   );
 }

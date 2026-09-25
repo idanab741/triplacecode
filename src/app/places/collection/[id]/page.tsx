@@ -12,6 +12,7 @@ import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { PostInlineComments } from "@/screens/places/PostInlineComments";
 import { SearchResultCard } from "@/screens/search/SearchResultCard";
 import { CollectionCover } from "@/screens/collections/CollectionCover";
+import { CollectionQuickAdd } from "@/screens/collections/QuickAdd";
 import { CollectionActionBar } from "@/screens/collections/CollectionActionBar";
 import { getAvatarUrl } from "@/constants/avatar";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
@@ -59,6 +60,9 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const [collection, setCollection] = useState<CollectionDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // הוספה מהירה (CollectionQuickAdd) - טוענים מחדש את המפה אחרי כל פריט שנוסף
+  const [version, setVersion] = useState(0);
+  const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
@@ -73,7 +77,7 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
         setCollection(data.collection as CollectionDetailDto);
       })
       .catch((err) => setError(err.message));
-  }, [id, user]);
+  }, [id, user, version]);
 
   async function handleDelete() {
     if (!window.confirm("למחוק את המפה? הפעולה לא הפיכה.")) return;
@@ -107,12 +111,12 @@ export default function CollectionPage({ params }: { params: Promise<{ id: strin
   // *** בקשה מפורשת ("חסר לי פה בר תחתון"): הבר התחתון של האפליקציה גם בעמוד האוסף.
   return collection.type === "trips" ? (
     <>
-      <TripsExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+      <TripsExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} onChanged={reload} />
       <MainBottomNav active="places" />
     </>
   ) : (
     <>
-      <PlacesExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} />
+      <PlacesExperience collection={collection} onBack={() => router.back()} onDelete={handleDelete} onChanged={reload} />
       <MainBottomNav active="places" />
     </>
   );
@@ -197,7 +201,17 @@ const PILL_CLASS = "flex h-9 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3
 
 /* ═════════════════════════════ חוויה של מקומות ═════════════════════════════ */
 
-function PlacesExperience({ collection, onBack, onDelete }: { collection: CollectionDetailDto; onBack: () => void; onDelete: () => void }) {
+function PlacesExperience({
+  collection,
+  onBack,
+  onDelete,
+  onChanged,
+}: {
+  collection: CollectionDetailDto;
+  onBack: () => void;
+  onDelete: () => void;
+  onChanged: () => void;
+}) {
   const items = useMemo(
     () => collection.items.filter((i): i is CollectionPlaceItemDto => i.kind === "place").sort((a, b) => a.position - b.position),
     [collection.items]
@@ -373,6 +387,7 @@ function PlacesExperience({ collection, onBack, onDelete }: { collection: Collec
             ))}
           </div>
         )}
+        <CollectionQuickAdd collection={collection} onChanged={onChanged} />
       </section>
     </div>
   );
@@ -484,7 +499,17 @@ function PlaceItemCard({
 
 /* ═════════════════════════════ חוויה של טיולים ═════════════════════════════ */
 
-function TripsExperience({ collection, onBack, onDelete }: { collection: CollectionDetailDto; onBack: () => void; onDelete: () => void }) {
+function TripsExperience({
+  collection,
+  onBack,
+  onDelete,
+  onChanged,
+}: {
+  collection: CollectionDetailDto;
+  onBack: () => void;
+  onDelete: () => void;
+  onChanged: () => void;
+}) {
   const items = useMemo(
     () => collection.items.filter((i): i is CollectionTripItemDto => i.kind === "trip").sort((a, b) => a.position - b.position),
     [collection.items]
@@ -594,6 +619,7 @@ function TripsExperience({ collection, onBack, onDelete }: { collection: Collect
               />
             ))}
           </ol>
+          <CollectionQuickAdd collection={collection} onChanged={onChanged} />
         </section>
       </div>
     </div>

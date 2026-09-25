@@ -791,7 +791,7 @@ export function PlacesFriendsMap({
           ref={scrollerRef}
           onScroll={handleCardsScroll}
           className="stories-rail-track absolute inset-x-0 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
-          style={{ scrollbarWidth: "none", bottom: `calc(var(--map-bottom-inset, 0px) + ${selecting ? 70 : 56}px)`, ...controlsStyle(24) }}
+          style={{ scrollbarWidth: "none", bottom: `calc(var(--map-bottom-inset, 0px) + ${selecting ? (checkedKeys.length > 0 ? 114 : 70) : 56}px)`, ...controlsStyle(24) }}
         >
           {filtered.map((pin) => {
             const selected = pin.key === activeKey;

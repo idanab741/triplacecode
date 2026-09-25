@@ -434,3 +434,78 @@ export const addTripComment = (supabase: SupabaseClient, tripId: string, authorI
 
 export const deleteTripComment = (supabase: SupabaseClient, commentId: string, authorId: string) =>
   deleteTargetComment(supabase, "trip_id", commentId, authorId);
+
+// ────────────────────────────────────────────────────────────────────────────
+// הוספה מהירה לטיול קיים (רק היוצר)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface AddToTargetResult {
+  added: number;
+  /** כבר היו בטיול / במפה - דולגו */
+  skipped: number;
+}
+
+/**
+ * *** בקשה מפורשת ("הוספה לטיול רק ליוצר של המסלול"): מוסיף מקומות כתחנות בסוף יום בטיול קיים, בלי
+ * לעבור דרך טופס העריכה. day ריק = היום האחרון. מקום שכבר בטיול מדולג (בהוספה מהירה כפילות היא כמעט
+ * תמיד טעות). התחנות נשמרות באותה החלפה אטומית כמו בעריכה (replace_trip_stops - בודקת בעלות גם היא).
+ */
+export async function addPlacesToTrip(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+  rawPlaceIds: unknown,
+  rawDay?: unknown
+): Promise<AddToTargetResult> {
+  const placeIds = [...new Set((Array.isArray(rawPlaceIds) ? rawPlaceIds : []).filter((id): id is string => typeof id === "string" && UUID_RE.test(id)))];
+  if (placeIds.length === 0) throw new TripInputError("לא נבחרו מקומות להוספה");
+
+  const { data: existing, error: existingError } = await supabase.from("trips").select("id, author_id").eq("id", tripId).maybeSingle();
+  if (existingError) throw existingError;
+  if (!existing) throw new TripInputError("הטיול לא נמצא");
+  if (existing.author_id !== userId) throw new TripInputError("רק היוצר יכול להוסיף תחנות לטיול");
+
+  const { data: stopRows, error: stopsError } = await supabase
+    .from("trip_stops")
+    .select("place_id, day_index, position, note")
+    .eq("trip_id", tripId)
+    .order("day_index")
+    .order("position");
+  if (stopsError) throw stopsError;
+  const stops = (stopRows ?? []) as { place_id: string; day_index: number; position: number; note: string | null }[];
+
+  const inTrip = new Set(stops.map((s) => s.place_id));
+  const toAdd = placeIds.filter((id) => !inTrip.has(id));
+  const skipped = placeIds.length - toAdd.length;
+  if (toAdd.length === 0) return { added: 0, skipped };
+
+  if (stops.length + toAdd.length > TRIP_LIMITS.maxStops) {
+    throw new TripInputError(`אפשר עד ${TRIP_LIMITS.maxStops} תחנות בטיול`);
+  }
+  const { data: found, error: placesError } = await supabase.from("places").select("id").in("id", toAdd);
+  if (placesError) throw placesError;
+  if ((found ?? []).length !== toAdd.length) throw new TripInputError("אחד המקומות לא נמצא - ייתכן שהוסר");
+
+  const lastDay = stops.reduce((max, s) => Math.max(max, s.day_index), 1);
+  const requested = Number(rawDay);
+  const day = Number.isInteger(requested) && requested >= 1 && requested <= lastDay ? requested : lastDay;
+
+  // כל הימים בסדר הקיים; התחנות החדשות בסוף היום שנבחר; מספור מחדש של המיקומים בכל יום.
+  const byDay = new Map<number, { placeId: string; note: string | null }[]>();
+  for (const s of stops) {
+    const list = byDay.get(s.day_index) ?? [];
+    list.push({ placeId: s.place_id, note: s.note });
+    byDay.set(s.day_index, list);
+  }
+  const target = byDay.get(day) ?? [];
+  target.push(...toAdd.map((placeId) => ({ placeId, note: null })));
+  byDay.set(day, target);
+
+  const payload = [...byDay.entries()]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([dayIndex, list]) => list.map((stop, position) => ({ placeId: stop.placeId, day: dayIndex, position, note: stop.note })));
+
+  const { error: replaceError } = await supabase.rpc("replace_trip_stops", { p_trip_id: tripId, p_stops: payload });
+  if (replaceError) throw replaceError;
+  return { added: toAdd.length, skipped };
+}

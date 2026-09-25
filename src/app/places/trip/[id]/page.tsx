@@ -10,6 +10,7 @@ import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { PlacesEmptyState } from "@/screens/places/PlacesEmptyState";
 import { PostInlineComments } from "@/screens/places/PostInlineComments";
 import { CollectionActionBar } from "@/screens/collections/CollectionActionBar";
+import { TripQuickAdd } from "@/screens/collections/QuickAdd";
 import { AddToCalendarSheet } from "@/screens/calendar/AddToCalendarSheet";
 import { getAvatarUrl } from "@/constants/avatar";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
@@ -52,6 +53,8 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
   const [trip, setTrip] = useState<TripDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [justCreated, setJustCreated] = useState(false);
+  // הוספה מהירה של תחנות (TripQuickAdd) - טוענים מחדש את הטיול אחרי כל תחנה שנוספה
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
@@ -77,7 +80,7 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
         setTrip(data.trip as TripDetailDto);
       })
       .catch((err) => setError(err.message));
-  }, [id, user]);
+  }, [id, user, version]);
 
   async function handleDelete() {
     if (!window.confirm("למחוק את הטיול? הפעולה לא הפיכה.")) return;
@@ -102,7 +105,7 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
       ) : !trip ? (
         <TripSkeleton />
       ) : (
-        <TripBody trip={trip} onBack={() => router.back()} onDelete={handleDelete} />
+        <TripBody trip={trip} onBack={() => router.back()} onDelete={handleDelete} onChanged={() => setVersion((v) => v + 1)} />
       )}
       <MainBottomNav active="places" />
     </div>
@@ -134,7 +137,17 @@ function hasCoords(stop: TripStopDto): boolean {
   return stop.place.latitude != null && stop.place.longitude != null;
 }
 
-function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () => void; onDelete: () => void }) {
+function TripBody({
+  trip,
+  onBack,
+  onDelete,
+  onChanged,
+}: {
+  trip: TripDetailDto;
+  onBack: () => void;
+  onDelete: () => void;
+  onChanged: () => void;
+}) {
   const authorName = trip.author.fullName ?? trip.author.username ?? "מטייל";
   const profileHref = `/places/profile/${trip.author.username ?? trip.author.id}`;
   const apiBase = `/api/social/trips/${trip.id}`;
@@ -403,6 +416,7 @@ function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () 
                       />
                     ))}
                   </ol>
+                  <TripQuickAdd trip={trip} day={day} label={multiDay ? `הוספת תחנה ליום ${day}` : "הוספת תחנה"} onChanged={onChanged} />
                 </div>
               );
             })}

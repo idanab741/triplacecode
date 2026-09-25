@@ -7,6 +7,7 @@ import { createClient } from "@/services/supabase/client";
 import { getFavoriteStatus, toggleFavorite, type PlaceType } from "@/services/favorites/favoritesService";
 import { ShareToFriendsSheet } from "@/screens/places/ShareToFriendsSheet";
 import { AddToCalendarSheet, type CalendarEntryRef } from "@/screens/calendar/AddToCalendarSheet";
+import { AddToSheet } from "@/screens/collections/AddToSheet";
 
 interface AttractionSaveShareRowProps {
   placeId: string;
@@ -42,6 +43,8 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
   /** *** חדש (בקשה מפורשת - "היומן שלי: להכניס בית קפה / אטרקציה מסוימת"): כפתור "ליומן" שלישי. */
   const [calendarEntry, setCalendarEntry] = useState<CalendarEntryRef | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  /** *** בקשה מפורשת ("להוסיף מקום למפה / לטיול קיימים"): "הוספה ל..." - המפות והטיולים שלי. */
+  const [addToOpen, setAddToOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -98,8 +101,9 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
     }
   }
 
+  // 4 כפתורים בשורה - טקסט מעט קטן יותר כדי שייכנסו גם בטלפון צר
   const btn =
-    "flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#EFF1F4] text-[15.5px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60";
+    "flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#EFF1F4] px-1 text-[14.5px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60";
 
   return (
     <div className="flex gap-2 px-5 pt-4">
@@ -115,6 +119,14 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
           {calendarEntry ? "ביומן" : "ליומן"}
         </button>
       )}
+      {user && (
+        <button type="button" onClick={() => setAddToOpen(true)} className={btn} aria-label="הוספה למפה או לטיול">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          הוספה
+        </button>
+      )}
       <button type="button" onClick={handleShare} className={btn}>
         <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={20} height={20} />
         {justShared ? "הועתק!" : "שיתוף"}
@@ -127,6 +139,8 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
           onClose={() => setShareOpen(false)}
         />
       )}
+
+      {addToOpen && <AddToSheet ids={[placeId]} label={placeName} onClose={() => setAddToOpen(false)} />}
 
       {calendarOpen && (
         <AddToCalendarSheet
