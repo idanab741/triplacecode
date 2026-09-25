@@ -52,6 +52,8 @@ interface CollectionFormProps {
    *  להוסיף?" בלבד נפתח כהה, כדי להתאים לזרימה שממנה הגיעו. שום דבר אחר בטופס/בעמוד
    *  לא משתנה (לא הרקע, לא הבר העליון, אין בר תחתון) - בדיוק כמו תמיד. ברירת מחדל false. */
   dark?: boolean;
+  /** יצירה בלבד: החלפת סוג המפה (מקומות / טיולים) משורת הבחירה בראש הטופס */
+  onTypeChange?: (type: CollectionType) => void;
 }
 
 function SortableItemRow({
@@ -127,7 +129,7 @@ function readDraft(type: CollectionType): CollectionFormInitial | null {
 }
 
 /** טופס יצירה/עריכה של אוסף (משותף). כותרת (חובה) · תיאור · Cover · פריטים (לפחות 2, גרירה לסדר) · פרטיות. */
-export function CollectionForm({ mode, type, collectionId, initial, dark = false }: CollectionFormProps) {
+export function CollectionForm({ mode, type, collectionId, initial, dark = false, onTypeChange }: CollectionFormProps) {
   const router = useRouter();
   const labels = COLLECTION_TYPE_LABELS[type];
 
@@ -245,6 +247,39 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
 
   return (
     <div className="mx-auto max-w-xl px-5 pb-12 pt-4">
+      {/* *** בקשה מפורשת ("שורה למעלה - כמו עבורך / חברים - של מקומות / טיולים"): בוחרים מה יהיה במפה.
+          החלפה עם פריטים שכבר נבחרו מבקשת אישור - מפה מכילה סוג אחד בלבד. */}
+      {mode === "create" && onTypeChange && (
+        <div role="radiogroup" aria-label="מה יהיה במפה" className="mb-5 grid grid-cols-2 rounded-full bg-[#F1F2F5] p-1">
+          {(
+            [
+              { id: "places", label: "מקומות", icon: <PinIcon size={16} /> },
+              { id: "trips", label: "טיולים", icon: <PlaneIcon size={16} /> },
+            ] as const
+          ).map((option) => {
+            const active = type === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => {
+                  if (active) return;
+                  if (items.length > 0 && !window.confirm(`להחליף למפה של ${option.label}? ה${itemsWord} שכבר בחרתם יוסרו.`)) return;
+                  onTypeChange(option.id);
+                }}
+                className={`flex h-10 items-center justify-center gap-1.5 rounded-full text-[14.5px] font-semibold transition ${
+                  active ? "bg-white text-ink shadow-[0_1px_3px_rgba(15,20,25,0.12)]" : "text-ink-secondary"
+                }`}
+              >
+                {option.icon}
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {/* *** עיצוב מחדש (בקשה מפורשת - "נתאים לעיצוב של האפליקציה"): אותה שפה כמו יצירת פוסט/מקום -
           כותרת גדולה + שורת הסבר, שדות אפורים-בהירים בלי מסגרות, כחול לבחירה, והכפתור הראשי הקבוע. */}
       <CreatePageHeader
