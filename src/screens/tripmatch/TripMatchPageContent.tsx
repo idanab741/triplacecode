@@ -30,6 +30,20 @@ import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import { getSessionLocation } from "@/utils/sessionLocation";
 import { readDeck, writeDeck, clearDeck } from "@/utils/tripMatchDeckCache";
 import { TripsIntroCard } from "@/components/trips/TripsIntroCard";
+import { AddToCalendarSheet, type CalendarItemRef } from "@/screens/calendar/AddToCalendarSheet";
+import { AddToSheet } from "@/screens/collections/AddToSheet";
+
+const SWIPE_CALENDAR_ICON = (
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+const SWIPE_ADD_ICON = (
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
 
 // המפה (Leaflet) משתמשת ב-window/DOM - חייבת להיטען רק בצד הלקוח, לא ב-SSR
 const ResultMap = dynamic(() => import("@/screens/trip-builder/ResultMap").then((m) => m.ResultMap), {
@@ -426,6 +440,9 @@ export function TripMatchPageContent({
   }, [filtersOpen]);
   const [likedPlace, setLikedPlace] = useState<CandidatePlace | null>(null);
   const [sessionLikedPlaces, setSessionLikedPlaces] = useState<CandidatePlace[]>(restoredDeck?.likedPlaces ?? []);
+  // *** שיטת ההחלקות: החלקה שמאלה על מקום שאהבתם - יומן / הוספה למפה או לטיול
+  const [likedCalendarItem, setLikedCalendarItem] = useState<CalendarItemRef | null>(null);
+  const [likedAddTo, setLikedAddTo] = useState<{ id: string; name: string } | null>(null);
   const [hasSwipedAny, setHasSwipedAny] = useState(Boolean(restoredDeck && restoredDeck.decidedIds.length > 0));
   // *** עוקב אחרי אילו מתוך 3 הקטגוריות של "המשך לקטגוריה הבאה" כבר
   // הושלמו ליעד הנוכחי (מתאפס בכל בחירת יעד חדש) - כדי לדעת מתי להציג
@@ -2100,7 +2117,21 @@ export function TripMatchPageContent({
                     (SwipeToDeleteRow), כולל אפשרות מחיקה בהחלקה. */}
                 <div className="flex flex-col gap-3">
                   {sessionLikedPlaces.map((place) => (
-                    <SwipeToDeleteRow key={place.id} resetKey={String(sessionLikedPlaces.length)} onDelete={() => handleRemoveLikedPlace(place.id)}>
+                    <SwipeToDeleteRow
+                      key={place.id}
+                      resetKey={String(sessionLikedPlaces.length)}
+                      onDelete={() => handleRemoveLikedPlace(place.id)}
+                      actions={[
+                        {
+                          key: "calendar",
+                          label: "יומן",
+                          color: "#0A6DFE",
+                          icon: SWIPE_CALENDAR_ICON,
+                          onClick: () => setLikedCalendarItem({ itemType: "place", id: place.id, name: place.name, imageUrl: place.imageUrls[0] ?? null, category: place.category }),
+                        },
+                        { key: "add", label: "הוספה ל...", color: "#7C3AED", icon: SWIPE_ADD_ICON, onClick: () => setLikedAddTo({ id: place.id, name: place.name }) },
+                      ]}
+                    >
                       <button
                         type="button"
                         onClick={() => router.push(`/place/${place.id}`)}
@@ -2125,6 +2156,11 @@ export function TripMatchPageContent({
                     </SwipeToDeleteRow>
                   ))}
                 </div>
+
+                {likedAddTo && <AddToSheet ids={[likedAddTo.id]} label={likedAddTo.name} onClose={() => setLikedAddTo(null)} />}
+                {likedCalendarItem && (
+                  <AddToCalendarSheet item={likedCalendarItem} onClose={() => setLikedCalendarItem(null)} onDone={() => setLikedCalendarItem(null)} />
+                )}
 
                 {error && <p className="text-center text-sm text-danger">{error}</p>}
 
