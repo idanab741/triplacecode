@@ -8,6 +8,7 @@ import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { setPendingCreateMedia } from "@/screens/create/pendingCreateMedia";
+import { optimizeImage } from "@/utils/imageUrl";
 
 const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
   ssr: false,
@@ -219,6 +220,64 @@ function PlaceStage({ onSearch, onAdd }: { onSearch: (rating: number) => void; o
 /* *** בקשה מפורשת ("המפה זהה מדי ולא ברור מאיפה מעלים"): במקום המפה עצמה - מסך יצירה מזמין עם
    כפתור ראשי אחד ("מפה חדשה" / "טיול חדש"), ובחירת מקומות מהמפה כאפשרות משנית (נפתחת במסך מלא). */
 const IMG = "/images/vacation-destinations";
+const DEFAULT_MAP_IMAGES = [`${IMG}/telaviv.png`, `${IMG}/haifa.png`, `${IMG}/jerusalem.png`];
+const DEFAULT_TRIP_IMAGES = [`${IMG}/zafongolan.png`, `${IMG}/tiberias.png`, `${IMG}/haifa.png`];
+
+/* *** בקשה מפורשת: בתמונות - המקומות של המשתמש עצמו (ששמר / העלה, כמו "שלי" במפה). משתמש בלי
+   מספיק מקומות רואה את תמונות ברירת המחדל. */
+interface MyPlace {
+  imageUrl: string;
+  latitude: number;
+  longitude: number;
+}
+
+function usePersonalArt(enabled: boolean): { map: string[]; trip: string[] } {
+  const [places, setPlaces] = useState<MyPlace[]>([]);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    fetch("/api/social/map")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { pins?: (MyPlace & { imageUrl: string | null; hasSelf?: boolean; savedByViewer?: boolean })[] } | null) => {
+        if (cancelled || !data?.pins) return;
+        const seen = new Set<string>();
+        const mine = data.pins.filter((p) => {
+          if (!(p.hasSelf || p.savedByViewer) || !p.imageUrl || seen.has(p.imageUrl)) return false;
+          seen.add(p.imageUrl);
+          return true;
+        }) as MyPlace[];
+        setPlaces(mine);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  const img = (p: MyPlace) => optimizeImage(p.imageUrl, 240);
+  const map = places.length >= 3 ? places.slice(0, 3).map(img) : DEFAULT_MAP_IMAGES;
+
+  // טיול: 3 מקומות קרובים זה לזה - המקום עם השכנים הקרובים ביותר ושני השכנים שלו, מסודרים מערב -> מזרח
+  let trip = DEFAULT_TRIP_IMAGES;
+  if (places.length >= 3) {
+    const dist = (a: MyPlace, b: MyPlace) => (a.latitude - b.latitude) ** 2 + (a.longitude - b.longitude) ** 2;
+    let best: MyPlace[] = places.slice(0, 3);
+    let bestScore = Infinity;
+    for (const center of places.slice(0, 40)) {
+      const near = places
+        .filter((p) => p !== center)
+        .sort((x, y) => dist(center, x) - dist(center, y))
+        .slice(0, 2);
+      const score = near.reduce((sum, p) => sum + dist(center, p), 0);
+      if (score < bestScore) {
+        bestScore = score;
+        best = [center, ...near];
+      }
+    }
+    trip = [...best].sort((x, y) => x.longitude - y.longitude).map(img);
+  }
+  return { map, trip };
+}
 
 function Photo({ src, className = "", style }: { src: string; className?: string; style?: CSSProperties }) {
   // eslint-disable-next-line @next/next/no-img-element
@@ -226,17 +285,18 @@ function Photo({ src, className = "", style }: { src: string; className?: string
 }
 
 /** מפה: שלוש תמונות של מקומות בערימה, כל אחת עם נעץ - "אוסף של מקומות" במבט אחד */
-function MapArt() {
+function MapArt({ images }: { images: string[] }) {
+  const [a, b, c] = images;
   const cards = [
-    { src: `${IMG}/telaviv.png`, rotate: -9, x: -78, y: 10 },
-    { src: `${IMG}/haifa.png`, rotate: 8, x: 78, y: 12 },
-    { src: `${IMG}/jerusalem.png`, rotate: 0, x: 0, y: -6 },
+    { src: a, rotate: -9, x: -78, y: 10 },
+    { src: b, rotate: 8, x: 78, y: 12 },
+    { src: c, rotate: 0, x: 0, y: -6 },
   ];
   return (
     <div className="relative h-[170px] w-[280px]" aria-hidden="true">
       {cards.map((c, i) => (
         <div
-          key={c.src}
+          key={`${i}-${c.src}`}
           className="cx-art-card absolute left-1/2 top-1/2 h-[128px] w-[104px] overflow-hidden rounded-[18px] border-[3px] border-white/90 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.8)]"
           style={{ transform: `translate(calc(-50% + ${c.x}px), calc(-50% + ${c.y}px)) rotate(${c.rotate}deg)`, zIndex: i, animationDelay: `${i * 70}ms` }}
         >
@@ -251,11 +311,12 @@ function MapArt() {
 }
 
 /** טיול: שלוש תחנות ממוספרות על קו מסלול מקווקו, ויום 1 · יום 2 */
-function TripArt() {
+function TripArt({ images }: { images: string[] }) {
+  const [a, b, c] = images;
   const stops = [
-    { src: `${IMG}/zafongolan.png`, n: 1, x: 40, y: 92, color: "#0A6DFE" },
-    { src: `${IMG}/tiberias.png`, n: 2, x: 140, y: 42, color: "#0A6DFE" },
-    { src: `${IMG}/haifa.png`, n: 3, x: 240, y: 88, color: "#E0701A" },
+    { src: a, n: 1, x: 40, y: 92, color: "#0A6DFE" },
+    { src: b, n: 2, x: 140, y: 42, color: "#0A6DFE" },
+    { src: c, n: 3, x: 240, y: 88, color: "#E0701A" },
   ];
   return (
     <div className="relative h-[176px] w-[280px]" aria-hidden="true">
@@ -367,6 +428,7 @@ export default function ContentPage() {
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<"next" | "prev">("next");
   const [pickOpen, setPickOpen] = useState<null | "map" | "trip">(null);
+  const art = usePersonalArt(!!user);
   const mode = MODES[index];
 
   useEffect(() => {
@@ -466,7 +528,7 @@ export default function ContentPage() {
                 )}
                 {mode.id === "map" && (
                   <CreateStage
-                    art={<MapArt />}
+                    art={<MapArt images={art.map} />}
                     title="צרו מפה משלכם"
                     sub="אטרקציות, מסעדות ומקומות שאהבתם - סביב רעיון אחד"
                     cta="מפה חדשה"
@@ -476,7 +538,7 @@ export default function ContentPage() {
                 )}
                 {mode.id === "trip" && (
                   <CreateStage
-                    art={<TripArt />}
+                    art={<TripArt images={art.trip} />}
                     title="בנו טיול לפי מסלול"
                     sub="תחנות לפי סדר, יום אחרי יום - עם מפה וניווט"
                     cta="טיול חדש"
