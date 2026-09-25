@@ -52,12 +52,14 @@ export function toTripAddCategory(value: string | null | undefined): string | nu
   const c = (value ?? "").toLowerCase();
   if (!c) return null;
   if (["food", "attraction", "nature", "nightlife", "sleep", "shopping"].includes(c)) return c;
-  if (/restaurant|culinar|cafe|coffee|dining|food|bakery|winer|brunch/.test(c)) return "food";
-  if (/night|bar|club|pub/.test(c)) return "nightlife";
+  if (/restaurant|culinar|caf[eé]|coffee|espresso|dining|food|bakery|winer|brunch|breakfast|taverna?|bistro|osteria|cuisine|tapas|seafood|pastry|patisserie|dessert|gelato|crepe|burger|steak|tea_salon|greek|italian|japanese|thai|mediterranean|fusion|vegan|french|catalan|roman_|hungarian|balkan/.test(c)) return "food";
+  if (/night|bar|club|pub(?!lic)|brew/.test(c)) return "nightlife";
   if (/hotel|lodging|sleep|resort|hostel|accommodation/.test(c)) return "sleep";
   if (/shop|market|mall/.test(c)) return "shopping";
-  if (/nature|spring|beach|pool|desert|canyon|trail|park|garden|forest|view|water|lake|river|mountain|cave/.test(c)) return "nature";
-  if (/attraction|museum|amusement|culture|histor|art|heritage|activit|theme|zoo/.test(c)) return "attraction";
+  // פארקי שעשועים/מים הם אטרקציה, לא טבע - נבדק לפני ה-"park" של הטבע
+  if (/amusement|theme_park|adventure_park|aquarium|zoo/.test(c)) return "attraction";
+  if (/nature|spring|beach|pool|desert|canyon|gorge|trail|hik|park|garden|botanic|forest|view|water|lake|river|mountain|cave|scenic|thermal|lilies/.test(c)) return "nature";
+  if (/attraction|museum|cultur|histor|art|heritage|activit|theme|monument|landmark|palace|castle|cathedral|church|basilica|temple|monaster|religious|spiritual|square|plaza|neighborhood|district|quarter|stadium|theat|concert|show|tour|flight|sport|architect|tower|bridge|mansion|university|amphitheater|archaeolog|site|urban|village|spa|fountain|observation/.test(c)) return "attraction";
   return null;
 }
 

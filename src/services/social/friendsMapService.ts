@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/services/supabase/admin";
 import { getFriendIds } from "./friendIds";
+import { toTripAddCategory } from "@/services/tripMatch/matchScore";
 
 export interface FriendsMapRecommender {
   id: string;
@@ -56,6 +57,8 @@ export interface FriendsMapPin {
   latestAt: string;
   hasFriend: boolean;
   hasSelf: boolean;
+  /** קטגוריית TripAdd (food/attraction/nature/nightlife/sleep/shopping) - לשורת הסינון במפה. null = לא ידוע. */
+  category: string | null;
 }
 
 const POST_LIMIT = 600;
@@ -137,10 +140,11 @@ interface Loc {
   ratingCount: number | null;
   googlePlaceId: string | null;
   createdAt: string | null;
+  category: string | null;
 }
 
 const SUBMISSION_COLUMNS =
-  "id, submitted_by, name, description, rating, latitude, longitude, city, address, google_rating, google_rating_count, google_place_id, status, created_at";
+  "id, submitted_by, name, description, rating, latitude, longitude, city, address, google_rating, google_rating_count, google_place_id, status, created_at, category";
 
 /**
  * *** מפת place's (בקשה מפורשת - "כל המקומות שאנשים העלו, מכל המשתמשים, כמקומות
@@ -275,7 +279,7 @@ export async function getFriendsMapPins(
     selectIn(allPlaceIds, (chunk) =>
       supabase
         .from("places")
-        .select("id, name, image_urls, latitude, longitude, city, rating, rating_count, google_place_id")
+        .select("id, name, image_urls, latitude, longitude, city, rating, rating_count, google_place_id, category")
         .in("id", chunk)
     ),
     selectIn(postIds, (chunk) =>
@@ -351,6 +355,7 @@ export async function getFriendsMapPins(
       ratingCount: (row.rating_count as number | null) ?? null,
       googlePlaceId: (row.google_place_id as string | null) ?? null,
       createdAt: null,
+      category: toTripAddCategory(row.category as string | null),
     });
   }
   for (const row of submissions) {
@@ -370,6 +375,7 @@ export async function getFriendsMapPins(
       ratingCount: (row.google_rating_count as number | null) ?? null,
       googlePlaceId: (row.google_place_id as string | null) ?? null,
       createdAt: (row.created_at as string | null) ?? null,
+      category: toTripAddCategory(row.category as string | null),
     });
   }
 
@@ -680,6 +686,7 @@ export async function getFriendsMapPins(
       latestAt: contributions[0].createdAt,
       hasFriend: contributions.some((c) => c.isFriend),
       hasSelf: contributions.some((c) => c.isSelf),
+      category: canonical.category ?? members.find((m) => m.category)?.category ?? null,
     });
   }
 

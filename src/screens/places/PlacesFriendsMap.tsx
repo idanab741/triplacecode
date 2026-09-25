@@ -22,6 +22,8 @@ import { getCurrentPositionSafe } from "@/utils/geolocationSafe";
 import type { FriendsMapPin, FriendsMapContribution } from "@/services/social/friendsMapService";
 import { getFriendPinIcon } from "./friendPin";
 import { ShareToFriendsSheet } from "./ShareToFriendsSheet";
+import { TripMatchCategoryChips } from "@/screens/tripmatch/TripMatchCategoryChips";
+import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 type Filter = "all" | "friends" | "mine";
 type LatLng = { lat: number; lng: number };
@@ -102,7 +104,7 @@ function MapController({
       map.setView(points[0], 14, { animate: false });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 72], paddingBottomRight: [44, 150], maxZoom: 15, animate: false });
+    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 235], paddingBottomRight: [44, 150], maxZoom: 15, animate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToken]);
 
@@ -340,6 +342,8 @@ export function PlacesFriendsMap({
   const [pins, setPins] = useState<FriendsMapPin[] | null>(null);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  // סינון לפי סוג מקום (אטרקציות / אוכל / ...) - בחירה מרובה, ריק = הכל. אותה שורה כמו בעמוד ההחלקות.
+  const [categories, setCategories] = useState<HomeQuickCategoryId[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [fly, setFly] = useState<{ key: string; n: number } | null>(null);
@@ -374,10 +378,12 @@ export function PlacesFriendsMap({
 
   const filtered = useMemo(() => {
     if (!pins) return [];
-    if (filter === "friends") return pins.filter((p) => p.hasFriend);
-    if (filter === "mine") return pins.filter((p) => p.hasSelf);
-    return pins;
-  }, [pins, filter]);
+    let list = pins;
+    if (filter === "friends") list = list.filter((p) => p.hasFriend);
+    else if (filter === "mine") list = list.filter((p) => p.hasSelf);
+    if (categories.length > 0) list = list.filter((p) => p.category != null && categories.includes(p.category as HomeQuickCategoryId));
+    return list;
+  }, [pins, filter, categories]);
 
   const activeKey = filtered.some((p) => p.key === selectedKey) ? selectedKey : (filtered[0]?.key ?? null);
   const fitToken = `${filter}|${filtered.map((p) => p.key).join(",")}`;
@@ -490,7 +496,7 @@ export function PlacesFriendsMap({
           עדינה רק בראש המפה, כדי שהלוגו והכפתורים יהיו קריאים בלי עיגולים וצללים כבדים. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-36"
+        className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44"
         style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0) 100%)" }}
       />
 
@@ -533,6 +539,22 @@ export function PlacesFriendsMap({
         </button>
       </div>
 
+      {/* שורת הסינון לפי סוג מקום - אותה שורה כמו בעמוד ההחלקות, בגרסה צפה (לבנה עם צל) מעל המפה
+          ובסגול של place's. יושבת מתחת לשורת "הכל / חברים / שלי". */}
+      <div
+        className="absolute inset-x-0 z-[1000]"
+        style={{ top: topOffsetPx + 48, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+      >
+        <TripMatchCategoryChips
+          selected={categories}
+          onToggle={(id) => setCategories((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))}
+          onClear={() => setCategories([])}
+          accent="var(--color-places-purple)"
+          surface="floating"
+          className="px-5 pb-3 pt-1"
+        />
+      </div>
+
       {/* מצב ריק / שגיאה */}
       {isEmpty && (
         <div className={`absolute inset-x-6 top-1/2 z-[1000] -translate-y-[60%] rounded-3xl bg-white p-6 text-center ring-1 ring-black/[0.06] ${FLOAT}`}>
@@ -543,7 +565,7 @@ export function PlacesFriendsMap({
             </svg>
           </span>
           <p className="mt-3 text-[16px] font-extrabold text-ink">
-            {error ? "לא הצלחנו לטעון את המפה" : filter === "mine" ? "עוד אין לכם מקומות על המפה" : filter === "friends" ? "לחברים שלכם עוד אין מקומות על המפה" : "אין עדיין מקומות על המפה"}
+            {error ? "לא הצלחנו לטעון את המפה" : categories.length > 0 && (pins?.length ?? 0) > 0 ? "אין כאן מקומות מהסוג הזה" : filter === "mine" ? "עוד אין לכם מקומות על המפה" : filter === "friends" ? "לחברים שלכם עוד אין מקומות על המפה" : "אין עדיין מקומות על המפה"}
           </p>
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
