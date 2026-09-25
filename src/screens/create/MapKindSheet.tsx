@@ -17,9 +17,9 @@ function RouteIcon({ size = 22 }: { size?: number }) {
 }
 
 const OPTIONS: { id: MapKind; icon: ReactNode; label: string; sub: string }[] = [
-  { id: "places", icon: <PinIcon size={22} />, label: "מקומות אהובים", sub: "מקומות סביב רעיון אחד, בלי סדר" },
-  { id: "route", icon: <RouteIcon />, label: "מסלול לטיול", sub: "תחנות לפי סדר וימים, עם ניווט" },
-  { id: "trips", icon: <PlaneIcon size={22} />, label: "טיולים שאהבתי", sub: "אוסף של טיולים שלמים" },
+  { id: "places", icon: <PinIcon size={22} />, label: "מקומות", sub: "המקומות שאהבתם" },
+  { id: "route", icon: <RouteIcon />, label: "מסלול", sub: "לפי סדר, יום אחרי יום" },
+  { id: "trips", icon: <PlaneIcon size={22} />, label: "טיולים", sub: "הטיולים שאהבתם" },
 ];
 
 /**
@@ -31,7 +31,7 @@ export function MapKindSheet({ onClose, onSelect }: { onClose: () => void; onSel
   return (
     <BottomSheet onClose={onClose} dark>
       <div className="px-5 pb-2">
-        <h2 className="text-[20px] font-bold tracking-tight text-white">איזו מפה?</h2>
+        <h2 className="text-[20px] font-bold tracking-tight text-white">מה יהיה במפה?</h2>
         <div className="mt-4 flex flex-col gap-2">
           {OPTIONS.map((option) => (
             <button
