@@ -6,35 +6,30 @@ import { useAuth } from "@/hooks/useAuth";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
-import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
-import { CreateModePreview, CREATE_PREVIEW_CSS } from "@/screens/create/CreateModePreviews";
-
-type TileId = "post" | "place" | "collection" | "trip";
+import { CreateModePreview, CREATE_PREVIEW_CSS, type CreateModeId } from "@/screens/create/CreateModePreviews";
+import { MapKindSheet } from "@/screens/create/MapKindSheet";
 
 interface Mode {
-  id: TileId;
+  id: CreateModeId;
   /** השם בשורת המצבים למטה */
   label: string;
   title: string;
   sub: string;
-  /** 3 צעדים קצרים - איך יוצרים */
-  includes: string[];
   cta: string;
 }
 
+/* *** בקשה מפורשת ("המסגור מסורבל - לזקק"): שלושה מצבים שהולכים מהקטן לגדול - רגע אחד, מקום אחד,
+   הרבה מקומות. "מפה" מאחדת את מה שהיה "חוויה" ו"טיול" (ר' MapKindSheet). */
 const MODES: Mode[] = [
-  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים ותיוג של המקום", includes: ["בוחרים תמונות", "כותבים כמה מילים", "מפרסמים"], cta: "צרו פוסט" },
-  { id: "place", label: "מקום", title: "המליצו על מקום שאהבתם", sub: "ציון, כמה מילים ותמונות - וכולם יגלו אותו במפה", includes: ["מחפשים את המקום", "נותנים ציון", "כותבים ביקורת"], cta: "המליצו על מקום" },
-  { id: "collection", label: "חוויה", title: "אספו מקומות תחת רעיון אחד", sub: "\"בתי הקפה הכי שווים\", \"מקומות לדייט\" - רשימה שכולם יכולים לשמור", includes: ["נותנים שם", "מוסיפים מקומות", "מפרסמים"], cta: "צרו חוויה" },
-  { id: "trip", label: "טיול", title: "בנו מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים - עם מפה וניווט", includes: ["מוסיפים תחנות", "מסדרים לפי ימים", "יוצאים לדרך"], cta: "צרו טיול" },
+  { id: "moment", label: "רגע", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון וכמה מילים", cta: "שתפו רגע" },
+  { id: "place", label: "מקום", title: "המליצו על מקום", sub: "ציון וכמה מילים - וכולם יגלו אותו במפה", cta: "המליצו על מקום" },
+  { id: "map", label: "מפה", title: "צרו מפה משלכם", sub: "המקומות האהובים עליכם, או מסלול לטיול", cta: "צרו מפה" },
 ];
 
 const CSS = `
 .cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
-/* הכרטיס המרכזי - "המסך" של המצב הנבחר (כמו העינית במצלמה של אינסטגרם) */
-/* *** בקשה מפורשת ("צעקני, כפתורים לא בסגנון שלנו"): משטח כהה שקט ואחיד - כמו הריבועים הקודמים בעמוד -
-   בלי הילות צבעוניות וגרדיאנטים. הצבע היחיד בעמוד הוא הכחול של כפתור היצירה. */
-.cx-stage { position:relative; border-radius:24px; overflow:hidden; touch-action:pan-y; user-select:none; background:#141416; }
+/* אזור ההחלקה - הדוגמה עומדת לבד על השחור, בלי כרטיס מסביב. הצבע היחיד בעמוד הוא הכחול של כפתור היצירה. */
+.cx-stage { position:relative; touch-action:pan-y; user-select:none; }
 .cx-scene { animation:cx-scene-in .42s cubic-bezier(.2,.8,.2,1) both; }
 .cx-scene[data-dir="prev"] { animation-name:cx-scene-in-prev; }
 @keyframes cx-scene-in { from { opacity:0; transform:translateX(-28px) scale(.98); } to { opacity:1; transform:none; } }
@@ -50,17 +45,16 @@ const CSS = `
 
 /**
  * *** עיצוב מחדש (בקשה מפורשת - "כמו באינסטגרם: להחליק ימינה ושמאלה בין סוגי ההעלאה - פשוט, מעוצב, ברור וכיף"):
- * "תוכן" - הטאב שבבר התחתון. במקום 4 ריבועים: כרטיס גדול אחד שמציג את סוג ההעלאה הנבחר (צבע, אייקון,
- * הסבר קצר ומה מוסיפים), הדמות מציצה מעליו, ולמטה - כפתור עגול גדול ("צילום") ושורת המצבים
- * פוסט · מקום · חוויה · טיול כמו POST / STORY / REEL. מחליפים מצב בהחלקה על הכרטיס, בהחלקה/לחיצה על
- * השורה או בחיצים במקלדת. הכפתור מוביל לזרימת היצירה הקיימת (לא נוצרת כאן לוגיקה חדשה):
- *  פוסט -> /places/post/create · מקום -> /places/create
- *  חוויה -> "מה תרצו לאסוף?" -> /places/collection/create · טיול -> /places/trip/create
+ * "תוכן" - הטאב שבבר התחתון. דוגמה חיה של התוצאה, כותרת ומשפט אחד, כפתור יצירה ושורת המצבים
+ * רגע · מקום · מפה כמו POST / STORY / REEL. מחליפים מצב בהחלקה, בלחיצה על השורה או בחיצים במקלדת.
+ * הכפתור מוביל לזרימת היצירה הקיימת (לא נוצרת כאן לוגיקה חדשה):
+ *  רגע -> /places/post/create · מקום -> /places/create
+ *  מפה -> "איזו מפה?" -> אוסף מקומות / טיול (/places/trip/create) / אוסף טיולים
  */
 export default function ContentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
+  const [mapKindOpen, setMapKindOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<"next" | "prev">("next");
   const mode = MODES[index];
@@ -79,10 +73,9 @@ export default function ContentPage() {
 
   function start() {
     const id = mode.id;
-    if (id === "post") router.push("/places/post/create");
+    if (id === "moment") router.push("/places/post/create");
     else if (id === "place") router.push("/places/create");
-    else if (id === "collection") setCollectionTypeOpen(true);
-    else router.push("/places/trip/create");
+    else setMapKindOpen(true);
   }
 
   // החלקה על הכרטיס. האפליקציה בעברית (מימין לשמאל): המצב הבא נמצא משמאל, לכן החלקה ימינה = הבא.
@@ -145,23 +138,15 @@ export default function ContentPage() {
               onPointerDown={onPointerDown}
               onPointerUp={onPointerUp}
               onPointerCancel={() => (drag.current = null)}
-              className="cx-stage mt-2 flex min-h-[420px] flex-1 flex-col outline-none"
+              className="cx-stage flex flex-1 flex-col outline-none"
             >
-              <div key={mode.id} data-dir={dir} className="cx-scene relative flex flex-1 flex-col items-center justify-center px-5 pb-4 pt-6 text-center">
+              <div key={mode.id} data-dir={dir} className="cx-scene flex flex-1 flex-col items-center justify-center pb-2 pt-4 text-center">
                 {/* דוגמה חיה של התוצאה - איך זה ייראה באפליקציה */}
                 <div className="flex w-full justify-center" aria-hidden="true">
                   <CreateModePreview mode={mode.id} />
                 </div>
-                <h1 className="mt-5 text-[22px] font-bold leading-tight tracking-tight">{mode.title}</h1>
-                <p className="mt-1.5 max-w-[19rem] text-balance text-[14.5px] leading-snug text-white/60">{mode.sub}</p>
-                {/* איך זה עובד - שורת טקסט שקטה, בלי "בועות" */}
-                <p className="mt-3 text-[13px] font-medium text-white/45">{mode.includes.join(" · ")}</p>
-              </div>
-              {/* נקודות - איפה אנחנו בין 4 הסוגים */}
-              <div className="relative flex justify-center gap-1.5 pb-4" aria-hidden="true">
-                {MODES.map((m, i) => (
-                  <span key={m.id} className="h-1.5 rounded-full bg-white transition-all duration-300" style={{ width: i === index ? 18 : 6, opacity: i === index ? 0.95 : 0.35 }} />
-                ))}
+                <h1 className="mt-7 text-[22px] font-bold leading-tight tracking-tight">{mode.title}</h1>
+                <p className="mt-1.5 max-w-[19rem] text-balance text-[14.5px] leading-snug text-white/55">{mode.sub}</p>
               </div>
             </section>
 
@@ -202,11 +187,12 @@ export default function ContentPage() {
       {/* בר תחתון שחור: כל האייקונים והתוויות בלבן, חוץ מ"תוכן" (הטאב הפעיל) שנשאר בצבעיו */}
       <MainBottomNav active="content" tone="dark" />
 
-      {collectionTypeOpen && (
-        <CollectionTypeSheet
-          dark
-          onClose={() => setCollectionTypeOpen(false)}
-          onSelect={(type) => router.push(`/places/collection/create?type=${type}&origin=content`)}
+      {mapKindOpen && (
+        <MapKindSheet
+          onClose={() => setMapKindOpen(false)}
+          onSelect={(kind) =>
+            router.push(kind === "route" ? "/places/trip/create" : `/places/collection/create?type=${kind}&origin=content`)
+          }
         />
       )}
     </>

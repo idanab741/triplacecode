@@ -385,7 +385,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
           // *** תיקון (בקשה מפורשת - "עכשיו רק באוסף - במקומות ובטיולים - צריך להחזיר את 'מה תרצו
           // להוסיף' לצבע לבן"): "מה תרצו להוסיף?" נשאר תמיד לבן בזרימת האוסף - גם ב-type="places"
           // וגם ב-type="trips" - בלי קשר ל-dark שהתקבל מ-collection/create/page.tsx (origin=content).
-          // ה-dark ההוא עדיין משפיע על CollectionTypeSheet הקודם ("מה תרצו לאסוף?") - לא נגעתי בו.
+          // (בחירת הסוג בעמוד התוכן עברה ל-MapKindSheet.)
         />
       )}
 
