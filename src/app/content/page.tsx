@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,129 +53,219 @@ const ART: Record<TileId, ReactNode> = {
   ),
 };
 
-interface Tile {
+interface Mode {
   id: TileId;
+  /** השם בשורת המצבים למטה */
+  label: string;
   title: string;
-  /** שורה אחת: מה זה. */
   sub: string;
+  /** מה מוסיפים - שורת "צ'יפים" קצרה במרכז הכרטיס */
+  includes: string[];
+  cta: string;
   a: string;
   b: string;
 }
 
-const TILES: Tile[] = [
-  { id: "post", title: "פוסט", sub: "שתפו רגע מהדרך", a: "#FF8FB8", b: "#FFA96B" },
-  { id: "place", title: "מקום", sub: "המלצה על מקום שאהבתם", a: "#B69CFF", b: "#5EC8FF" },
-  { id: "collection", title: "חוויות", sub: "מקומות וטיולים תחת רעיון אחד", a: "#5BE3A8", b: "#38D6E8" },
-  { id: "trip", title: "טיול", sub: "מסלול תחנות מוכן לדרך", a: "#FFCB5C", b: "#FF7F8E" },
+const MODES: Mode[] = [
+  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים, ומקום אם בא לכם", includes: ["תמונות וסרטונים", "טקסט", "תיוג מקום"], cta: "פוסט חדש", a: "#FF8FB8", b: "#FFA96B" },
+  { id: "place", label: "מקום", title: "המלצה על מקום", sub: "מקום שאהבתם - עם ציון, כמה מילים ותמונות", includes: ["דירוג", "ביקורת", "תמונות"], cta: "המלצה חדשה", a: "#B69CFF", b: "#5EC8FF" },
+  { id: "collection", label: "חוויה", title: "חוויה תחת רעיון אחד", sub: "אספו מקומות או טיולים - \"הבתי קפה הכי שווים\", \"דייטים\"", includes: ["כמה מקומות", "שם ורעיון", "תמונת שער"], cta: "חוויה חדשה", a: "#5BE3A8", b: "#38D6E8" },
+  { id: "trip", label: "טיול", title: "מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים", includes: ["תחנות", "ימים", "מפה וניווט"], cta: "טיול חדש", a: "#FFCB5C", b: "#FF7F8E" },
 ];
 
 const CSS = `
 .cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
-/* זוהר יחיד ושקט בראש העמוד, מאחורי הדמות - בלי תנועה */
-.cx-glow { position:absolute; inset-inline:0; top:0; height:30rem; pointer-events:none;
-  background:radial-gradient(ellipse 70% 60% at 50% 38%, rgba(0,124,254,.16), transparent 70%); }
-/* רגע כניסה אחד בלבד - הדמות. הריבועים לא "קופצים" אחד-אחד. */
+/* הכרטיס המרכזי - "המסך" של המצב הנבחר (כמו העינית במצלמה של אינסטגרם) */
+.cx-stage { position:relative; border-radius:30px; overflow:hidden; touch-action:pan-y; user-select:none;
+  background:#0f0f12; box-shadow:0 30px 60px -30px color-mix(in srgb, var(--a) 55%, transparent); transition:box-shadow .4s ease; }
+.cx-stage-bg { position:absolute; inset:0; transition:opacity .45s ease;
+  background:
+    radial-gradient(120% 70% at 85% 0%, color-mix(in srgb, var(--a) 55%, transparent), transparent 60%),
+    radial-gradient(110% 70% at 10% 100%, color-mix(in srgb, var(--b) 50%, transparent), transparent 65%),
+    #121216; }
+.cx-scene { animation:cx-scene-in .42s cubic-bezier(.2,.8,.2,1) both; }
+.cx-scene[data-dir="prev"] { animation-name:cx-scene-in-prev; }
+@keyframes cx-scene-in { from { opacity:0; transform:translateX(-28px) scale(.98); } to { opacity:1; transform:none; } }
+@keyframes cx-scene-in-prev { from { opacity:0; transform:translateX(28px) scale(.98); } to { opacity:1; transform:none; } }
+.cx-bigicon { background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18), 0 18px 40px -12px color-mix(in srgb, var(--a) 70%, transparent);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:cx-float 4s ease-in-out infinite; }
+@keyframes cx-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
+.cx-chip { background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
+/* שורת המצבים - כמו POST / STORY / REEL */
+.cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
+.cx-mode { transition:color .25s, opacity .25s, transform .25s; -webkit-tap-highlight-color:transparent; }
+/* כפתור ה"צילום" - מתחיל את היצירה */
+.cx-shutter { -webkit-tap-highlight-color:transparent; transition:transform .15s cubic-bezier(.2,.8,.2,1); }
+.cx-shutter:active { transform:scale(.92); }
+.cx-shutter-core { background:linear-gradient(135deg, var(--a), var(--b)); transition:background .35s; box-shadow:0 10px 26px -8px color-mix(in srgb, var(--a) 80%, transparent); }
 .cx-hero { animation:cx-hero-in .7s cubic-bezier(.2,.8,.2,1) .05s backwards; }
 @keyframes cx-hero-in { from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none} }
-
-/* *** עיצוב מחדש (בקשה מפורשת - "לסדר את העמוד"): ריבועים שקטים - משטח אפור-כהה אחיד, בלי מסגרת,
-   בלי הילה צבעונית ובלי אנימציית כניסה. הצבע של כל סוג מופיע רק באייקון ובמשטח העדין שמאחוריו. */
-.cx-tile { position:relative; border-radius:22px; text-align:start; background:#141416;
-  -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.2,.8,.2,1), background-color .2s; }
-.cx-tile:active { transform:scale(.97); background:#1b1b1e; }
-@media (hover:hover) { .cx-tile:hover { background:#1b1b1e; } }
-.cx-tile:focus-visible { outline:2px solid var(--a); outline-offset:3px; }
-.cx-icon { background:color-mix(in srgb, var(--a) 14%, transparent); }
-@media (prefers-reduced-motion: reduce) { .cx-hero { animation:none !important; } }
+@media (prefers-reduced-motion: reduce) { .cx-hero, .cx-scene, .cx-bigicon { animation:none !important; } .cx-rail { transition:none; } }
 `;
 
 /**
- * "תוכן" - הטאב שבבר התחתון. עמוד יצירה שחור: הבר העליון של triplace (כמו בעמוד הבית), כותרת + שורת הסבר, ה-HERO (הדמות מציצה מעל
- * הכרטיסיות ומצביעה עליהן), ו-4 ריבועים (פוסט / מקום / אוסף / טיול - אותן 4 פעולות של תפריט ה-+ ב-places).
- * הבר התחתון שחור (tone="dark") - אייקונים ותוויות בלבן, הטאב הפעיל נשאר בצבעיו.
- * לחיצה על ריבוע מובילה לזרימת היצירה הקיימת - לא נוצרת כאן לוגיקה חדשה:
+ * *** עיצוב מחדש (בקשה מפורשת - "כמו באינסטגרם: להחליק ימינה ושמאלה בין סוגי ההעלאה - פשוט, מעוצב, ברור וכיף"):
+ * "תוכן" - הטאב שבבר התחתון. במקום 4 ריבועים: כרטיס גדול אחד שמציג את סוג ההעלאה הנבחר (צבע, אייקון,
+ * הסבר קצר ומה מוסיפים), הדמות מציצה מעליו, ולמטה - כפתור עגול גדול ("צילום") ושורת המצבים
+ * פוסט · מקום · חוויה · טיול כמו POST / STORY / REEL. מחליפים מצב בהחלקה על הכרטיס, בהחלקה/לחיצה על
+ * השורה או בחיצים במקלדת. הכפתור מוביל לזרימת היצירה הקיימת (לא נוצרת כאן לוגיקה חדשה):
  *  פוסט -> /places/post/create · מקום -> /places/create
- *  אוסף -> "מה תרצו לאסוף?" -> /places/collection/create · טיול -> /places/trip/create
+ *  חוויה -> "מה תרצו לאסוף?" -> /places/collection/create · טיול -> /places/trip/create
  */
 export default function ContentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [dir, setDir] = useState<"next" | "prev">("next");
+  const mode = MODES[index];
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
   }, [authLoading, user, router]);
 
-  function handleSelect(id: TileId) {
+  function go(next: number) {
+    const clamped = Math.max(0, Math.min(MODES.length - 1, next));
+    if (clamped === index) return;
+    setDir(clamped > index ? "next" : "prev");
+    setIndex(clamped);
+    navigator.vibrate?.(8);
+  }
+
+  function start() {
+    const id = mode.id;
     if (id === "post") router.push("/places/post/create");
     else if (id === "place") router.push("/places/create");
     else if (id === "collection") setCollectionTypeOpen(true);
     else router.push("/places/trip/create");
   }
 
+  // החלקה על הכרטיס. האפליקציה בעברית (מימין לשמאל): המצב הבא נמצא משמאל, לכן החלקה ימינה = הבא.
+  const drag = useRef<{ x: number; y: number } | null>(null);
+  function onPointerDown(e: PointerEvent) {
+    drag.current = { x: e.clientX, y: e.clientY };
+  }
+  function onPointerUp(e: PointerEvent) {
+    const start = drag.current;
+    drag.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    go(index + (dx > 0 ? 1 : -1));
+  }
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === "ArrowLeft") go(index + 1);
+    else if (e.key === "ArrowRight") go(index - 1);
+  }
+
+  // שורת המצבים: המצב הנבחר תמיד במרכז (כמו באינסטגרם) - מזיזים את כל השורה.
+  const railBoxRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [railShift, setRailShift] = useState(0);
+  const railShiftRef = useRef(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const box = railBoxRef.current;
+      const item = itemRefs.current[index];
+      if (!box || !item) return;
+      const boxRect = box.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const current = itemRect.left + itemRect.width / 2 - railShiftRef.current;
+      const next = boxRect.left + boxRect.width / 2 - current;
+      railShiftRef.current = next;
+      setRailShift(next);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [index]);
+
   return (
     <>
       <HomeStatusBarTint />
       <style>{CSS}</style>
 
-      <div className="cx-page relative isolate flex flex-col">
-        <span className="cx-glow -z-10" aria-hidden="true" />
-
-        {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות) */}
-        {/* *** בקשה מפורשת: בעמוד הזה בלבד (רקע כהה) - הלוגו triplace בלבן. */}
+      <div className="cx-page relative isolate flex flex-col" style={{ "--a": mode.a, "--b": mode.b } as CSSProperties}>
+        {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות), לוגו בלבן על הרקע הכהה */}
         <CollapsibleTopBar logoTone="white" />
 
-        {/* *** בקשה מפורשת - "שיהיה רווח קצת בין הבר העליון לכותרת": pt-1 -> pt-7. */}
-        <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-7">
-          <div className="mx-auto w-full max-w-sm">
-            {/* *** תיקון: הכותרת נשברה באמצע ("triplace" בשורה אחת, "creator's" בשורה הבאה) כי עברית ואנגלית
-                מעורבבות. עכשיו "triplace creator's" הוא יחידה אחת LTR שלא נשברת - תמיד בשורה משלה. */}
-            <h1 className="text-center text-[24px] font-bold leading-[1.25] tracking-tight">
-              הצטרפו לקהילת
-              <br />
-              <bdi dir="ltr" className="whitespace-nowrap">
-                triplace creator&apos;s
-              </bdi>
-            </h1>
-            <p className="mx-auto mb-5 mt-2 max-w-[19rem] text-balance text-center text-[15px] leading-snug text-white/60">שתפו את המקומות, הטיולים והרעיונות שלכם</p>
-
-            {/* ה-HERO: הדמות "מציצה" מעל קצה הכרטיסיות ומצביעה עליהן. החלק שמתחת לקצה התמונה (האצבע, ~6.6% מרוחב המכולה)
-                יורד אל תוך הכרטיסיות - לכן margin שלילי, ו-pointer-events-none כדי לא לחסום לחיצה על הכרטיס. */}
-            <div className="cx-hero pointer-events-none relative z-10 mx-auto -mb-[6.6%] w-[88%]" aria-hidden="true">
-              <Image
-                src="/images/content-hero.png"
-                alt=""
-                width={720}
-                height={492}
-                priority
-                draggable={false}
-                sizes="(max-width: 420px) 80vw, 340px"
-                className="h-auto w-full select-none"
-              />
+        <main className="flex flex-1 flex-col px-4 pt-2" style={{ paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" }}>
+          <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
+            {/* הדמות מציצה מעל הכרטיס */}
+            <div className="cx-hero pointer-events-none relative z-10 mx-auto -mb-[9%] w-[46%]" aria-hidden="true">
+              <Image src="/images/content-hero.png" alt="" width={720} height={492} priority draggable={false} sizes="200px" className="h-auto w-full select-none" />
             </div>
 
-            <section aria-label="בחירת סוג תוכן ליצירה">
-              <div className="grid w-full grid-cols-2 gap-2.5">
-                {TILES.map((tile) => (
-                  <button
-                    key={tile.id}
-                    type="button"
-                    onClick={() => handleSelect(tile.id)}
-                    aria-label={`יצירת ${tile.title}: ${tile.sub}`}
-                    className="cx-tile flex min-h-[150px] flex-col justify-between p-4"
-                    style={{ "--a": tile.a, "--b": tile.b } as CSSProperties}
-                  >
-                    <span className="cx-icon flex h-11 w-11 items-center justify-center rounded-[14px]">
-                      <span className="block h-6 w-6">{ART[tile.id]}</span>
+            <section
+              aria-roledescription="קרוסלה"
+              aria-label="סוג ההעלאה"
+              tabIndex={0}
+              onKeyDown={onKeyDown}
+              onPointerDown={onPointerDown}
+              onPointerUp={onPointerUp}
+              onPointerCancel={() => (drag.current = null)}
+              className="cx-stage flex min-h-[340px] flex-1 flex-col outline-none"
+            >
+              <span className="cx-stage-bg" aria-hidden="true" />
+              <div key={mode.id} data-dir={dir} className="cx-scene relative flex flex-1 flex-col items-center justify-center px-6 pb-7 pt-12 text-center">
+                <span className="cx-bigicon flex h-24 w-24 items-center justify-center rounded-[30px]" style={{ "--a": "#ffffff" } as CSSProperties}>
+                  <span className="block h-12 w-12">{ART[mode.id]}</span>
+                </span>
+                <h1 className="mt-6 text-[27px] font-extrabold leading-tight tracking-tight">{mode.title}</h1>
+                <p className="mt-2 max-w-[18rem] text-balance text-[15px] leading-snug text-white/75">{mode.sub}</p>
+                <div className="mt-5 flex flex-wrap justify-center gap-1.5">
+                  {mode.includes.map((t) => (
+                    <span key={t} className="cx-chip rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-white/90">
+                      {t}
                     </span>
-                    <span className="mt-6 block">
-                      <span className="block text-[18px] font-semibold leading-tight text-white">{tile.title}</span>
-                      <span className="mt-1 block text-balance text-[13px] leading-snug text-white/55">{tile.sub}</span>
-                    </span>
-                  </button>
+                  ))}
+                </div>
+              </div>
+              {/* נקודות - איפה אנחנו בין 4 הסוגים */}
+              <div className="relative flex justify-center gap-1.5 pb-4" aria-hidden="true">
+                {MODES.map((m, i) => (
+                  <span key={m.id} className="h-1.5 rounded-full bg-white transition-all duration-300" style={{ width: i === index ? 18 : 6, opacity: i === index ? 0.95 : 0.35 }} />
                 ))}
               </div>
             </section>
+
+            {/* כפתור ה"צילום" - מתחיל את היצירה של הסוג הנבחר */}
+            <div className="mt-5 flex justify-center">
+              <button
+                type="button"
+                onClick={start}
+                aria-label={mode.cta}
+                className="cx-shutter flex h-[78px] w-[78px] items-center justify-center rounded-full bg-transparent p-[5px] ring-[3.5px] ring-white"
+              >
+                <span className="cx-shutter-core flex h-full w-full items-center justify-center rounded-full text-white">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
+              </button>
+            </div>
+
+            {/* שורת המצבים - כמו POST / STORY / REEL באינסטגרם */}
+            <div ref={railBoxRef} className="relative mt-3 overflow-hidden" role="tablist" aria-label="בחירת סוג העלאה">
+              <div className="cx-rail flex w-max gap-7 px-4 py-2" dir="rtl" style={{ transform: `translateX(${railShift}px)` }}>
+                {MODES.map((m, i) => (
+                  <button
+                    key={m.id}
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === index}
+                    onClick={() => go(i)}
+                    className={`cx-mode text-[15px] font-bold tracking-wide ${i === index ? "text-white" : "text-white/40"}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </main>
       </div>
