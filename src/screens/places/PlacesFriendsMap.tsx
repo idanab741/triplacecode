@@ -29,7 +29,8 @@ type Filter = "all" | "friends" | "mine";
 type LatLng = { lat: number; lng: number };
 
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "הכל" },
+  // "כולם" (ולא "הכל") - כדי לא להתבלבל עם "הכל" של שורת סוגי המקומות.
+  { id: "all", label: "כולם" },
   { id: "friends", label: "חברים" },
   { id: "mine", label: "שלי" },
 ];
@@ -104,7 +105,7 @@ function MapController({
       map.setView(points[0], 14, { animate: false });
       return;
     }
-    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 235], paddingBottomRight: [44, 150], maxZoom: 15, animate: false });
+    map.fitBounds(L.latLngBounds(points), { paddingTopLeft: [44, 185], paddingBottomRight: [44, 225], maxZoom: 15, animate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitToken]);
 
@@ -500,12 +501,9 @@ export function PlacesFriendsMap({
         style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0) 100%)" }}
       />
 
-      {/* סינון + מיקום שלי. inset-x-5 (20px) = בדיוק ה-px-5 של שורת הכותרת (PlacesHeaderRow):
-          כפתור המיקום (40px) יושב בקו ישר מתחת לפעמון, ושורת הסינון מיושרת לקצה של כפתור הצ'אט. */}
-      <div
-        className="absolute inset-x-5 z-[1000] flex items-center justify-between"
-        style={{ top: topOffsetPx, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
-      >
+      {/* *** בקשה מפורשת: "כולם / חברים / שלי" + כפתור המיקום שלי - למטה, מתחת לפס הכרטיסים
+          (מעל הבר התחתון). inset-x-5 = אותם שוליים כמו שורת הכותרת. */}
+      <div className="absolute inset-x-5 bottom-3 z-[1000] flex items-center justify-between">
         <div className={`flex rounded-full bg-white p-1 ring-1 ring-black/[0.06] ${FLOAT}`} role="tablist" aria-label="סינון המלצות">
           {FILTERS.map((f) => {
             const selected = filter === f.id;
@@ -540,10 +538,10 @@ export function PlacesFriendsMap({
       </div>
 
       {/* שורת הסינון לפי סוג מקום - אותה שורה כמו בעמוד ההחלקות, בגרסה צפה (לבנה עם צל) מעל המפה
-          ובסגול של place's. יושבת מתחת לשורת "הכל / חברים / שלי". */}
+          ובסגול של place's. יושבת ישר מתחת ללוגו. */}
       <div
         className="absolute inset-x-0 z-[1000]"
-        style={{ top: topOffsetPx + 48, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+        style={{ top: topOffsetPx, transition: "top 320ms cubic-bezier(0.22, 1, 0.36, 1)" }}
       >
         <TripMatchCategoryChips
           selected={categories}
@@ -591,7 +589,7 @@ export function PlacesFriendsMap({
         <div
           ref={scrollerRef}
           onScroll={handleCardsScroll}
-          className="stories-rail-track absolute inset-x-0 bottom-3 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
+          className="stories-rail-track absolute inset-x-0 bottom-14 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
           style={{ scrollbarWidth: "none" }}
         >
           {filtered.map((pin) => {
