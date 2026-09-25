@@ -234,7 +234,7 @@ export default function TripMatchHomePage() {
             <div data-home-search="">
             <SearchBarLink
               destinationMode
-              variant="hero"
+              variant="flat"
               onSelectDestination={handleSelectDestination}
               containerClassName="relative"
               endAdornment={
