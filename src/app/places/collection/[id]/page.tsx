@@ -330,6 +330,8 @@ function PlacesExperience({
           <h2 id="exp-places-title" className="text-[19px] font-bold text-ink">
             {COLLECTION_TYPE_LABELS.places.itemCount(items.length)}
           </h2>
+          <span className="flex-1" />
+          <CollectionQuickAdd collection={collection} onChanged={onChanged} variant="header" />
           {items.length > 0 && (
             <div role="radiogroup" aria-label="תצוגה" className="flex rounded-full bg-[#F1F2F5] p-[3px]">
               {(
@@ -601,9 +603,12 @@ function TripsExperience({
         <ExperienceHeader collection={collection} />
 
         <section aria-labelledby="exp-trips-title" className="mx-auto mt-7 max-w-xl px-4">
-          <h2 id="exp-trips-title" className="px-1 text-[19px] font-bold text-ink">
-            {COLLECTION_TYPE_LABELS.trips.itemCount(items.length)}
-          </h2>
+          <div className="flex items-center justify-between gap-3 px-1">
+            <h2 id="exp-trips-title" className="text-[19px] font-bold text-ink">
+              {COLLECTION_TYPE_LABELS.trips.itemCount(items.length)}
+            </h2>
+            <CollectionQuickAdd collection={collection} onChanged={onChanged} variant="header" />
+          </div>
           {items.length === 0 && <p className="py-8 text-center text-[14px] text-ink-secondary">אין טיולים להצגה במפה הזו.</p>}
 
           <ol className="mt-3 flex flex-col gap-3">

@@ -20,6 +20,7 @@ export function SelectionActionBar({
   accent = "#0A6DFE",
   labels = { collection: "מפה חדשה", trip: "טיול חדש" },
   allowEmpty = false,
+  allowAddToExisting = true,
   style,
   className = "",
 }: {
@@ -30,6 +31,8 @@ export function SelectionActionBar({
   labels?: { collection: string; trip: string };
   /** אפשר ליצור גם בלי מקומות שנבחרו - פשוט עוברים לעמוד היצירה הריק */
   allowEmpty?: boolean;
+  /** השורה "הוספה למפה או טיול קיימים" (לא מוצגת בעמוד התוכן - שם יוצרים חדש) */
+  allowAddToExisting?: boolean;
   style?: CSSProperties;
   className?: string;
 }) {
@@ -102,7 +105,7 @@ export function SelectionActionBar({
         </button>
       </div>
       {/* *** בקשה מפורשת ("להוסיף למפה / לטיול קיימים"): כשנבחר משהו - גם הוספה למה שכבר יצרתם */}
-      {count > 0 && (
+      {count > 0 && allowAddToExisting && (
         <button
           type="button"
           onClick={() => setAddToOpen(true)}

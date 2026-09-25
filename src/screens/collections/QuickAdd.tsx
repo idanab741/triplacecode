@@ -25,6 +25,21 @@ function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
+/** כפתור קטן בכותרת הרשימה - גלוי מיד כשנכנסים למפה / לטיול, בלי לגלול לסוף */
+function HeaderButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="flex h-9 shrink-0 items-center gap-1 rounded-full bg-[#0A6DFE] px-3.5 text-[13.5px] font-semibold text-white transition active:scale-95"
+    >
+      <PlusIcon size={16} />
+      הוספה
+    </button>
+  );
+}
+
 function ErrorLine({ message }: { message: string | null }) {
   return message ? (
     <p className="mt-2 text-center text-[13px] text-[#C8373C]" role="alert">
@@ -42,7 +57,16 @@ async function post(url: string, body: unknown): Promise<void> {
 }
 
 /** מפה (אוסף): מקומות או טיולים, לפי סוג המפה. */
-export function CollectionQuickAdd({ collection, onChanged }: { collection: CollectionDetailDto; onChanged: () => void }) {
+export function CollectionQuickAdd({
+  collection,
+  onChanged,
+  variant = "row",
+}: {
+  collection: CollectionDetailDto;
+  onChanged: () => void;
+  /** row = שורה מקווקוות בסוף הרשימה; header = כפתור "+ הוספה" בכותרת */
+  variant?: "row" | "header";
+}) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +93,11 @@ export function CollectionQuickAdd({ collection, onChanged }: { collection: Coll
     }
   }
 
+  const addLabel = collection.type === "places" ? "הוספת מקום" : "הוספת טיול";
   return (
-    <div className="mt-6">
-      <AddRow label={collection.type === "places" ? "הוספת מקום" : "הוספת טיול"} onClick={() => setOpen(true)} />
-      <ErrorLine message={open ? null : error} />
+    <div className={variant === "row" ? "mt-6" : "contents"}>
+      {variant === "row" ? <AddRow label={addLabel} onClick={() => setOpen(true)} /> : <HeaderButton label={`${addLabel} למפה`} onClick={() => setOpen(true)} />}
+      {variant === "row" && <ErrorLine message={open ? null : error} />}
       {open && (
         <CollectionItemPickerSheet
           type={collection.type}
@@ -92,7 +117,19 @@ export function CollectionQuickAdd({ collection, onChanged }: { collection: Coll
 }
 
 /** טיול: תחנה חדשה בסוף יום מסוים (day), או בסוף הטיול. */
-export function TripQuickAdd({ trip, day, label, onChanged }: { trip: TripDetailDto; day: number; label: string; onChanged: () => void }) {
+export function TripQuickAdd({
+  trip,
+  day,
+  label,
+  onChanged,
+  variant = "row",
+}: {
+  trip: TripDetailDto;
+  day: number;
+  label: string;
+  onChanged: () => void;
+  variant?: "row" | "header";
+}) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -117,9 +154,9 @@ export function TripQuickAdd({ trip, day, label, onChanged }: { trip: TripDetail
   }
 
   return (
-    <div className="mt-3">
-      <AddRow label={label} onClick={() => setOpen(true)} />
-      <ErrorLine message={open ? null : error} />
+    <div className={variant === "row" ? "mt-3" : "contents"}>
+      {variant === "row" ? <AddRow label={label} onClick={() => setOpen(true)} /> : <HeaderButton label={label} onClick={() => setOpen(true)} />}
+      {variant === "row" && <ErrorLine message={open ? null : error} />}
       {open && (
         <CollectionItemPickerSheet
           type="places"

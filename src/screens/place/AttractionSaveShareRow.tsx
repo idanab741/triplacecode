@@ -18,9 +18,9 @@ interface AttractionSaveShareRowProps {
   category?: string | null;
 }
 
-function CalendarIcon({ filled }: { filled: boolean }) {
+function CalendarIcon({ filled, size = 19 }: { filled: boolean; size?: number }) {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill={filled ? "currentColor" : "none"} />
       <path d="M3.5 10h17M8 3v4M16 3v4" stroke={filled ? "#fff" : "currentColor"} />
     </svg>
@@ -101,36 +101,46 @@ export function AttractionSaveShareRow({ placeId, placeName, placeType = "place"
     }
   }
 
-  // 4 כפתורים בשורה - טקסט מעט קטן יותר כדי שייכנסו גם בטלפון צר
+  // *** בקשה מפורשת ("רק את האייקונים, בלי הטקסט"): שורת אייקונים. השם של כל פעולה נשאר לקוראי מסך
+  // (aria-label) ובריחוף (title), והמצב (נשמר / ביומן) מוצג בצבע ובאייקון המלא.
   const btn =
-    "flex h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#EFF1F4] px-1 text-[14.5px] font-semibold text-ink transition active:scale-[0.98] disabled:opacity-60";
+    "flex h-12 min-w-0 flex-1 items-center justify-center rounded-xl bg-[#EFF1F4] text-ink transition active:scale-[0.96] disabled:opacity-60";
+  const saveLabel = saved ? "נשמר" : "שמירה";
+  const calendarLabel = calendarEntry ? "ביומן" : "הוספה ליומן";
+  const shareLabel = justShared ? "הקישור הועתק" : "שיתוף";
 
   return (
     <div className="flex gap-2 px-5 pt-4">
       {user && (
-        <button type="button" onClick={handleSave} disabled={busy} className={btn}>
-          <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={18} height={18} />
-          {saved ? "נשמר" : "שמירה"}
+        <button type="button" onClick={handleSave} disabled={busy} className={btn} aria-label={saveLabel} aria-pressed={saved} title={saveLabel}>
+          <Image src={saved ? "/icons/save-active.png" : "/icons/save.png"} alt="" width={22} height={22} />
         </button>
       )}
       {user && (
-        <button type="button" onClick={() => setCalendarOpen(true)} className={btn} style={calendarEntry ? { color: "#0A6DFE" } : undefined}>
-          <CalendarIcon filled={!!calendarEntry} />
-          {calendarEntry ? "ביומן" : "ליומן"}
+        <button
+          type="button"
+          onClick={() => setCalendarOpen(true)}
+          className={btn}
+          style={calendarEntry ? { color: "#0A6DFE" } : undefined}
+          aria-label={calendarLabel}
+          title={calendarLabel}
+        >
+          <CalendarIcon filled={!!calendarEntry} size={22} />
         </button>
       )}
       {user && (
-        <button type="button" onClick={() => setAddToOpen(true)} className={btn} aria-label="הוספה למפה או לטיול">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+        <button type="button" onClick={() => setAddToOpen(true)} className={btn} aria-label="הוספה למפה או לטיול" title="הוספה למפה או לטיול">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          הוספה
         </button>
       )}
-      <button type="button" onClick={handleShare} className={btn}>
-        <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={20} height={20} />
-        {justShared ? "הועתק!" : "שיתוף"}
+      <button type="button" onClick={handleShare} className={btn} aria-label={shareLabel} title={shareLabel}>
+        <Image src={justShared ? "/icons/share-active.png" : "/icons/share.png"} alt="" width={23} height={23} />
       </button>
+      <span className="sr-only" aria-live="polite">
+        {justShared ? "הקישור הועתק" : ""}
+      </span>
 
       {shareOpen && (
         <ShareToFriendsSheet

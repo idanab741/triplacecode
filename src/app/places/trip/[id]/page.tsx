@@ -386,9 +386,20 @@ function TripBody({
 
         {/* ───── המסלול ───── */}
         <section aria-labelledby="trip-route" className="mx-auto mt-8 max-w-xl px-5">
-          <h2 id="trip-route" className="text-[19px] font-bold text-ink">
-            המסלול
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="trip-route" className="text-[19px] font-bold text-ink">
+              המסלול
+            </h2>
+            {dayNumbers.length > 0 && (
+              <TripQuickAdd
+                trip={trip}
+                day={dayNumbers[dayNumbers.length - 1]}
+                label={multiDay ? `הוספת תחנה ליום ${dayNumbers[dayNumbers.length - 1]}` : "הוספת תחנה"}
+                onChanged={onChanged}
+                variant="header"
+              />
+            )}
+          </div>
           {trip.stops.length === 0 && <p className="py-6 text-center text-[14px] text-ink-secondary">אין תחנות להצגה בטיול הזה.</p>}
 
           <div className="mt-2 flex flex-col gap-7">
