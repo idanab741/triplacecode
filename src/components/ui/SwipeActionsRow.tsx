@@ -25,7 +25,10 @@ interface SwipeActionsRowProps {
   className?: string;
 }
 
-const BUTTON_W = 76;
+// *** בקשה מפורשת ("בסגנון ששלחתי" - ההודעות באייפון): עיגולים צבעוניים עם אייקון בלבד, עם רווח,
+// על רקע לבן - לא מלבנים מלאים. כל כפתור תופס "משבצת" ברוחב BUTTON_W.
+const BUTTON_W = 64;
+const CIRCLE = 50;
 const DEAD_ZONE = 8;
 const LONG_PRESS_MS = 480;
 const SNAP = "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -48,8 +51,8 @@ function TrashIcon() {
  */
 export function SwipeActionsRow({ children, onDelete, deleteLabel = "הסרה", actions = [], disabled = false, resetKey, className = "" }: SwipeActionsRowProps) {
   const id = useId();
-  const leftW = onDelete ? BUTTON_W : 0; // נחשף בהחלקה ימינה
-  const rightW = actions.length * BUTTON_W; // נחשף בהחלקה שמאלה
+  const leftW = onDelete ? BUTTON_W + 10 : 0; // נחשף בהחלקה ימינה (+ ריווח מהקצה)
+  const rightW = actions.length ? actions.length * BUTTON_W + 10 : 0; // נחשף בהחלקה שמאלה (+ ריווח מהקצה)
   const trackRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const x = useRef(0);
@@ -176,32 +179,40 @@ export function SwipeActionsRow({ children, onDelete, deleteLabel = "הסרה", 
     <div ref={rootRef} data-side="none" className={`group relative overflow-hidden ${className}`} onContextMenu={(e) => rightW > 0 && !disabled && (e.preventDefault(), snapTo("right"))}>
       {/* הסרה - בצד שמאל, נחשף בהחלקה ימינה */}
       {onDelete && !disabled && (
-        <div className="absolute inset-y-0 left-0 flex opacity-0 group-data-[side=left]:opacity-100" style={{ width: leftW }} dir="ltr">
+        <div className="absolute inset-y-0 left-0 flex ps-2.5 opacity-0 transition-opacity group-data-[side=left]:opacity-100" style={{ width: leftW }} dir="ltr">
           <button
             type="button"
             onClick={() => run(onDelete)}
             onFocus={() => snapTo("left")}
-            className="flex h-full w-full flex-col items-center justify-center gap-1 bg-[#E5484D] text-[12px] font-semibold text-white"
+            aria-label={deleteLabel}
+            title={deleteLabel}
+            className="flex h-full w-full items-center justify-center"
           >
-            <TrashIcon />
-            {deleteLabel}
+            <span className="flex items-center justify-center rounded-full bg-[#EF4444] text-white shadow-[0_4px_12px_-4px_rgba(239,68,68,0.6)] transition active:scale-90" style={{ width: CIRCLE, height: CIRCLE }}>
+              <TrashIcon />
+            </span>
           </button>
         </div>
       )}
       {/* פעולות - בצד ימין, נחשפות בהחלקה שמאלה */}
       {actions.length > 0 && !disabled && (
-        <div className="absolute inset-y-0 right-0 flex opacity-0 group-data-[side=right]:opacity-100" style={{ width: rightW }} dir="rtl">
+        <div className="absolute inset-y-0 right-0 flex ps-2.5 opacity-0 transition-opacity group-data-[side=right]:opacity-100" style={{ width: rightW }} dir="rtl">
           {actions.map((a) => (
             <button
               key={a.key}
               type="button"
               onClick={() => run(a.onClick)}
               onFocus={() => snapTo("right")}
-              className="flex h-full flex-1 flex-col items-center justify-center gap-1 text-[12px] font-semibold text-white"
-              style={{ background: a.color }}
+              aria-label={a.label}
+              title={a.label}
+              className="flex h-full flex-1 items-center justify-center"
             >
-              {a.icon}
-              {a.label}
+              <span
+                className="flex items-center justify-center rounded-full text-white transition active:scale-90"
+                style={{ width: CIRCLE, height: CIRCLE, background: a.color, boxShadow: `0 4px 12px -4px ${a.color}99` }}
+              >
+                {a.icon}
+              </span>
             </button>
           ))}
         </div>
