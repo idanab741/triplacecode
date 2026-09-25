@@ -1,57 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import Image from "next/image";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
+import { CreateModePreview, CREATE_PREVIEW_CSS } from "@/screens/create/CreateModePreviews";
 
 type TileId = "post" | "place" | "collection" | "trip";
-
-/* ───────────── אייקוני קו דקים, בגרדיאנט של האקסנט של כל ריבוע ───────────── */
-
-/** *** עיצוב מחדש: קו אחיד בצבע האקסנט של הריבוע (בלי גרדיאנט), עבה מעט יותר כדי להיות חד על שחור. */
-function Icon({ children }: { id: string; children: ReactNode }) {
-  return (
-    <svg viewBox="0 0 48 48" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" stroke="var(--a)" className="h-full w-full" aria-hidden="true">
-      {children}
-    </svg>
-  );
-}
-
-const ART: Record<TileId, ReactNode> = {
-  post: (
-    <Icon id="cx-post">
-      <path d="M8 12.5A4.5 4.5 0 0 1 12.5 8h23A4.5 4.5 0 0 1 40 12.5v16a4.5 4.5 0 0 1-4.5 4.5H21l-8.5 7V33A4.5 4.5 0 0 1 8 28.5v-16Z" />
-      <path d="M15 17h18M15 24h11" />
-    </Icon>
-  ),
-  place: (
-    <Icon id="cx-place">
-      <path d="M24 42S11 30.5 11 20a13 13 0 0 1 26 0c0 10.5-13 22-13 22Z" />
-      <circle cx="24" cy="20" r="4.5" />
-    </Icon>
-  ),
-  collection: (
-    <Icon id="cx-collection">
-      <rect x="9" y="8" width="26" height="22" rx="4.5" opacity=".4" />
-      <rect x="13" y="13" width="26" height="22" rx="4.5" opacity=".7" />
-      <rect x="17" y="18" width="24" height="22" rx="4.5" />
-      <path d="m20 36 6-6 4 4 3-3 5 5" />
-    </Icon>
-  ),
-  trip: (
-    <Icon id="cx-trip">
-      <circle cx="10" cy="37" r="3" />
-      <circle cx="24" cy="26" r="3" />
-      <circle cx="38" cy="10" r="3" />
-      <path d="M12.5 35c3-2 6-4 9-7.5M26.5 24c4-3 7-6.5 9-11.5" strokeDasharray="2.5 3.5" />
-    </Icon>
-  ),
-};
 
 interface Mode {
   id: TileId;
@@ -59,7 +17,7 @@ interface Mode {
   label: string;
   title: string;
   sub: string;
-  /** מה מוסיפים - שורת "צ'יפים" קצרה במרכז הכרטיס */
+  /** 3 צעדים קצרים - איך יוצרים */
   includes: string[];
   cta: string;
   a: string;
@@ -67,10 +25,10 @@ interface Mode {
 }
 
 const MODES: Mode[] = [
-  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים, ומקום אם בא לכם", includes: ["תמונות וסרטונים", "טקסט", "תיוג מקום"], cta: "פוסט חדש", a: "#FF8FB8", b: "#FFA96B" },
-  { id: "place", label: "מקום", title: "המלצה על מקום", sub: "מקום שאהבתם - עם ציון, כמה מילים ותמונות", includes: ["דירוג", "ביקורת", "תמונות"], cta: "המלצה חדשה", a: "#B69CFF", b: "#5EC8FF" },
-  { id: "collection", label: "חוויה", title: "חוויה תחת רעיון אחד", sub: "אספו מקומות או טיולים - \"בתי הקפה הכי שווים\", \"דייטים\"", includes: ["כמה מקומות", "שם ורעיון", "תמונת שער"], cta: "חוויה חדשה", a: "#5BE3A8", b: "#38D6E8" },
-  { id: "trip", label: "טיול", title: "מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים", includes: ["תחנות", "ימים", "מפה וניווט"], cta: "טיול חדש", a: "#FFCB5C", b: "#FF7F8E" },
+  { id: "post", label: "פוסט", title: "שתפו רגע מהדרך", sub: "תמונה או סרטון, כמה מילים ותיוג של המקום", includes: ["בוחרים תמונות", "כותבים כמה מילים", "מפרסמים"], cta: "צרו פוסט", a: "#FF8FB8", b: "#FFA96B" },
+  { id: "place", label: "מקום", title: "המליצו על מקום שאהבתם", sub: "ציון, כמה מילים ותמונות - וכולם יגלו אותו במפה", includes: ["מחפשים את המקום", "נותנים ציון", "כותבים ביקורת"], cta: "המליצו על מקום", a: "#B69CFF", b: "#5EC8FF" },
+  { id: "collection", label: "חוויה", title: "אספו מקומות תחת רעיון אחד", sub: "\"בתי הקפה הכי שווים\", \"מקומות לדייט\" - רשימה שכולם יכולים לשמור", includes: ["נותנים שם", "מוסיפים מקומות", "מפרסמים"], cta: "צרו חוויה", a: "#5BE3A8", b: "#38D6E8" },
+  { id: "trip", label: "טיול", title: "בנו מסלול מוכן לדרך", sub: "תחנות לפי סדר, יום אחד או כמה ימים - עם מפה וניווט", includes: ["מוסיפים תחנות", "מסדרים לפי ימים", "יוצאים לדרך"], cta: "צרו טיול", a: "#FFCB5C", b: "#FF7F8E" },
 ];
 
 const CSS = `
@@ -87,9 +45,6 @@ const CSS = `
 .cx-scene[data-dir="prev"] { animation-name:cx-scene-in-prev; }
 @keyframes cx-scene-in { from { opacity:0; transform:translateX(-28px) scale(.98); } to { opacity:1; transform:none; } }
 @keyframes cx-scene-in-prev { from { opacity:0; transform:translateX(28px) scale(.98); } to { opacity:1; transform:none; } }
-.cx-bigicon { background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.18), 0 18px 40px -12px color-mix(in srgb, var(--a) 70%, transparent);
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:cx-float 4s ease-in-out infinite; }
-@keyframes cx-float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
 .cx-chip { background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 1px rgba(255,255,255,.14); }
 /* שורת המצבים - כמו POST / STORY / REEL */
 .cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
@@ -98,9 +53,7 @@ const CSS = `
 .cx-shutter { -webkit-tap-highlight-color:transparent; transition:transform .15s cubic-bezier(.2,.8,.2,1); }
 .cx-shutter:active { transform:scale(.92); }
 .cx-shutter-core { background:linear-gradient(135deg, var(--a), var(--b)); transition:background .35s; box-shadow:0 10px 26px -8px color-mix(in srgb, var(--a) 80%, transparent); }
-.cx-hero { animation:cx-hero-in .7s cubic-bezier(.2,.8,.2,1) .05s backwards; }
-@keyframes cx-hero-in { from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none} }
-@media (prefers-reduced-motion: reduce) { .cx-hero, .cx-scene, .cx-bigicon { animation:none !important; } .cx-rail { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .cx-scene { animation:none !important; } .cx-rail { transition:none; } }
 `;
 
 /**
@@ -184,7 +137,7 @@ export default function ContentPage() {
   return (
     <>
       <HomeStatusBarTint />
-      <style>{CSS}</style>
+      <style>{CSS + CREATE_PREVIEW_CSS}</style>
 
       <div className="cx-page relative isolate flex flex-col" style={{ "--a": mode.a, "--b": mode.b } as CSSProperties}>
         {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות), לוגו בלבן על הרקע הכהה */}
@@ -192,11 +145,6 @@ export default function ContentPage() {
 
         <main className="flex flex-1 flex-col px-4 pt-2" style={{ paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 12px)" }}>
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
-            {/* הדמות מציצה מעל הכרטיס */}
-            <div className="cx-hero pointer-events-none relative z-10 mx-auto -mb-[9%] w-[46%]" aria-hidden="true">
-              <Image src="/images/content-hero.png" alt="" width={720} height={492} priority draggable={false} sizes="200px" className="h-auto w-full select-none" />
-            </div>
-
             <section
               aria-roledescription="קרוסלה"
               aria-label="סוג ההעלאה"
@@ -205,22 +153,26 @@ export default function ContentPage() {
               onPointerDown={onPointerDown}
               onPointerUp={onPointerUp}
               onPointerCancel={() => (drag.current = null)}
-              className="cx-stage flex min-h-[340px] flex-1 flex-col outline-none"
+              className="cx-stage mt-2 flex min-h-[420px] flex-1 flex-col outline-none"
             >
               <span className="cx-stage-bg" aria-hidden="true" />
-              <div key={mode.id} data-dir={dir} className="cx-scene relative flex flex-1 flex-col items-center justify-center px-6 pb-7 pt-12 text-center">
-                <span className="cx-bigicon flex h-24 w-24 items-center justify-center rounded-[30px]" style={{ "--a": "#ffffff" } as CSSProperties}>
-                  <span className="block h-12 w-12">{ART[mode.id]}</span>
-                </span>
-                <h1 className="mt-6 text-[27px] font-extrabold leading-tight tracking-tight">{mode.title}</h1>
-                <p className="mt-2 max-w-[18rem] text-balance text-[15px] leading-snug text-white/75">{mode.sub}</p>
-                <div className="mt-5 flex flex-wrap justify-center gap-1.5">
-                  {mode.includes.map((t) => (
-                    <span key={t} className="cx-chip rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-white/90">
-                      {t}
-                    </span>
-                  ))}
+              <div key={mode.id} data-dir={dir} className="cx-scene relative flex flex-1 flex-col items-center justify-center px-5 pb-4 pt-6 text-center">
+                {/* דוגמה חיה של התוצאה - איך זה ייראה באפליקציה */}
+                <div className="flex w-full justify-center" aria-hidden="true">
+                  <CreateModePreview mode={mode.id} />
                 </div>
+                <h1 className="mt-5 text-[23px] font-extrabold leading-tight tracking-tight">{mode.title}</h1>
+                <p className="mt-1.5 max-w-[19rem] text-balance text-[14px] leading-snug text-white/75">{mode.sub}</p>
+                <ol className="mt-3.5 flex flex-wrap justify-center gap-1.5" aria-label="איך זה עובד">
+                  {mode.includes.map((t, i) => (
+                    <li key={t} className="cx-chip flex items-center gap-1.5 rounded-full py-1 pe-3 ps-1 text-[12px] font-semibold text-white/90">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-extrabold" style={{ color: "#111" }}>
+                        {i + 1}
+                      </span>
+                      {t}
+                    </li>
+                  ))}
+                </ol>
               </div>
               {/* נקודות - איפה אנחנו בין 4 הסוגים */}
               <div className="relative flex justify-center gap-1.5 pb-4" aria-hidden="true">
@@ -230,19 +182,17 @@ export default function ContentPage() {
               </div>
             </section>
 
-            {/* כפתור ה"צילום" - מתחיל את היצירה של הסוג הנבחר */}
-            <div className="mt-5 flex justify-center">
+            {/* כפתור היצירה - ברור, עם טקסט, בצבעי הסוג הנבחר */}
+            <div className="mt-4 flex justify-center">
               <button
                 type="button"
                 onClick={start}
-                aria-label={mode.cta}
-                className="cx-shutter flex h-[78px] w-[78px] items-center justify-center rounded-full bg-transparent p-[5px] ring-[3.5px] ring-white"
+                className="cx-shutter cx-shutter-core flex h-14 min-w-[70%] items-center justify-center gap-2 rounded-full px-8 text-[17px] font-extrabold text-white"
               >
-                <span className="cx-shutter-core flex h-full w-full items-center justify-center rounded-full text-white">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </span>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                {mode.cta}
               </button>
             </div>
 
