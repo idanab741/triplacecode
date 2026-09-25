@@ -19,11 +19,17 @@ type ModeId = "moment" | "place" | "map";
 /* *** בקשה מפורשת ("רגע · מקום · מפה" - וכל מצב פותח את הכלי עצמו, כמו באפליקציות המוכרות):
    רגע = מצלמה / גלריה (כמו אפליקציית המצלמה), מקום = כוכבים (כמו "דרגו וכתבו ביקורת" ב-Google Maps),
    מפה = המפה של places עצמה - נוגעים בנעצים ויוצרים מפה או מסלול. */
-const MODES: { id: ModeId; label: string }[] = [
+const ALL_MODES: { id: ModeId; label: string }[] = [
   { id: "moment", label: "רגע" },
   { id: "place", label: "מקום" },
   { id: "map", label: "מפה" },
 ];
+
+/* *** בקשה מפורשת ("לאחד בין רגע לביקורת; רגע בינתיים לא מופיע - רק נשמר"): הביקורת קיבלה את העורך
+   של "רגע" (ר' /places/create). "רגע" עצמו מוסתר עד שיהפוך ל-Story - הקוד שלו (MomentStage) נשאר כאן
+   כמו שהוא; כדי להחזיר אותו מספיק להפוך את SHOW_MOMENT ל-true. */
+const SHOW_MOMENT = false;
+const MODES = ALL_MODES.filter((m) => SHOW_MOMENT || m.id !== "moment");
 
 const RATING_LABELS = ["", "לא משהו", "סביר", "טוב", "טוב מאוד", "מושלם!"];
 const STAR_PATH = "M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.08 6.33L12 17.31l-5.68 2.99 1.08-6.33-4.6-4.49 6.36-.92L12 2.8z";
@@ -213,7 +219,7 @@ function PlaceStage({ onSearch, onAdd }: { onSearch: (rating: number) => void; o
  * (כמו POST / STORY / REEL). מחליפים מצב בהחלקה (על המסך או על השורה), בלחיצה על השורה או בחיצים.
  * כל מצב ממשיך לזרימת היצירה הקיימת - לא נוצרת כאן לוגיקה חדשה:
  *  רגע  -> /places/post/create (עם הקבצים שנבחרו)
- *  מקום -> /places/create?rating=N (או ?add=1 להוספת מקום חדש)
+ *  מקום -> /places/create?pick=1&rating=N (בחירת המקום, ואז העורך) · ?add=1 להוספת מקום חדש
  *  מפה  -> בחירת נעצים -> /places/collection/create (מפה) או /places/trip/create (מסלול)
  */
 export default function ContentPage() {
@@ -314,7 +320,7 @@ export default function ContentPage() {
                 )}
                 {mode.id === "place" && (
                   <PlaceStage
-                    onSearch={(rating) => router.push(`/places/create${rating ? `?${ratingQuery(rating)}` : ""}`)}
+                    onSearch={(rating) => router.push(`/places/create?pick=1${rating ? `&${ratingQuery(rating)}` : ""}`)}
                     onAdd={(rating) => router.push(`/places/create?add=1${rating ? `&${ratingQuery(rating)}` : ""}`)}
                   />
                 )}
