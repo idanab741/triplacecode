@@ -350,3 +350,61 @@ body {
 .places-friends-map .leaflet-control-attribution a {
   color: inherit;
 }
+
+/* ───── TripMatch - תנועה בהחלקות (בקשה מפורשת - "משהו שיגרום לי להתרגש") ───── */
+/* הכרטיס הבא "קופץ" קדימה מהחפיסה */
+@keyframes tm-card-enter {
+  from { transform: scale(0.94) translateY(10px); opacity: 0.6; }
+  to { transform: none; opacity: 1; }
+}
+.tm-card-enter {
+  animation: tm-card-enter 360ms cubic-bezier(0.22, 1.25, 0.36, 1) backwards;
+}
+/* הכפתורים גדלים לכיוון הגרירה (--tm-drag מוגדר על ה-Deck, בין -1 ל-1) */
+.tm-like-btn,
+.tm-nope-btn {
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out;
+}
+.tm-like-btn {
+  transform: scale(calc(1 + max(var(--tm-drag, 0), 0) * 0.2));
+}
+.tm-nope-btn {
+  transform: scale(calc(1 + max(var(--tm-drag, 0) * -1, 0) * 0.2));
+}
+/* פרץ לבבות + גל מהכפתור בכל לייק */
+@keyframes tm-heart-fly {
+  0% { transform: translate(-50%, -50%) rotate(var(--tm-angle)) translateY(0) scale(0.4); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(-50%, -50%) rotate(var(--tm-angle)) translateY(calc(var(--tm-dist) * -1)) scale(1.15); opacity: 0; }
+}
+.tm-heart-particle {
+  color: #4a9eff;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(10, 109, 254, 0.35);
+  animation: tm-heart-fly 750ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes tm-like-ring {
+  from { box-shadow: 0 0 0 0 rgba(74, 158, 255, 0.55); }
+  to { box-shadow: 0 0 0 26px rgba(74, 158, 255, 0); }
+}
+.tm-like-ring {
+  animation: tm-like-ring 600ms ease-out both;
+}
+/* טבעת אחוז ההתאמה מתמלאת כשהכרטיס עולה */
+@keyframes tm-ring-fill {
+  from { stroke-dashoffset: var(--tm-arc); }
+  to { stroke-dashoffset: 0; }
+}
+.tm-ring-fill {
+  animation: tm-ring-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-card-enter,
+  .tm-ring-fill {
+    animation: none;
+  }
+  .tm-heart-particle,
+  .tm-like-ring {
+    display: none;
+  }
+}
