@@ -57,7 +57,17 @@ function CreateCollectionContent() {
       <HomeStatusBarTint />
       <CollapsibleTopBar onBack={() => router.back()} />
       <div className="pb-24">
-        <CollectionForm mode="create" type={type} dark={dark} />
+        <CollectionForm
+          key={type}
+          mode="create"
+          type={type}
+          dark={dark}
+          onTypeChange={(next) => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("type", next);
+            router.replace(`/places/collection/create?${params.toString()}`, { scroll: false });
+          }}
+        />
       </div>
       <MainBottomNav active="content" />
     </div>
