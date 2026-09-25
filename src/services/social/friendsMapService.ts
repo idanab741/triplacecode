@@ -21,6 +21,8 @@ export interface FriendsMapContribution {
   avatarUrl: string | null;
   isSelf: boolean;
   isFriend: boolean;
+  /** פרופיל מאומת (וי כחול, migration 0098) - יוצרי תוכן */
+  isVerified: boolean;
   text: string | null;
   /** דירוג 1-5 של המשתמש (אם דירג). */
   rating: number | null;
@@ -59,6 +61,12 @@ export interface FriendsMapPin {
   hasSelf: boolean;
   /** קטגוריית TripAdd (food/attraction/nature/nightlife/sleep/shopping) - לשורת הסינון במפה. null = לא ידוע. */
   category: string | null;
+  /** לפחות משתמש מאומת אחד תרם למקום (סינון "מאומתים") */
+  hasVerified: boolean;
+  /** היוצר המאומת שהעלה/המליץ - העיגול הקטן עם התמונה שלו ליד הנעץ */
+  verifiedBy: { id: string; name: string; avatarUrl: string | null } | null;
+  /** הצופה שמר את המקום ("הבחירות שלי" / החלקה ימינה) - חלק מסינון "שלי" */
+  savedByViewer: boolean;
 }
 
 const POST_LIMIT = 600;
@@ -180,7 +188,7 @@ export async function getFriendsMapPins(
   const friendIds = await getFriendIds(supabase, viewerId);
 
   // ---------- 1. תוכן גולמי ----------
-  const [postsRes, submissionsRes, tripsRes, collectionsRes, createdPlacesRes] = await Promise.all([
+  const [postsRes, submissionsRes, tripsRes, collectionsRes, createdPlacesRes, favoritesRes] = await Promise.all([
     supabase
       .from("posts")
       .select("id, author_id, text, post_type, place_id, tripadd_submission_id, created_at")
@@ -211,7 +219,21 @@ export async function getFriendsMapPins(
       .not("created_by", "is", null)
       .order("created_at", { ascending: false })
       .limit(CREATED_PLACE_LIMIT),
+    // *** בקשה מפורשת ("שלי = מה שהעליתי + השמורים שלי"): המקומות שהצופה שמר - אותו כלל כמו "הבחירות שלי"
+    supabase
+      .from("favorites")
+      .select("place_id, status, source, created_at")
+      .eq("user_id", viewerId)
+      .in("status", ["saved", "liked"])
+      .order("created_at", { ascending: false })
+      .limit(500),
   ]);
+  const savedAt = new Map<string, string>();
+  for (const f of (favoritesRes.data ?? []) as Row[]) {
+    if (f.status === "saved" || (f.status === "liked" && f.source === "tripmatch")) {
+      if (!savedAt.has(f.place_id as string)) savedAt.set(f.place_id as string, f.created_at as string);
+    }
+  }
   if (postsRes.error) throw postsRes.error;
   if (submissionsRes.error) console.error("[friendsMap] tripadd_submissions query failed:", submissionsRes.error.message);
   if (tripsRes.error) console.error("[friendsMap] trips query failed:", tripsRes.error.message);
@@ -231,7 +253,9 @@ export async function getFriendsMapPins(
         .map((p) => p.tripadd_submission_id as string | null)
         .filter((id): id is string => !!id && !submissionIds.has(id))
     ),
-  ];
+    // מקומות שמורים שלא נכללו - כדי שיופיעו במפה תחת "שלי"
+    ...[...savedAt.keys()].filter((id) => !submissionIds.has(id)),
+  ].filter((id, i, arr) => arr.indexOf(id) === i);
   if (missingTripAddIds.length) {
     const extra = await selectIn(missingTripAddIds, (chunk) =>
       supabase.from("tripadd_submissions").select(SUBMISSION_COLUMNS).in("id", chunk)
@@ -272,7 +296,7 @@ export async function getFriendsMapPins(
   const containerPlaceIds = new Set<string>();
   for (const list of placesByTrip.values()) for (const id of list) containerPlaceIds.add(id);
   for (const row of collectionItemRows) if (row.place_id) containerPlaceIds.add(row.place_id as string);
-  const allPlaceIds = [...new Set([...postPlaceIds, ...containerPlaceIds, ...createdPlaces.map((p) => p.id as string)])];
+  const allPlaceIds = [...new Set([...postPlaceIds, ...containerPlaceIds, ...createdPlaces.map((p) => p.id as string), ...savedAt.keys()])];
 
   // ---------- 2. השלמות: מקומות, מדיה, דירוגים ----------
   const [placesRows, postMediaRows, submissionMediaRows, tripAddReviewRows, placeReviewRows] = await Promise.all([
@@ -440,7 +464,7 @@ export async function getFriendsMapPins(
   for (const c of collections) userIds.add(c.author_id as string);
   for (const p of createdPlaces) userIds.add(p.created_by as string);
   const profileRows = await selectIn([...userIds], (chunk) =>
-    supabase.from("profiles").select("id, username, full_name, avatar_url").in("id", chunk)
+    supabase.from("profiles").select("id, username, full_name, avatar_url, is_verified").in("id", chunk)
   );
   const profiles = new Map(profileRows.map((p) => [p.id as string, p]));
 
@@ -463,6 +487,7 @@ export async function getFriendsMapPins(
       avatarUrl: (profile?.avatar_url as string | null) ?? null,
       isSelf: userId === viewerId,
       isFriend: friendIds.has(userId),
+      isVerified: Boolean(profile?.is_verified),
       text: text?.trim() || null,
       rating: rating != null && rating >= 1 && rating <= 5 ? rating : null,
       photos: photos.slice(0, MAX_PHOTOS_PER_CONTRIBUTION),
@@ -631,16 +656,32 @@ export async function getFriendsMapPins(
     membersByRoot.set(root, list);
   }
 
+  // שמורים של הצופה: root -> זמן השמירה (גם מקומות שאף אחד לא תרם להם - יופיעו כנעץ ב"שלי")
+  const savedRoots = new Map<string, string>();
+  for (const l of locList) {
+    const at = savedAt.get(l.id);
+    if (!at) continue;
+    const root = find(l.rawKey);
+    const prev = savedRoots.get(root);
+    if (!prev || at > prev) savedRoots.set(root, at);
+  }
+  const roots = new Map<string, FriendsMapContribution[]>(contributionsByRoot);
+  for (const root of savedRoots.keys()) if (!roots.has(root)) roots.set(root, []);
+
   const pins: FriendsMapPin[] = [];
-  for (const [root, rawList] of contributionsByRoot) {
+  for (const [root, rawList] of roots) {
     const members = membersByRoot.get(root) ?? [];
     if (members.length === 0) continue;
+    const savedByViewer = savedRoots.has(root);
     const canonical =
       members.find((m) => m.source === "place") ??
       [...members].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))[0];
 
     const contributions = mergeSameUser(rawList).slice(0, MAX_CONTRIBUTIONS_PER_PIN);
-    if (contributions.length === 0) continue;
+    if (contributions.length === 0 && !savedByViewer) continue;
+    // העיגול עם התמונה ליד הנעץ: מי שהעלה את המקום אם הוא מאומת, אחרת המאומת הראשון שתרם
+    const verifiedContribution =
+      contributions.find((c) => c.isVerified && c.kind === "added") ?? contributions.find((c) => c.isVerified) ?? null;
 
     const photos: string[] = [];
     for (const c of contributions) {
@@ -683,10 +724,15 @@ export async function getFriendsMapPins(
           ? `${latestText.slice(0, TEXT_SNIPPET_CHARS)}…`
           : latestText
         : null,
-      latestAt: contributions[0].createdAt,
+      latestAt: contributions[0]?.createdAt ?? savedRoots.get(root) ?? new Date(0).toISOString(),
       hasFriend: contributions.some((c) => c.isFriend),
       hasSelf: contributions.some((c) => c.isSelf),
       category: canonical.category ?? members.find((m) => m.category)?.category ?? null,
+      hasVerified: verifiedContribution != null,
+      verifiedBy: verifiedContribution
+        ? { id: verifiedContribution.userId, name: verifiedContribution.name, avatarUrl: verifiedContribution.avatarUrl }
+        : null,
+      savedByViewer,
     });
   }
 

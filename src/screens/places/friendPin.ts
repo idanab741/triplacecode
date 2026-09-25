@@ -26,6 +26,8 @@ interface FriendPinOptions {
   selected: boolean;
   /** בחירה מרובה (אוסף/מסלול חדש): מסגרת סגולה + וי בפינה. */
   checked?: boolean;
+  /** יוצר תוכן מאומת שהעלה את המקום - עיגול קטן עם התמונה שלו ליד הנעץ */
+  creatorAvatarUrl?: string | null;
 }
 
 const WIDTH = 40;
@@ -39,8 +41,8 @@ const HEIGHT = 48;
  *  - צל אחד צמוד וחד (לא הילה מטושטשת), כדי שהנעץ "יישב" על המפה ולא ירחף.
  *  - מונה ממליצים: עיגול סגול מלא עם מספר לבן, בפינה העליונה.
  */
-export function getFriendPinIcon({ photoUrl, count, selected, checked = false }: FriendPinOptions): L.DivIcon {
-  return getPhotoPinIcon({ photoUrl, count, selected, checked });
+export function getFriendPinIcon({ photoUrl, count, selected, checked = false, creatorAvatarUrl = null }: FriendPinOptions): L.DivIcon {
+  return getPhotoPinIcon({ photoUrl, count, selected, checked, creatorAvatarUrl });
 }
 
 export interface PhotoPinOptions {
@@ -57,6 +59,9 @@ export interface PhotoPinOptions {
   badgeColor?: string;
   /** שם שמוצג מעל הנעץ כשהוא נבחר */
   label?: string;
+  /** *** בקשה מפורשת ("יוצרי תוכן שמעלים מקומות - עם העיגול הקטן של הפרופיל שלהם ליד הנעץ"):
+   *  תמונת הפרופיל של היוצר המאומת, בעיגול קטן בפינה העליונה של הנעץ. */
+  creatorAvatarUrl?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -74,8 +79,9 @@ export function getPhotoPinIcon({
   badge,
   badgeColor = PURPLE_DARK,
   label,
+  creatorAvatarUrl = null,
 }: PhotoPinOptions): L.DivIcon {
-  const key = `v3|${photoUrl ?? ""}|${count}|${selected ? 1 : 0}|${checked ? 1 : 0}|${accent}|${badge ?? ""}|${badgeColor}|${selected ? label ?? "" : ""}`;
+  const key = `v3|${photoUrl ?? ""}|${count}|${selected ? 1 : 0}|${checked ? 1 : 0}|${accent}|${badge ?? ""}|${badgeColor}|${selected ? label ?? "" : ""}|${creatorAvatarUrl ?? ""}`;
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -97,6 +103,12 @@ export function getPhotoPinIcon({
   const check = checked
     ? corner(`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`, accent, "right")
     : "";
+  const safeAvatar = creatorAvatarUrl?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  // היוצר המאומת - בפינה העליונה-ימנית (כשהנעץ מסומן בבחירה מרובה - הוי תופס את הפינה הזו)
+  const avatarHtml =
+    safeAvatar && !checked
+      ? `<div style="position:absolute;top:-6px;right:-7px;width:21px;height:21px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 2px #fff,0 2px 5px rgba(15,20,25,.3);background:#EFF1F4;"><img src="${safeAvatar}" alt="" style="width:100%;height:100%;object-fit:cover;display:block"/></div>`
+      : "";
   const labelHtml =
     selected && label
       ? `<div style="position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;padding:6px 12px;border-radius:999px;background:#fff;color:#0f1419;font:600 13px/1.2 var(--font-sans),system-ui,sans-serif;box-shadow:0 6px 18px -6px rgba(15,20,25,.35);direction:rtl">${escapeHtml(label)}</div>`
@@ -112,6 +124,7 @@ export function getPhotoPinIcon({
     </svg>
     ${counter}
     ${badgeHtml}
+    ${avatarHtml}
     ${check}
   </div>`;
 
