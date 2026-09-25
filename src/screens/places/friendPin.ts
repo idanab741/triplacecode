@@ -40,30 +40,70 @@ const HEIGHT = 48;
  *  - מונה ממליצים: עיגול סגול מלא עם מספר לבן, בפינה העליונה.
  */
 export function getFriendPinIcon({ photoUrl, count, selected, checked = false }: FriendPinOptions): L.DivIcon {
-  const key = `v2|${photoUrl ?? ""}|${count}|${selected ? 1 : 0}|${checked ? 1 : 0}`;
+  return getPhotoPinIcon({ photoUrl, count, selected, checked });
+}
+
+export interface PhotoPinOptions {
+  photoUrl: string | null;
+  selected: boolean;
+  /** צבע המסגרת כשנבחר / מסומן (ברירת מחדל: הסגול של place's) */
+  accent?: string;
+  /** מונה ממליצים (מפת place's) - מוצג רק כשגדול מ-1 */
+  count?: number;
+  /** בחירה מרובה - וי בפינה */
+  checked?: boolean;
+  /** תווית בפינה (למשל מספר התחנה במסלול) בצבע badgeColor */
+  badge?: string;
+  badgeColor?: string;
+  /** שם שמוצג מעל הנעץ כשהוא נבחר */
+  label?: string;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+}
+
+/** *** בקשה מפורשת ("המפה צריכה להיות זהה למפה שלנו ב-places, עם אותם פינים"): הנעץ של מפת place's,
+ *  משותף לכל המפות - מפת place's, עמוד טיול ועמוד אוסף. */
+export function getPhotoPinIcon({
+  photoUrl,
+  selected,
+  accent = PURPLE,
+  count = 0,
+  checked = false,
+  badge,
+  badgeColor = PURPLE_DARK,
+  label,
+}: PhotoPinOptions): L.DivIcon {
+  const key = `v3|${photoUrl ?? ""}|${count}|${selected ? 1 : 0}|${checked ? 1 : 0}|${accent}|${badge ?? ""}|${badgeColor}|${selected ? label ?? "" : ""}`;
   const cached = cache.get(key);
   if (cached) return cached;
 
   const clipId = `fpc${clipCounter++}`;
   // *** ביצועים: הנעץ מציג עיגול של 31px - מורידים תמונה בגודל הזה, לא את קובץ המקור (כמה MB לכל נעץ).
   const safePhoto = (photoUrl ? optimizeImage(photoUrl, 36, { height: 36 }) : null)?.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const frame = selected || checked ? PURPLE : "#FFFFFF";
+  const frame = selected || checked ? accent : "#FFFFFF";
 
   // viewBox 40x48: עיגול במרכז (20,19) ברדיוס 18, זנב עד (20,47).
   const inner = safePhoto
     ? `<image href="${safePhoto}" x="4.5" y="3.5" width="31" height="31" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`
-    : `<circle cx="20" cy="19" r="15.5" fill="#F3EEFF"/><circle cx="20" cy="19" r="5" fill="${PURPLE}"/>`;
+    : `<circle cx="20" cy="19" r="15.5" fill="#F3EEFF"/><circle cx="20" cy="19" r="5" fill="${accent}"/>`;
 
+  const corner = (content: string, bg: string, side: "left" | "right") =>
+    `<div style="position:absolute;top:-3px;${side}:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:${bg};color:#fff;font:700 10.5px/18px var(--font-sans),system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;box-sizing:border-box;display:flex;align-items:center;justify-content:center;">${content}</div>`;
+
+  const counter = count > 1 ? corner(String(count), PURPLE_DARK, "left") : "";
+  const badgeHtml = badge ? corner(escapeHtml(badge), badgeColor, "left") : "";
   const check = checked
-    ? `<div style="position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:10px;background:${PURPLE};box-shadow:0 0 0 2px #fff;display:flex;align-items:center;justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>`
+    ? corner(`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`, accent, "right")
     : "";
-
-  const counter =
-    count > 1
-      ? `<div style="position:absolute;top:-3px;left:-3px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:${PURPLE_DARK};color:#fff;font:700 10.5px/18px var(--font-sans),system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;box-sizing:border-box;">${count}</div>`
+  const labelHtml =
+    selected && label
+      ? `<div style="position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;padding:6px 12px;border-radius:999px;background:#fff;color:#0f1419;font:600 13px/1.2 var(--font-sans),system-ui,sans-serif;box-shadow:0 6px 18px -6px rgba(15,20,25,.35);direction:rtl">${escapeHtml(label)}</div>`
       : "";
 
   const html = `<div style="position:relative;width:${WIDTH}px;height:${HEIGHT}px;transform:scale(${selected ? 1.18 : 1});transform-origin:50% 100%;transition:transform .2s cubic-bezier(.22,1,.36,1);filter:drop-shadow(0 1px 1.5px rgba(15,20,25,.28)) drop-shadow(0 4px 8px rgba(15,20,25,.14));">
+    ${labelHtml}
     <svg width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;">
       <defs><clipPath id="${clipId}"><circle cx="20" cy="19" r="15.5"/></clipPath></defs>
       <path d="M14.5 34.2 20 46.5l5.5-12.3Z" fill="${frame}"/>
@@ -71,6 +111,7 @@ export function getFriendPinIcon({ photoUrl, count, selected, checked = false }:
       ${inner}
     </svg>
     ${counter}
+    ${badgeHtml}
     ${check}
   </div>`;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { MainBottomNav } from "@/components/MainBottomNav";
 import { use, useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -14,7 +15,7 @@ import { getAvatarUrl } from "@/constants/avatar";
 import { getPlaceCategoryLabel } from "@/constants/placeCategories";
 import { optimizeImage } from "@/utils/imageUrl";
 import { CREATE_INK } from "@/screens/create/CreateUi";
-import { directionsUrl, journeyColor, type JourneyLine, type JourneyMarker } from "@/screens/journey/JourneyMap";
+import { directionsUrl, journeyColor, type JourneyLine, type JourneyMarker } from "@/screens/journey/journeyUtils";
 import {
   CalendarIcon,
   HeroIconButton,
@@ -89,7 +90,7 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
       <HomeStatusBarTint />
 
       {justCreated && (
-        <div role="status" className="fixed inset-x-4 bottom-28 z-[45] rounded-full bg-[#0f1419] px-4 py-3 text-center text-[14px] font-semibold text-white shadow-soft">
+        <div role="status" className="fixed inset-x-4 bottom-48 z-[45] rounded-full bg-[#0f1419] px-4 py-3 text-center text-[14px] font-semibold text-white shadow-soft">
           יצרתם טיול! הנה הוא על המפה
         </div>
       )}
@@ -103,6 +104,7 @@ export default function TripPage({ params }: { params: Promise<{ id: string }> }
       ) : (
         <TripBody trip={trip} onBack={() => router.back()} onDelete={handleDelete} />
       )}
+      <MainBottomNav active="places" />
     </div>
   );
 }
@@ -173,6 +175,7 @@ function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () 
         latitude: s.place.latitude as number,
         longitude: s.place.longitude as number,
         name: s.place.name,
+        imageUrl: s.place.imageUrls[0] ?? null,
         label: String(s.position + 1),
         color: dayColor(s.day),
       })),
@@ -298,7 +301,7 @@ function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () 
       </div>
 
       {/* ───── הגיליון ───── */}
-      <div className="relative z-10 -mt-6 rounded-t-[28px] bg-white pb-32">
+      <div className="relative z-10 -mt-6 rounded-t-[28px] bg-white pb-56">
         <div className="mx-auto max-w-xl px-5 pt-5">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-ink-secondary">
             {mainCity && (
@@ -409,8 +412,9 @@ function TripBody({ trip, onBack, onDelete }: { trip: TripDetailDto; onBack: () 
 
       {/* ───── בר פעולה קבוע ───── */}
       <div
-        className="fixed inset-x-0 bottom-0 z-30 bg-white/95 px-4 pt-3 shadow-[0_-10px_24px_-14px_rgba(15,20,25,0.25)] backdrop-blur"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 14px)" }}
+        className="fixed inset-x-0 z-30 bg-white/95 px-4 pb-2.5 pt-3 backdrop-blur"
+        // *** בקשה מפורשת ("חסר לי פה בר תחתון"): הבר התחתון של האפליקציה נוסף לעמוד, ובר הפעולה יושב ישר מעליו.
+        style={{ bottom: "calc(66px + max(env(safe-area-inset-bottom), 22px))" }}
       >
         <div className="mx-auto flex max-w-xl gap-2">
           {goUrl ? (
