@@ -11,6 +11,7 @@ import { CollectionItemPickerSheet } from "./CollectionItemPickerSheet";
 import { CoverPickerSheet } from "./CoverPickerSheet";
 import { VisibilityChips } from "./VisibilityChips";
 import { toItemInputs, type CollectionFormItem } from "./collectionFormTypes";
+import { COLLECTION_DRAFT_KEY } from "./createDrafts";
 import { Button } from "@/components/ui";
 import {
   ActionRow,
@@ -27,7 +28,7 @@ import {
   PlusIcon,
   TEXTAREA_CLASS,
 } from "@/screens/create/CreateUi";
-const DRAFT_KEY = "collection_draft_v1";
+const DRAFT_KEY = COLLECTION_DRAFT_KEY;
 
 const TITLE_EXAMPLES: Record<CollectionType, string[]> = {
   places: ["עגלות הקפה שאסור לפספס", "המסעדות האהובות עליי", "מקומות לדייט"],
@@ -113,16 +114,33 @@ function SortableItemRow({
   );
 }
 
+function readDraft(type: CollectionType): CollectionFormInitial | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as CollectionFormInitial & { type: CollectionType };
+    return draft.type === type ? draft : null;
+  } catch {
+    return null; // טיוטה פגומה / localStorage חסום - מתעלמים
+  }
+}
+
 /** טופס יצירה/עריכה של אוסף (משותף). כותרת (חובה) · תיאור · Cover · פריטים (לפחות 2, גרירה לסדר) · פרטיות. */
 export function CollectionForm({ mode, type, collectionId, initial, dark = false }: CollectionFormProps) {
   const router = useRouter();
   const labels = COLLECTION_TYPE_LABELS[type];
 
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
-  const [coverUrl, setCoverUrl] = useState<string | null>(initial?.coverUrl ?? null);
-  const [visibility, setVisibility] = useState<CollectionVisibility>(initial?.visibility ?? "public");
-  const [items, setItems] = useState<CollectionFormItem[]>(initial?.items ?? []);
+  // *** תיקון: הטיוטה נטענת כערך ההתחלתי של הטופס (ולא ב-effect). קודם effect השחזור ו-effect השמירה
+  // רצו באותו רגע - השמירה כתבה את הטופס הריק מעל הטיוטה לפני שהשחזור נקלט, והפריטים (למשל מבחירה
+  // מרובה במפה / ב"הבחירות שלי") הלכו לאיבוד.
+  const [draft] = useState<CollectionFormInitial | null>(() => (mode === "create" ? readDraft(type) : null));
+  const start = initial ?? draft;
+  const [title, setTitle] = useState(start?.title ?? "");
+  const [description, setDescription] = useState(start?.description ?? "");
+  const [coverUrl, setCoverUrl] = useState<string | null>(start?.coverUrl ?? null);
+  const [visibility, setVisibility] = useState<CollectionVisibility>(start?.visibility ?? "public");
+  const [items, setItems] = useState<CollectionFormItem[]>(start?.items ?? []);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [coverSheetOpen, setCoverSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -133,26 +151,9 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // *** תיקון (בקשה מפורשת - "וכמובן שמירה קבועה"): מ-sessionStorage (נמחק כשסוגרים את הטאב) ל-
-  // localStorage (שורד סגירת דפדפן/טאב) - כדי שהוספת פריטים לאוסף לא תלך לאיבוד אם יוצאים מהעמוד
-  // לפני "פרסום האוסף" בפועל.
-  useEffect(() => {
-    if (mode !== "create") return;
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const draft = JSON.parse(raw) as CollectionFormInitial & { type: CollectionType };
-      if (draft.type !== type) return;
-      setTitle(draft.title);
-      setDescription(draft.description);
-      setCoverUrl(draft.coverUrl);
-      setVisibility(draft.visibility);
-      setItems(draft.items);
-    } catch {
-      // טיוטה פגומה - מתעלמים
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, type]);
+  // *** תיקון (בקשה מפורשת - "וכמובן שמירה קבועה"): הטיוטה נשמרת ב-localStorage (שורד סגירת דפדפן/טאב) -
+  // כדי שהוספת פריטים לאוסף לא תלך לאיבוד אם יוצאים מהעמוד לפני "פרסום האוסף" בפועל. נטענת למעלה
+  // (readDraft) כערך ההתחלתי.
 
   // *** תוספת (אותה בקשה - "שמירה קבועה"): שמירה שוטפת של הטיוטה בכל שינוי, לא רק ברגע היציאה
   // הזמנית ל"הוספת מקום" (handleGoAddPlace למטה) - כך שכל פריט שנוסף לאוסף נשמר מיד, גם אם המשתמש

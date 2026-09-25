@@ -29,7 +29,8 @@ import {
   Svg,
   TEXTAREA_CLASS,
 } from "@/screens/create/CreateUi";
-const DRAFT_KEY = "trip_draft_v1";
+import { TRIP_DRAFT_KEY } from "@/screens/collections/createDrafts";
+const DRAFT_KEY = TRIP_DRAFT_KEY;
 /** *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, אל תחזיר אותי אחורה לעמוד 'מקום' - תן לי להוסיף
  *  בטיול עצמו כבר"): שני מפתחות session נפרדים מ-DRAFT_KEY (שקיים רק ב-create) - אלה עובדים גם
  *  ב-edit, כי הם לא "טיוטת טופס מלאה" אלא רק "לאיזה יום להוסיף" ו"איזה מקום נוצר/נבחר בדרך".

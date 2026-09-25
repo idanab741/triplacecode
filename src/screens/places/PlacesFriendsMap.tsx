@@ -23,6 +23,7 @@ import type { FriendsMapPin, FriendsMapContribution } from "@/services/social/fr
 import { getFriendPinIcon } from "./friendPin";
 import { ShareToFriendsSheet } from "./ShareToFriendsSheet";
 import { TripMatchCategoryChips } from "@/screens/tripmatch/TripMatchCategoryChips";
+import { SelectionActionBar } from "@/screens/collections/SelectionActionBar";
 import type { HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 
 type Filter = "all" | "friends" | "mine";
@@ -406,6 +407,17 @@ export function PlacesFriendsMap({
   const [fly, setFly] = useState<{ key: string; n: number } | null>(null);
   const [locateToken, setLocateToken] = useState(0);
   const [controlsHidden, setControlsHidden] = useState(false);
+  // *** בחירה מרובה (בקשה מפורשת - "ללחוץ על כמה נעצים במפה ואז ליצור אוסף חדש / מסלול"): במצב הזה
+  // לחיצה על נעץ או כרטיס מסמנת/מבטלת אותו, ובתחתית מופיע בר "אוסף חדש / מסלול חדש".
+  const [selecting, setSelecting] = useState(false);
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
+  function toggleChecked(key: string) {
+    setCheckedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+  function exitSelecting() {
+    setSelecting(false);
+    setCheckedKeys([]);
+  }
   // מעבר רך להעלמה/חזרה של הפקדים שמעל המפה (ר' ControlsAutoHide).
   const controlsStyle = (shiftY: number): React.CSSProperties => ({
     opacity: controlsHidden ? 0 : 1,
@@ -544,10 +556,11 @@ export function PlacesFriendsMap({
               icon={getFriendPinIcon({
                 photoUrl: pin.imageUrl,
                 count: pin.recommendersCount,
-                selected: pin.key === activeKey,
+                selected: !selecting && pin.key === activeKey,
+                checked: selecting && checkedKeys.includes(pin.key),
               })}
-              zIndexOffset={pin.key === activeKey ? 1000 : 0}
-              eventHandlers={{ click: () => handlePinTap(pin.key) }}
+              zIndexOffset={pin.key === activeKey || (selecting && checkedKeys.includes(pin.key)) ? 1000 : 0}
+              eventHandlers={{ click: () => (selecting ? toggleChecked(pin.key) : handlePinTap(pin.key)) }}
             />
           ))}
 
@@ -568,6 +581,15 @@ export function PlacesFriendsMap({
 
       {/* *** בקשה מפורשת: "כולם / חברים / שלי" + כפתור המיקום שלי - למטה, מתחת לפס הכרטיסים
           (מעל הבר התחתון). inset-x-5 = אותם שוליים כמו שורת הכותרת. */}
+      {selecting ? (
+        <SelectionActionBar
+          selectedIds={(pins ?? []).filter((p) => checkedKeys.includes(p.key)).map((p) => p.placeId)}
+          onCancel={exitSelecting}
+          accent="var(--color-places-purple)"
+          className="absolute inset-x-3 z-[1000]"
+          style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 8px)", ...controlsStyle(16) }}
+        />
+      ) : (
       <div
         className="absolute inset-x-5 z-[1000] flex items-center justify-between"
         style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 12px)", ...controlsStyle(16) }}
@@ -592,6 +614,19 @@ export function PlacesFriendsMap({
           })}
         </div>
 
+        <span className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setSelecting(true)}
+          disabled={filtered.length === 0}
+          className={`flex h-10 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-semibold text-ink ring-1 ring-black/[0.06] transition active:scale-95 disabled:opacity-50 ${FLOAT}`}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+            <path d="m8 12.3 2.8 2.8L16 9.6" />
+          </svg>
+          בחירה
+        </button>
         <button
           type="button"
           onClick={handleLocate}
@@ -603,7 +638,9 @@ export function PlacesFriendsMap({
             <path d="M20.5 3.5 3.8 10.4c-.8.3-.7 1.4.1 1.6l6.6 1.5 1.5 6.6c.2.8 1.3.9 1.6.1Z" />
           </svg>
         </button>
+        </span>
       </div>
+      )}
 
       {/* שורת הסינון לפי סוג מקום - אותה שורה כמו בעמוד ההחלקות, בגרסה צפה (לבנה עם צל) מעל המפה
           ובסגול של place's. יושבת ישר מתחת ללוגו. */}
@@ -658,10 +695,11 @@ export function PlacesFriendsMap({
           ref={scrollerRef}
           onScroll={handleCardsScroll}
           className="stories-rail-track absolute inset-x-0 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
-          style={{ scrollbarWidth: "none", bottom: "calc(var(--map-bottom-inset, 0px) + 56px)", ...controlsStyle(24) }}
+          style={{ scrollbarWidth: "none", bottom: `calc(var(--map-bottom-inset, 0px) + ${selecting ? 70 : 56}px)`, ...controlsStyle(24) }}
         >
           {filtered.map((pin) => {
             const selected = pin.key === activeKey;
+            const checked = checkedKeys.includes(pin.key);
             return (
               <button
                 key={pin.key}
@@ -671,13 +709,30 @@ export function PlacesFriendsMap({
                 }}
                 type="button"
                 onClick={() => {
+                  if (selecting) {
+                    toggleChecked(pin.key);
+                    return;
+                  }
                   selectByUser(pin.key);
                   setSheetKey(pin.key);
                 }}
-                className={`w-[72%] max-w-[280px] shrink-0 snap-center rounded-[18px] bg-white p-2.5 text-start transition-shadow duration-200 ${FLOAT} ${
-                  selected ? "ring-2 ring-places-purple" : "ring-1 ring-black/[0.06]"
+                aria-pressed={selecting ? checked : undefined}
+                className={`relative w-[72%] max-w-[280px] shrink-0 snap-center rounded-[18px] bg-white p-2.5 text-start transition-shadow duration-200 ${FLOAT} ${
+                  (selecting ? checked : selected) ? "ring-2 ring-places-purple" : "ring-1 ring-black/[0.06]"
                 }`}
               >
+                {selecting && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute end-2.5 top-2.5 z-[1] flex h-6 w-6 items-center justify-center rounded-full ${
+                      checked ? "bg-places-purple text-white" : "bg-white text-transparent ring-2 ring-black/15"
+                    }`}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m5 12.5 4.5 4.5L19 7.5" />
+                    </svg>
+                  </span>
+                )}
                 <span className="flex items-center gap-2.5">
                   {pin.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
