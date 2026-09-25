@@ -12,10 +12,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   try {
     const collection = await getCollection(supabase, user.id, id);
-    if (!collection) return NextResponse.json({ error: "החוויה לא נמצאה" }, { status: 404 });
+    if (!collection) return NextResponse.json({ error: "המפה לא נמצאה" }, { status: 404 });
     return NextResponse.json({ collection });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בטעינת החוויה" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בטעינת המפה" }, { status: 500 });
   }
 }
 
@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err instanceof CollectionInputError) return NextResponse.json({ error: err.message }, { status: 422 });
-    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בעדכון החוויה" }, { status: 400 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בעדכון המפה" }, { status: 400 });
   }
 }
 
@@ -50,6 +50,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     await deleteCollection(supabase, user.id, id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה במחיקת החוויה" }, { status: 400 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה במחיקת המפה" }, { status: 400 });
   }
 }

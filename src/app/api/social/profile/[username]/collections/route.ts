@@ -24,6 +24,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     const nextCursor = collections.length === PAGE_SIZE ? collections[collections.length - 1].createdAt : null;
     return NextResponse.json({ collections, nextCursor });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בטעינת החוויות" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "שגיאה בטעינת המפות" }, { status: 500 });
   }
 }

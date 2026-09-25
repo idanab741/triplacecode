@@ -262,7 +262,7 @@ const KIND_LABEL: Record<FriendsMapContribution["kind"], string> = {
   review: "ביקורת",
   post: "פוסט",
   trip: "הוסיף/ה לטיול",
-  collection: "הוסיף/ה לאוסף",
+  collection: "הוסיף/ה למפה",
 };
 
 function timeAgo(iso: string): string {
@@ -443,6 +443,7 @@ export function PlacesFriendsMap({
   topOffsetPx = 12,
   area = null,
   onClearArea,
+  pickMode = false,
 }: {
   onCreate?: () => void;
   /** נקרא כשהאצבע נוגעת במפה (true) ובעת הרמתה (false) - העמוד מסתיר בזמן הזה את הטאבים. */
@@ -452,6 +453,8 @@ export function PlacesFriendsMap({
   /** עיר / כפר שנבחרו בחיפוש - המפה מתמקדת בהם ומסמנת את הגבול (גם כשאין שם נעצים). */
   area?: MapArea | null;
   onClearArea?: () => void;
+  /** *** עמוד התוכן ("מפה"): המפה נפתחת ישר בבחירה - נוגעים בנעצים ויוצרים מפה / מסלול. */
+  pickMode?: boolean;
 }) {
   const router = useRouter();
   const [pins, setPins] = useState<FriendsMapPin[] | null>(null);
@@ -466,7 +469,7 @@ export function PlacesFriendsMap({
   const [controlsHidden, setControlsHidden] = useState(false);
   // *** בחירה מרובה (בקשה מפורשת - "ללחוץ על כמה נעצים במפה ואז ליצור אוסף חדש / מסלול"): במצב הזה
   // לחיצה על נעץ או כרטיס מסמנת/מבטלת אותו, ובתחתית מופיע בר "אוסף חדש / מסלול חדש".
-  const [selecting, setSelecting] = useState(false);
+  const [selecting, setSelecting] = useState(pickMode);
   const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
   function toggleChecked(key: string) {
     setCheckedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -497,7 +500,11 @@ export function PlacesFriendsMap({
     fetch("/api/social/map")
       .then((res) => (res.ok ? res.json() : Promise.reject()))
       .then((data) => {
-        if (!cancelled) setPins((data.pins ?? []) as FriendsMapPin[]);
+        if (cancelled) return;
+        const loaded = (data.pins ?? []) as FriendsMapPin[];
+        setPins(loaded);
+        // בבחירה ליצירת מפה - מתחילים מהמקומות של המשתמש (שהעלה / שמר), אם יש כאלה
+        if (pickMode && loaded.some((p) => p.hasSelf || p.savedByViewer)) setFilter("mine");
       })
       .catch(() => {
         if (!cancelled) {
@@ -508,6 +515,7 @@ export function PlacesFriendsMap({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- נטען פעם אחת
   }, []);
 
   const filtered = useMemo(() => {
@@ -650,8 +658,9 @@ export function PlacesFriendsMap({
       {selecting ? (
         <SelectionActionBar
           selectedIds={(pins ?? []).filter((p) => checkedKeys.includes(p.key)).map((p) => p.placeId)}
-          onCancel={exitSelecting}
+          onCancel={pickMode ? (checkedKeys.length > 0 ? () => setCheckedKeys([]) : undefined) : exitSelecting}
           accent="var(--color-places-purple)"
+          allowEmpty={pickMode}
           className="absolute inset-x-3 z-[1000]"
           style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 8px)", ...controlsStyle(16) }}
         />
@@ -687,7 +696,7 @@ export function PlacesFriendsMap({
           type="button"
           onClick={() => setSelecting(true)}
           disabled={filtered.length === 0}
-          aria-label="בחירה מרובה - יצירת אוסף או מסלול"
+          aria-label="בחירה מרובה - יצירת מפה או טיול"
           title="בחירה מרובה"
           className={`flex h-10 w-10 items-center justify-center rounded-full bg-white text-ink ring-1 ring-black/[0.06] transition active:scale-95 disabled:opacity-50 ${FLOAT}`}
         >
@@ -760,7 +769,7 @@ export function PlacesFriendsMap({
           <p className="mt-1 text-[13.5px] leading-relaxed text-ink-secondary">
             {error
               ? "נסו שוב בעוד רגע."
-              : "מקומות שיועלו, יקבלו ביקורת, יפורסמו בפוסט או יתווספו לטיול או לאוסף יופיעו כאן על המפה."}
+              : "מקומות שיועלו, יקבלו ביקורת, יפורסמו בפוסט או יתווספו למפה או לטיול יופיעו כאן על המפה."}
           </p>
           {!error && onCreate && (
             <button

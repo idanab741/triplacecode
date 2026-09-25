@@ -27,12 +27,18 @@ export function SelectionActionBar({
   selectedIds,
   onCancel,
   accent = "#0A6DFE",
+  labels = { collection: "מפה חדשה", trip: "טיול חדש" },
+  allowEmpty = false,
   style,
   className = "",
 }: {
   selectedIds: string[];
-  onCancel: () => void;
+  /** בלי onCancel - אין כפתור ✕ (למשל כשאין מה לבטל) */
+  onCancel?: () => void;
   accent?: string;
+  labels?: { collection: string; trip: string };
+  /** אפשר ליצור גם בלי מקומות שנבחרו - פשוט עוברים לעמוד היצירה הריק */
+  allowEmpty?: boolean;
   style?: CSSProperties;
   className?: string;
 }) {
@@ -42,7 +48,11 @@ export function SelectionActionBar({
   const count = selectedIds.length;
 
   async function create(target: Target) {
-    if (busy || count === 0) return;
+    if (busy) return;
+    if (count === 0) {
+      if (allowEmpty) router.push(target === "collection" ? "/places/collection/create?type=places" : "/places/trip/create");
+      return;
+    }
     setBusy(target);
     setError(null);
     try {
@@ -103,37 +113,39 @@ export function SelectionActionBar({
       aria-label="בחירה מרובה"
     >
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="ביטול הבחירה"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-ink transition active:scale-95"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
-        </button>
-        <span className="min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink">
-          {count === 0 ? "בחרו מקומות" : count === 1 ? "נבחר מקום אחד" : `נבחרו ${count} מקומות`}
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="ביטול הבחירה"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F1F2F5] text-ink transition active:scale-95"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        )}
+        <span className={`min-w-0 flex-1 truncate text-[14.5px] font-bold text-ink ${onCancel ? "" : "ps-2"}`} aria-live="polite">
+          {count === 0 ? "בחרו מקומות" : count === 1 ? "נבחר 1" : `נבחרו ${count}`}
         </span>
         <button
           type="button"
-          disabled={count === 0 || busy !== null}
+          disabled={(count === 0 && !allowEmpty) || busy !== null}
           onClick={() => create("collection")}
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#F1F2F5] px-3.5 text-[13.5px] font-semibold text-ink transition active:scale-95 disabled:opacity-45"
         >
           {busy === "collection" ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/15 border-t-ink" /> : null}
-          אוסף חדש
+          {labels.collection}
         </button>
         <button
           type="button"
-          disabled={count === 0 || busy !== null}
+          disabled={(count === 0 && !allowEmpty) || busy !== null}
           onClick={() => create("trip")}
           className="flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold text-white transition active:scale-95 disabled:opacity-45"
           style={{ background: accent }}
         >
           {busy === "trip" ? spinner : null}
-          מסלול חדש
+          {labels.trip}
         </button>
       </div>
       {error && <p className="px-1 pt-2 text-[12.5px] text-danger">{error}</p>}

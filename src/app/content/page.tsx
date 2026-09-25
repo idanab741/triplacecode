@@ -1,117 +1,286 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import Image from "next/image";
+import dynamic from "next/dynamic";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
-import { CollectionTypeSheet } from "@/screens/collections/CollectionTypeSheet";
+import { setPendingCreateMedia } from "@/screens/create/pendingCreateMedia";
 
-type TileId = "post" | "place" | "collection" | "trip";
+const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap").then((m) => m.PlacesFriendsMap), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-[#F2F0EB]" />,
+});
 
-/* ───────────── אייקוני קו דקים, בגרדיאנט של האקסנט של כל ריבוע ───────────── */
+type ModeId = "moment" | "place" | "map";
 
-/** *** עיצוב מחדש: קו אחיד בצבע האקסנט של הריבוע (בלי גרדיאנט), עבה מעט יותר כדי להיות חד על שחור. */
-function Icon({ children }: { id: string; children: ReactNode }) {
+/* *** בקשה מפורשת ("רגע · מקום · מפה" - וכל מצב פותח את הכלי עצמו, כמו באפליקציות המוכרות):
+   רגע = מצלמה / גלריה (כמו אפליקציית המצלמה), מקום = כוכבים (כמו "דרגו וכתבו ביקורת" ב-Google Maps),
+   מפה = המפה של places עצמה - נוגעים בנעצים ויוצרים מפה או מסלול. */
+const MODES: { id: ModeId; label: string }[] = [
+  { id: "moment", label: "רגע" },
+  { id: "place", label: "מקום" },
+  { id: "map", label: "מפה" },
+];
+
+const RATING_LABELS = ["", "לא משהו", "סביר", "טוב", "טוב מאוד", "מושלם!"];
+const STAR_PATH = "M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.08 6.33L12 17.31l-5.68 2.99 1.08-6.33-4.6-4.49 6.36-.92L12 2.8z";
+
+const CSS = `
+.cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
+.cx-stage { position:relative; border-radius:24px; overflow:hidden; background:#121214; touch-action:pan-y; user-select:none; -webkit-user-select:none; }
+.cx-scene { animation:cx-scene-in .38s cubic-bezier(.2,.8,.2,1) both; }
+.cx-scene[data-dir="prev"] { animation-name:cx-scene-in-prev; }
+@keyframes cx-scene-in { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:none; } }
+@keyframes cx-scene-in-prev { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+/* עינית: פינות מסגרת, כמו במצלמה */
+.cx-corner { position:absolute; width:26px; height:26px; border:0 solid rgba(255,255,255,.3); }
+.cx-corner[data-c="tl"] { top:0; left:0; border-top-width:2px; border-left-width:2px; border-top-left-radius:14px; }
+.cx-corner[data-c="tr"] { top:0; right:0; border-top-width:2px; border-right-width:2px; border-top-right-radius:14px; }
+.cx-corner[data-c="bl"] { bottom:0; left:0; border-bottom-width:2px; border-left-width:2px; border-bottom-left-radius:14px; }
+.cx-corner[data-c="br"] { bottom:0; right:0; border-bottom-width:2px; border-right-width:2px; border-bottom-right-radius:14px; }
+.cx-press { -webkit-tap-highlight-color:transparent; transition:transform .16s cubic-bezier(.2,.8,.2,1), background-color .2s, opacity .2s; }
+.cx-press:active { transform:scale(.94); }
+.cx-shutter:active .cx-shutter-core { transform:scale(.86); }
+.cx-shutter-core { transition:transform .16s cubic-bezier(.2,.8,.2,1); }
+.cx-star { -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.3,1.6,.5,1); }
+.cx-star[data-on="true"] { animation:cx-star-pop .34s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes cx-star-pop { 0% { transform:scale(.8); } 60% { transform:scale(1.14); } 100% { transform:scale(1); } }
+.cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
+.cx-mode { -webkit-tap-highlight-color:transparent; transition:color .25s; }
+.cx-page :focus-visible { outline:2px solid #0A6DFE; outline-offset:3px; }
+@media (prefers-reduced-motion: reduce) { .cx-scene, .cx-star[data-on="true"] { animation:none !important; } .cx-rail { transition:none; } }
+`;
+
+/* ───────────── אייקונים ───────────── */
+
+function GalleryIcon() {
   return (
-    <svg viewBox="0 0 48 48" fill="none" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" stroke="var(--a)" className="h-full w-full" aria-hidden="true">
-      {children}
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+      <circle cx="9" cy="9.2" r="1.7" />
+      <path d="m20.5 15.5-4.6-4.6a1.2 1.2 0 0 0-1.7 0L5 20.2" />
     </svg>
   );
 }
 
-const ART: Record<TileId, ReactNode> = {
-  post: (
-    <Icon id="cx-post">
-      <path d="M8 12.5A4.5 4.5 0 0 1 12.5 8h23A4.5 4.5 0 0 1 40 12.5v16a4.5 4.5 0 0 1-4.5 4.5H21l-8.5 7V33A4.5 4.5 0 0 1 8 28.5v-16Z" />
-      <path d="M15 17h18M15 24h11" />
-    </Icon>
-  ),
-  place: (
-    <Icon id="cx-place">
-      <path d="M24 42S11 30.5 11 20a13 13 0 0 1 26 0c0 10.5-13 22-13 22Z" />
-      <circle cx="24" cy="20" r="4.5" />
-    </Icon>
-  ),
-  collection: (
-    <Icon id="cx-collection">
-      <rect x="9" y="8" width="26" height="22" rx="4.5" opacity=".4" />
-      <rect x="13" y="13" width="26" height="22" rx="4.5" opacity=".7" />
-      <rect x="17" y="18" width="24" height="22" rx="4.5" />
-      <path d="m20 36 6-6 4 4 3-3 5 5" />
-    </Icon>
-  ),
-  trip: (
-    <Icon id="cx-trip">
-      <circle cx="10" cy="37" r="3" />
-      <circle cx="24" cy="26" r="3" />
-      <circle cx="38" cy="10" r="3" />
-      <path d="M12.5 35c3-2 6-4 9-7.5M26.5 24c4-3 7-6.5 9-11.5" strokeDasharray="2.5 3.5" />
-    </Icon>
-  ),
-};
-
-interface Tile {
-  id: TileId;
-  title: string;
-  /** שורה אחת: מה זה. */
-  sub: string;
-  a: string;
-  b: string;
+function CameraIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.3l1.3-1.8c.3-.4.7-.7 1.2-.7h3.4c.5 0 .9.3 1.2.7L16.2 6h1.3A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5Z" />
+      <circle cx="12" cy="12.4" r="3.4" />
+    </svg>
+  );
 }
 
-const TILES: Tile[] = [
-  { id: "post", title: "פוסט", sub: "שתפו רגע מהדרך", a: "#FF8FB8", b: "#FFA96B" },
-  { id: "place", title: "מקום", sub: "המלצה על מקום שאהבתם", a: "#B69CFF", b: "#5EC8FF" },
-  { id: "collection", title: "חוויות", sub: "מקומות וטיולים תחת רעיון אחד", a: "#5BE3A8", b: "#38D6E8" },
-  { id: "trip", title: "טיול", sub: "מסלול תחנות מוכן לדרך", a: "#FFCB5C", b: "#FF7F8E" },
-];
+function SearchIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </svg>
+  );
+}
 
-const CSS = `
-.cx-page { background:#000; color:#fff; min-height:100vh; min-height:100dvh; }
-/* זוהר יחיד ושקט בראש העמוד, מאחורי הדמות - בלי תנועה */
-.cx-glow { position:absolute; inset-inline:0; top:0; height:30rem; pointer-events:none;
-  background:radial-gradient(ellipse 70% 60% at 50% 38%, rgba(0,124,254,.16), transparent 70%); }
-/* רגע כניסה אחד בלבד - הדמות. הריבועים לא "קופצים" אחד-אחד. */
-.cx-hero { animation:cx-hero-in .7s cubic-bezier(.2,.8,.2,1) .05s backwards; }
-@keyframes cx-hero-in { from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none} }
+/* ───────────── רגע: מצלמה / גלריה ───────────── */
 
-/* *** עיצוב מחדש (בקשה מפורשת - "לסדר את העמוד"): ריבועים שקטים - משטח אפור-כהה אחיד, בלי מסגרת,
-   בלי הילה צבעונית ובלי אנימציית כניסה. הצבע של כל סוג מופיע רק באייקון ובמשטח העדין שמאחוריו. */
-.cx-tile { position:relative; border-radius:22px; text-align:start; background:#141416;
-  -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.2,.8,.2,1), background-color .2s; }
-.cx-tile:active { transform:scale(.97); background:#1b1b1e; }
-@media (hover:hover) { .cx-tile:hover { background:#1b1b1e; } }
-.cx-tile:focus-visible { outline:2px solid var(--a); outline-offset:3px; }
-.cx-icon { background:color-mix(in srgb, var(--a) 14%, transparent); }
-@media (prefers-reduced-motion: reduce) { .cx-hero { animation:none !important; } }
-`;
+/** כמו אפליקציית המצלמה: עינית, ולמטה גלריה · כפתור צילום · טקסט. בחירה -> עמוד הפוסט עם הקבצים כבר בפנים. */
+function MomentStage({ onFiles, onTextOnly }: { onFiles: (files: File[]) => void; onTextOnly: () => void }) {
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  function handle(list: FileList | null) {
+    const files = list ? Array.from(list) : [];
+    if (files.length > 0) onFiles(files);
+  }
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="relative m-4 mb-0 flex flex-1 flex-col items-center justify-center px-8 text-center">
+        {["tl", "tr", "bl", "br"].map((c) => (
+          <span key={c} aria-hidden="true" data-c={c} className="cx-corner" />
+        ))}
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.07] text-white/85">
+          <CameraIcon />
+        </span>
+        <h2 className="mt-4 text-[21px] font-bold tracking-tight">שתפו רגע מהדרך</h2>
+        <p className="mt-1 text-[14.5px] text-white/55">צלמו עכשיו, או בחרו מהגלריה</p>
+      </div>
+
+      {/* שורת המצלמה - אותו סדר כמו בכל אפליקציית מצלמה (גלריה משמאל, טקסט מימין) */}
+      <div className="flex items-center justify-between px-8 pb-6 pt-4" dir="ltr">
+        <span className="flex w-16 flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => galleryRef.current?.click()}
+            aria-label="בחירה מהגלריה"
+            className="cx-press flex h-[52px] w-[52px] items-center justify-center rounded-[14px] bg-white/10 text-white ring-2 ring-white/85"
+          >
+            <GalleryIcon />
+          </button>
+          <span className="text-[11.5px] font-medium text-white/60" aria-hidden="true">גלריה</span>
+        </span>
+
+        <button
+          type="button"
+          onClick={() => cameraRef.current?.click()}
+          aria-label="צילום"
+          className="cx-press cx-shutter flex h-[78px] w-[78px] items-center justify-center rounded-full border-[4px] border-white"
+        >
+          <span className="cx-shutter-core block h-[62px] w-[62px] rounded-full bg-white" />
+        </button>
+
+        <span className="flex w-16 flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onTextOnly}
+            aria-label="פוסט טקסט בלבד"
+            className="cx-press flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white/10 text-[18px] font-bold text-white"
+          >
+            Aa
+          </button>
+          <span className="text-[11.5px] font-medium text-white/60" aria-hidden="true">טקסט</span>
+        </span>
+      </div>
+
+      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" className="hidden" onChange={(e) => handle(e.target.files)} />
+      <input ref={galleryRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => handle(e.target.files)} />
+    </div>
+  );
+}
+
+/* ───────────── מקום: כוכבים ───────────── */
+
+/** כמו "דרגו וכתבו ביקורת" במפות: קודם כוכבים, אחר כך בוחרים את המקום (או מוסיפים חדש). */
+function PlaceStage({ onSearch, onAdd }: { onSearch: (rating: number) => void; onAdd: (rating: number) => void }) {
+  const [rating, setRating] = useState(0);
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <h2 className="text-[24px] font-bold tracking-tight">איך היה?</h2>
+      <p className="mt-1 text-[14.5px] text-white/55">דרגו מקום שהייתם בו - וכולם יגלו אותו</p>
+
+      <div className="mt-7 flex justify-center gap-1" dir="ltr" role="radiogroup" aria-label="דירוג">
+        {[1, 2, 3, 4, 5].map((star) => {
+          const on = star <= rating;
+          return (
+            <button
+              key={star}
+              type="button"
+              role="radio"
+              aria-checked={star === rating}
+              aria-label={`${star} כוכבים - ${RATING_LABELS[star]}`}
+              onClick={() => setRating(star)}
+              data-on={on}
+              className="cx-star p-1"
+            >
+              <svg width="46" height="46" viewBox="0 0 24 24" aria-hidden="true">
+                <path d={STAR_PATH} fill={on ? "#F5B301" : "rgba(255,255,255,0.14)"} strokeLinejoin="round" />
+              </svg>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 h-5 text-[14.5px] font-semibold text-[#F5B301]" aria-live="polite">
+        {RATING_LABELS[rating]}
+      </p>
+
+      {/* השלב הבא: על איזה מקום? - מתבהר אחרי שדירגו */}
+      <button
+        type="button"
+        onClick={() => onSearch(rating)}
+        className={`cx-press mt-7 flex h-12 w-full max-w-[20rem] items-center gap-2.5 rounded-full px-5 text-start text-[15.5px] ${
+          rating > 0 ? "bg-white font-semibold text-[#0f1419]" : "bg-white/10 text-white/70"
+        }`}
+      >
+        <SearchIcon />
+        על איזה מקום?
+      </button>
+      <button type="button" onClick={() => onAdd(rating)} className="cx-press mt-4 text-[14px] font-medium text-white/60 underline-offset-4 active:text-white">
+        המקום לא ב-triplace? <span className="font-semibold text-white">הוסיפו אותו</span>
+      </button>
+    </div>
+  );
+}
+
+/* ───────────── העמוד ───────────── */
 
 /**
- * "תוכן" - הטאב שבבר התחתון. עמוד יצירה שחור: הבר העליון של triplace (כמו בעמוד הבית), כותרת + שורת הסבר, ה-HERO (הדמות מציצה מעל
- * הכרטיסיות ומצביעה עליהן), ו-4 ריבועים (פוסט / מקום / אוסף / טיול - אותן 4 פעולות של תפריט ה-+ ב-places).
- * הבר התחתון שחור (tone="dark") - אייקונים ותוויות בלבן, הטאב הפעיל נשאר בצבעיו.
- * לחיצה על ריבוע מובילה לזרימת היצירה הקיימת - לא נוצרת כאן לוגיקה חדשה:
- *  פוסט -> /places/post/create · מקום -> /places/create
- *  אוסף -> "מה תרצו לאסוף?" -> /places/collection/create · טיול -> /places/trip/create
+ * *** עיצוב מחדש (בקשה מפורשת - "כמו באינסטגרם: להחליק ימינה ושמאלה בין סוגי ההעלאה"):
+ * "תוכן" - הטאב שבבר התחתון. במסך אחד: הכלי של המצב הנבחר, ומתחתיו שורת המצבים רגע · מקום · מפה
+ * (כמו POST / STORY / REEL). מחליפים מצב בהחלקה (על המסך או על השורה), בלחיצה על השורה או בחיצים.
+ * כל מצב ממשיך לזרימת היצירה הקיימת - לא נוצרת כאן לוגיקה חדשה:
+ *  רגע  -> /places/post/create (עם הקבצים שנבחרו)
+ *  מקום -> /places/create?rating=N (או ?add=1 להוספת מקום חדש)
+ *  מפה  -> בחירת נעצים -> /places/collection/create (מפה) או /places/trip/create (מסלול)
  */
 export default function ContentPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [collectionTypeOpen, setCollectionTypeOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [dir, setDir] = useState<"next" | "prev">("next");
+  const mode = MODES[index];
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
   }, [authLoading, user, router]);
 
-  function handleSelect(id: TileId) {
-    if (id === "post") router.push("/places/post/create");
-    else if (id === "place") router.push("/places/create");
-    else if (id === "collection") setCollectionTypeOpen(true);
-    else router.push("/places/trip/create");
+  function go(next: number) {
+    const clamped = Math.max(0, Math.min(MODES.length - 1, next));
+    if (clamped === index) return;
+    setDir(clamped > index ? "next" : "prev");
+    setIndex(clamped);
+    navigator.vibrate?.(8);
   }
+
+  // החלקה. האפליקציה בעברית (מימין לשמאל): המצב הבא נמצא משמאל, לכן החלקה ימינה = הבא.
+  // על המפה ההחלקה מזיזה את המפה - שם מחליפים מצב רק מהשורה שלמטה.
+  const drag = useRef<{ x: number; y: number } | null>(null);
+  function onPointerDown(e: PointerEvent) {
+    drag.current = (e.target as HTMLElement).closest(".places-friends-map") ? null : { x: e.clientX, y: e.clientY };
+  }
+  function onPointerUp(e: PointerEvent) {
+    const start = drag.current;
+    drag.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    go(index + (dx > 0 ? 1 : -1));
+  }
+  function onKeyDown(e: KeyboardEvent) {
+    // רק כשהפוקוס על המסך/השורה עצמם - לא בתוך הכוכבים או המפה
+    if (e.target !== e.currentTarget && (e.target as HTMLElement).getAttribute("role") !== "tab") return;
+    if (e.key === "ArrowLeft") go(index + 1);
+    else if (e.key === "ArrowRight") go(index - 1);
+  }
+  const swipe = { onPointerDown, onPointerUp, onPointerCancel: () => (drag.current = null) };
+
+  // שורת המצבים: המצב הנבחר תמיד במרכז (כמו באינסטגרם) - מזיזים את כל השורה.
+  const railBoxRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [railShift, setRailShift] = useState(0);
+  const railShiftRef = useRef(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const box = railBoxRef.current;
+      const item = itemRefs.current[index];
+      if (!box || !item) return;
+      const boxRect = box.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const current = itemRect.left + itemRect.width / 2 - railShiftRef.current;
+      const next = boxRect.left + boxRect.width / 2 - current;
+      railShiftRef.current = next;
+      setRailShift(next);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [index]);
+
+  const ratingQuery = (rating: number) => (rating > 0 ? `rating=${rating}` : "");
 
   return (
     <>
@@ -119,77 +288,70 @@ export default function ContentPage() {
       <style>{CSS}</style>
 
       <div className="cx-page relative isolate flex flex-col">
-        <span className="cx-glow -z-10" aria-hidden="true" />
-
-        {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית: צ'אט · לוגו · התראות) */}
-        {/* *** בקשה מפורשת: בעמוד הזה בלבד (רקע כהה) - הלוגו triplace בלבן. */}
+        {/* הבר העליון של triplace (אותו בר כמו בעמוד הבית), לוגו בלבן על הרקע הכהה */}
         <CollapsibleTopBar logoTone="white" />
+        <h1 className="sr-only">יצירת תוכן</h1>
 
-        {/* *** בקשה מפורשת - "שיהיה רווח קצת בין הבר העליון לכותרת": pt-1 -> pt-7. */}
-        <main className="flex flex-1 flex-col justify-start px-6 pb-32 pt-7">
-          <div className="mx-auto w-full max-w-sm">
-            {/* *** תיקון: הכותרת נשברה באמצע ("triplace" בשורה אחת, "creator's" בשורה הבאה) כי עברית ואנגלית
-                מעורבבות. עכשיו "triplace creator's" הוא יחידה אחת LTR שלא נשברת - תמיד בשורה משלה. */}
-            <h1 className="text-center text-[24px] font-bold leading-[1.25] tracking-tight">
-              הצטרפו לקהילת
-              <br />
-              <bdi dir="ltr" className="whitespace-nowrap">
-                triplace creator&apos;s
-              </bdi>
-            </h1>
-            <p className="mx-auto mb-5 mt-2 max-w-[19rem] text-balance text-center text-[15px] leading-snug text-white/60">שתפו את המקומות, הטיולים והרעיונות שלכם</p>
+        <main className="flex flex-1 flex-col px-3 pt-2" style={{ paddingBottom: "calc(66px + max(env(safe-area-inset-bottom), 22px) + 8px)" }}>
+          <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
+            <section
+              aria-roledescription="קרוסלה"
+              aria-label={`יצירה: ${mode.label}`}
+              tabIndex={0}
+              onKeyDown={onKeyDown}
+              {...swipe}
+              className="cx-stage mt-1 min-h-[440px] flex-1 outline-none"
+            >
+              <div key={mode.id} data-dir={dir} className="cx-scene absolute inset-0">
+                {mode.id === "moment" && (
+                  <MomentStage
+                    onFiles={(files) => {
+                      setPendingCreateMedia(files);
+                      router.push("/places/post/create");
+                    }}
+                    onTextOnly={() => router.push("/places/post/create")}
+                  />
+                )}
+                {mode.id === "place" && (
+                  <PlaceStage
+                    onSearch={(rating) => router.push(`/places/create${rating ? `?${ratingQuery(rating)}` : ""}`)}
+                    onAdd={(rating) => router.push(`/places/create?add=1${rating ? `&${ratingQuery(rating)}` : ""}`)}
+                  />
+                )}
+                {mode.id === "map" && <PlacesFriendsMap pickMode />}
+              </div>
+            </section>
 
-            {/* ה-HERO: הדמות "מציצה" מעל קצה הכרטיסיות ומצביעה עליהן. החלק שמתחת לקצה התמונה (האצבע, ~6.6% מרוחב המכולה)
-                יורד אל תוך הכרטיסיות - לכן margin שלילי, ו-pointer-events-none כדי לא לחסום לחיצה על הכרטיס. */}
-            <div className="cx-hero pointer-events-none relative z-10 mx-auto -mb-[6.6%] w-[88%]" aria-hidden="true">
-              <Image
-                src="/images/content-hero.png"
-                alt=""
-                width={720}
-                height={492}
-                priority
-                draggable={false}
-                sizes="(max-width: 420px) 80vw, 340px"
-                className="h-auto w-full select-none"
-              />
-            </div>
-
-            <section aria-label="בחירת סוג תוכן ליצירה">
-              <div className="grid w-full grid-cols-2 gap-2.5">
-                {TILES.map((tile) => (
+            {/* שורת המצבים - כמו POST / STORY / REEL באינסטגרם */}
+            <div ref={railBoxRef} {...swipe} className="relative mt-2 overflow-hidden" role="tablist" aria-label="בחירת סוג העלאה" onKeyDown={onKeyDown}>
+              <div className="cx-rail flex w-max gap-8 px-4 py-3" dir="rtl" style={{ transform: `translateX(${railShift}px)` }}>
+                {MODES.map((m, i) => (
                   <button
-                    key={tile.id}
+                    key={m.id}
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
                     type="button"
-                    onClick={() => handleSelect(tile.id)}
-                    aria-label={`יצירת ${tile.title}: ${tile.sub}`}
-                    className="cx-tile flex min-h-[150px] flex-col justify-between p-4"
-                    style={{ "--a": tile.a, "--b": tile.b } as CSSProperties}
+                    role="tab"
+                    aria-selected={i === index}
+                    onClick={() => go(i)}
+                    className={`cx-mode relative text-[15.5px] font-bold tracking-wide ${i === index ? "text-white" : "text-white/40"}`}
                   >
-                    <span className="cx-icon flex h-11 w-11 items-center justify-center rounded-[14px]">
-                      <span className="block h-6 w-6">{ART[tile.id]}</span>
-                    </span>
-                    <span className="mt-6 block">
-                      <span className="block text-[18px] font-semibold leading-tight text-white">{tile.title}</span>
-                      <span className="mt-1 block text-balance text-[13px] leading-snug text-white/55">{tile.sub}</span>
-                    </span>
+                    {m.label}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute -bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-white transition-opacity duration-300 ${i === index ? "opacity-100" : "opacity-0"}`}
+                    />
                   </button>
                 ))}
               </div>
-            </section>
+            </div>
           </div>
         </main>
       </div>
 
       {/* בר תחתון שחור: כל האייקונים והתוויות בלבן, חוץ מ"תוכן" (הטאב הפעיל) שנשאר בצבעיו */}
       <MainBottomNav active="content" tone="dark" />
-
-      {collectionTypeOpen && (
-        <CollectionTypeSheet
-          dark
-          onClose={() => setCollectionTypeOpen(false)}
-          onSelect={(type) => router.push(`/places/collection/create?type=${type}&origin=content`)}
-        />
-      )}
     </>
   );
 }

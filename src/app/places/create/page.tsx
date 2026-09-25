@@ -225,7 +225,8 @@ export function CreatePlacePageContent() {
   const searchSeqRef = useRef(0);
 
   // 2. הוספת מקום חדש
-  const [addOpen, setAddOpen] = useState(false);
+  // ?add=1 - "המקום לא קיים? הוסיפו אותו" מעמוד התוכן: נפתח ישר בטופס ההוספה.
+  const [addOpen, setAddOpen] = useState(() => searchParams.get("add") === "1");
   const [category, setCategory] = useState<PlaceSubmissionCategory | null>(null);
   const [nameQuery, setNameQuery] = useState("");
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[] | null>(null);
@@ -249,7 +250,11 @@ export function CreatePlacePageContent() {
   // 3. ביקורת
   const [selected, setSelected] = useState<SelectedPlace | null>(null);
   const [justAdded, setJustAdded] = useState(false);
-  const [rating, setRating] = useState(0);
+  // ?rating=1..5 - הכוכבים שנבחרו כבר בעמוד התוכן ("מקום"). נשמרים עד שבוחרים מקום.
+  const [rating, setRating] = useState(() => {
+    const r = Number(searchParams.get("rating"));
+    return Number.isInteger(r) && r >= 1 && r <= 5 ? r : 0;
+  });
   const [comment, setComment] = useState("");
   const [media, setMedia] = useState<(UploadedMedia & { previewUrl: string })[]>([]);
   const [uploading, setUploading] = useState(false);

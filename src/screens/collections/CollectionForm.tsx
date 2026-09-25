@@ -210,7 +210,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
               body: JSON.stringify(body),
             });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "שגיאה בשמירת החוויה");
+      if (!res.ok) throw new Error(data.error ?? "שגיאה בשמירת המפה");
       // *** תיקון (אותה בקשה - "שמירה קבועה"): פורסם בהצלחה - מוחקים את הטיוטה הקבועה, כדי שאוסף
       // הבא (create) לא "יירש" בטעות את הפריטים של האוסף הזה.
       if (mode === "create") {
@@ -222,20 +222,20 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
       }
       router.replace(`/places/collection/${mode === "create" ? data.id : collectionId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה בשמירת החוויה");
+      setError(err instanceof Error ? err.message : "שגיאה בשמירת המפה");
       setSubmitting(false);
     }
   }
 
   async function handleDelete() {
-    if (!collectionId || !window.confirm("למחוק את החוויה? הפעולה לא הפיכה.")) return;
+    if (!collectionId || !window.confirm("למחוק את המפה? הפעולה לא הפיכה.")) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/social/collections/${collectionId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("שגיאה במחיקת החוויה");
+      if (!res.ok) throw new Error("שגיאה במחיקת המפה");
       router.replace("/home");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה במחיקת החוויה");
+      setError(err instanceof Error ? err.message : "שגיאה במחיקת המפה");
       setSubmitting(false);
     }
   }
@@ -248,22 +248,22 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
       {/* *** עיצוב מחדש (בקשה מפורשת - "נתאים לעיצוב של האפליקציה"): אותה שפה כמו יצירת פוסט/מקום -
           כותרת גדולה + שורת הסבר, שדות אפורים-בהירים בלי מסגרות, כחול לבחירה, והכפתור הראשי הקבוע. */}
       <CreatePageHeader
-        title={mode === "create" ? "יצירת חוויה" : "עריכת חוויה"}
+        title={mode === "create" ? "יצירת מפה" : "עריכת מפה"}
         subtitle={
           <span className="inline-flex items-center gap-1.5">
             <span className="text-ink">{type === "places" ? <PinIcon size={15} /> : <PlaneIcon size={15} />}</span>
-            {type === "places" ? "חוויה של מקומות - אספו מקומות סביב רעיון אחד" : "חוויה של טיולים - אספו טיולים שאהבתם"}
+            {type === "places" ? "המקומות שאהבתם, סביב רעיון אחד" : "הטיולים שאהבתם, במקום אחד"}
           </span>
         }
       />
 
-      <FieldLabel htmlFor="collection-title">איך תקראו לחוויה?</FieldLabel>
+      <FieldLabel htmlFor="collection-title">איך תקראו למפה?</FieldLabel>
       <input
         id="collection-title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         maxLength={COLLECTION_LIMITS.maxTitle}
-        placeholder="כותרת החוויה"
+        placeholder="כותרת המפה"
         className={`${FIELD_CLASS} text-[16px]`}
       />
       {/* רעיונות לכותרת - לחיצה ממלאת את השדה. נעלמים ברגע שמתחילים לכתוב. */}
@@ -292,13 +292,13 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
           onChange={(e) => setDescription(e.target.value)}
           maxLength={COLLECTION_LIMITS.maxDescription}
           rows={3}
-          placeholder="ספרו בקצרה על החוויה..."
+          placeholder="ספרו בקצרה על המפה..."
           className={TEXTAREA_CLASS}
         />
       </div>
 
       <div className="mt-6">
-        <FieldLabel>תמונת החוויה</FieldLabel>
+        <FieldLabel>תמונת המפה</FieldLabel>
         <div className="relative overflow-hidden rounded-[20px]">
           <CollectionCover coverUrl={coverUrl} collageUrls={itemImages} type={type} className="aspect-[16/9]" />
           <button
@@ -361,7 +361,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
       {error && <ErrorBox>{error}</ErrorBox>}
 
       <Button type="button" fullWidth disabled={!canPublish} onClick={handleSubmit} className="mt-8">
-        {submitting ? "שומרים..." : mode === "create" ? "פרסום החוויה" : "שמירת שינויים"}
+        {submitting ? "שומרים..." : mode === "create" ? "פרסום המפה" : "שמירת שינויים"}
       </Button>
 
       {mode === "edit" && (
@@ -371,7 +371,7 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
           disabled={submitting}
           className="mt-2 h-11 w-full text-[14px] font-semibold text-[#C8373C] disabled:opacity-50"
         >
-          מחיקת החוויה
+          מחיקת המפה
         </button>
       )}
 
@@ -385,7 +385,6 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
           // *** תיקון (בקשה מפורשת - "עכשיו רק באוסף - במקומות ובטיולים - צריך להחזיר את 'מה תרצו
           // להוסיף' לצבע לבן"): "מה תרצו להוסיף?" נשאר תמיד לבן בזרימת האוסף - גם ב-type="places"
           // וגם ב-type="trips" - בלי קשר ל-dark שהתקבל מ-collection/create/page.tsx (origin=content).
-          // ה-dark ההוא עדיין משפיע על CollectionTypeSheet הקודם ("מה תרצו לאסוף?") - לא נגעתי בו.
         />
       )}
 
@@ -393,8 +392,8 @@ export function CollectionForm({ mode, type, collectionId, initial, dark = false
         <CoverPickerSheet
           coverUrl={coverUrl}
           imageUrls={itemImages}
-          heading="בחירת תמונת החוויה"
-          autoLabel="תמונת חוויה אוטומטית"
+          heading="בחירת תמונת המפה"
+          autoLabel="תמונה אוטומטית"
           onSelect={(url) => {
             setCoverUrl(url);
             setCoverSheetOpen(false);
