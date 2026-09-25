@@ -661,6 +661,7 @@ export function PlacesFriendsMap({
           onCancel={pickMode ? (checkedKeys.length > 0 ? () => setCheckedKeys([]) : undefined) : exitSelecting}
           accent="var(--color-places-purple)"
           allowEmpty={pickMode}
+          allowAddToExisting={!pickMode}
           className="absolute inset-x-3 z-[1000]"
           style={{ bottom: "calc(var(--map-bottom-inset, 0px) + 8px)", ...controlsStyle(16) }}
         />
@@ -791,7 +792,7 @@ export function PlacesFriendsMap({
           ref={scrollerRef}
           onScroll={handleCardsScroll}
           className="stories-rail-track absolute inset-x-0 z-[1000] flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-3 pt-2"
-          style={{ scrollbarWidth: "none", bottom: `calc(var(--map-bottom-inset, 0px) + ${selecting ? 70 : 56}px)`, ...controlsStyle(24) }}
+          style={{ scrollbarWidth: "none", bottom: `calc(var(--map-bottom-inset, 0px) + ${selecting ? (checkedKeys.length > 0 && !pickMode ? 114 : 70) : 56}px)`, ...controlsStyle(24) }}
         >
           {filtered.map((pin) => {
             const selected = pin.key === activeKey;

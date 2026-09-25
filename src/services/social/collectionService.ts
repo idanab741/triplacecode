@@ -676,3 +676,74 @@ export const addCollectionComment = (supabase: SupabaseClient, collectionId: str
 
 export const deleteCollectionComment = (supabase: SupabaseClient, commentId: string, authorId: string) =>
   deleteTargetComment(supabase, "collection_id", commentId, authorId);
+
+// ────────────────────────────────────────────────────────────────────────────
+// הוספה מהירה למפה קיימת (רק היוצר)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * *** בקשה מפורשת ("להוסיף מקומות למפה אחרי שכבר נשמרה"): מוסיף פריטים לסוף מפה קיימת בלי לעבור
+ * דרך טופס העריכה. במפת מקומות - placeIds; במפת טיולים - trips ({ id, source }). פריט שכבר במפה מדולג.
+ */
+export async function addItemsToCollection(
+  supabase: SupabaseClient,
+  userId: string,
+  collectionId: string,
+  raw: unknown
+): Promise<{ added: number; skipped: number }> {
+  const { data: existing, error: existingError } = await supabase
+    .from("collections")
+    .select("id, author_id, collection_type")
+    .eq("id", collectionId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (!existing) throw new CollectionInputError("המפה לא נמצאה");
+  if (existing.author_id !== userId) throw new CollectionInputError("רק היוצר יכול להוסיף למפה");
+
+  const type = existing.collection_type as CollectionType;
+  const body = (raw ?? {}) as { placeIds?: unknown; trips?: unknown };
+  const requested: CollectionItemInput[] = [];
+  if (type === "places") {
+    for (const id of Array.isArray(body.placeIds) ? body.placeIds : []) {
+      if (typeof id === "string" && UUID_RE.test(id)) requested.push({ kind: "place", refId: id, note: null });
+    }
+  } else {
+    for (const entry of Array.isArray(body.trips) ? body.trips : []) {
+      const t = (entry ?? {}) as { id?: unknown; source?: unknown };
+      if (typeof t.id !== "string" || !UUID_RE.test(t.id)) continue;
+      if (t.source !== "session" && t.source !== "trippy_ai" && t.source !== "trip") continue;
+      requested.push({ kind: "trip", refId: t.id, tripSource: t.source, note: null });
+    }
+  }
+  if (requested.length === 0) {
+    throw new CollectionInputError(type === "places" ? "לא נבחרו מקומות להוספה" : "לא נבחרו טיולים להוספה");
+  }
+
+  const { data: currentRows, error: currentError } = await supabase
+    .from("collection_items")
+    .select("id, item_type, place_id, trip_session_id, trippy_ai_result_id, trip_id, position")
+    .eq("collection_id", collectionId);
+  if (currentError) throw currentError;
+  const current = (currentRows ?? []) as (ExistingItemRow & { position: number })[];
+  const currentKeys = new Set(current.map(existingItemKey));
+
+  const seen = new Set<string>();
+  const toAdd = requested.filter((item) => {
+    const key = inputItemKey(item);
+    if (currentKeys.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const skipped = requested.length - toAdd.length;
+  if (toAdd.length === 0) return { added: 0, skipped };
+
+  if (current.length + toAdd.length > COLLECTION_LIMITS.maxItems) {
+    throw new CollectionInputError(`אפשר עד ${COLLECTION_LIMITS.maxItems} פריטים במפה`);
+  }
+  await assertItemsUsable(supabase, userId, type, toAdd);
+
+  const start = current.reduce((max, row) => Math.max(max, row.position), -1) + 1;
+  const { error } = await supabase.from("collection_items").insert(toAdd.map((item, i) => toItemRow(collectionId, item, start + i)));
+  if (error) throw error;
+  return { added: toAdd.length, skipped };
+}
