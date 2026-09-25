@@ -88,9 +88,9 @@ export default function ProfileView({
   const coverUrl = profile.coverUrl;
   const following = profile.viewerState.following;
 
-  /** תמונת הפרופיל - עיגול מושלם עם טבעת כחולה דקה (ר' ProfileAvatarRing). משותפת לשני מצבי הקאבר. */
+  /** תמונת הפרופיל - עיגול מושלם עם טבעת דקה שצבעה לפי מספר העוקבים (ר' ProfileAvatarRing). משותפת לשני מצבי הקאבר. */
   const avatarLayer = (
-    <ProfileAvatarRing>
+    <ProfileAvatarRing followers={profile.counts.followers}>
       <span className="block h-full w-full overflow-hidden rounded-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={getAvatarUrl(profile.avatarUrl, 200)} alt="" className="h-full w-full object-cover" />
