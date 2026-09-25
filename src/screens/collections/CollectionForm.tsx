@@ -129,7 +129,7 @@ function readDraft(type: CollectionType): CollectionFormInitial | null {
 }
 
 /** טופס יצירה/עריכה של אוסף (משותף). כותרת (חובה) · תיאור · Cover · פריטים (לפחות 2, גרירה לסדר) · פרטיות. */
-export function CollectionForm({ mode, type, collectionId, initial, dark = false, onTypeChange }: CollectionFormProps) {
+export function CollectionForm({ mode, type, collectionId, initial, onTypeChange }: CollectionFormProps) {
   const router = useRouter();
   const labels = COLLECTION_TYPE_LABELS[type];
 
