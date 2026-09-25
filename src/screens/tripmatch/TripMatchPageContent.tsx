@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Screen, SwipeCard, BackButton, Chip, ImageOptionRow, SwipeToDeleteRow, type SwipeCardHandle } from "@/components/ui";
 import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
 import { CategoryPicker } from "@/screens/tripmatch/CategoryPicker";
-import { HomeQuickCategories } from "@/screens/home/HomeQuickCategories";
 import { type HomeQuickCategoryId } from "@/constants/homeQuickCategories";
 import { TRIPMATCH_INTEREST_OPTIONS, TRIPMATCH_CATEGORY_BUCKETS } from "@/locales/he/tripBuilder";
 import { INTERESTS, VACATION_PREFERENCES, type PreferenceOption } from "@/locales/he/preferences";
@@ -14,8 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/services/supabase/client";
 import { toggleFavorite } from "@/services/favorites/favoritesService";
 import { listAddresses } from "@/services/addresses/addressesService";
-import { SwipeHeader, SwipeProgressBar } from "@/screens/tripmatch/SwipeHeader";
-import { FilterCircleButton } from "@/screens/tripmatch/FilterCircleButton";
+import { SwipeHeader } from "@/screens/tripmatch/SwipeHeader";
+import { TripMatchCategoryChips } from "@/screens/tripmatch/TripMatchCategoryChips";
 import { TripMatchCard, TRIPMATCH_BUTTON_ROW, resolveCardTap } from "@/screens/tripmatch/TripMatchCard";
 import { LikedDialog } from "@/screens/tripmatch/LikedDialog";
 import { FiltersSheet, EMPTY_FILTERS, applyFilters, countActiveFilters, type TripMatchFilters } from "@/screens/tripmatch/FiltersSheet";
@@ -91,8 +90,8 @@ function computeMatchPercent(candidate: CandidatePlace, filters: TripMatchFilter
 /** מידות ה-Deck המוטמע (Home). הכרטיס לעולם לא רחב מ-MAX, ותמיד נשארים
  *  GUTTER px משני צדי ה-viewport - מספיק גם לבליטת הסיבוב של הכרטיסים
  *  מאחור (~sin(1.2°) × גובה הכרטיס ≈ 11px). */
-const DECK_MAX_CARD_WIDTH = 340;
-const DECK_SIDE_GUTTER = 24;
+const DECK_MAX_CARD_WIDTH = 520;
+const DECK_SIDE_GUTTER = 14;
 const DECK_CARD_ASPECT = 0.66;
 /** הכרטיסים המציצים מאחורי הכרטיס הקדמי - [0] = הקרוב (depth 1) ... [3] =
  *  הרחוק (depth 4). rot = זווית (מעלות, סביב תחתית הכרטיס), y = הזזה אנכית
@@ -267,6 +266,13 @@ export function TripMatchPageContent({
   // (שיושבים כ-siblings קבועים, לא בתוך האלמנט הנגרר) עדיין גורמים
   // לאותה אנימציית fly-out בדיוק, בלי לזוז בעצמם בזמן גרירה.
   const swipeCardRef = useRef<SwipeCardHandle>(null);
+  // תגובה לגרירה: --tm-drag (בין -1 ל-1) על ה-Deck - הכפתורים גדלים לכיוון הגרירה, בלי re-render.
+  const deckRef = useRef<HTMLDivElement | null>(null);
+  const handleCardDrag = (x: number) => {
+    deckRef.current?.style.setProperty("--tm-drag", String(Math.max(-1, Math.min(1, x / 110))));
+  };
+  // פרץ לבבות בכל לייק - מפתח עולה מפעיל מחדש את האנימציה.
+  const [likeBurst, setLikeBurst] = useState(0);
 
   // *** גובה הכרטיס עד ה-Bottom Nav (בקשה מפורשת - "תאריך את הגובה של
   // הכרטיסיות שיגיע עד הבר התחתון"): הרוחב והמרכוז נשארים מבניים (CSS,
@@ -285,14 +291,15 @@ export function TripMatchPageContent({
       const el = deckStageRef.current;
       const nav = document.querySelector("[data-main-bottom-nav]");
       if (!el || !nav) return;
-      const stageDocTop = el.getBoundingClientRect().top + window.scrollY;
+      // העמוד לא נגלל בזמן החלקה (ר' נעילת הגלילה למטה), כך שהמדידה ביחס ל-viewport היא
+      // בדיוק השטח הפנוי עד הבר התחתון - גם כשהחיפוש העליון נפתח/נסגר.
+      const stageTop = el.getBoundingClientRect().top;
       const navTop = nav.getBoundingClientRect().top; // fixed - קבוע ביחס ל-viewport
       const width = el.getBoundingClientRect().width;
-      // 12px אוויר מעל הבר הצף - כדי שהכרטיס לא ייגע בגלולה.
-      const h = Math.round(navTop - stageDocTop - 12);
-      // רצפה: הכרטיס לא יהיה "שטוח" מדי במסכים נמוכים מאוד (אז הוא פשוט
-      // ממשיך מתחת לבר וגוללים). 1.15 = גובה מינימלי ביחס לרוחב.
-      const next = width > 0 ? Math.max(h, Math.round(width * 1.05) + TRIPMATCH_BUTTON_ROW) : null;
+      // 8px אוויר מעל הבר הצף - כדי שהכפתורים לא ייגעו בגלולה.
+      const h = Math.round(navTop - stageTop - 8);
+      // הרצפה נמוכה בכוונה: העמוד לא נגלל, אז הכרטיס חייב להיכנס במסך גם בטלפונים נמוכים.
+      const next = width > 0 ? Math.max(h, 300) : null;
       setDeckStageHeight((prev) => (prev === next ? prev : next));
     };
     measure();
@@ -313,6 +320,8 @@ export function TripMatchPageContent({
           })
         : null;
     observer?.observe(document.body);
+    const topBar = document.querySelector("[data-home-top-bar]");
+    if (topBar) observer?.observe(topBar);
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
@@ -323,6 +332,22 @@ export function TripMatchPageContent({
     // hasCandidates: שורת הקטגוריות ופס ההתקדמות מופיעים רק אחרי שהמועמדים
     // נטענים ודוחפים את הכרטיס למטה - מודדים שוב כדי שלא יחרוג מתחת לבר.
   }, [deckStageMounted, hasCandidatesForDeck]);
+  // *** בקשה מפורשת - "תוריד את הרווח בין הבר התחתון לכרטיסייה": בזמן החלקה העמוד לא נגלל בכלל.
+  // קודם העמוד היה ארוך מעט מהמסך - גלילה קטנה העלימה את הבר העליון והעלתה את הכרטיס, ונפתח רווח
+  // ריק מעל הבר התחתון. עכשיו הכרטיס ממלא בדיוק את המסך, והחיפוש עדיין נפתח במשיכה למטה.
+  useEffect(() => {
+    if (!deckStageMounted) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = [html.style.overflow, body.style.overflow];
+    window.scrollTo(0, 0);
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prev[0];
+      body.style.overflow = prev[1];
+    };
+  }, [deckStageMounted]);
   // *** שונה מהיסוד שוב (Bug חוזר - "זה שוב בורח" - אחרי כמה סבבים של
   // חישובי-JS (getBoundingClientRect, window.innerWidth וכו') שכל אחד
   // מהם תיקן משהו אבל הביא איתו תקלה חדשה (כולל תקלה שדוחפת את *כל*
@@ -1268,6 +1293,11 @@ export function TripMatchPageContent({
 
     setLastDecision({ candidate: decidedPlace, liked });
     setHasSwipedAny(true);
+    handleCardDrag(0);
+    if (liked) {
+      setLikeBurst((n) => n + 1);
+      navigator.vibrate?.(14);
+    }
     setError(null);
     setDecidedIds((prev) => (prev.includes(decidedPlace.id) ? prev : [...prev, decidedPlace.id]));
     setCandidateIndex(0);
@@ -1682,35 +1712,18 @@ export function TripMatchPageContent({
               />
             )}
 
-            {/* עיגולי סינון קטגוריה - בדיוק אותו קומפוננט כמו בעמוד הבית
-                (HomeQuickCategories, לא עותק) - אופציונלי, לא חוסם: הכרטיסים
-                כבר מוצגים למעלה מ"הכל" לפני שנוגעים בעיגול אחד. בחירה
-                מרובה (OR) מסננת בצד הלקוח בלבד, בלי קריאת שרת נוספת. */}
+            {/* שורת הסינון - גלולות בשפה של שאר האפליקציה (כמו "כל מה שחם"), במקום עיגולי הסוגים
+                הגדולים. "סינון" ראשון מימין, אחריו "הכל" והקטגוריות. פס ההתקדמות האפור הוסר - המיקום
+                בחפיסה כבר מוצג על הכרטיס עצמו (1/14). */}
             {candidates.length > 0 && (
               <div className="w-full min-w-0 max-w-full shrink-0">
-                <HomeQuickCategories
+                <TripMatchCategoryChips
                   selected={activeCategoryFilters}
-                onToggle={toggleCategoryFilter}
-                // בקשה מפורשת - "הפילטרים בשורה של הסוגים, הראשונים
-                // מימין": במצב מוטמע (בלי הבר העליון עם כפתור הפילטר) הכפתור
-                // יושב כאן, כפריט ראשון בשורת הסוגים. ב-/tripmatch העצמאי
-                // הפילטר נשאר בבר העליון כמו קודם.
-                leading={
-                  embedded ? (
-                    <FilterCircleButton onClick={() => setFiltersOpen(true)} activeFilterCount={countActiveFilters(filters)} />
-                  ) : undefined
-                }
+                  onToggle={toggleCategoryFilter}
+                  onClear={() => setActiveCategoryFilters([])}
+                  onOpenFilters={() => setFiltersOpen(true)}
+                  activeFilterCount={countActiveFilters(filters)}
                 />
-              </div>
-            )}
-
-            {/* *** תיקון (בקשה מפורשת - "ציר ההתקדמות צריך להיות מתחת
-                לפילטרים"): במצב מוטמע פס ההתקדמות יושב *אחרי* שורת הסוגים
-                (והפילטר), ישר מעל הכרטיס - לא מעליהם. באותם שוליים
-                אופקיים (px-6) כמו שורת החיפוש והכרטיס. */}
-            {embedded && currentCandidate && (
-              <div className="px-8 pt-1.5">
-                <SwipeProgressBar currentIndex={totalDecisions} total={totalDecisions + visibleCandidates.length} />
               </div>
             )}
 
@@ -1768,6 +1781,7 @@ export function TripMatchPageContent({
               }}
             >
               <div
+                ref={deckRef}
                 className={embedded ? "tripmatch-deck" : "relative w-full"}
                 style={embedded ? DECK_STYLE : { height: "75%" }}
               >
@@ -1900,7 +1914,9 @@ export function TripMatchPageContent({
                     // visual card prevents the wrapper from collapsing to the
                     // content width and shifting the whole deck left.
                     <div
+                      key={currentCandidate.id}
                       data-tripmatch-front-surface=""
+                      className="tm-card-enter"
                       style={DECK_CARD_STYLE}
                     >
                       <SwipeCard
@@ -1909,6 +1925,8 @@ export function TripMatchPageContent({
                         onSwipeLeft={() => handleDecision(false)}
                         onSwipeRight={() => handleDecision(true)}
                         onTap={handleCardTap}
+                        onDrag={handleCardDrag}
+                        stampVariant="labels"
                         allowVerticalScroll
                         disabled={busy}
                       >
@@ -1981,7 +1999,7 @@ export function TripMatchPageContent({
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.nope()}
                       aria-label="דלג"
-                      className="pointer-events-auto mt-1.5 flex h-[64px] w-[64px] items-center justify-center rounded-full bg-white text-[#e5484d] shadow-[0_10px_26px_-6px_rgba(16,24,40,0.28)] ring-1 ring-black/[0.04] transition active:scale-90 disabled:opacity-50"
+                      className="tm-nope-btn pointer-events-auto mt-1.5 flex h-[64px] w-[64px] items-center justify-center rounded-full bg-white text-[#e5484d] shadow-[0_10px_26px_-6px_rgba(16,24,40,0.28)] ring-1 ring-black/[0.04] transition active:scale-90 disabled:opacity-50"
                     >
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
                         <path d="M6 6l12 12M18 6 6 18" />
@@ -2006,9 +2024,23 @@ export function TripMatchPageContent({
                       disabled={busy}
                       onClick={() => swipeCardRef.current?.like()}
                       aria-label="אהבתי"
-                      className="pointer-events-auto flex h-[72px] w-[72px] items-center justify-center rounded-full text-white shadow-[0_14px_30px_-8px_rgba(27,111,232,0.65)] transition active:scale-90 disabled:opacity-50"
+                      className="tm-like-btn pointer-events-auto relative flex h-[72px] w-[72px] items-center justify-center rounded-full text-white shadow-[0_14px_30px_-8px_rgba(27,111,232,0.65)] transition active:scale-90 disabled:opacity-50"
                       style={{ background: "linear-gradient(145deg, var(--color-primary-start) 0%, var(--color-primary-end) 100%)" }}
                     >
+                      {likeBurst > 0 && (
+                        <span key={likeBurst} aria-hidden="true" className="pointer-events-none absolute inset-0">
+                          <span className="tm-like-ring absolute inset-0 rounded-full" />
+                          {[-70, -40, -12, 16, 44, 72].map((angle, i) => (
+                            <span
+                              key={angle}
+                              className="tm-heart-particle absolute left-1/2 top-1/2"
+                              style={{ "--tm-angle": `${angle}deg`, "--tm-dist": `${70 + (i % 3) * 22}px`, animationDelay: `${i * 25}ms`, fontSize: 14 + (i % 3) * 5 } as CSSProperties}
+                            >
+                              ♥
+                            </span>
+                          ))}
+                        </span>
+                      )}
                       <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" />
                       </svg>

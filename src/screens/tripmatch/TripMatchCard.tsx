@@ -123,6 +123,8 @@ function MatchRing({ percent, personalized }: { percent: number; personalized: b
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={`${(percent / 100) * c} ${c}`}
+          className="tm-ring-fill"
+          style={{ "--tm-arc": `${(percent / 100) * c}` } as CSSProperties}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
@@ -190,7 +192,7 @@ export function TripMatchCard({ candidate, matchIndex, matchTotal, cityLabel, im
       // *** תוקן שוב (Bug חוזר - "זה שוב בורח"): לא עוד חישוב JS - centerBox
       // הוא עכשיו CSS style object טהור (CARD_BOX_STYLE, עם aspect-ratio)
       // שמוחלת כמו שהיא, בלי לפרק/להרכיב מחדש left/top/width/height.
-      className="absolute overflow-hidden rounded-[28px] border-[3px] border-white bg-white shadow-[0_22px_48px_-12px_rgba(16,24,40,0.35)]"
+      className="absolute overflow-hidden rounded-[28px] bg-white shadow-[0_22px_48px_-12px_rgba(16,24,40,0.35)]"
       style={{
         ...(centerBox ?? { top: 0, height: "100%", left: 0, right: 0 }),
         // חצי-עיגול בתחתית הכרטיס סביב גלובוס ה-tripmatch - רק כשהכרטיס נוגע בבר התחתון (notch).

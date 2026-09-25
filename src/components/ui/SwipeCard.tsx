@@ -51,6 +51,12 @@ interface SwipeCardProps {
    *  לא מתבצעת), וגרירה אופקית ממשיכה להחליק את הכרטיס כרגיל. ברירת המחדל
    *  false - בדיוק ההתנהגות הקודמת (למשל trip-builder). */
   allowVerticalScroll?: boolean;
+  /** נקרא בכל תזוזה עם ההזזה האופקית (px, חיובי = ימינה/לייק) - מאפשר להורה להגיב לגרירה
+   *  (למשל להגדיל את כפתור הלב) בלי re-render. 0 כשהכרטיס חוזר למקום. */
+  onDrag?: (x: number) => void;
+  /** "images" (ברירת מחדל) - תגיות התמונה הישנות. "labels" - הילה צבעונית על הכרטיס ותגית טקסט
+   *  בשפת המותג ("אהבתי" / "לא בשבילי"). */
+  stampVariant?: "images" | "labels";
 }
 
 const SWIPE_THRESHOLD_PX = 100;
@@ -69,7 +75,7 @@ const FLY_OUT_DISTANCE_PX = 500;
  * (לא דרך React state) כדי לא לגרום ל-re-render בכל תזוזת עכבר/אצבע.
  */
 export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function SwipeCard(
-  { children, onSwipeLeft, onSwipeRight, disabled, onTap, allowVerticalScroll = false },
+  { children, onSwipeLeft, onSwipeRight, disabled, onTap, allowVerticalScroll = false, onDrag, stampVariant = "images" },
   ref
 ) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -103,6 +109,7 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
     el.style.transform = `translate3d(${x}px, 0, 0) rotate(${x / 20}deg)`;
     el.style.opacity = `${Math.max(0, 1 - Math.abs(x) / (FLY_OUT_DISTANCE_PX * 1.5))}`;
     setStamps(x);
+    onDrag?.(x);
   }
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -197,6 +204,35 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
         <div className="relative h-full">
           {resolvedChildren}
 
+          {stampVariant === "labels" ? (
+            <>
+              <div
+                ref={likeStampRef}
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] opacity-0"
+                style={{ transition: "opacity 0.1s ease", background: "linear-gradient(to right, rgba(10,109,254,0.55), rgba(10,109,254,0) 70%)", boxShadow: "inset 0 0 0 4px rgba(74,158,255,0.9)" }}
+              >
+                <span
+                  className="absolute left-6 top-24 rounded-2xl border-[3px] border-white px-4 py-1.5 text-[26px] font-extrabold text-white shadow-[0_8px_24px_rgba(10,109,254,0.5)]"
+                  style={{ transform: "rotate(-12deg)", background: "#0A6DFE" }}
+                >
+                  אהבתי ♥
+                </span>
+              </div>
+              <div
+                ref={nopeStampRef}
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] opacity-0"
+                style={{ transition: "opacity 0.1s ease", background: "linear-gradient(to left, rgba(229,72,77,0.5), rgba(229,72,77,0) 70%)", boxShadow: "inset 0 0 0 4px rgba(229,72,77,0.85)" }}
+              >
+                <span
+                  className="absolute right-6 top-24 rounded-2xl border-[3px] border-white px-4 py-1.5 text-[26px] font-extrabold text-white shadow-[0_8px_24px_rgba(229,72,77,0.45)]"
+                  style={{ transform: "rotate(12deg)", background: "#e5484d" }}
+                >
+                  לא בשבילי
+                </span>
+              </div>
+            </>
+          ) : (
+          <>
           {/* תגית "אהבתי" - מופיעה תוך כדי גרירה ימינה */}
           <div
             ref={likeStampRef}
@@ -214,6 +250,8 @@ export const SwipeCard = forwardRef<SwipeCardHandle, SwipeCardProps>(function Sw
           >
             <Image src="/images/tripmatch/action-nope.png" alt="" width={140} height={140} className="drop-shadow-2xl" />
           </div>
+          </>
+          )}
         </div>
       </div>
 
