@@ -56,12 +56,17 @@ const CSS = `
 .cx-star { -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.3,1.6,.5,1); }
 .cx-star[data-on="true"] { animation:cx-star-pop .34s cubic-bezier(.3,1.6,.5,1) both; }
 @keyframes cx-star-pop { 0% { transform:scale(.8); } 60% { transform:scale(1.14); } 100% { transform:scale(1); } }
+/* גל "תצוגת סאונד" על הכוכבים לפני שדירגו */
+.cx-wave { animation:cx-wave 1.9s cubic-bezier(.45,0,.3,1) infinite; }
+.cx-wave path { animation:cx-wave-fill 1.9s cubic-bezier(.45,0,.3,1) infinite; }
+@keyframes cx-wave { 0%, 52%, 100% { transform:translateY(0) scale(1); } 22% { transform:translateY(-13px) scale(1.08); } }
+@keyframes cx-wave-fill { 0%, 52%, 100% { fill:rgba(255,255,255,0.14); } 22% { fill:#F5B301; filter:drop-shadow(0 0 6px rgba(245,179,1,0.55)); } }
 .cx-art-card { animation:cx-art-in .5s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes cx-art-in { from { opacity:0; margin-top:14px; } to { opacity:1; margin-top:0; } }
 .cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
 .cx-mode { -webkit-tap-highlight-color:transparent; transition:color .25s; }
 .cx-page :focus-visible { outline:2px solid #0A6DFE; outline-offset:3px; }
-@media (prefers-reduced-motion: reduce) { .cx-scene, .cx-star[data-on="true"], .cx-art-card { animation:none !important; } .cx-rail { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .cx-scene, .cx-star[data-on="true"], .cx-art-card, .cx-wave, .cx-wave path { animation:none !important; } .cx-rail { transition:none; } }
 `;
 
 /* ───────────── אייקונים ───────────── */
@@ -186,8 +191,22 @@ function PlaceStage({ onSearch, onAdd }: { onSearch: (rating: number) => void; o
               data-on={on}
               className="cx-star p-1"
             >
-              <svg width="46" height="46" viewBox="0 0 24 24" aria-hidden="true">
-                <path d={STAR_PATH} fill={on ? "#F5B301" : "rgba(255,255,255,0.14)"} strokeLinejoin="round" />
+              {/* *** בקשה מפורשת ("שהכוכבים יעלו וירדו עם הצהוב - כמו תצוגת סאונד"): כל עוד לא דירגו - גל
+                  שעובר על הכוכבים (עולים ונצבעים בצהוב אחד אחרי השני). ברגע שבוחרים דירוג - נעצר. */}
+              <svg
+                width="46"
+                height="46"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className={rating === 0 ? "cx-wave" : undefined}
+                style={rating === 0 ? { animationDelay: `${(star - 1) * 0.13}s` } : undefined}
+              >
+                <path
+                  d={STAR_PATH}
+                  fill={on ? "#F5B301" : "rgba(255,255,255,0.14)"}
+                  strokeLinejoin="round"
+                  style={rating === 0 ? { animationDelay: `${(star - 1) * 0.13}s` } : undefined}
+                />
               </svg>
             </button>
           );
