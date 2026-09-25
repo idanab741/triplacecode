@@ -11,6 +11,7 @@ import { uploadMultipleSocialMedia, type UploadedMedia } from "@/services/social
 import { searchPlaces, type PlaceSearchResult } from "@/services/places/searchService";
 import type { PostVisibility } from "@/services/social/types";
 import { MainBottomNav } from "@/components/MainBottomNav";
+import { takePendingCreateMedia } from "@/screens/create/pendingCreateMedia";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
 import { CollapsibleTopBar } from "@/screens/home/CollapsibleTopBar";
 
@@ -81,7 +82,17 @@ export default function CreatePostPage() {
     el.style.height = `${Math.max(el.scrollHeight, 120)}px`;
   }
 
-  async function handleFilesSelected(files: FileList | null) {
+  // קבצים שנבחרו ב"רגע" בעמוד התוכן (מצלמה / גלריה) - נכנסים לפוסט מיד כשהמשתמש מוכן.
+  const pendingTakenRef = useRef(false);
+  useEffect(() => {
+    if (!user || pendingTakenRef.current) return;
+    pendingTakenRef.current = true;
+    const files = takePendingCreateMedia();
+    if (files) void handleFilesSelected(files);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- רץ פעם אחת, כשהמשתמש נטען
+  }, [user]);
+
+  async function handleFilesSelected(files: FileList | File[] | null) {
     if (!files || !user) return;
     const selected = Array.from(files).slice(0, MAX_FILES - media.length);
     if (selected.length === 0) return;
