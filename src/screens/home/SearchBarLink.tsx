@@ -38,8 +38,10 @@ interface SearchBarLinkProps {
   containerClassName?: string;
   /** "hero" - העיצוב החדש של עמוד הבית על רקע כחול: גובה קבוע 48px, לבן
    *  מלא, בלי מסגרת, אייקון חיפוש בכחול המותג, צל עדין וטבעת פוקוס.
-   *  ברירת המחדל "default" שומרת על העיצוב הקיים בשאר המקומות. */
-  variant?: "default" | "hero";
+   *  ברירת המחדל "default" שומרת על העיצוב הקיים בשאר המקומות.
+   *  "flat" - שורת החיפוש בשפה של שאר האפליקציה (חיפוש מטיילים, היומן): גלולה אפורה-בהירה
+   *  שטוחה בלי צל, אייקון אפור, ובפוקוס רקע לבן עם מסגרת כחולה דקה. */
+  variant?: "default" | "hero" | "flat";
   /** אלמנט שמוצג *בתוך* שורת החיפוש, בקצה הסופי שלה (פיזית שמאל ב-RTL) -
    *  למשל כפתור "קרוב אלי" (בקשה מפורשת: המיקום נכנס לתוך שורת החיפוש). */
   endAdornment?: ReactNode;
@@ -143,12 +145,14 @@ export function SearchBarLink({
         className={
           variant === "hero"
             ? "flex h-12 items-center gap-2.5 rounded-full bg-white px-4 text-[15px] text-ink shadow-[0_6px_18px_-8px_rgba(0,50,120,0.28)] ring-1 ring-black/[0.06] transition focus-within:ring-2 focus-within:ring-[#0AA9FD]/40"
+            : variant === "flat"
+            ? "flex h-11 items-center gap-2.5 rounded-full bg-[#F1F2F5] px-4 text-[15px] text-ink transition-colors focus-within:bg-white focus-within:ring-[1.5px] focus-within:ring-[#0A6DFE]"
             : "flex items-center gap-2 rounded-pill border border-ink-secondary/15 bg-bg px-4 py-3 text-sm text-ink shadow-soft"
         }
       >
         <svg
-          width={variant === "hero" ? 20 : 18}
-          height={variant === "hero" ? 20 : 18}
+          width={variant === "default" ? 18 : 20}
+          height={variant === "default" ? 18 : 20}
           viewBox="0 0 24 24"
           fill="none"
           stroke={variant === "hero" ? "var(--color-primary-end)" : "currentColor"}
@@ -176,7 +180,7 @@ export function SearchBarLink({
           }}
           placeholder={destinationMode ? "חפשו יעד או מקום שמעניין אתכם" : "חפש מסעדה, מלון, אטרקציה..."}
           className={
-            variant === "hero"
+            variant !== "default"
               ? "w-full min-w-0 bg-transparent font-medium text-ink placeholder:font-normal placeholder:text-ink-secondary focus:outline-none"
               : "w-full bg-transparent text-ink placeholder:text-ink-secondary focus:outline-none"
           }
