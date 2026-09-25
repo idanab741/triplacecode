@@ -1,165 +1,152 @@
-import type { ReactNode } from "react";
+"use client";
+
+import dynamic from "next/dynamic";
+import type { CSSProperties, ReactNode } from "react";
+import { PostCard } from "@/screens/places/PostCard";
+import { CollectionFeedCard } from "@/screens/collections/CollectionFeedCard";
+import type { FeedItemDto } from "@/services/social/feedService";
+import type { CollectionCardDto } from "@/services/social/collectionTypes";
+import type { JourneyLine, JourneyMarker } from "@/screens/journey/journeyUtils";
+
+const JourneyMap = dynamic(() => import("@/screens/journey/JourneyMap").then((m) => m.JourneyMap), { ssr: false });
 
 /**
- * *** בקשה מפורשת ("עדיין לא ברור - צריך דוגמאות, משהו יותר טוב"): בעמוד התוכן כל סוג העלאה מציג
- * דוגמה חיה של איך התוצאה תיראה באפליקציה - פוסט, המלצה על מקום, חוויה ומסלול - ככרטיס לבן
- * שמרחף מעל הרקע הצבעוני. רק תצוגה (aria-hidden), בלי נתונים אמיתיים.
+ * *** בקשה מפורשת ("הביקורות צריכות להיות כמו בעמודים... המפה כמו המפה ב-places... שייראה מקצועי ורציני"):
+ * כל סוג העלאה בעמוד התוכן מציג את **הרכיבים האמיתיים** של האפליקציה עם נתוני דוגמה - אותו PostCard של
+ * הפיד (פוסט / ביקורת), אותו CollectionFeedCard (חוויה), ואותה מפה של places (JourneyMap - אותם נעצים). כך
+ * הדוגמה תמיד נראית בדיוק כמו התוצאה, וכל שינוי עיצובי בפיד/במפה מתעדכן כאן לבד. רק תצוגה - בלי לחיצות.
+ *
+ * כל התמונות של הדוגמאות מרוכזות כאן (PREVIEW_IMAGES) - להחלפה בתמונות מעוצבות.
  */
+export const PREVIEW_IMAGES = {
+  postPhoto: "/images/vacation-destinations/telaviv.png",
+  reviewPhoto: "/images/vacation-destinations/haifa.png",
+  collection: [
+    "/images/vacation-destinations/telaviv.png",
+    "/images/vacation-destinations/eilat.png",
+    "/images/vacation-destinations/jerusalem.png",
+    "/images/vacation-destinations/tiberias.png",
+  ],
+  tripStops: [
+    "/images/vacation-destinations/zafongolan.png",
+    "/images/vacation-destinations/tiberias.png",
+    "/images/vacation-destinations/haifa.png",
+  ],
+  avatarPost: null as string | null,
+  avatarReview: null as string | null,
+  avatarCollection: null as string | null,
+};
 
-const IMG = "/images/vacation-destinations";
+const NOW = new Date().toISOString();
+const noop = async () => true;
+const noopVoid = async () => {};
 
-function Avatar({ letter, color }: { letter: string; color: string }) {
-  return (
-    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white" style={{ background: color }}>
-      {letter}
-    </span>
-  );
+function author(id: string, fullName: string, username: string, avatarUrl: string | null) {
+  return { id, username, fullName, avatarUrl, isCreator: false };
 }
 
-function Frame({ children, tilt = 0 }: { children: ReactNode; tilt?: number }) {
+const POST: FeedItemDto = {
+  id: "preview-post",
+  type: "post",
+  createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  text: "שקיעה מושלמת בחוף 🌅 חייבים לבוא לפה בערב",
+  author: author("preview-a", "נועה לוי", "noa", PREVIEW_IMAGES.avatarPost),
+  media: [{ id: "m1", type: "image", url: PREVIEW_IMAGES.postPhoto, thumbnailUrl: null, width: 1200, height: 900 }],
+  place: { id: "preview-place", name: "חוף הצוק", imageUrl: null },
+  destination: null,
+  stats: { likes: 128, comments: 12, saves: 9 },
+  likers: [],
+  viewerState: { liked: true, saved: false, following: true, isSelf: false },
+  nextCursor: null,
+};
+
+const REVIEW: FeedItemDto = {
+  id: "preview-review",
+  type: "review",
+  createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  text: "הקרואסון הכי טוב שאכלתי, והנוף מהמרפסת מטורף. שווה להגיע מוקדם בבוקר ⭐⭐⭐⭐⭐",
+  author: author("preview-b", "עומר כהן", "omer", PREVIEW_IMAGES.avatarReview),
+  media: [{ id: "m2", type: "image", url: PREVIEW_IMAGES.reviewPhoto, thumbnailUrl: null, width: 1200, height: 900 }],
+  place: { id: "preview-place-2", name: "קפה על המדרגות", imageUrl: null },
+  destination: null,
+  stats: { likes: 46, comments: 5, saves: 21 },
+  likers: [],
+  viewerState: { liked: false, saved: true, following: false, isSelf: false },
+  nextCursor: null,
+};
+
+const COLLECTION: CollectionCardDto = {
+  id: "preview-collection",
+  type: "places",
+  title: "בתי הקפה הכי שווים בת״א",
+  description: null,
+  createdAt: NOW,
+  visibility: "public",
+  author: author("preview-c", "דניאל אברהם", "daniel", PREVIEW_IMAGES.avatarCollection),
+  itemCount: 8,
+  coverUrl: null,
+  collageUrls: PREVIEW_IMAGES.collection,
+  stats: { likes: 214, comments: 18 },
+  viewerState: { liked: false, saved: false, isSelf: false },
+};
+
+const TRIP_MARKERS: JourneyMarker[] = [
+  { id: "s1", latitude: 33.0, longitude: 35.77, name: "תצפית הגולן", label: "1", color: "#0A6DFE", imageUrl: PREVIEW_IMAGES.tripStops[0] },
+  { id: "s2", latitude: 32.795, longitude: 35.53, name: "טיילת טבריה", label: "2", color: "#0A6DFE", imageUrl: PREVIEW_IMAGES.tripStops[1] },
+  { id: "s3", latitude: 32.814, longitude: 34.99, name: "המושבה הגרמנית", label: "1", color: "#E0701A", imageUrl: PREVIEW_IMAGES.tripStops[2] },
+];
+const TRIP_LINES: JourneyLine[] = [
+  { id: "d1", color: "#0A6DFE", points: TRIP_MARKERS.slice(0, 2) },
+  { id: "d2", color: "#E0701A", dashed: true, points: [TRIP_MARKERS[1], TRIP_MARKERS[2]] },
+];
+
+/** מסגרת: הרכיב האמיתי ברוחב של טלפון, מוקטן, בכרטיס לבן - בלי אינטראקציה */
+function Frame({ children, height }: { children: ReactNode; height: number }) {
   return (
     <div
-      className="cx-preview w-[78%] max-w-[270px] overflow-hidden rounded-[22px] bg-white text-[#0f1419] shadow-[0_24px_50px_-18px_rgba(0,0,0,0.65)]"
-      style={{ transform: `rotate(${tilt}deg)` }}
+      className="cx-preview pointer-events-none relative w-[86%] max-w-[300px] overflow-hidden rounded-[22px] bg-white shadow-[0_24px_50px_-18px_rgba(0,0,0,0.65)]"
+      style={{ height, "--color-ink": "#0f1419", "--color-ink-secondary": "#5b6472" } as CSSProperties}
+      dir="rtl"
     >
-      {children}
+      <div style={{ zoom: 0.8 }}>{children}</div>
+      <span className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" aria-hidden="true" />
     </div>
   );
 }
 
-function PostPreview() {
-  return (
-    <Frame tilt={-2}>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <Avatar letter="נ" color="#FF8FB8" />
-        <div className="min-w-0 leading-tight">
-          <p className="text-[12.5px] font-bold">נועה לוי</p>
-          <p className="text-[10.5px] text-[#5b6472]">לפני שעה</p>
-        </div>
-      </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`${IMG}/telaviv.png`} alt="" className="aspect-[4/3] w-full object-cover" />
-      <div className="px-3 pb-3 pt-2">
-        <div className="flex items-center gap-3 text-[12px] font-semibold">
-          <span className="cx-heart text-[#e5484d]">♥ 128</span>
-          <span className="text-[#5b6472]">💬 12</span>
-        </div>
-        <p className="mt-1.5 text-[12.5px] leading-snug">שקיעה מושלמת בחוף 🌅 חייבים לבוא לפה בערב</p>
-        <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#F1EDFB] px-2 py-0.5 text-[11px] font-semibold text-[#7C3AED]">📍 חוף הצוק</span>
-      </div>
-    </Frame>
-  );
-}
-
-function PlacePreview() {
-  return (
-    <Frame tilt={2}>
-      <div className="relative">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`${IMG}/haifa.png`} alt="" className="aspect-[16/10] w-full object-cover" />
-        <span className="absolute end-2.5 top-2.5 rounded-full bg-white/90 px-2 py-0.5 text-[10.5px] font-bold">☕ בית קפה</span>
-      </div>
-      <div className="px-3 pb-3 pt-2.5">
-        <p className="text-[14px] font-extrabold">קפה על המדרגות</p>
-        <div className="mt-1 flex items-center gap-1.5">
-          <span className="text-[14px] leading-none tracking-tight text-[#F59E0B]">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <span key={i} className="cx-star inline-block" style={{ animationDelay: `${0.15 + i * 0.09}s` }}>
-                ★
-              </span>
-            ))}
-          </span>
-          <span className="text-[12px] font-bold">5.0</span>
-        </div>
-        <div className="mt-2 flex gap-2 rounded-xl bg-[#F5F6F8] p-2">
-          <Avatar letter="ע" color="#B69CFF" />
-          <p className="text-[11.5px] leading-snug text-[#3a3f4b]">&quot;הקרואסון הכי טוב שאכלתי, והנוף מהמרפסת מטורף&quot;</p>
-        </div>
-      </div>
-    </Frame>
-  );
-}
-
-function CollectionPreview() {
-  const pics = ["telaviv", "eilat", "jerusalem", "tiberias"];
-  return (
-    <Frame tilt={-1.5}>
-      <div className="relative grid grid-cols-2 gap-0.5">
-        {pics.map((p) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img key={p} src={`${IMG}/${p}.png`} alt="" className="aspect-square w-full object-cover" />
-        ))}
-        <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pb-2.5 pt-8 text-white">
-          <span className="block text-[14px] font-extrabold leading-tight">בתי הקפה הכי שווים בת״א</span>
-          <span className="block text-[11px] text-white/85">8 מקומות</span>
-        </span>
-      </div>
-      <div className="flex items-center gap-2 px-3 py-2.5">
-        <Avatar letter="ד" color="#38D6E8" />
-        <p className="text-[12px] font-semibold">דניאל · <span className="font-normal text-[#5b6472]">חוויה</span></p>
-      </div>
-    </Frame>
-  );
-}
-
 function TripPreview() {
-  const stops = [
-    { x: 22, y: 76, n: 1, img: "zafongolan", day: "#0A6DFE" },
-    { x: 50, y: 48, n: 2, img: "tiberias", day: "#0A6DFE" },
-    { x: 78, y: 26, n: 1, img: "haifa", day: "#E0701A" },
-  ];
   return (
-    <Frame tilt={1.5}>
-      <div className="relative aspect-[16/11] w-full overflow-hidden bg-[#EAF1E4]">
-        {/* "מפה" - פסי דרך ומים עדינים */}
-        <svg viewBox="0 0 100 70" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
-          <path d="M0 58 C 25 50, 40 64, 100 40" stroke="#fff" strokeWidth="3" fill="none" />
-          <path d="M70 0 C 64 20, 88 30, 84 70" stroke="#CFE3F5" strokeWidth="7" fill="none" />
-          <path className="cx-route" d="M22 53 L50 33.6 L78 18" stroke="#0A6DFE" strokeWidth="1.6" strokeDasharray="3 2.4" fill="none" strokeLinecap="round" />
-        </svg>
-        {stops.map((s, i) => (
-          <span key={i} className="cx-pin absolute -translate-x-1/2 -translate-y-full" style={{ left: `${s.x}%`, top: `${s.y}%`, animationDelay: `${0.2 + i * 0.18}s` }}>
-            <span className="relative block h-9 w-9 overflow-hidden rounded-full border-[2.5px] border-white shadow-md">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`${IMG}/${s.img}.png`} alt="" className="h-full w-full object-cover" />
-            </span>
-            <span className="absolute -start-1.5 -top-1.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[9.5px] font-bold text-white ring-2 ring-white" style={{ background: s.day }}>
-              {s.n}
-            </span>
-          </span>
-        ))}
+    <div className="cx-preview pointer-events-none w-[86%] max-w-[300px] overflow-hidden rounded-[22px] bg-white text-[#0f1419] shadow-[0_24px_50px_-18px_rgba(0,0,0,0.65)]">
+      <JourneyMap markers={TRIP_MARKERS} lines={TRIP_LINES} className="h-[210px]" padding={{ top: 36, right: 28, bottom: 24, left: 28 }} />
+      <div className="px-4 pb-3.5 pt-3 text-start">
+        <p className="text-[15px] font-bold">סופ״ש בצפון</p>
+        <p className="mt-0.5 text-[12.5px] text-[#5b6472]">3 תחנות · 2 ימים</p>
       </div>
-      <div className="px-3 pb-3 pt-2.5">
-        <p className="text-[14px] font-extrabold">סופ״ש בצפון</p>
-        <div className="mt-1.5 flex gap-1.5 text-[10.5px] font-bold">
-          <span className="rounded-full bg-[#E8F1FF] px-2 py-0.5 text-[#0A6DFE]">● יום 1 · 2 תחנות</span>
-          <span className="rounded-full bg-[#FDEEE2] px-2 py-0.5 text-[#E0701A]">● יום 2 · תחנה אחת</span>
-        </div>
-      </div>
-    </Frame>
+    </div>
   );
 }
 
 export type CreateModeId = "post" | "place" | "collection" | "trip";
 
 export function CreateModePreview({ mode }: { mode: CreateModeId }) {
-  if (mode === "post") return <PostPreview />;
-  if (mode === "place") return <PlacePreview />;
-  if (mode === "collection") return <CollectionPreview />;
-  return <TripPreview />;
+  if (mode === "trip") return <TripPreview />;
+  if (mode === "collection")
+    return (
+      <Frame height={300}>
+        <CollectionFeedCard item={COLLECTION} />
+      </Frame>
+    );
+  const item = mode === "post" ? POST : REVIEW;
+  return (
+    <Frame height={300}>
+      <PostCard item={item} onLikeToggle={noop} onSaveToggle={noop} onWriteReview={() => {}} onEditPost={noopVoid} onDeletePost={noopVoid} />
+    </Frame>
+  );
 }
 
-/** אנימציות הדוגמאות - נכנס לעמוד עם ה-CSS שלו */
+/** אנימציית כניסה של הדוגמה - נכנס לעמוד עם ה-CSS שלו */
 export const CREATE_PREVIEW_CSS = `
-.cx-preview { animation:cx-preview-in .55s cubic-bezier(.2,.8,.2,1) both; }
-@keyframes cx-preview-in { from { opacity:0; transform:translateY(22px) scale(.94) rotate(0deg); } }
-.cx-star { animation:cx-star-in .35s cubic-bezier(.3,1.6,.5,1) both; }
-@keyframes cx-star-in { from { opacity:0; transform:scale(.2); } }
-.cx-heart { display:inline-block; animation:cx-heart-beat 1.6s ease-in-out .5s infinite; }
-@keyframes cx-heart-beat { 0%,100% { transform:scale(1); } 12% { transform:scale(1.25); } 24% { transform:scale(1); } }
-.cx-pin { animation:cx-pin-drop .45s cubic-bezier(.3,1.5,.5,1) both; }
-@keyframes cx-pin-drop { from { opacity:0; transform:translateY(-14px); } }
-.cx-route { stroke-dashoffset:60; animation:cx-route-draw 1.2s ease .5s forwards; }
-@keyframes cx-route-draw { to { stroke-dashoffset:0; } }
-@media (prefers-reduced-motion: reduce) { .cx-preview, .cx-star, .cx-heart, .cx-pin, .cx-route { animation:none !important; } .cx-route { stroke-dashoffset:0; } }
+.cx-preview { animation:cx-preview-in .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes cx-preview-in { from { opacity:0; transform:translateY(20px) scale(.95); } }
+@media (prefers-reduced-motion: reduce) { .cx-preview { animation:none !important; } }
 `;
