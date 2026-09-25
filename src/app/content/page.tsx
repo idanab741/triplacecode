@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { MainBottomNav } from "@/components/MainBottomNav";
@@ -14,15 +14,16 @@ const PlacesFriendsMap = dynamic(() => import("@/screens/places/PlacesFriendsMap
   loading: () => <div className="h-full w-full animate-pulse bg-[#F2F0EB]" />,
 });
 
-type ModeId = "moment" | "place" | "map";
+type ModeId = "moment" | "place" | "map" | "trip";
 
 /* *** בקשה מפורשת ("רגע · מקום · מפה" - וכל מצב פותח את הכלי עצמו, כמו באפליקציות המוכרות):
    רגע = מצלמה / גלריה (כמו אפליקציית המצלמה), מקום = כוכבים (כמו "דרגו וכתבו ביקורת" ב-Google Maps),
    מפה = המפה של places עצמה - נוגעים בנעצים ויוצרים מפה או מסלול. */
 const ALL_MODES: { id: ModeId; label: string }[] = [
   { id: "moment", label: "רגע" },
-  { id: "place", label: "מקום" },
+  { id: "place", label: "ביקורת" },
   { id: "map", label: "מפה" },
+  { id: "trip", label: "טיול" },
 ];
 
 /* *** בקשה מפורשת ("לאחד בין רגע לביקורת; רגע בינתיים לא מופיע - רק נשמר"): הביקורת קיבלה את העורך
@@ -54,10 +55,12 @@ const CSS = `
 .cx-star { -webkit-tap-highlight-color:transparent; transition:transform .18s cubic-bezier(.3,1.6,.5,1); }
 .cx-star[data-on="true"] { animation:cx-star-pop .34s cubic-bezier(.3,1.6,.5,1) both; }
 @keyframes cx-star-pop { 0% { transform:scale(.8); } 60% { transform:scale(1.14); } 100% { transform:scale(1); } }
+.cx-art-card { animation:cx-art-in .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes cx-art-in { from { opacity:0; margin-top:14px; } to { opacity:1; margin-top:0; } }
 .cx-rail { transition:transform .35s cubic-bezier(.2,.8,.2,1); }
 .cx-mode { -webkit-tap-highlight-color:transparent; transition:color .25s; }
 .cx-page :focus-visible { outline:2px solid #0A6DFE; outline-offset:3px; }
-@media (prefers-reduced-motion: reduce) { .cx-scene, .cx-star[data-on="true"] { animation:none !important; } .cx-rail { transition:none; } }
+@media (prefers-reduced-motion: reduce) { .cx-scene, .cx-star[data-on="true"], .cx-art-card { animation:none !important; } .cx-rail { transition:none; } }
 `;
 
 /* ───────────── אייקונים ───────────── */
@@ -211,6 +214,142 @@ function PlaceStage({ onSearch, onAdd }: { onSearch: (rating: number) => void; o
   );
 }
 
+/* ───────────── מפה / טיול: מסך יצירה ברור, באותו סגנון כמו הביקורת ───────────── */
+
+/* *** בקשה מפורשת ("המפה זהה מדי ולא ברור מאיפה מעלים"): במקום המפה עצמה - מסך יצירה מזמין עם
+   כפתור ראשי אחד ("מפה חדשה" / "טיול חדש"), ובחירת מקומות מהמפה כאפשרות משנית (נפתחת במסך מלא). */
+const IMG = "/images/vacation-destinations";
+
+function Photo({ src, className = "", style }: { src: string; className?: string; style?: CSSProperties }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" draggable={false} className={`object-cover ${className}`} style={style} />;
+}
+
+/** מפה: שלוש תמונות של מקומות בערימה, כל אחת עם נעץ - "אוסף של מקומות" במבט אחד */
+function MapArt() {
+  const cards = [
+    { src: `${IMG}/telaviv.png`, rotate: -9, x: -78, y: 10 },
+    { src: `${IMG}/haifa.png`, rotate: 8, x: 78, y: 12 },
+    { src: `${IMG}/jerusalem.png`, rotate: 0, x: 0, y: -6 },
+  ];
+  return (
+    <div className="relative h-[170px] w-[280px]" aria-hidden="true">
+      {cards.map((c, i) => (
+        <div
+          key={c.src}
+          className="cx-art-card absolute left-1/2 top-1/2 h-[128px] w-[104px] overflow-hidden rounded-[18px] border-[3px] border-white/90 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.8)]"
+          style={{ transform: `translate(calc(-50% + ${c.x}px), calc(-50% + ${c.y}px)) rotate(${c.rotate}deg)`, zIndex: i, animationDelay: `${i * 70}ms` }}
+        >
+          <Photo src={c.src} className="h-full w-full" />
+          <span className="absolute bottom-1.5 end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#7C3AED] text-white">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22s7-5.8 7-12a7 7 0 1 0-14 0c0 6.2 7 12 7 12Zm0-9.3a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4Z" /></svg>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** טיול: שלוש תחנות ממוספרות על קו מסלול מקווקו, ויום 1 · יום 2 */
+function TripArt() {
+  const stops = [
+    { src: `${IMG}/zafongolan.png`, n: 1, x: 40, y: 92, color: "#0A6DFE" },
+    { src: `${IMG}/tiberias.png`, n: 2, x: 140, y: 42, color: "#0A6DFE" },
+    { src: `${IMG}/haifa.png`, n: 3, x: 240, y: 88, color: "#E0701A" },
+  ];
+  return (
+    <div className="relative h-[176px] w-[280px]" aria-hidden="true">
+      <svg className="absolute inset-0" width="280" height="170" viewBox="0 0 280 170" fill="none">
+        <path d="M40 92 C 70 50, 100 42, 140 42" stroke="#0A6DFE" strokeWidth="3" strokeLinecap="round" strokeDasharray="1 9" />
+        <path d="M140 42 C 185 42, 215 62, 240 88" stroke="#E0701A" strokeWidth="3" strokeLinecap="round" strokeDasharray="1 9" />
+      </svg>
+      {stops.map((s, i) => (
+        <div key={s.n} className="cx-art-card absolute" style={{ left: s.x, top: s.y, transform: "translate(-50%, -50%)", animationDelay: `${i * 90}ms` }}>
+          <div className="h-[70px] w-[70px] overflow-hidden rounded-full border-[3px] border-white shadow-[0_14px_28px_-12px_rgba(0,0,0,0.8)]">
+            <Photo src={s.src} className="h-full w-full" />
+          </div>
+          <span
+            className="absolute -top-1 end-[-4px] flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#121214] text-[13px] font-bold text-white"
+            style={{ background: s.color }}
+          >
+            {s.n}
+          </span>
+        </div>
+      ))}
+      <span className="absolute left-[40px] top-[146px] -translate-x-1/2 whitespace-nowrap rounded-full bg-[#0A6DFE]/20 px-2.5 py-1 text-[11.5px] font-semibold text-[#6DA8FF]">יום 1</span>
+      <span className="absolute left-[240px] top-[146px] -translate-x-1/2 whitespace-nowrap rounded-full bg-[#E0701A]/20 px-2.5 py-1 text-[11.5px] font-semibold text-[#F2A15E]">יום 2</span>
+    </div>
+  );
+}
+
+function CreateStage({
+  art,
+  title,
+  sub,
+  cta,
+  onCreate,
+  onPick,
+}: {
+  art: ReactNode;
+  title: string;
+  sub: string;
+  cta: string;
+  onCreate: () => void;
+  onPick: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      {art}
+      <h2 className="mt-7 text-[24px] font-bold tracking-tight">{title}</h2>
+      <p className="mt-1.5 max-w-[19rem] text-balance text-[14.5px] leading-snug text-white/55">{sub}</p>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="cx-press mt-7 flex h-12 w-full max-w-[20rem] items-center justify-center gap-2 rounded-full bg-white text-[16px] font-semibold text-[#0f1419]"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        {cta}
+      </button>
+      <button type="button" onClick={onPick} className="cx-press mt-4 flex items-center gap-1.5 text-[14px] font-medium text-white/60 active:text-white">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </svg>
+        או <span className="font-semibold text-white">בחרו מקומות מהמפה</span>
+      </button>
+    </div>
+  );
+}
+
+/** בחירת מקומות מהמפה - מסך מלא מעל עמוד התוכן, עם כפתור סגירה */
+function PickOverlay({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="סגירה"
+          className="cx-press flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <div className="min-w-0">
+          <p className="text-[17px] font-bold text-white">{title}</p>
+          <p className="text-[13px] text-white/55">געו בנעצים או בכרטיסים כדי לבחור</p>
+        </div>
+      </div>
+      <div className="relative mx-3 mb-3 flex-1 overflow-hidden rounded-[24px]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <PlacesFriendsMap pickMode />
+      </div>
+    </div>
+  );
+}
+
 /* ───────────── העמוד ───────────── */
 
 /**
@@ -227,6 +366,7 @@ export default function ContentPage() {
   const { user, loading: authLoading } = useAuth();
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState<"next" | "prev">("next");
+  const [pickOpen, setPickOpen] = useState<null | "map" | "trip">(null);
   const mode = MODES[index];
 
   useEffect(() => {
@@ -324,7 +464,26 @@ export default function ContentPage() {
                     onAdd={(rating) => router.push(`/places/create?add=1${rating ? `&${ratingQuery(rating)}` : ""}`)}
                   />
                 )}
-                {mode.id === "map" && <PlacesFriendsMap pickMode />}
+                {mode.id === "map" && (
+                  <CreateStage
+                    art={<MapArt />}
+                    title="צרו מפה משלכם"
+                    sub="אטרקציות, מסעדות ומקומות שאהבתם - סביב רעיון אחד"
+                    cta="מפה חדשה"
+                    onCreate={() => router.push("/places/collection/create?type=places&origin=content")}
+                    onPick={() => setPickOpen("map")}
+                  />
+                )}
+                {mode.id === "trip" && (
+                  <CreateStage
+                    art={<TripArt />}
+                    title="בנו טיול לפי מסלול"
+                    sub="תחנות לפי סדר, יום אחרי יום - עם מפה וניווט"
+                    cta="טיול חדש"
+                    onCreate={() => router.push("/places/trip/create")}
+                    onPick={() => setPickOpen("trip")}
+                  />
+                )}
               </div>
             </section>
 
@@ -358,6 +517,7 @@ export default function ContentPage() {
 
       {/* בר תחתון שחור: כל האייקונים והתוויות בלבן, חוץ מ"תוכן" (הטאב הפעיל) שנשאר בצבעיו */}
       <MainBottomNav active="content" tone="dark" />
+      {pickOpen && <PickOverlay title={pickOpen === "map" ? "בחרו מקומות למפה" : "בחרו תחנות לטיול"} onClose={() => setPickOpen(null)} />}
     </>
   );
 }
