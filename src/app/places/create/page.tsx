@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense, type CSSProperties, type ReactNo
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button, ImageOptionRow, Skeleton } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
+import { getAvatarUrl } from "@/constants/avatar";
 import { createClient } from "@/services/supabase/client";
 import { MainBottomNav } from "@/components/MainBottomNav";
 import { HomeStatusBarTint } from "@/screens/home/HomeStatusBarTint";
@@ -207,7 +208,7 @@ function ErrorBox({ children }: { children: ReactNode }) {
  * המשתמש לא צריך להבין אם המקום קיים או חדש. הבר העליון והתחתון קבועים לאורך כל השלבים.
  */
 export function CreatePlacePageContent() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   // *** תוספת (בקשה מפורשת - "אם לא מצאתי מקום, כשאני כבר יוצר טיול - אל תחזיר אותי אחורה לעמוד
@@ -249,6 +250,10 @@ export function CreatePlacePageContent() {
 
   // 3. ביקורת
   const [selected, setSelected] = useState<SelectedPlace | null>(null);
+  // *** בקשה מפורשת ("לאחד בין רגע לביקורת - שייראה כמו רגע, פלוס כוכבים, מיקום חובה"): העמוד הוא
+  // עורך אחד בסגנון יצירת הפוסט; בחירת המקום (חיפוש / הוספה ידנית) היא שלב נפרד שנפתח ממנו.
+  // מגיעים מעמוד התוכן ("על איזה מקום?", ?pick=1) או מ"הוספת מקום" (?add=1) - ישר לבחירת המקום.
+  const [picking, setPicking] = useState(() => searchParams.get("pick") === "1" || searchParams.get("add") === "1");
   const [justAdded, setJustAdded] = useState(false);
   // ?rating=1..5 - הכוכבים שנבחרו כבר בעמוד התוכן ("מקום"). נשמרים עד שבוחרים מקום.
   const [rating, setRating] = useState(() => {
@@ -264,7 +269,6 @@ export function CreatePlacePageContent() {
   const previewUrlsRef = useRef<string[]>([]);
 
   const addRef = useRef<HTMLElement>(null);
-  const reviewRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/auth/login");
@@ -279,35 +283,30 @@ export function CreatePlacePageContent() {
   useEffect(() => {
     if (addOpen) addRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [addOpen]);
-  useEffect(() => {
-    if (selected) reviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [selected]);
 
   const hasReviewContent = rating > 0 || comment.trim().length > 0 || media.length > 0;
+  const canPublish = !!selected && rating > 0 && !uploading && !publishing;
+  const displayName = profile?.full_name ?? (user?.user_metadata?.full_name as string | undefined) ?? "";
 
   // ───────── ניווט ─────────
 
   /** חזרה שלב-שלב: ביקורת -> חיפוש, הוספה -> חיפוש, חיפוש -> יציאה מהעמוד. */
   function handleBack() {
-    if (selected) {
-      if (hasReviewContent && !window.confirm("לבטל את הביקורת? מה שכתבתם לא יישמר.")) return;
-      resetReview();
-      setSelected(null);
-      setJustAdded(false);
+    if (picking) {
+      if (addOpen) {
+        setAddOpen(false);
+        return;
+      }
+      // מבחירת המקום חוזרים לעורך (אם כבר יש בו משהו), אחרת יוצאים מהעמוד
+      if (selected || hasReviewContent) {
+        setPicking(false);
+        return;
+      }
+      router.back();
       return;
     }
-    if (addOpen) {
-      setAddOpen(false);
-      return;
-    }
+    if (hasReviewContent && !window.confirm("לבטל את הביקורת? מה שכתבתם לא יישמר.")) return;
     router.back();
-  }
-
-  function resetReview() {
-    setRating(0);
-    setComment("");
-    setMedia([]);
-    setReviewError(null);
   }
 
   // ───────── 1. חיפוש ─────────
@@ -342,6 +341,7 @@ export function CreatePlacePageContent() {
 
   function selectFromSearch(place: PlaceSearchResult) {
     setJustAdded(false);
+    setPicking(false);
     setSelected({
       id: place.id,
       name: place.name,
@@ -370,6 +370,7 @@ export function CreatePlacePageContent() {
     }
     setAddOpen(false);
     setJustAdded(fromAdd);
+    setPicking(false);
     setSelected(next);
   }
 
@@ -593,13 +594,15 @@ export function CreatePlacePageContent() {
       <CollapsibleTopBar onBack={handleBack} />
 
       <div className="mx-auto max-w-xl px-5 pt-4">
-        <header className="mb-5">
-          <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">על איזה מקום בא לכם לספר?</h1>
-          <p className="mt-1 text-[14px] text-ink-secondary">{selected ? "דרגו וספרו איך היה" : addOpen ? "הוסיפו מקום חדש ל-triplace" : "חפשו את המקום, דרגו ושתפו"}</p>
-        </header>
+        {picking && (
+          <header className="mb-5">
+            <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">איפה הייתם?</h1>
+            <p className="mt-1 text-[14px] text-ink-secondary">{addOpen ? "הוסיפו מקום חדש ל-triplace" : "חפשו את המקום - או הוסיפו אותו אם הוא חדש"}</p>
+          </header>
+        )}
 
         {/* ───── שלב 1: חיפוש ───── */}
-        {!selected && !addOpen && (
+        {picking && !addOpen && (
           <section className="pc-reveal">
             <label className="flex h-12 items-center gap-2.5 rounded-full bg-[#F1F2F5] px-4 text-ink-secondary focus-within:ring-2 focus-within:ring-[#0A6DFE]/30">
               <SearchIcon />
@@ -667,7 +670,7 @@ export function CreatePlacePageContent() {
         )}
 
         {/* ───── שלב 2: הוספת מקום (נחשף בלחיצה) ───── */}
-        {!selected && addOpen && (
+        {picking && addOpen && (
           <section ref={addRef} className="pc-reveal scroll-mt-28">
             <FieldLabel>מה שם המקום?</FieldLabel>
             <div className="relative mb-1">
@@ -855,111 +858,169 @@ export function CreatePlacePageContent() {
           </section>
         )}
 
-        {/* ───── שלב 3: ביקורת (נחשף אחרי בחירת מקום) ───── */}
-        {selected && (
-          <section ref={reviewRef} className="pc-reveal scroll-mt-28">
+        {/* ───── העורך - באותו מבנה כמו יצירת פוסט ("רגע"), פלוס מקום (חובה) ודירוג (חובה) ───── */}
+        {!picking && (
+          <section className="pc-reveal">
+            <header className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-[26px] font-bold leading-tight tracking-tight text-ink">ביקורת</h1>
+                <p className="mt-1 text-[14px] text-ink-secondary">דרגו מקום וספרו איך היה</p>
+              </div>
+              <button
+                type="button"
+                disabled={!canPublish}
+                onClick={handlePublish}
+                className={`mt-1 h-10 shrink-0 rounded-xl px-5 text-[15px] font-semibold transition-opacity ${
+                  canPublish
+                    ? "bg-[linear-gradient(135deg,var(--color-primary-start),var(--color-primary-end))] text-white shadow-soft"
+                    : "bg-[#F1F2F5] text-[#9aa1ad]"
+                }`}
+              >
+                {publishing ? "מפרסם..." : "פרסום"}
+              </button>
+            </header>
+
+            {/* הכותב */}
+            <div className="mt-6 flex items-center gap-3">
+              <span className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#EFF1F4]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={getAvatarUrl(profile?.avatar_url)} alt="" className="h-full w-full object-cover" />
+              </span>
+              <p className="min-w-0 truncate text-[15px] font-semibold text-ink">{displayName}</p>
+            </div>
+
             {justAdded && (
-              <div className="mb-4 flex items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-[13.5px] font-semibold" style={{ background: "rgba(10,109,254,0.08)", color: BLUE }}>
+              <div className="mt-4 flex items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-[13.5px] font-semibold" style={{ background: "rgba(10,109,254,0.08)", color: BLUE }}>
                 <CheckIcon />
-                הוספנו את המקום! רוצים לספר איך היה לכם?
+                הוספנו את המקום ל-triplace!
               </div>
             )}
 
-            {/* Place Preview קטן - בלי לחזור על כל פרטי המקום. */}
-            <div className="flex items-center gap-3 rounded-[20px] bg-[#F7F8FA] p-3">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-[#EFF1F4] text-[#9aa1ad]">
-                {selected.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selected.imageUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
+            {/* המקום - חובה */}
+            {selected ? (
+              <div className="mt-4 flex items-center gap-3 rounded-[20px] bg-[#F7F8FA] p-3">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[16px] bg-[#EFF1F4] text-[#9aa1ad]">
+                  {selected.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={selected.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <PinIcon />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] font-semibold text-ink">{selected.name}</span>
+                  <span className="block truncate text-[12.5px] text-ink-secondary">{[selected.city, selected.categoryLabel].filter(Boolean).join(" · ")}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPicking(true)}
+                  className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[13px] font-semibold text-ink shadow-[0_1px_3px_rgba(15,20,25,0.12)] active:scale-95"
+                >
+                  שינוי
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPicking(true)}
+                className="mt-4 flex w-full items-center gap-3 rounded-[20px] border-2 border-dashed border-[#C9D6F5] p-3 text-start transition active:scale-[0.99] active:bg-[#F4F7FF]"
+              >
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px]" style={{ background: "rgba(10,109,254,0.1)", color: BLUE }}>
                   <PinIcon />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-semibold text-ink">{selected.name}</span>
-                <span className="block truncate text-[12.5px] text-ink-secondary">{[selected.city, selected.categoryLabel].filter(Boolean).join(" · ")}</span>
-              </span>
-              <button type="button" onClick={handleBack} className="h-9 shrink-0 rounded-full bg-white px-3.5 text-[13px] font-semibold text-ink shadow-[0_1px_3px_rgba(15,20,25,0.12)] active:scale-95">
-                שינוי
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-semibold text-ink">איפה הייתם?</span>
+                  <span className="block text-[12.5px] text-ink-secondary">חובה - חפשו את המקום או הוסיפו אותו</span>
+                </span>
+                <span className="text-[#b3b9c3]">
+                  <ChevronIcon />
+                </span>
               </button>
-            </div>
+            )}
 
-            <h2 className="mt-7 text-center text-[20px] font-bold tracking-tight text-ink">איך היה לכם?</h2>
-            <div className="mt-3 flex justify-center gap-1.5" dir="ltr">
+            {/* הדירוג - חובה */}
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <span className="text-[15px] font-semibold text-ink" id="rating-label">
+                איך היה?
+              </span>
+              <span className="h-5 text-[14px] font-semibold text-[#E09A00]" aria-live="polite">
+                {RATING_LABELS[rating]}
+              </span>
+            </div>
+            <div className="mt-2 flex justify-between gap-1" dir="ltr" role="radiogroup" aria-labelledby="rating-label">
               {[1, 2, 3, 4, 5].map((star) => {
                 const on = star <= rating;
                 return (
                   <button
                     key={star}
                     type="button"
+                    role="radio"
+                    aria-checked={star === rating}
                     onClick={() => setRating(star)}
-                    aria-label={`${star} כוכבים`}
-                    aria-pressed={on}
-                    className="p-0.5 transition active:scale-90"
+                    aria-label={`${star} כוכבים - ${RATING_LABELS[star]}`}
+                    className="flex flex-1 justify-center rounded-[14px] py-1 transition active:scale-90"
                   >
-                    <svg width="42" height="42" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true">
                       <path d={STAR_PATH} fill={on ? "#F5B301" : "#E6E8EC"} stroke={on ? "#F5B301" : "#E6E8EC"} strokeWidth="1.2" strokeLinejoin="round" />
                     </svg>
                   </button>
                 );
               })}
             </div>
-            <p className="mt-1.5 h-5 text-center text-[14px] font-semibold text-ink-secondary" aria-live="polite">
-              {RATING_LABELS[rating]}
-            </p>
 
-            {/* נחשף אחרי שנבחר דירוג */}
-            {rating > 0 && (
-              <div className="pc-reveal mt-5">
-                <FieldLabel>ספרו קצת יותר</FieldLabel>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="מה אהבתם? מה כדאי לדעת לפני שמגיעים?"
-                  rows={4}
-                  className="w-full resize-none rounded-[20px] bg-[#F1F2F5] p-4 text-[16px] leading-relaxed text-ink placeholder:text-[#9aa1ad] focus:outline-none focus:ring-2 focus:ring-[#0A6DFE]/30"
-                />
+            {/* הטקסט - בלי מסגרת, כמו בפוסט */}
+            <textarea
+              value={comment}
+              onChange={(e) => {
+                setComment(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.max(e.target.scrollHeight, 110)}px`;
+              }}
+              placeholder="מה אהבתם? מה כדאי לדעת לפני שמגיעים?"
+              rows={4}
+              className="mt-5 block min-h-[110px] w-full resize-none bg-transparent text-[17px] leading-relaxed text-ink placeholder:text-[#9aa1ad] focus:outline-none"
+            />
 
-                {media.length > 0 && (
-                  <div className="mt-3 grid grid-cols-4 gap-1.5">
-                    {media.map((m) => (
-                      <div key={m.id} className="relative aspect-square overflow-hidden rounded-[14px] bg-[#EFF1F4]">
-                        {m.type === "video" ? (
-                          <video src={m.previewUrl} className="h-full w-full object-cover" muted />
-                        ) : (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
-                          aria-label="הסר"
-                          className="absolute end-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm active:scale-90"
-                        >
-                          <CloseIcon />
-                        </button>
-                      </div>
-                    ))}
+            {/* מדיה - אותה רשת כמו בפוסט */}
+            {media.length > 0 && (
+              <div className={`mt-2 grid gap-1.5 ${media.length === 1 ? "grid-cols-1" : "grid-cols-3"}`}>
+                {media.map((m) => (
+                  <div key={m.id} className={`relative overflow-hidden rounded-[16px] bg-[#EFF1F4] ${media.length === 1 ? "aspect-[4/3]" : "aspect-square"}`}>
+                    {m.type === "video" ? (
+                      <video src={`${m.previewUrl}#t=0.1`} preload="metadata" className="h-full w-full object-cover" muted playsInline />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.previewUrl} alt="" className="h-full w-full object-cover" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
+                      aria-label="הסר"
+                      className="absolute end-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm active:scale-90"
+                    >
+                      <CloseIcon />
+                    </button>
                   </div>
-                )}
-
-                <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
-                <div className="mt-3">
-                  <ActionRow
-                    icon={<ImageIcon />}
-                    title={uploading ? "מעלה..." : "הוסיפו תמונות"}
-                    subtitle={media.length > 0 ? `${media.length} מתוך ${MAX_MEDIA}` : `עד ${MAX_MEDIA} תמונות או סרטונים`}
-                    disabled={uploading || media.length >= MAX_MEDIA}
-                    onClick={() => fileInputRef.current?.click()}
-                  />
-                </div>
-
-                {reviewError && <ErrorBox>{reviewError}</ErrorBox>}
-
-                <PrimaryButton className="mt-6" disabled={publishing || uploading} onClick={handlePublish}>
-                  {publishing ? "מפרסמים..." : "פרסום ביקורת"}
-                </PrimaryButton>
+                ))}
               </div>
+            )}
+
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
+            <div className="mt-5 overflow-hidden rounded-[20px] bg-[#F7F8FA]">
+              <ActionRow
+                icon={<ImageIcon />}
+                title={uploading ? "מעלה..." : "תמונות או סרטון"}
+                subtitle={media.length > 0 ? `${media.length} מתוך ${MAX_MEDIA}` : `עד ${MAX_MEDIA} קבצים`}
+                disabled={uploading || media.length >= MAX_MEDIA}
+                onClick={() => fileInputRef.current?.click()}
+              />
+            </div>
+
+            {reviewError && <ErrorBox>{reviewError}</ErrorBox>}
+            {!canPublish && !publishing && (
+              <p className="mt-4 text-center text-[13px] text-ink-secondary">
+                {!selected ? "כדי לפרסם - בחרו מקום ודרגו אותו" : rating === 0 ? "כדי לפרסם - דרגו את המקום" : ""}
+              </p>
             )}
           </section>
         )}
