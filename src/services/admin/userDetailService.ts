@@ -164,6 +164,7 @@ export async function getUserFullDetail(supabase: SupabaseClient, userId: string
       age: ageFromBirthDate(profile?.birth_date ?? null),
       isAnonymous: Boolean(u.is_anonymous),
       isBanned: Boolean(u.banned_until && new Date(u.banned_until) > new Date()),
+      isVerified: Boolean(profile?.is_verified),
       bannedUntil: u.banned_until ?? null,
       signupDate: u.created_at,
       lastLogin: u.last_sign_in_at ?? null,

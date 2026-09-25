@@ -96,6 +96,27 @@ export function UserDetailDrawer({ userId, onClose, onDeleted }: { userId: strin
     }
   }
 
+  const [verifying, setVerifying] = useState(false);
+  async function handleVerifyToggle() {
+    if (!detail) return;
+    setVerifying(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${detail.account.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", [ADMIN_SECRET_HEADER]: adminSecret },
+        body: JSON.stringify({ action: detail.account.isVerified ? "unverify" : "verify" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "הפעולה נכשלה");
+      setDetail((d) => (d ? { ...d, account: { ...d.account, isVerified: data.isVerified } } : d));
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "הפעולה נכשלה");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   async function handleDelete() {
     if (!detail || deleteConfirmText !== "DELETE") return;
     setDeleting(true);
@@ -157,6 +178,7 @@ export function UserDetailDrawer({ userId, onClose, onDeleted }: { userId: strin
           <div className="mb-5 flex flex-wrap gap-1.5">
             <Badge tone={detail.account.isAnonymous ? "neutral" : "accent"}>{detail.account.isAnonymous ? "אורח" : "רשום"}</Badge>
             <Badge tone={detail.account.isBanned ? "danger" : "success"}>{detail.account.isBanned ? "מושעה" : "פעיל"}</Badge>
+            {detail.account.isVerified && <Badge tone="accent">✓ מאומת</Badge>}
             <Badge tone={detail.account.onboarding.main ? "success" : "warning"}>{detail.account.onboarding.main ? "Onboarding הושלם" : "Onboarding לא הושלם"}</Badge>
             {detail.tokens && <Badge tone="accent">✦ {detail.tokens.balance} טריפים</Badge>}
           </div>
@@ -411,6 +433,9 @@ export function UserDetailDrawer({ userId, onClose, onDeleted }: { userId: strin
             <div className="flex flex-wrap gap-2">
               <AdminButton variant="secondary" onClick={handleExport}>
                 ייצוא נתוני משתמש (CSV)
+              </AdminButton>
+              <AdminButton variant="secondary" onClick={handleVerifyToggle} disabled={verifying}>
+                {verifying ? "מעדכן..." : detail.account.isVerified ? "ביטול אימות (וי כחול)" : "אימות פרופיל (וי כחול)"}
               </AdminButton>
               <AdminButton variant="secondary" onClick={handleSuspendToggle} disabled={suspending}>
                 {suspending ? "מעדכן..." : detail.account.isBanned ? "שחזור חשבון" : "השעיית חשבון"}

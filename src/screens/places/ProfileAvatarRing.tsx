@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 export interface ProfileRingTier {
   minFollowers: number;
   name: string;
+  /** התווית על התג ליד השם ("5K+"); null = בלי תג (משתמשים בתחילת הדרך) */
+  badge: string | null;
   /** מילוי הטבעת (צבע אחיד או גרדיאנט) */
   fill: string;
   /** צבע הצל/הזוהר מסביב */
@@ -14,16 +16,18 @@ export interface ProfileRingTier {
 }
 
 export const PROFILE_RING_TIERS: ProfileRingTier[] = [
-  { minFollowers: 0, name: "כחול", fill: "#0A6DFE", glow: "rgba(10,60,150,0.45)" },
-  { minFollowers: 1_000, name: "טורקיז", fill: "linear-gradient(135deg, #2DD4BF 0%, #0891B2 100%)", glow: "rgba(8,145,178,0.5)" },
-  { minFollowers: 5_000, name: "סגול", fill: "linear-gradient(135deg, #A855F7 0%, #6D28D9 100%)", glow: "rgba(109,40,217,0.5)" },
-  { minFollowers: 25_000, name: "ורוד", fill: "linear-gradient(135deg, #FB7185 0%, #DB2777 100%)", glow: "rgba(219,39,119,0.5)" },
-  { minFollowers: 100_000, name: "זהב", fill: "linear-gradient(135deg, #FDE68A 0%, #F59E0B 45%, #B45309 100%)", glow: "rgba(217,119,6,0.55)" },
+  { minFollowers: 0, name: "כחול", badge: null, fill: "#0A6DFE", glow: "rgba(10,60,150,0.45)" },
+  { minFollowers: 1_000, name: "טורקיז", badge: "1K+", fill: "linear-gradient(135deg, #2DD4BF 0%, #0891B2 100%)", glow: "rgba(8,145,178,0.5)" },
+  { minFollowers: 5_000, name: "סגול", badge: "5K+", fill: "linear-gradient(135deg, #A855F7 0%, #6D28D9 100%)", glow: "rgba(109,40,217,0.5)" },
+  { minFollowers: 25_000, name: "ורוד", badge: "25K+", fill: "linear-gradient(135deg, #FB7185 0%, #DB2777 100%)", glow: "rgba(219,39,119,0.5)" },
+  { minFollowers: 100_000, name: "זהב", badge: "100K+", fill: "linear-gradient(135deg, #FDE68A 0%, #F59E0B 45%, #B45309 100%)", glow: "rgba(217,119,6,0.55)" },
+  // *** בקשה מפורשת ("יהלום לא טוב, צבעוני מדי"): פלטינה - כסוף-גרפיט מאופק במקום גרדיאנט קשת.
   {
     minFollowers: 1_000_000,
-    name: "יהלום",
-    fill: "conic-gradient(from 200deg, #60A5FA, #A78BFA, #F472B6, #FBBF24, #34D399, #60A5FA)",
-    glow: "rgba(167,139,250,0.6)",
+    name: "פלטינה",
+    badge: "1M+",
+    fill: "linear-gradient(135deg, #F1F5F9 0%, #94A3B8 38%, #334155 72%, #CBD5E1 100%)",
+    glow: "rgba(51,65,85,0.5)",
   },
 ];
 

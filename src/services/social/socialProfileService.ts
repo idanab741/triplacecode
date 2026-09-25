@@ -16,6 +16,8 @@ export interface SocialProfileDto {
   instagram: string | null;
   tiktok: string | null;
   isCreator: boolean;
+  /** מאומת ע"י האדמין (migration 0098) - וי כחול ליד השם */
+  isVerified: boolean;
   profileVisibility: "public" | "private";
   /** media = כל התוכן שהצופה רשאי לראות אצל המשתמש הזה, כמו בגריד: פוסטים + ביקורות + אוספים + טיולים. */
   counts: { followers: number; following: number; friends: number; media: number };
@@ -38,7 +40,7 @@ export async function getProfileByUsername(
   const BASE_COLUMNS = "id, username, full_name, avatar_url, cover_url, bio, website, is_creator, profile_visibility";
   let { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select(`${BASE_COLUMNS}, instagram, tiktok`)
+    .select(`${BASE_COLUMNS}, instagram, tiktok, is_verified`)
     .ilike("username", username)
     .maybeSingle();
   if (profileError) {
@@ -78,6 +80,7 @@ export async function getProfileByUsername(
     instagram: profile.instagram ?? null,
     tiktok: profile.tiktok ?? null,
     isCreator: profile.is_creator,
+    isVerified: Boolean((profile as { is_verified?: boolean | null }).is_verified),
     profileVisibility: profile.profile_visibility,
     counts,
     viewerState: {
