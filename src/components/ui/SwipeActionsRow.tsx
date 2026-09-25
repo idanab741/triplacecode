@@ -27,8 +27,8 @@ interface SwipeActionsRowProps {
 
 // *** בקשה מפורשת ("בסגנון ששלחתי" - ההודעות באייפון): עיגולים צבעוניים עם אייקון בלבד, עם רווח,
 // על רקע לבן - לא מלבנים מלאים. כל כפתור תופס "משבצת" ברוחב BUTTON_W.
-const BUTTON_W = 64;
-const CIRCLE = 50;
+const BUTTON_W = 52;
+const CIRCLE = 40;
 const DEAD_ZONE = 8;
 const LONG_PRESS_MS = 480;
 const SNAP = "transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)";
@@ -36,7 +36,7 @@ const OPEN_EVENT = "swipe-actions-row:open";
 
 function TrashIcon() {
   return (
-    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M4 7h16M9.5 7V4.8c0-.4.4-.8.8-.8h3.4c.4 0 .8.4.8.8V7M6.5 7l.8 12.2c.1.9.8 1.8 1.8 1.8h5.8c1 0 1.7-.9 1.8-1.8L17.5 7" />
     </svg>
   );
