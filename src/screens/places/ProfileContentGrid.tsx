@@ -8,17 +8,18 @@ import type { ProfileContentFilter, ProfileTileDto } from "@/services/social/pro
 import { ContentTypeIcon } from "./contentTypeIcons";
 
 const TABS: { id: ProfileContentFilter; label: string }[] = [
+  // *** בקשה מפורשת ("החלוקה עמוסה מידי - אין יותר פוסטים, ושמות אחרים"): הכל · מקומות · מפות · טיולים.
+  // פוסטים מוצגים יחד עם הביקורות תחת "מקומות".
   { id: "all", label: "הכל" },
-  { id: "post", label: "פוסטים" },
-  { id: "review", label: "ביקורות" },
+  { id: "review", label: "מקומות" },
   { id: "collection", label: "מפות" },
   { id: "trip", label: "טיולים" },
 ];
 
 const EMPTY_TEXT: Record<ProfileContentFilter, { self: string; other: string }> = {
-  all: { self: "כל מה שתפרסמו - פוסטים, ביקורות, מפות וטיולים - יופיע כאן.", other: "אין עדיין תוכן להצגה כאן." },
+  all: { self: "כל מה שתפרסמו - מקומות, מפות וטיולים - יופיע כאן.", other: "אין עדיין תוכן להצגה כאן." },
   post: { self: "עוד לא פרסמתם פוסט.", other: "אין עדיין פוסטים להצגה כאן." },
-  review: { self: "עוד לא כתבתם ביקורת.", other: "אין עדיין ביקורות להצגה כאן." },
+  review: { self: "עוד לא שיתפתם מקום.", other: "אין עדיין מקומות להצגה כאן." },
   collection: { self: "עוד לא יצרתם מפה.", other: "אין עדיין מפות להצגה כאן." },
   trip: { self: "עוד לא יצרתם טיול.", other: "אין עדיין טיולים להצגה כאן." },
 };
@@ -100,7 +101,7 @@ interface ProfileContentGridProps {
 }
 
 /**
- * תוכן הפרופיל - טאבים עם אייקון (הכל · פוסטים · ביקורות · אוספים · טיולים) ו-Grid של 3 עמודות ללא שוליים,
+ * תוכן הפרופיל - טאבים עם אייקון (הכל · מקומות · מפות · טיולים) ו-Grid של 3 עמודות ללא שוליים,
  * אריחים לאורך (3:4): תמונה מלאה, כותרת בתחתית, ★ דירוג לביקורות, ואייקון סוג התוכן בפינה.
  * המקור: /api/social/profile/[username]/content (מיזוג פוסטים+ביקורות+אוספים+טיולים).
  */
