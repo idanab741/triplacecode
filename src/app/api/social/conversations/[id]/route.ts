@@ -9,6 +9,7 @@ import {
   type DmMessageRow,
   type DmSharedPreview,
 } from "@/services/social/dmMappers";
+import { computeOnlineStatus } from "@/services/social/onlinePresenceService";
 
 async function getAuthedUser() {
   const supabase = await createClient();
@@ -138,7 +139,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const [messagesRes, otherProfileRes] = await Promise.all([
     supabase.from("dm_messages").select("*").eq("conversation_id", id).order("created_at", { ascending: true }),
-    supabase.from("profiles").select("id, username, full_name, avatar_url").eq("id", otherId).maybeSingle(),
+    supabase.from("profiles").select("id, username, full_name, avatar_url, last_seen").eq("id", otherId).maybeSingle(),
   ]);
   if (messagesRes.error) return NextResponse.json({ error: messagesRes.error.message }, { status: 500 });
 
@@ -161,6 +162,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           username: otherProfileRes.data.username,
           fullName: otherProfileRes.data.full_name,
           avatarUrl: otherProfileRes.data.avatar_url,
+          // נקודת ירוק / צהוב ליד התמונה בכותרת השיחה
+          status: computeOnlineStatus(otherProfileRes.data.last_seen as string | null),
         }
       : null,
     messages: messages.map((m) => ({ ...mapMessageRow(m), shared: sharedByMessage.get(m.id) ?? null })),

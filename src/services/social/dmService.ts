@@ -1,4 +1,5 @@
 import type { DmMessageDto, DmSharedPreview } from "./dmMappers";
+import type { OnlineStatus } from "./onlinePresenceService";
 
 export type { DmMessageDto, DmSharedPreview };
 
@@ -14,6 +15,8 @@ export interface DmOtherUserDto {
   username: string | null;
   fullName: string | null;
   avatarUrl: string | null;
+  /** רק בטעינת שיחה בודדת (כותרת הצ'אט) */
+  status?: OnlineStatus;
 }
 
 export interface DmConversationListItemDto extends DmConversationDto {
