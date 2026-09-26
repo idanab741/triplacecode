@@ -194,7 +194,8 @@ export function SubmissionEditor({
 
   const subcategoryOptions =
     submission.kind === "tripadd" ? (TRIPADD_SUBCATEGORIES[draft.category as TripAddCategory] ?? []).flatMap((g) => g.tags) : [];
-  const photos = [...submission.photos, ...(submission.googlePhotoUrl ? [submission.googlePhotoUrl] : [])];
+  // *** בקשה מפורשת: לעולם לא תמונות של Google - רק מה שמשתמשים העלו
+  const photos = submission.photos;
 
   // Portal לשורש האדמין: המגירה מכסה את כל המסך ולא נכלאת בתוך הכרטיס, ועדיין יורשת את משתני העיצוב
   const portalTarget = typeof document !== "undefined" ? document.querySelector(".admin-root") : null;

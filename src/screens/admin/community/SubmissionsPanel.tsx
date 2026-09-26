@@ -113,7 +113,7 @@ export function SubmissionsPanel() {
       ) : (
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2" style={{ opacity: loading ? 0.6 : 1 }}>
           {data?.submissions.map((s) => {
-            const photo = s.photos[0] ?? s.googlePhotoUrl;
+            const photo = s.photos[0]; // בלי Google - רק תמונות משתמשים
             const category = data.categories[s.kind].find((c) => c.value === s.category)?.label ?? s.category;
             const st = STATUS_PILL[s.status];
             return (
