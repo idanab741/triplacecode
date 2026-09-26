@@ -181,7 +181,7 @@ async function fetchTripAddCandidates(
   let query = adminForMedia
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, taxonomy_tags, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_photo_url, google_place_id, tripadd_submission_media(sort_order, media_assets(url))"
+      "id, name, category, subcategory, taxonomy_tags, short_description, latitude, longitude, city, price_level, accessible, google_rating, google_rating_count, google_place_id, tripadd_submission_media(sort_order, media_assets(url))"
     )
     .not("latitude", "is", null)
     .not("longitude", "is", null);
@@ -266,10 +266,9 @@ async function fetchTripAddCandidates(
       ?.filter((m) => m.media_assets?.url)
       .sort((a, b) => a.sort_order - b.sort_order);
     const userPhotos = (media ?? []).map((m) => m.media_assets!.url);
-    // *** תוספת (בקשה מפורשת - "איפה כל התמונות?"): כשאין אף תמונה שמשתמש העלה, נופלים חזרה לתמונת ה-
-    // Google היחידה שכבר נשמרת מרגע ההגשה עצמה (google_photo_url, autocomplete) - עדיף תמונה אחת אמיתית
-    // מאשר כרטיס ריק. תמונות משתמשים תמיד קודמות כשקיימות.
-    const imageUrls = userPhotos.length > 0 ? userPhotos : row.google_photo_url ? [row.google_photo_url as string] : [];
+    // *** בקשה מפורשת ("לעולם לא חיבור לתמונות של Google"): רק תמונות שמשתמשים העלו. (הוסר ה-fallback
+    // ל-google_photo_url שנוסף קודם.)
+    const imageUrls = userPhotos;
 
     const distanceKm = distanceOrigin
       ? haversineDistanceKm(distanceOrigin, { lat: row.latitude as number, lng: row.longitude as number })
@@ -329,7 +328,7 @@ async function fetchTripAddCandidates(
     session,
     tripadd: mapped,
     googleIdById: new Map(rows.map((r) => [r.id as string, (r.google_place_id as string | null) ?? null])),
-    googleFallbackPhotos: new Set(rows.map((r) => r.google_photo_url as string | null).filter((u): u is string => !!u)),
+    googleFallbackPhotos: new Set<string>(),
     excluded,
     searchOrigin,
     radiusKm,

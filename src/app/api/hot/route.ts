@@ -164,7 +164,7 @@ export async function GET(request: Request) {
   let placesQuery = admin.from("places").select("id, name, image_urls, city, category").eq("is_legacy", false);
   let tripAddQuery = admin
     .from("tripadd_submissions")
-    .select("id, name, city, category, google_photo_url, tripadd_submission_media(sort_order, media_assets(url, type))")
+    .select("id, name, city, category, tripadd_submission_media(sort_order, media_assets(url, type))")
     .eq("status", "approved");
   if (placeCategory) placesQuery = placesQuery.eq("category", placeCategory);
   if (category) tripAddQuery = tripAddQuery.eq("category", category);
@@ -223,7 +223,8 @@ export async function GET(request: Request) {
     if (!row) continue; // לא קיים / לא מאושר / לא בסוג שנבחר
 
     const own = userMedia.get(key) ?? (entry.kind === "tripadd" ? pickMedia(row.tripadd_submission_media as MediaRow[]) : null);
-    const fallbackUrl = entry.kind === "place" ? firstImage(row.image_urls) : ((row.google_photo_url as string | null) ?? null);
+    // *** בקשה מפורשת: לעולם לא תמונות של Google למקומות קהילה - רק מה שמשתמשים העלו
+    const fallbackUrl = entry.kind === "place" ? firstImage(row.image_urls) : null;
     const rating = avg(entry.ratings);
 
     places.push({

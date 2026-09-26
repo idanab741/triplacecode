@@ -30,20 +30,18 @@ export async function getUnifiedPlace(id: string): Promise<UnifiedPlace | null> 
   const { data: tripadd } = await supabase
     .from("tripadd_submissions")
     .select(
-      "id, name, category, subcategory, short_description, latitude, longitude, city, price_level, google_photo_url, tripadd_submission_media(sort_order, media_assets(type, url, thumbnail_url))"
+      "id, name, category, subcategory, short_description, latitude, longitude, city, price_level, tripadd_submission_media(sort_order, media_assets(type, url, thumbnail_url))"
     )
     .eq("id", id)
     .maybeSingle();
   if (tripadd) {
     // *** תיקון (בקשה מפורשת - "איפה התמונות של המקומות?"): סרטון -> תמונת התצוגה שלו (לא קובץ הווידאו,
-    // שאי אפשר להציג כ-<img>), ואם אין מדיה בכלל - תמונת Google של המקום.
+    // שאי אפשר להציג כ-<img>). *** בקשה מפורשת: לעולם לא תמונות של Google - רק מה שמשתמשים העלו.
     type MediaRow = { sort_order: number; media_assets: { type: string | null; url: string | null; thumbnail_url: string | null } | null };
     const imageUrls = ((tripadd.tripadd_submission_media as unknown as MediaRow[] | null) ?? [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((m) => (m.media_assets?.type === "video" ? m.media_assets.thumbnail_url : (m.media_assets?.url ?? m.media_assets?.thumbnail_url)) ?? null)
       .filter((u): u is string => !!u);
-    const googlePhoto = (tripadd as { google_photo_url?: string | null }).google_photo_url ?? null;
-    if (imageUrls.length === 0 && googlePhoto) imageUrls.push(googlePhoto);
     return {
       id: tripadd.id,
       type: "place",

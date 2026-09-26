@@ -61,7 +61,7 @@ async function buildSharedPreviews(
     tripAddIds.length
       ? supabase
           .from("tripadd_submissions")
-          .select("id, name, google_photo_url, tripadd_submission_media(sort_order, media_assets(url))")
+          .select("id, name, tripadd_submission_media(sort_order, media_assets(url))")
           .in("id", tripAddIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -85,14 +85,14 @@ async function buildSharedPreviews(
   type TripAddPreviewRow = {
     id: string;
     name: string;
-    google_photo_url: string | null;
     tripadd_submission_media: { sort_order: number; media_assets: { url: string } | { url: string }[] | null }[] | null;
   };
   const tripAddById = new Map(
     ((tripAddRes.data ?? []) as unknown as TripAddPreviewRow[]).map((t) => {
       const first = [...(t.tripadd_submission_media ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0];
       const media = first ? (Array.isArray(first.media_assets) ? first.media_assets[0] : first.media_assets) : null;
-      return [t.id, { name: t.name, imageUrl: media?.url ?? t.google_photo_url ?? null }];
+      // *** בקשה מפורשת: לעולם לא תמונות של Google - רק מה שמשתמשים העלו
+      return [t.id, { name: t.name, imageUrl: media?.url ?? null }];
     })
   );
 
