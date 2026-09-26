@@ -279,6 +279,8 @@ export function CollapsibleTopBar({
       data-home-top-bar=""
       className={`sticky top-0 ${colored ? "rounded-b-[32px] pb-5" : "pb-3"} ${raised ? "z-[65]" : "z-30"}`}
       style={{
+        // הבר מתחיל מתחת לסרגל הסטטוס (שעה/סוללה) - הרקע שלו ממשיך גם מאחוריו
+        paddingTop: "var(--sat)",
         ...(colored ? { background: gradient, boxShadow: shadow } : { backgroundColor: "transparent" }),
         transition: "transform 240ms cubic-bezier(0.22, 1, 0.36, 1), background-color 200ms ease, box-shadow 200ms ease",
         willChange: "transform",

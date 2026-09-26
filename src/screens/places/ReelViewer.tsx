@@ -119,7 +119,7 @@ export function ReelViewer({
       {/* עליון: סגירה + קול */}
       <div
         className="relative z-10 flex items-center justify-between px-3"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
+        style={{ paddingTop: "max(var(--sat), 12px)" }}
       >
         <button type="button" onClick={onClose} aria-label="סגירה" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-white/10">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
@@ -132,7 +132,7 @@ export function ReelViewer({
           aria-label="triplace"
           className="pointer-events-none absolute left-1/2 block h-[53px] w-[174px] -translate-x-1/2 -translate-y-1/2 select-none"
           style={{
-            top: "calc(max(env(safe-area-inset-top), 12px) + 22px)",
+            top: "calc(max(var(--sat), 12px) + 22px)",
             backgroundColor: "#ffffff",
             WebkitMaskImage: "url(/images/triplace-logo-black.png)",
             maskImage: "url(/images/triplace-logo-black.png)",

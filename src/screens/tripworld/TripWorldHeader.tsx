@@ -12,7 +12,7 @@ import { TRIPLACE_LOGO_STYLE } from "@/components/ui/triplaceLogo";
  */
 export function TripWorldHeader() {
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
+    <header className="safe-top sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
       <div className="flex h-16 items-center justify-center gap-2 px-5">
         <span
             role="img"

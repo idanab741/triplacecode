@@ -13,7 +13,7 @@ export function AttractionTopBar({ backHref }: AttractionTopBarProps) {
     // הסולידי - זכוכית חלבית שקופה (backdrop-blur) שיושבת *על* תמונת ה-HERO. העמוד
     // האב חייב להיות position:relative והתמונה מתחילה מראש העמוד (בלי מרווח שלילי).
     <div
-      className="absolute inset-x-0 top-0 z-10 rounded-b-[32px] border-b border-white/30 pb-4 backdrop-blur-xl backdrop-saturate-150"
+      className="safe-top absolute inset-x-0 top-0 z-10 rounded-b-[32px] border-b border-white/30 pb-4 backdrop-blur-xl backdrop-saturate-150"
       style={{ background: "rgba(255, 255, 255, 0.14)", WebkitBackdropFilter: "blur(20px) saturate(1.5)" }}
     >
       {/* צל עדין מאחורי הלוגו הלבן, כדי שיישאר קריא גם על תמונה בהירה */}

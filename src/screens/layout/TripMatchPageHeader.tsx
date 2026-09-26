@@ -10,7 +10,7 @@ interface TripMatchPageHeaderProps {
 
 export function TripMatchPageHeader({ onBack, heroSrc }: TripMatchPageHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+    <header className="safe-top sticky top-0 z-30 w-full bg-white shadow-sm">
       <div className="relative h-16">
         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
           <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />

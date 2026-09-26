@@ -14,7 +14,7 @@ export function ChatHeader({ current, total, onBack }: ChatHeaderProps) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
+    <header className="safe-top sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
       <div className="relative h-16">
         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
           <span

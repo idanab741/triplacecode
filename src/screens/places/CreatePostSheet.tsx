@@ -128,7 +128,7 @@ export function CreatePostSheet({ onClose, onSubmit }: CreatePostSheetProps) {
       {/* 1. HEADER - יצירת פוסט (ימין) | ביטול + פרסום (שמאל) */}
       <div
         className="flex shrink-0 items-center justify-between border-b border-ink-secondary/10 px-4 pb-2.5"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
+        style={{ paddingTop: "max(var(--sat), 12px)" }}
       >
         <h1 className="text-[17px] font-bold text-ink">יצירת פוסט</h1>
         <div className="flex items-center gap-3">
@@ -362,7 +362,7 @@ function PlacePickerView({ onClose, onPick }: { onClose: () => void; onPick: (pl
     <div className="fixed inset-0 z-[80] flex flex-col bg-white">
       <div
         className="flex shrink-0 items-center justify-between border-b border-ink-secondary/10 px-4 pb-2.5"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
+        style={{ paddingTop: "max(var(--sat), 12px)" }}
       >
         <h1 className="text-[17px] font-bold text-ink">הוספת מקום</h1>
         <button type="button" onClick={onClose} className="text-[14px] font-semibold text-ink-secondary">

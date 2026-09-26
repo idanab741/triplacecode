@@ -576,7 +576,7 @@ function TripsExperience({
             className="h-full"
             padding={{ top: 90, right: 48, bottom: 70, left: 48 }}
           />
-          <div className="pointer-events-none absolute inset-x-4 z-10 flex items-start justify-between" style={{ top: "max(env(safe-area-inset-top), 16px)" }}>
+          <div className="pointer-events-none absolute inset-x-4 z-10 flex items-start justify-between" style={{ top: "max(var(--sat), 16px)" }}>
             <HeroIconButton label="חזרה" onClick={onBack}>
               <BackIcon />
             </HeroIconButton>

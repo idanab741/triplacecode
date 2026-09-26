@@ -22,7 +22,7 @@ export function RouteResultHeader({ onBack, heroSrc, onSave, saved, onShare }: R
   }
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
+    <header className="safe-top sticky top-0 z-30 w-full border-b border-black/[0.06] bg-white">
       <div className="relative h-16">
         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
           <Image src="/images/trip-triplace-logo.png" alt="" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />

@@ -587,7 +587,7 @@ function PlacePickerView({ onClose, onPick }: { onClose: () => void; onPick: (pl
     <div className="fixed inset-0 z-[80] flex flex-col bg-white" style={INK}>
       <div
         className="flex shrink-0 items-center justify-between px-5 pb-3"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}
+        style={{ paddingTop: "max(var(--sat), 14px)" }}
       >
         <h1 className="text-[20px] font-bold tracking-tight text-ink">תיוג מקום</h1>
         <button

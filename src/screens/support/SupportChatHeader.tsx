@@ -32,7 +32,7 @@ function SupportAvatar() {
  */
 export function SupportChatHeader({ onBack }: SupportChatHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-3 bg-white px-2 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-[calc(4rem+var(--sat))] safe-top w-full items-center gap-3 bg-white px-2 shadow-sm">
       <BackButton onBack={onBack} />
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         <span className="relative h-9 w-9 shrink-0">

@@ -19,7 +19,7 @@ export function DmChatHeader({ otherUser, onBack }: DmChatHeaderProps) {
   const online = otherUser?.status === "online";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-3 bg-white px-2 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-[calc(4rem+var(--sat))] safe-top w-full items-center gap-3 bg-white px-2 shadow-sm">
       <BackButton onBack={onBack} />
       {otherUser ? (
         <Link href={`/places/profile/${otherUser.username ?? otherUser.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">

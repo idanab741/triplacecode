@@ -121,7 +121,7 @@ export function LikedDialog({ placeName, placeImageUrl, likedCount, onContinue, 
 
   const style: CSSProperties = placement
     ? { top: placement.top, left: placement.left, width: placement.width, height: placement.height }
-    : { top: "calc(env(safe-area-inset-top, 0px) + 12px)", left: 16, right: 16, height: DEFAULT_HEIGHT };
+    : { top: "calc(var(--sat) + 12px)", left: 16, right: 16, height: DEFAULT_HEIGHT };
 
   return (
     <div className="pointer-events-none fixed z-[55]" style={style}>

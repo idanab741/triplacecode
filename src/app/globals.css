@@ -4,6 +4,32 @@
 :root {
   /* מונע מדפדפנים (בעיקר כרום באנדרואיד) לכפות מצב כהה - האתר בעיצוב בהיר בלבד */
   color-scheme: light;
+  /* *** גובה סרגל הסטטוס (שעה/סוללה) - העמוד נמשך מתחתיו (viewport-fit=cover), והברים העליונים
+     יורדים בדיוק בגובה הזה כדי שלא יתחבאו מתחת לשעה. 0 בדפדפן רגיל / במחשב. */
+  --sat: env(safe-area-inset-top, 0px);
+}
+
+/* *** צל עדין מאחורי השעה/סוללה - באפליקציה ממסך הבית (standalone) iOS מציג אותן בלבן כשהעמוד נמשך
+   מתחתיהן, ובלי הצל הן נעלמות על רקע לבן. מוצג רק במצב הזה (בדפדפן רגיל --sat=0 והסרגל של הדפדפן עצמו). */
+.status-scrim {
+  display: none;
+}
+@media (display-mode: standalone) {
+  .status-scrim {
+    display: block;
+    position: fixed;
+    inset-inline: 0;
+    top: 0;
+    height: calc(var(--sat) + 14px);
+    z-index: 2147483000;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(10, 12, 20, 0.38), rgba(10, 12, 20, 0.18) 60%, rgba(10, 12, 20, 0));
+  }
+}
+
+/* ריווח עליון בגובה סרגל הסטטוס - לברים עליונים (sticky / absolute בראש העמוד) */
+.safe-top {
+  padding-top: var(--sat);
 }
 
 /* *** תוספת (בקשה מפורשת - "מושכים כלפי מטה בראש הדף ממש (איפה שפעם היה
