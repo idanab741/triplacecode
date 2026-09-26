@@ -433,7 +433,7 @@ export function CreatePlacePageContent() {
         address: details.address ?? s.secondaryText,
         latitude: details.latitude,
         longitude: details.longitude,
-        imageUrl: details.imageUrl ?? null,
+        imageUrl: null, // *** בקשה מפורשת: לעולם לא תמונות של Google
       });
     } catch {
       setAddError("שגיאה בטעינת פרטי המקום");
