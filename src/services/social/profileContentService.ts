@@ -38,8 +38,9 @@ async function getPostTiles(
     .order("created_at", { ascending: false })
     .limit(limit);
   if (cursor) query = query.lt("created_at", cursor);
-  if (filter === "review") query = query.eq("post_type", "review");
-  else if (filter === "post") query = query.neq("post_type", "review");
+  // *** בקשה מפורשת ("אין יותר פוסטים - צריך למזג אותם לביקורות"): הטאב "מקומות" (filter=review) מציג
+  // ביקורות ופוסטים יחד. "post" נשאר רק לתאימות לאחור.
+  if (filter === "post") query = query.neq("post_type", "review");
 
   const { data, error } = await query;
   if (error) throw error;
