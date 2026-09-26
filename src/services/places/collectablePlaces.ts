@@ -87,7 +87,7 @@ export async function resolveCollectablePlaces(admin: SupabaseClient, ids: strin
   const { data: subs } = rest.length
     ? await admin
         .from("tripadd_submissions")
-        .select("id, submitted_by, name, category, city, address, latitude, longitude, google_place_id, google_photo_url, status")
+        .select("id, submitted_by, name, category, city, address, latitude, longitude, google_place_id, status")
         .in("id", rest)
     : { data: [] };
   const subById = new Map(((subs ?? []) as Record<string, unknown>[]).map((s) => [s.id as string, s]));
@@ -124,7 +124,8 @@ export async function resolveCollectablePlaces(admin: SupabaseClient, ids: strin
     const lat = typeof sub.latitude === "number" ? sub.latitude : null;
     const lng = typeof sub.longitude === "number" ? sub.longitude : null;
     const googleId = (sub.google_place_id as string | null) ?? null;
-    const photo = firstPhoto.get(id) ?? (sub.google_photo_url as string | null) ?? null;
+    // *** בקשה מפורשת: לעולם לא תמונות של Google - רק תמונה שמשתמש העלה
+    const photo = firstPhoto.get(id) ?? null;
 
     // 1) Place קיים עם אותו google_place_id
     let existing: PlaceRow | null = null;
