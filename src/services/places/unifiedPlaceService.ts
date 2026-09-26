@@ -29,22 +29,28 @@ export async function getUnifiedPlace(id: string): Promise<UnifiedPlace | null> 
   // (ר' ההערה שם) - אז ניווט אליו ("/place/{id}") כבר עבד; רק ה-DTO לרשימה עצמה היה חסר.
   const { data: tripadd } = await supabase
     .from("tripadd_submissions")
-    .select("id, name, category, subcategory, short_description, latitude, longitude, city, price_level, tripadd_submission_media(sort_order, media_assets(url))")
+    .select(
+      "id, name, category, subcategory, short_description, latitude, longitude, city, price_level, google_photo_url, tripadd_submission_media(sort_order, media_assets(type, url, thumbnail_url))"
+    )
     .eq("id", id)
     .maybeSingle();
   if (tripadd) {
-    const media = (
-      tripadd.tripadd_submission_media as unknown as { sort_order: number; media_assets: { url: string } | null }[] | null
-    )
-      ?.filter((m) => m.media_assets?.url)
-      .sort((a, b) => a.sort_order - b.sort_order);
+    // *** תיקון (בקשה מפורשת - "איפה התמונות של המקומות?"): סרטון -> תמונת התצוגה שלו (לא קובץ הווידאו,
+    // שאי אפשר להציג כ-<img>), ואם אין מדיה בכלל - תמונת Google של המקום.
+    type MediaRow = { sort_order: number; media_assets: { type: string | null; url: string | null; thumbnail_url: string | null } | null };
+    const imageUrls = ((tripadd.tripadd_submission_media as unknown as MediaRow[] | null) ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((m) => (m.media_assets?.type === "video" ? m.media_assets.thumbnail_url : (m.media_assets?.url ?? m.media_assets?.thumbnail_url)) ?? null)
+      .filter((u): u is string => !!u);
+    const googlePhoto = (tripadd as { google_photo_url?: string | null }).google_photo_url ?? null;
+    if (imageUrls.length === 0 && googlePhoto) imageUrls.push(googlePhoto);
     return {
       id: tripadd.id,
       type: "place",
       name: tripadd.name,
       category: tripadd.category,
       subcategory: tripadd.subcategory,
-      imageUrls: (media ?? []).map((m) => m.media_assets!.url),
+      imageUrls,
       // *** בקשה מפורשת (TripMatch): לא מציגים דירוג/מרחק/תיאור לאטרקציות tripadd - null בכוונה, לא חוסר-מידע.
       rating: null,
       ratingCount: null,
