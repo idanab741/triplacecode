@@ -307,9 +307,10 @@ function Photo({ src, className = "", style }: { src: string; className?: string
 function MapArt({ images }: { images: string[] }) {
   const [a, b, c] = images;
   const cards = [
-    { src: a, rotate: -9, x: -78, y: 10 },
-    { src: b, rotate: 8, x: 78, y: 12 },
-    { src: c, rotate: 0, x: 0, y: -6 },
+    { src: a, rotate: -9, x: -78, y: 10, z: 1 },
+    // *** בקשה מפורשת ("הכרטיסייה הימנית - תהיה מעל"): הכרטיס הימני עליון בערימה
+    { src: b, rotate: 8, x: 78, y: 12, z: 3 },
+    { src: c, rotate: 0, x: 0, y: -6, z: 2 },
   ];
   return (
     <div className="relative h-[170px] w-[280px]" aria-hidden="true">
@@ -317,7 +318,7 @@ function MapArt({ images }: { images: string[] }) {
         <div
           key={`${i}-${c.src}`}
           className="cx-art-card absolute left-1/2 top-1/2 h-[128px] w-[104px] overflow-hidden rounded-[18px] border-[3px] border-white/90 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.8)]"
-          style={{ transform: `translate(calc(-50% + ${c.x}px), calc(-50% + ${c.y}px)) rotate(${c.rotate}deg)`, zIndex: i, animationDelay: `${i * 70}ms` }}
+          style={{ transform: `translate(calc(-50% + ${c.x}px), calc(-50% + ${c.y}px)) rotate(${c.rotate}deg)`, zIndex: c.z, animationDelay: `${i * 70}ms` }}
         >
           <Photo src={c.src} className="h-full w-full" />
           <span className="absolute bottom-1.5 end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#7C3AED] text-white">
