@@ -295,7 +295,7 @@ export function AddPlaceModal({ onClose, onSaved }: AddPlaceModalProps) {
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
       style={{
-        paddingTop: "max(env(safe-area-inset-top), 24px)",
+        paddingTop: "max(var(--sat), 24px)",
         paddingBottom: "max(env(safe-area-inset-bottom), 24px)",
       }}
       onClick={(e) => {

@@ -30,7 +30,7 @@ export function Screen({
     // התיקון האמיתי לזליגה נשאר רק ב-CARD_BOX_STYLE (tripmatch/page.tsx),
     // בלי overflow-x-hidden גורף שפוגע בגלילה תקינה.
     <div
-      className={`${fullHeight ? "min-h-screen" : ""} bg-bg-secondary px-5 pt-8 ${
+      className={`${fullHeight ? "min-h-screen" : ""} bg-bg-secondary px-5 pt-[calc(var(--sat)+2rem)] ${
         withBottomNavSpacing ? "pb-28" : "pb-8"
       } ${className}`}
       {...props}

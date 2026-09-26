@@ -408,7 +408,7 @@ function CreateStage({
 function PickOverlay({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-black" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}>
+      <div className="flex items-center gap-3 px-4 pb-3" style={{ paddingTop: "max(var(--sat), 14px)" }}>
         <button
           type="button"
           onClick={onClose}

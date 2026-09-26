@@ -649,8 +649,8 @@ export function PlacesFriendsMap({
           עדינה רק בראש המפה, כדי שהלוגו והכפתורים יהיו קריאים בלי עיגולים וצללים כבדים. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44"
-        style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0) 100%)" }}
+        className="pointer-events-none absolute inset-x-0 z-[500] h-44"
+        style={{ top: "var(--sat)", background: "linear-gradient(to bottom, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.6) 45%, rgba(255,255,255,0) 100%)" }}
       />
 
       {/* *** בקשה מפורשת: "כולם / חברים / שלי" + כפתור המיקום שלי - למטה, מתחת לפס הכרטיסים
@@ -725,7 +725,7 @@ export function PlacesFriendsMap({
           ובסגול של place's. יושבת ישר מתחת ללוגו. */}
       <div
         className="absolute inset-x-0 z-[1000]"
-        style={{ top: topOffsetPx, ...controlsStyle(-12) }}
+        style={{ top: `calc(var(--sat) + ${topOffsetPx}px)`, ...controlsStyle(-12) }}
       >
         <TripMatchCategoryChips
           selected={categories}
@@ -740,7 +740,7 @@ export function PlacesFriendsMap({
       {/* מצב ריק / שגיאה */}
       {/* האזור שנבחר בחיפוש - תגית עם השם ו-✕ לחזרה למפה הרגילה */}
       {area && (
-        <div className="absolute inset-x-0 z-[1000] flex justify-center" style={{ top: topOffsetPx + 58, ...controlsStyle(-12) }}>
+        <div className="absolute inset-x-0 z-[1000] flex justify-center" style={{ top: `calc(var(--sat) + ${topOffsetPx + 58}px)`, ...controlsStyle(-12) }}>
           <span className={`flex h-9 max-w-[80%] items-center gap-1.5 rounded-full bg-white pe-1.5 ps-3.5 text-[13.5px] font-semibold text-ink ring-1 ring-black/[0.06] ${FLOAT}`}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />

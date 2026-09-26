@@ -59,7 +59,7 @@ export function PostImageModal({ item, startIndex, onClose }: PostImageModalProp
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]"
       style={{
-        paddingTop: "max(env(safe-area-inset-top), 24px)",
+        paddingTop: "max(var(--sat), 24px)",
         paddingBottom: "max(env(safe-area-inset-bottom), 24px)",
       }}
       onClick={(e) => {

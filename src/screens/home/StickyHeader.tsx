@@ -30,7 +30,7 @@ export function StickyHeader() {
       }`}
     >
       <div className="mx-auto max-w-xl border-b border-black/5 bg-white/75 backdrop-blur-2xl backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
-        <div className="pt-safe pt-3 pb-3">
+        <div className="pb-3" style={{ paddingTop: "calc(var(--sat) + 12px)" }}>
           <SearchBarLink />
 
           <div className="mt-3">

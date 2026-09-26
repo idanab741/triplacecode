@@ -138,7 +138,7 @@ function TripMatchSavedResultContent() {
           לוגו+חזרה משמאל, שיתוף+שמירה מימין. בלי טקסט כותרת בבר עצמו -
           זה מה שיצר את החפיפה הקודמת עם הלוגו. שם היעד יורד לגוף העמוד,
           מעל המפה. */}
-      <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+      <header className="safe-top sticky top-0 z-30 w-full bg-white shadow-sm">
         <div className="relative h-16">
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
             <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />

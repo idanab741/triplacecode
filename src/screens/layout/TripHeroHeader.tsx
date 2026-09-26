@@ -50,7 +50,7 @@ export function TripHeroHeader({
         className="h-auto w-full"
       />
 
-      <header className="absolute inset-x-0 top-0 z-30 w-full">
+      <header className="safe-top absolute inset-x-0 top-0 z-30 w-full">
         <div className="relative flex h-16 items-center justify-center px-2">
           <button
             type="button"

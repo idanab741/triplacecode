@@ -255,7 +255,7 @@ function TripBody({
         )}
 
         {/* כפתורים עליונים. המפה עטופה ב-isolate (z-0), אז z-10 מספיק כדי לשבת מעליה. */}
-        <div className="pointer-events-none absolute inset-x-4 z-10 flex items-start justify-between" style={{ top: "max(env(safe-area-inset-top), 16px)" }}>
+        <div className="pointer-events-none absolute inset-x-4 z-10 flex items-start justify-between" style={{ top: "max(var(--sat), 16px)" }}>
           <HeroIconButton label="חזרה" onClick={onBack}>
             <BackIcon />
           </HeroIconButton>

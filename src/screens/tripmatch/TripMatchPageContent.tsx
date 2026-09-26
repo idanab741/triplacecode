@@ -1393,7 +1393,7 @@ export function TripMatchPageContent({
       className={`!bg-bg !px-0 !pt-0 ${stage === "swiping" ? "!pb-0" : ""} ${embedded ? "flex flex-1 min-h-0 w-full min-w-0 max-w-full flex-col overflow-x-clip" : ""}`}
     >
       {!embedded && stage !== "swiping" && (
-        <header className="sticky top-0 z-30 w-full bg-white shadow-sm">
+        <header className="safe-top sticky top-0 z-30 w-full bg-white shadow-sm">
           <div className="relative h-16">
             <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2">
               <Image src="/images/trip-tripmatch-logo.png" alt="" width={110} height={34} className="object-contain" />

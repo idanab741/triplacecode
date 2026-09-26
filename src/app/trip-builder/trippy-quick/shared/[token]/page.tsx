@@ -52,7 +52,7 @@ function SharedTrippyQuickContent({ token }: { token: string }) {
   return (
     <Screen withBottomNavSpacing>
       <div className="-mx-5 -mt-8">
-        <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between bg-white px-4 shadow-sm">
+        <header className="sticky top-0 z-30 flex h-[calc(4rem+var(--sat))] safe-top w-full items-center justify-between bg-white px-4 shadow-sm">
           <Image src="/images/triplace-logo-black.png" alt="" width={174} height={53} className="-my-[7px] h-[53px] w-[174px] max-w-none object-contain" />
           <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-primary-start)]">
             <span className="relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
