@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Screen } from "@/components/ui";
 import { MainBottomNav } from "@/components/MainBottomNav";
-import { ChatBubble } from "@/screens/trip-builder/chat/ChatBubble";
-import { UserBubble } from "@/screens/trip-builder/chat/UserBubble";
 import { DmChatHeader } from "./DmChatHeader";
 import { DmComposer } from "./DmComposer";
 import { DmSharedCard } from "./DmSharedCard";
+import { useKeyboardInset } from "./useKeyboardInset";
+import { dayKey, dayLabel, timeLabel } from "./chatTime";
 import {
   fetchConversation,
   sendTextMessage,
@@ -51,6 +51,39 @@ function fallbackLabel(kind: DmMessageDto["kind"]): string {
   }
 }
 
+/** בועת הודעה עם השעה בפינה (כמו בוואטסאפ). שלי - כחול, בצד השמאלי; של הצד השני - לבן, בצד הימני. */
+function DmBubble({ text, time, isMine, pending }: { text: string; time: string; isMine: boolean; pending: boolean }) {
+  return (
+    <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[82%] px-3.5 pb-1.5 pt-2 ${isMine ? "text-white" : "bg-white text-ink shadow-[0_2px_8px_rgba(16,24,40,0.06)]"}`}
+        style={{
+          borderRadius: 18,
+          ...(isMine
+            ? { borderBottomLeftRadius: 5, background: "linear-gradient(135deg, var(--color-primary-start), var(--color-primary-end))", boxShadow: "0 4px 12px rgba(24,119,242,0.22)" }
+            : { borderBottomRightRadius: 5 }),
+        }}
+      >
+        <p className="whitespace-pre-wrap break-words text-[15px] leading-6">{text}</p>
+        <p className={`mt-0.5 text-start text-[11px] leading-4 tabular-nums ${isMine ? "text-white/75" : "text-ink-secondary"}`} dir="ltr">
+          {pending ? "שולח..." : time}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** מפריד יום באמצע הצ'אט - "היום", "אתמול", "יום שלישי", "12 בספטמבר" */
+function DayDivider({ label }: { label: string }) {
+  return (
+    <div className="my-3 flex justify-center">
+      <span className="rounded-full bg-white/90 px-3 py-1 text-[12px] font-semibold text-ink-secondary shadow-[0_1px_4px_rgba(16,24,40,0.08)] backdrop-blur">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 interface DmChatScreenProps {
   conversationId: string;
   currentUserId: string;
@@ -67,6 +100,8 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
   const [sendError, setSendError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const knownIds = useRef<Set<string>>(new Set());
+  const lastSignature = useRef("");
+  const keyboardInset = useKeyboardInset();
 
   async function load(isBackgroundPoll = false) {
     if (!isBackgroundPoll) {
@@ -76,7 +111,12 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
     try {
       const data = await fetchConversation(conversationId);
       setOtherUser(data.otherUser);
-      setMessages(data.messages);
+      // ב-polling - מעדכנים רק אם באמת השתנה משהו (אחרת כל 4 שניות היה רינדור + גלילה באמצע הקלדה)
+      const signature = data.messages.map((m) => `${m.id}:${m.readAt ?? ""}`).join(",");
+      if (signature !== lastSignature.current) {
+        lastSignature.current = signature;
+        setMessages(data.messages);
+      }
       knownIds.current = new Set(data.messages.map((m) => m.id));
     } catch (e) {
       if (!isBackgroundPoll) setLoadError(e instanceof Error ? e.message : "טעינת הצ'אט נכשלה");
@@ -97,9 +137,19 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  // גוללים לתחתית רק כשנוספה הודעה חדשה (או בטעינה הראשונה) - לא בכל רענון
+  const lastId = messages[messages.length - 1]?.id ?? "";
+  const scrolledOnce = useRef(false);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    if (loading || !lastId) return;
+    bottom.current?.scrollIntoView({ behavior: scrolledOnce.current ? "smooth" : "auto", block: "end" });
+    scrolledOnce.current = true;
+  }, [lastId, loading]);
+
+  // המקלדת נפתחה - ההודעה האחרונה נשארת גלויה מעל שורת ההקלדה
+  useEffect(() => {
+    if (keyboardInset > 0) bottom.current?.scrollIntoView({ block: "end" });
+  }, [keyboardInset]);
 
   async function handleSend() {
     const trimmed = text.trim();
@@ -131,7 +181,7 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
         <DmChatHeader otherUser={otherUser} onBack={() => router.push("/places/chat")} />
       </div>
 
-      <div className="mx-auto flex max-w-md flex-col gap-4 px-1 pt-4 pb-56">
+      <div className="mx-auto flex max-w-md flex-col px-1 pt-2" style={{ paddingBottom: keyboardInset > 0 ? keyboardInset + 88 : 224 }}>
         {loading && (
           <div className="flex flex-col gap-3">
             <div className="h-16 w-3/4 animate-pulse rounded-card bg-white" />
@@ -157,27 +207,41 @@ export function DmChatScreen({ conversationId, currentUserId }: DmChatScreenProp
               </div>
             )}
 
-            {messages.map((message) => {
+            {/* *** בקשה מפורשת ("חלוקה של ימים בצ'אט + אלמנטים של שעות"): מפריד לכל יום, ושעה בכל הודעה.
+                הודעות רצופות של אותו צד צמודות יותר (כמו בוואטסאפ / iMessage). */}
+            {messages.map((message, i) => {
               const isMine = message.senderId === currentUserId;
-              if (message.shared) return <DmSharedCard key={message.id} message={message} isMine={isMine} />;
+              const prev = messages[i - 1];
+              const newDay = !prev || dayKey(prev.createdAt) !== dayKey(message.createdAt);
+              const gap = newDay ? "" : prev.senderId === message.senderId ? "mt-1" : "mt-3";
+              const time = timeLabel(message.createdAt);
               const content = message.kind === "text" ? message.text ?? "" : fallbackLabel(message.kind);
-              return isMine ? (
-                <UserBubble key={message.id}>{content}</UserBubble>
-              ) : (
-                <ChatBubble key={message.id}>{content}</ChatBubble>
+              return (
+                <div key={message.id} className={gap}>
+                  {newDay && <DayDivider label={dayLabel(message.createdAt)} />}
+                  {message.shared ? (
+                    <>
+                      <DmSharedCard message={message} isMine={isMine} />
+                      <p className={`mt-1 px-1 text-[11px] tabular-nums text-ink-secondary ${isMine ? "text-end" : "text-start"}`}>{time}</p>
+                    </>
+                  ) : (
+                    <DmBubble text={content} time={time} isMine={isMine} pending={message.id.startsWith("temp-")} />
+                  )}
+                </div>
               );
             })}
 
-            {sendError && <p className="text-center text-sm text-danger">{sendError}</p>}
+            {sendError && <p className="mt-3 text-center text-sm text-danger">{sendError}</p>}
           </>
         )}
 
         <div ref={bottom} />
       </div>
 
-      {!loading && !loadError && <DmComposer value={text} onChange={setText} onSend={handleSend} sending={sending} />}
+      {!loading && !loadError && <DmComposer value={text} onChange={setText} onSend={handleSend} sending={sending} keyboardInset={keyboardInset} />}
 
-      <MainBottomNav active="profile" />
+      {/* כשהמקלדת פתוחה הבר התחתון מוסתר - שלא "יצוף" בין ההודעות לשורת ההקלדה */}
+      {keyboardInset === 0 && <MainBottomNav active="profile" />}
     </Screen>
   );
 }

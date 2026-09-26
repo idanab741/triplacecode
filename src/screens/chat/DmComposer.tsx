@@ -1,12 +1,14 @@
 "use client";
 
-import { useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 
 interface DmComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
   sending: boolean;
+  /** גובה המקלדת (useKeyboardInset) - כשפתוחה, השורה יושבת צמוד מעליה */
+  keyboardInset?: number;
 }
 
 function SendIcon() {
@@ -21,8 +23,13 @@ function SendIcon() {
 /** תיבת הכתיבה הקבועה בתחתית - Enter שולח, Shift+Enter יורד שורה,
  *  מתרחבת אוטומטית עד גובה מקסימלי. אותו רכיב בדיוק כמו SupportComposer,
  *  רק placeholder שונה (שיחה עם אדם, לא עם צוות תמיכה). */
-export function DmComposer({ value, onChange, onSend, sending }: DmComposerProps) {
+export function DmComposer({ value, onChange, onSend, sending, keyboardInset = 0 }: DmComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // אחרי שליחה השדה מתרוקן - חוזר לגובה שורה אחת
+  useEffect(() => {
+    if (!value && textareaRef.current) textareaRef.current.style.height = "auto";
+  }, [value]);
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -41,7 +48,12 @@ export function DmComposer({ value, onChange, onSend, sending }: DmComposerProps
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-24 z-40 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3">
+    // *** בקשה מפורשת ("שורת ההקלדה פתאום צונחת למטה אחרי שמקלידים קצת"): המיקום נגזר מהמקלדת בפועל
+    // (visualViewport) ולא מ-bottom קבוע - כך היא נשארת צמודה מעל המקלדת גם כשהדפדפן גולל / השדה גדל.
+    <div
+      className="fixed inset-x-0 z-50 border-t border-ink-secondary/10 bg-bg-secondary px-5 pb-3 pt-3"
+      style={{ bottom: keyboardInset > 0 ? keyboardInset : 96 }}
+    >
       <div className="mx-auto flex max-w-md items-end gap-2">
         <textarea
           ref={textareaRef}
@@ -50,8 +62,8 @@ export function DmComposer({ value, onChange, onSend, sending }: DmComposerProps
           onKeyDown={handleKeyDown}
           placeholder="כתבו הודעה..."
           rows={1}
-          disabled={sending}
-          className="max-h-[120px] min-h-[44px] flex-1 resize-none rounded-card border border-ink-secondary/25 bg-bg p-3 text-sm text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+          // לא disabled בזמן שליחה - ב-iOS זה מאבד פוקוס וסוגר את המקלדת אחרי כל הודעה
+          className="max-h-[120px] min-h-[44px] flex-1 resize-none rounded-card border border-ink-secondary/25 bg-bg px-3.5 py-2.5 text-[16px] leading-6 text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
         />
         <button
           type="button"

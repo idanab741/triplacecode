@@ -14,6 +14,7 @@ import { getAvatarUrl } from "@/constants/avatar";
 import { ProfileAvatarRing, getProfileRingTier } from "@/screens/places/ProfileAvatarRing";
 import { DEFAULT_PROFILE_HERO_URL } from "@/constants/profileCover";
 import type { SocialProfileDto } from "@/services/social/socialProfileService";
+import { ensureConversation } from "@/services/social/dmService";
 import type { SocialPlatform } from "@/services/social/socialLinks";
 import type { ProfileTileDto } from "@/services/social/profileContentTypes";
 
@@ -53,6 +54,24 @@ export default function ProfileView({
   const [socialSheet, setSocialSheet] = useState<SocialPlatform | null>(null);
   /** מפתח לרענון ה-Grid (קבוע כרגע - אין יותר יצירת תוכן מהעמוד הזה). */
   const [gridVersion] = useState(0);
+
+  const [openingChat, setOpeningChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+
+  /** *** בקשה מפורשת ("כשלוחצים על הודעה לא מגיעים לשיחה שלי עם אותו משתמש"): פותחת (או יוצרת)
+   *  את השיחה עם המשתמש הזה ונכנסת ישר אליה - לא לתיבת הצ'אטים. */
+  async function openChat() {
+    if (openingChat) return;
+    setChatError(null);
+    setOpeningChat(true);
+    try {
+      const conversation = await ensureConversation(profile.id);
+      router.push(`/places/chat/${conversation.id}`);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "פתיחת הצ'אט נכשלה");
+      setOpeningChat(false);
+    }
+  }
 
   /** עקוב / עוקב - אותה מערכת follows הקיימת (POST/DELETE /api/social/follows). */
   async function handleFollowToggle() {
@@ -225,12 +244,18 @@ export default function ProfileView({
             </button>
             <button
               type="button"
-              onClick={() => router.push(`/places/chat?with=${encodeURIComponent(profile.username ?? profile.id)}`)}
-              className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 bg-[#EFF1F4] text-ink transition active:scale-[0.98]"
+              onClick={openChat}
+              disabled={openingChat}
+              className="h-12 rounded-xl text-[15.5px] font-semibold flex-1 bg-[#EFF1F4] text-ink transition active:scale-[0.98] disabled:opacity-60"
             >
               הודעה
             </button>
           </div>
+        )}
+        {chatError && (
+          <p className="mt-2 text-center text-[13px] text-danger" role="alert">
+            {chatError}
+          </p>
         )}
 
         {isSelf && (
