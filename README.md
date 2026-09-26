@@ -46,3 +46,10 @@ npm run dev
 ```
 
 לאחר מכן יש לגלוש לכתובת [http://localhost:3000](http://localhost:3000).
+
+## Deployment
+
+Production runs on the Vercel project **triplacecode2.0**, which deploys `main` automatically on every merge.
+The Vercel Hobby plan allows 100 deployments per day across all projects connected to this repo,
+so only triplacecode2.0 should stay connected. When a deploy is rate limited, redeploy later from
+Vercel → Deployments → ⋯ → Create Deployment → `main`.
